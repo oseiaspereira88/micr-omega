@@ -1,0 +1,6 @@
+name = "micr-omega-worker"
+main = "src/index.ts"
+compatibility_date = "2024-10-01"
+
+[vars]
+# Adicione variáveis de ambiente compartilhadas aqui
