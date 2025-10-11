@@ -1,66 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { Miniflare } from "miniflare";
-import { build } from "esbuild";
-
-type MessagePayload = { type: string; [key: string]: unknown };
+import {
+  createMiniflare,
+  onceMessage,
+  openSocket,
+  type MessagePayload,
+} from "./utils/miniflare";
 
 describe("RoomDO", () => {
-  async function createMiniflare(): Promise<Miniflare> {
-    const bundle = await build({
-      entryPoints: ["src/index.ts"],
-      bundle: true,
-      format: "esm",
-      platform: "neutral",
-      target: "es2022",
-      mainFields: ["module", "main"],
-      write: false,
-      sourcemap: "inline"
-    });
-
-    const script = bundle.outputFiles[0]?.text ?? "";
-
-    return new Miniflare({
-      modules: true,
-      script,
-      compatibilityDate: "2024-10-01",
-      durableObjects: {
-        ROOM: { className: "RoomDO" }
-      }
-    });
-  }
-
-  async function openSocket(mf: Miniflare) {
-    const response = await mf.dispatchFetch("http://localhost/ws", {
-      headers: { Upgrade: "websocket" }
-    });
-    expect(response.status).toBe(101);
-    const socket = response.webSocket;
-    expect(socket).toBeDefined();
-    socket!.accept();
-    return socket!;
-  }
-
-  function onceMessage<T extends MessagePayload>(socket: WebSocket, type?: string): Promise<T> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        socket.removeEventListener("message", onMessage as EventListener);
-        reject(new Error("Timed out waiting for message"));
-      }, 1000);
-
-      const onMessage = (event: MessageEvent) => {
-        const data = typeof event.data === "string" ? event.data : String(event.data);
-        const parsed = JSON.parse(data) as T;
-        if (!type || parsed.type === type) {
-          clearTimeout(timeout);
-          socket.removeEventListener("message", onMessage as EventListener);
-          resolve(parsed);
-        }
-      };
-
-      socket.addEventListener("message", onMessage as EventListener);
-    });
-  }
-
   it("responds with joined payload when a player joins", async () => {
     const mf = await createMiniflare();
     try {
