@@ -1,14 +1,14 @@
 export const nebulaTypes = {
   solid: {
-    color: '#1c193a',
-    innerColor: '#3a2f6b',
+    color: 'rgba(28, 25, 58, ',
+    innerColor: 'rgba(58, 47, 107, ',
     glow: '#7a5cff',
     radius: [140, 260],
     opacity: 0.65
   },
   gas: {
-    color: '#143851',
-    innerColor: '#2b8bb3',
+    color: 'rgba(20, 56, 81, ',
+    innerColor: 'rgba(43, 139, 179, ',
     glow: '#7fd9ff',
     radius: [200, 320],
     opacity: 0.35

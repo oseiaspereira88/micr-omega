@@ -627,6 +627,13 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
       const cameraOffsetX = camera.x - ctxWidth / 2;
       const cameraOffsetY = camera.y - ctxHeight / 2;
 
+      camera.offsetX = cameraOffsetX;
+      camera.offsetY = cameraOffsetY;
+      camera.viewport = {
+        width: ctxWidth,
+        height: ctxHeight,
+      };
+
       const drawWorld = () => {
         const width = ctxWidth;
         const height = ctxHeight;
@@ -753,6 +760,10 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
         });
 
         state.nebulas = state.nebulas.filter((nebula) => {
+          const nebulaColorBase =
+            nebula.color ?? nebulaTypes[nebula.type]?.color ?? 'rgba(20, 56, 81, ';
+          const nebulaEffectColor =
+            nebula.glow ?? nebulaTypes[nebula.type]?.glow ?? `${nebulaColorBase}0.6)`;
           const dx = nebula.x - organism.x;
           const dy = nebula.y - organism.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
@@ -763,7 +774,7 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
             nebula.rotationSpeed *= 3;
             nebula.turbulence *= 2;
             addNotification(state, '🌫️ Nebulosa bioenergética dispersa!');
-            createEffect(state, nebula.x, nebula.y, 'nebula', nebula.color);
+            createEffect(state, nebula.x, nebula.y, 'nebula', nebulaEffectColor);
             state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
           }
 
@@ -781,8 +792,8 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
           ctx.rotate(nebula.rotation);
 
           const gradient = ctx.createRadialGradient(0, 0, nebula.radius * 0.2, 0, 0, nebula.radius);
-          gradient.addColorStop(0, `${nebula.color}0.3)`);
-          gradient.addColorStop(0.7, `${nebula.color}0.15)`);
+          gradient.addColorStop(0, `${nebulaColorBase}0.3)`);
+          gradient.addColorStop(0.7, `${nebulaColorBase}0.15)`);
           gradient.addColorStop(1, 'rgba(10, 30, 60, 0)');
           ctx.fillStyle = gradient;
           ctx.globalAlpha = nebula.dispelled
