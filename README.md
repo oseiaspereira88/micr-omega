@@ -37,25 +37,36 @@ O arquivo `package.json` na raiz declara os workspaces `web/` e `worker/` e conc
    ```bash
    npm install
    ```
-2. Inicie o front-end (Vite) apontando para o workspace `web`:
+2. Crie um arquivo `web/.env.local` apontando para o Worker local (Wrangler expõe o WebSocket em `http://127.0.0.1:8787/ws`):
    ```bash
-   npm run dev:web
+   echo "VITE_REALTIME_URL=ws://127.0.0.1:8787/ws" > web/.env.local
    ```
-3. Em outra aba/terminal, suba o Worker localmente com Wrangler (requer `wrangler` autenticado):
+3. Em uma aba/terminal, suba o Worker localmente com Wrangler (requer `wrangler` autenticado). O comando habilita WebSocket sobre HTTPS em produção, mas no modo dev responde via `ws://`:
    ```bash
    npm run dev:worker
+   ```
+4. Em outra aba/terminal, inicie o front-end (Vite) apontando para o workspace `web`. O Vite recarrega automaticamente e usa a URL em `VITE_REALTIME_URL` para conectar ao Worker:
+   ```bash
+   npm run dev:web
    ```
 
 Scripts úteis adicionais:
 
-- `npm run build`: executa os builds de todos os workspaces.
+- `npm run build`: build apenas do front-end (para Cloudflare Pages).
+- `npm run build:all`: executa os builds de todos os workspaces.
 - `npm run test`: roda os testes definidos em cada workspace (por exemplo, Playwright no front-end).
 - `npm run lint`: encadeia linters configurados em cada workspace.
 
 ## Fluxo de publicação
 
-- **Front-end (`web/`)**: execute `npm run build -w web` para gerar `web/dist/` e publique via Cloudflare Pages ou pipeline CI/CD. O README do projeto espera que a CI utilize `npm ci` na raiz seguido de `npm run build -w web`.
+- **Front-end (`web/`)**: execute `npm run build` (ou `npm run build:web`) para gerar `web/dist/` e publique via Cloudflare Pages ou pipeline CI/CD. O README do projeto espera que a CI utilize `npm ci` na raiz seguido de `npm run build`.
 - **Worker (`worker/`)**: utilize `npm run deploy -w worker` (alias para `wrangler deploy`) com as credenciais da sua conta Cloudflare. O `wrangler.toml` deve residir dentro da pasta `worker/`.
+
+### Cloudflare Pages + Worker Realtime
+
+- O Worker está configurado para responder no caminho `/ws`, com roteamento HTTPS/WSS via domínio dedicado `realtime.<seu-dominio>.com/ws`.
+- O projeto Cloudflare Pages utiliza o diretório `web/`, com build `npm ci && npm run build` (script do workspace `web`). A configuração em `web/wrangler.toml` define `VITE_REALTIME_URL` como `wss://realtime.example.com/ws`; ajuste o host conforme o domínio real no painel de variáveis da Pages se preferir.
+- Para ambientes locais, `VITE_REALTIME_URL` deve apontar para `ws://127.0.0.1:8787/ws`, permitindo que o `vite dev` se conecte ao `wrangler dev` simultaneamente.
 
 ## Controles
 
