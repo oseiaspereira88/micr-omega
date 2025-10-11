@@ -592,12 +592,35 @@ const MicroOmegaGame = () => {
     });
   };
 
+  const effectConfigs = {
+    shockwave: { style: 'ring', growth: 260, decay: 1.6, maxSize: 220, lineWidth: 4 },
+    hit: { style: 'filled', growth: 220, decay: 4.4, maxSize: 60 },
+    attack: { style: 'ring', growth: 240, decay: 2.4, maxSize: 150, lineWidth: 2 },
+    shield: { style: 'double-ring', growth: 160, decay: 1.4, maxSize: 160, lineWidth: 3 },
+    pulse: { style: 'pulse', growth: 230, decay: 1.7, maxSize: 200 },
+    drain: { style: 'spiral', growth: 200, decay: 2.2, maxSize: 160, spin: 3, lineWidth: 2 },
+    dashstart: { style: 'burst', growth: 320, decay: 3.2, maxSize: 160, lineWidth: 3, rays: 12 },
+    dashend: { style: 'pulse', growth: 220, decay: 2.6, maxSize: 120 },
+    default: { style: 'ring', growth: 200, decay: 2, maxSize: 120, lineWidth: 2 }
+  };
+
   const createEffect = (x, y, type, color) => {
+    const config = effectConfigs[type] || effectConfigs.default;
     stateRef.current.effects.push({
-      x, y, type, color,
+      x,
+      y,
+      type,
+      color,
+      style: config.style,
       life: 1,
-      size: 0,
-      maxSize: type === 'shockwave' ? 200 : 50
+      size: config.initialSize ?? 0,
+      maxSize: config.maxSize,
+      growth: config.growth,
+      decay: config.decay,
+      lineWidth: config.lineWidth ?? 3,
+      rays: config.rays ?? 0,
+      rotation: Math.random() * Math.PI * 2,
+      spin: config.spin ?? 0
     });
   };
 
@@ -616,12 +639,11 @@ const MicroOmegaGame = () => {
 
     if (org.dashCharge < 30 || org.dashCooldown > 0 || org.isDashing) return;
 
-    org.dashCharge -= 30;
+    org.dashCharge = Math.max(0, org.dashCharge - 30);
     org.isDashing = true;
     org.invulnerable = true;
 
     const dashSpeed = 25 * org.speed * (org.currentSpeedMultiplier || 1);
-
     const currentSpeed = Math.sqrt(org.vx * org.vx + org.vy * org.vy);
 
     if (currentSpeed > 0.5) {
@@ -635,13 +657,27 @@ const MicroOmegaGame = () => {
     }
 
     playSound('dash');
+    createEffect(org.x, org.y, 'dashstart', org.color);
+
+    for (let i = 0; i < 10; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.random() * 20;
+      createParticle(
+        org.x + Math.cos(angle) * distance,
+        org.y + Math.sin(angle) * distance,
+        org.color,
+        6
+      );
+    }
 
     setTimeout(() => {
       org.isDashing = false;
       org.invulnerable = false;
       org.dashCooldown = 1;
+      createEffect(org.x, org.y, 'dashend', org.color);
+      syncState();
     }, 300);
-    
+
     syncState();
   };
 
@@ -2049,29 +2085,101 @@ const MicroOmegaGame = () => {
       
       // Effects
       state.effects = state.effects.filter(eff => {
-        eff.life -= delta * 2;
-        eff.size += delta * 200;
-        
+        const growth = eff.growth ?? 200;
+        const decay = eff.decay ?? 2;
+
+        eff.life -= delta * decay;
+        eff.size = Math.min(eff.maxSize ?? 120, eff.size + delta * growth);
+
+        if (eff.spin) {
+          eff.rotation = (eff.rotation || 0) + eff.spin * delta;
+        }
+
         if (eff.life <= 0) return false;
-        
+
         const screenX = eff.x - offsetX;
         const screenY = eff.y - offsetY;
-        
-        ctx.strokeStyle = eff.color;
-        ctx.lineWidth = 3;
-        ctx.globalAlpha = eff.life;
+
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        ctx.globalAlpha = Math.max(0, Math.min(1, eff.life));
         ctx.shadowBlur = 20;
         ctx.shadowColor = eff.color;
-        
-        if (eff.type === 'shockwave') {
-          ctx.beginPath();
-          ctx.arc(screenX, screenY, eff.size, 0, Math.PI * 2);
-          ctx.stroke();
+
+        const style = eff.style || 'ring';
+        const lineWidth = eff.lineWidth ?? 3;
+
+        switch (style) {
+          case 'filled': {
+            ctx.fillStyle = eff.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.max(4, eff.size * 0.4), 0, Math.PI * 2);
+            ctx.fill();
+            break;
+          }
+          case 'double-ring': {
+            ctx.strokeStyle = eff.color;
+            ctx.lineWidth = lineWidth;
+            ctx.beginPath();
+            ctx.arc(0, 0, eff.size * 0.6, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.globalAlpha *= 0.6;
+            ctx.beginPath();
+            ctx.arc(0, 0, eff.size, 0, Math.PI * 2);
+            ctx.stroke();
+            break;
+          }
+          case 'pulse': {
+            ctx.fillStyle = eff.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, eff.size, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+          }
+          case 'burst': {
+            ctx.strokeStyle = eff.color;
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            const rays = eff.rays || 10;
+            for (let i = 0; i < rays; i++) {
+              const angle = (i / rays) * Math.PI * 2 + (eff.rotation || 0);
+              const inner = eff.size * 0.2;
+              const outer = eff.size;
+              ctx.beginPath();
+              ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+              ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+              ctx.stroke();
+            }
+            break;
+          }
+          case 'spiral': {
+            ctx.strokeStyle = eff.color;
+            ctx.lineWidth = lineWidth;
+            ctx.beginPath();
+            const segments = 24;
+            for (let i = 0; i <= segments; i++) {
+              const t = i / segments;
+              const angle = (eff.rotation || 0) + t * Math.PI * 3;
+              const radius = t * eff.size * 0.6;
+              const x = Math.cos(angle) * radius;
+              const y = Math.sin(angle) * radius;
+              if (i === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            break;
+          }
+          default: {
+            ctx.strokeStyle = eff.color;
+            ctx.lineWidth = lineWidth;
+            ctx.beginPath();
+            ctx.arc(0, 0, eff.size, 0, Math.PI * 2);
+            ctx.stroke();
+          }
         }
-        
-        ctx.globalAlpha = 1;
-        ctx.shadowBlur = 0;
-        
+
+        ctx.restore();
+
         return true;
       });
       
