@@ -54,8 +54,13 @@ Scripts úteis adicionais:
 
 - `npm run build`: build apenas do front-end (para Cloudflare Pages).
 - `npm run build:all`: executa os builds de todos os workspaces.
-- `npm run test`: roda os testes definidos em cada workspace (por exemplo, Playwright no front-end).
+- `npm run test`: roda os testes definidos em cada workspace (Vitest no front-end e suíte Miniflare no worker).
+- `npm run test:e2e -w web`: executa a suíte de ponta a ponta com Playwright (requer variáveis `PLAYWRIGHT_BASE_URL` e `PLAYWRIGHT_WS_URL`).
+- `npm run test -w worker`: roda somente os testes de integração do Durable Object com Miniflare.
+- `npm run test -w web`: executa apenas os testes unitários de componentes e store com Vitest.
 - `npm run lint`: encadeia linters configurados em cada workspace.
+
+Consulte `docs/load-testing.md` para instruções de execução do teste de carga com k6 (50–100 conexões simultâneas).
 
 ## Fluxo de publicação
 
