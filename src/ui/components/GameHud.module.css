@@ -1,0 +1,12 @@
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: #fff;
+  font-family: system-ui, sans-serif;
+}
+
+.canvasOverlay {
+  position: absolute;
+  inset: 0;
+}
