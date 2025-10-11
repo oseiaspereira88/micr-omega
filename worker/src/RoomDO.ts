@@ -1,30 +1,29 @@
-import { z } from "zod";
 import type { Env } from "./index";
-import type {
-  ActionMessage,
-  ClientMessage,
-  GamePhase,
-  JoinedMessage,
-  JoinMessage,
-  PlayerAction,
-  PlayerLeftMessage,
-  PlayerJoinedMessage,
-  PongMessage,
-  RankingEntry,
-  RankingMessage,
-  ResetMessage,
-  ServerMessage,
-  SharedGameState,
-  SharedGameStateDiff,
-  StateDiffMessage,
-  StateFullMessage
+import {
+  PROTOCOL_VERSION,
+  clientMessageSchema,
+  joinMessageSchema,
+  actionMessageSchema,
+  sanitizePlayerName,
+  type ActionMessage,
+  type ClientMessage,
+  type GamePhase,
+  type JoinedMessage,
+  type JoinMessage,
+  type PlayerAction,
+  type PlayerLeftMessage,
+  type PlayerJoinedMessage,
+  type PongMessage,
+  type RankingEntry,
+  type RankingMessage,
+  type ResetMessage,
+  type ErrorMessage,
+  type ServerMessage,
+  type SharedGameState,
+  type SharedGameStateDiff,
+  type StateDiffMessage,
+  type StateFullMessage
 } from "./types";
-
-const PROTOCOL_VERSION = "1.0.0";
-
-const NAME_PATTERN = /^[A-Za-z0-9 _-]+$/;
-const MIN_NAME_LENGTH = 3;
-const MAX_NAME_LENGTH = 24;
 
 const MIN_PLAYERS_TO_START = 2;
 const WAITING_START_DELAY_MS = 15_000;
@@ -36,10 +35,70 @@ const INACTIVE_TIMEOUT_MS = 45_000;
 const MAX_SCORE_DELTA = 5_000;
 const MAX_COMBO_MULTIPLIER = 50;
 
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const MAX_MESSAGES_PER_CONNECTION = 120;
+const MAX_MESSAGES_GLOBAL = 600;
+
 const PLAYERS_KEY = "players";
 const ALARM_KEY = "alarms";
 
 const SUPPORTED_CLIENT_VERSIONS = new Set([PROTOCOL_VERSION]);
+
+type LogLevel = "info" | "warn" | "error";
+
+const structuredLog = (level: LogLevel, event: string, data: Record<string, unknown> = {}) => {
+  console.log(
+    JSON.stringify({
+      level,
+      event,
+      timestamp: new Date().toISOString(),
+      ...data
+    })
+  );
+};
+
+const serializeError = (error: unknown) => {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      stack: error.stack
+    };
+  }
+  return {
+    message: String(error)
+  };
+};
+
+class MessageRateLimiter {
+  private timestamps: number[] = [];
+
+  constructor(private readonly limit: number, private readonly windowMs: number) {}
+
+  consume(now: number): boolean {
+    this.prune(now);
+    if (this.timestamps.length >= this.limit) {
+      return false;
+    }
+    this.timestamps.push(now);
+    return true;
+  }
+
+  getRetryAfterMs(now: number): number {
+    this.prune(now);
+    const earliest = this.timestamps[0];
+    if (earliest === undefined) {
+      return 0;
+    }
+    return Math.max(0, earliest + this.windowMs - now);
+  }
+
+  private prune(now: number): void {
+    const cutoff = now - this.windowMs;
+    while (this.timestamps.length > 0 && this.timestamps[0]! <= cutoff) {
+      this.timestamps.shift();
+    }
+  }
+}
 
 type AlarmType = "waiting_start" | "round_end" | "reset" | "cleanup";
 
@@ -58,59 +117,6 @@ type PlayerInternal = StoredPlayer & {
   lastSeenAt: number;
 };
 
-const joinMessageSchema = z.object({
-  type: z.literal("join"),
-  name: z.string(),
-  playerId: z.string().optional(),
-  version: z.string().optional()
-});
-
-const scoreActionSchema = z.object({
-  type: z.literal("score"),
-  amount: z.number().finite(),
-  comboMultiplier: z.number().finite().optional()
-});
-
-const comboActionSchema = z.object({
-  type: z.literal("combo"),
-  multiplier: z.number().finite()
-});
-
-const deathActionSchema = z.object({
-  type: z.literal("death")
-});
-
-const abilityActionSchema = z.object({
-  type: z.literal("ability"),
-  abilityId: z.string(),
-  value: z.number().finite().optional()
-});
-
-const playerActionSchema = z.discriminatedUnion("type", [
-  scoreActionSchema,
-  comboActionSchema,
-  deathActionSchema,
-  abilityActionSchema
-]);
-
-const actionMessageSchema = z.object({
-  type: z.literal("action"),
-  playerId: z.string(),
-  clientTime: z.number().finite().optional(),
-  action: playerActionSchema
-});
-
-const pingMessageSchema = z.object({
-  type: z.literal("ping"),
-  ts: z.number().finite()
-});
-
-const clientMessageSchema = z.discriminatedUnion("type", [
-  joinMessageSchema,
-  actionMessageSchema,
-  pingMessageSchema
-]);
-
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -123,6 +129,11 @@ export class RoomDO {
   private readonly socketsByPlayer = new Map<string, WebSocket>();
   private readonly players = new Map<string, PlayerInternal>();
   private readonly nameToPlayerId = new Map<string, string>();
+  private readonly connectionRateLimiters = new WeakMap<WebSocket, MessageRateLimiter>();
+  private readonly globalRateLimiter = new MessageRateLimiter(
+    MAX_MESSAGES_GLOBAL,
+    RATE_LIMIT_WINDOW_MS
+  );
 
   private phase: GamePhase = "waiting";
   private roundId: string | null = null;
@@ -153,11 +164,15 @@ export class RoomDO {
     server.accept();
 
     this.setupSession(server).catch((error) => {
-      console.error("RoomDO session failed", error);
+      structuredLog("error", "room_session_failed", {
+        error: serializeError(error)
+      });
       try {
         server.close(1011, "internal_error");
       } catch (err) {
-        console.error("Failed to close websocket after error", err);
+        structuredLog("error", "room_session_close_failed", {
+          error: serializeError(err)
+        });
       }
     });
 
@@ -207,6 +222,38 @@ export class RoomDO {
     await this.syncAlarms();
   }
 
+  private getConnectionLimiter(socket: WebSocket): MessageRateLimiter {
+    let limiter = this.connectionRateLimiters.get(socket);
+    if (!limiter) {
+      limiter = new MessageRateLimiter(MAX_MESSAGES_PER_CONNECTION, RATE_LIMIT_WINDOW_MS);
+      this.connectionRateLimiters.set(socket, limiter);
+    }
+    return limiter;
+  }
+
+  private handleRateLimit(
+    socket: WebSocket,
+    scope: "connection" | "global",
+    retryAfterMs: number,
+    playerId: string | null
+  ): void {
+    const errorMessage: ErrorMessage = {
+      type: "error",
+      reason: "rate_limited",
+      ...(retryAfterMs > 0 ? { retryAfterMs } : {})
+    };
+
+    this.send(socket, errorMessage);
+
+    structuredLog(scope === "connection" ? "warn" : "error", "rate_limited", {
+      scope,
+      playerId,
+      retryAfterMs
+    });
+
+    socket.close(1013, "rate_limited");
+  }
+
   private async initialize(): Promise<void> {
     const storedPlayers = await this.state.storage.get<StoredPlayer[]>(PLAYERS_KEY);
     if (storedPlayers) {
@@ -238,21 +285,62 @@ export class RoomDO {
 
     socket.addEventListener("message", (event) => {
       const data = typeof event.data === "string" ? event.data : String(event.data);
-      let parsed: ClientMessage;
+      const now = Date.now();
 
+      const perConnectionLimiter = this.getConnectionLimiter(socket);
+      if (!perConnectionLimiter.consume(now)) {
+        const retryAfter = perConnectionLimiter.getRetryAfterMs(now);
+        const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
+        this.handleRateLimit(socket, "connection", retryAfter, knownPlayerId);
+        return;
+      }
+
+      if (!this.globalRateLimiter.consume(now)) {
+        const retryAfter = this.globalRateLimiter.getRetryAfterMs(now);
+        const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
+        this.handleRateLimit(socket, "global", retryAfter, knownPlayerId);
+        return;
+      }
+
+      let json: unknown;
       try {
-        const json = JSON.parse(data);
-        const validation = clientMessageSchema.safeParse(json);
-        if (!validation.success) {
-          throw new Error(validation.error.message);
-        }
-        parsed = validation.data;
+        json = JSON.parse(data);
       } catch (error) {
-        console.warn("Failed to parse client payload", error);
+        structuredLog("warn", "client_payload_invalid", {
+          stage: "parse",
+          error: serializeError(error)
+        });
         this.send(socket, { type: "error", reason: "invalid_payload" });
         socket.close(1003, "invalid_payload");
         return;
       }
+
+      const validation = clientMessageSchema.safeParse(json);
+      if (!validation.success) {
+        const rawType =
+          typeof json === "object" && json !== null ? (json as { type?: string }).type : undefined;
+        const issues = validation.error.issues.map((issue) => ({
+          code: issue.code,
+          path: issue.path,
+          message: issue.message
+        }));
+        structuredLog("warn", "client_payload_invalid", {
+          stage: "schema",
+          type: rawType ?? "unknown",
+          issues
+        });
+
+        if (rawType === "join") {
+          this.send(socket, { type: "error", reason: "invalid_name" });
+          socket.close(1008, "invalid_name");
+        } else {
+          this.send(socket, { type: "error", reason: "invalid_payload" });
+          socket.close(1003, "invalid_payload");
+        }
+        return;
+      }
+
+      const parsed = validation.data;
 
       switch (parsed.type) {
         case "join":
@@ -409,17 +497,7 @@ export class RoomDO {
   }
 
   private normalizeName(rawName: string): string | null {
-    if (typeof rawName !== "string") {
-      return null;
-    }
-    const trimmed = rawName.trim();
-    if (trimmed.length < MIN_NAME_LENGTH || trimmed.length > MAX_NAME_LENGTH) {
-      return null;
-    }
-    if (!NAME_PATTERN.test(trimmed)) {
-      return null;
-    }
-    return trimmed;
+    return sanitizePlayerName(rawName);
   }
 
   private async handleActionMessage(message: ActionMessage, socket: WebSocket): Promise<void> {
@@ -454,7 +532,10 @@ export class RoomDO {
         try {
           playerSocket.close(1008, "session_taken");
         } catch (error) {
-          console.warn("Failed to close stale socket", error);
+          structuredLog("warn", "close_stale_socket_failed", {
+            playerId: player.id,
+            error: serializeError(error)
+          });
         }
       }
       this.socketsByPlayer.set(player.id, socket);

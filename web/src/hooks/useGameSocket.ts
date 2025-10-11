@@ -3,10 +3,11 @@ import {
   ClientMessage,
   ErrorMessage,
   JoinMessage,
-  RankingMessage,
-  ResetMessage,
   ServerMessage,
-  StateMessage,
+  clientMessageSchema,
+  serverMessageSchema,
+  sanitizePlayerName,
+  sanitizePlayerId,
 } from "../utils/messageTypes";
 import { gameStore, useGameStore } from "../store/gameStore";
 
@@ -34,7 +35,7 @@ const resolveWebSocketUrl = (explicitUrl?: string) => {
 const errorReasonToMessage = (error: ErrorMessage): string => {
   switch (error.reason) {
     case "invalid_name":
-      return "Nome inválido. Use entre 3 e 16 caracteres alfanuméricos.";
+      return "Nome inválido. Use entre 3 e 24 caracteres válidos.";
     case "name_taken":
       return "Este nome já está em uso. Escolha outro.";
     case "unknown_player":
@@ -43,6 +44,13 @@ const errorReasonToMessage = (error: ErrorMessage): string => {
       return "A sala não está ativa no momento.";
     case "room_full":
       return "A sala está cheia no momento. Aguarde uma vaga.";
+    case "rate_limited": {
+      const seconds = error.retryAfterMs ? Math.ceil(error.retryAfterMs / 1000) : null;
+      if (seconds && seconds > 0) {
+        return `Muitas mensagens enviadas. Aguarde ${seconds}s e tente novamente.`;
+      }
+      return "Você está enviando mensagens muito rápido. Tente novamente em instantes.";
+    }
     case "invalid_payload":
     default:
       return "Erro ao comunicar com o servidor. Tente novamente.";
@@ -127,8 +135,14 @@ export const useGameSocket = (
       return false;
     }
 
+    const validation = clientMessageSchema.safeParse(message);
+    if (!validation.success) {
+      console.error("Mensagem de cliente inválida antes do envio", validation.error);
+      return false;
+    }
+
     try {
-      socket.send(JSON.stringify(message));
+      socket.send(JSON.stringify(validation.data));
       return true;
     } catch (err) {
       console.error("Não foi possível enviar mensagem ao servidor", err);
@@ -179,7 +193,12 @@ export const useGameSocket = (
     let message: ServerMessage;
 
     try {
-      message = JSON.parse(raw.data);
+      const json = JSON.parse(raw.data);
+      const validation = serverMessageSchema.safeParse(json);
+      if (!validation.success) {
+        throw new Error(validation.error.message);
+      }
+      message = validation.data;
     } catch (err) {
       console.error("Não foi possível interpretar mensagem do servidor", err);
       return;
@@ -203,17 +222,15 @@ export const useGameSocket = (
         break;
       }
       case "state": {
-        const stateMessage = message as StateMessage;
-        if (stateMessage.mode === "full") {
-          gameStore.actions.applyFullState(stateMessage.state);
+        if (message.mode === "full") {
+          gameStore.actions.applyFullState(message.state);
         } else {
-          gameStore.actions.applyStateDiff(stateMessage.state);
+          gameStore.actions.applyStateDiff(message.state);
         }
         break;
       }
       case "ranking": {
-        const rankingMessage = message as RankingMessage;
-        gameStore.actions.applyRanking(rankingMessage.ranking);
+        gameStore.actions.applyRanking(message.ranking);
         break;
       }
       case "pong": {
@@ -221,8 +238,7 @@ export const useGameSocket = (
         break;
       }
       case "reset": {
-        const resetMessage = message as ResetMessage;
-        gameStore.actions.applyFullState(resetMessage.state);
+        gameStore.actions.applyFullState(message.state);
         break;
       }
       case "player_joined":
@@ -253,7 +269,14 @@ export const useGameSocket = (
 
   const connectInternal = useCallback(
     (name: string, isReconnect: boolean) => {
-      if (typeof window === "undefined" || !name || !effectiveUrl) {
+      if (typeof window === "undefined" || !effectiveUrl) {
+        return;
+      }
+
+      const sanitizedName = sanitizePlayerName(name);
+      if (!sanitizedName) {
+        gameStore.actions.setJoinError("Nome inválido. Use entre 3 e 24 caracteres válidos.");
+        gameStore.actions.setConnectionStatus("disconnected");
         return;
       }
 
@@ -263,33 +286,37 @@ export const useGameSocket = (
       try {
         const socket = new WebSocket(effectiveUrl);
         socketRef.current = socket;
-        lastRequestedNameRef.current = name;
+        lastRequestedNameRef.current = sanitizedName;
         gameStore.actions.setConnectionStatus(
           isReconnect ? "reconnecting" : "connecting"
         );
         gameStore.actions.setJoinError(null);
         gameStore.actions.resetGameState();
-        gameStore.actions.setPlayerName(name);
+        gameStore.actions.setPlayerName(sanitizedName);
 
         socket.onopen = () => {
           const joinMessage: JoinMessage = {
             type: "join",
-            name,
+            name: sanitizedName,
           };
 
           const knownId = playerIdRef.current;
           if (knownId) {
-            joinMessage.playerId = knownId;
+            const sanitizedId = sanitizePlayerId(knownId);
+            if (!sanitizedId) {
+              console.error("Identificador de jogador inválido descartado antes do envio");
+            } else {
+              joinMessage.playerId = sanitizedId;
+            }
           }
 
           if (version) {
             joinMessage.version = version;
           }
 
-          try {
-            socket.send(JSON.stringify(joinMessage));
-          } catch (err) {
-            console.error("Falha ao enviar join", err);
+          if (!sendMessage(joinMessage)) {
+            console.error("Falha ao enviar join após validação");
+            return;
           }
 
           startHeartbeat();
@@ -326,7 +353,7 @@ export const useGameSocket = (
         };
       } catch (err) {
         console.error("Não foi possível abrir WebSocket", err);
-        if (shouldReconnectRef.current && name) {
+        if (shouldReconnectRef.current) {
           const attempts = gameStore.actions.incrementReconnectAttempts();
           const delay = Math.min(
             reconnectBaseDelay * Math.pow(2, Math.max(0, attempts - 1)),
@@ -337,7 +364,7 @@ export const useGameSocket = (
             reconnectTimerRef.current = window.setTimeout(() => {
               const connector = connectInternalRef.current;
               if (connector) {
-                connector(name, true);
+                connector(sanitizedName, true);
               }
             }, delay);
           }
@@ -353,6 +380,7 @@ export const useGameSocket = (
       stopSocket,
       playerIdRef,
       version,
+      sendMessage,
     ]
   );
 

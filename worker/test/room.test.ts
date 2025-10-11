@@ -12,6 +12,7 @@ describe("RoomDO", () => {
       format: "esm",
       platform: "neutral",
       target: "es2022",
+      mainFields: ["module", "main"],
       write: false,
       sourcemap: "inline"
     });
@@ -64,15 +65,20 @@ describe("RoomDO", () => {
     const mf = await createMiniflare();
     try {
       const socket = await openSocket(mf);
-      const joinedPromise = onceMessage<{ type: string; state: { players: string[] }; ranking: { name: string; score: number }[] }>(socket, "joined");
+      const joinedPromise = onceMessage<{
+        type: string;
+        state: { players: { id: string; name: string }[] };
+        ranking: { name: string; score: number }[];
+      }>(socket, "joined");
 
       socket.send(JSON.stringify({ type: "join", name: "Alice" }));
 
       const joined = await joinedPromise;
       expect(joined.type).toBe("joined");
-      expect(joined.state.players).toContain("Alice");
+      expect(joined.state.players.some((player) => player.name === "Alice")).toBe(true);
       expect(joined.ranking).toEqual([
         {
+          playerId: expect.any(String),
           name: "Alice",
           score: 0
         }
