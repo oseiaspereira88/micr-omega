@@ -14,7 +14,13 @@ const MicroOmegaGame = () => {
     canEvolve: false,
     showEvolutionChoice: false,
     showMenu: false,
-    gameOver: false
+    gameOver: false,
+    combo: 0,
+    maxCombo: 0,
+    activePowerUps: [],
+    bossActive: false,
+    bossHealth: 0,
+    bossMaxHealth: 0
   });
 
   const [joystickActive, setJoystickActive] = useState(false);
@@ -86,6 +92,9 @@ const MicroOmegaGame = () => {
     microorganisms: [],
     organicMatter: [],
     obstacles: [],
+    nebulas: [],
+    powerUps: [],
+    activePowerUps: [],
     enemies: [],
     projectiles: [],
     effects: [],
@@ -100,10 +109,18 @@ const MicroOmegaGame = () => {
     eventInterval: 5000,
     pulsePhase: 0,
     gameTime: 0,
+    combo: 0,
+    maxCombo: 0,
+    comboTimer: 0,
     
     showEvolutionChoice: false,
     evolutionType: 'skill',
     notifications: [],
+    fogIntensity: 0,
+    boss: null,
+    bossPending: false,
+    nextBossLevel: 3,
+    uiSyncTimer: 0.2,
     
     joystick: { x: 0, y: 0, active: false },
     actionButton: false,
@@ -241,6 +258,47 @@ const MicroOmegaGame = () => {
     membrane: { colors: ['#FF00FF44', '#FF00AA44', '#AA00FF44'], sizes: [60, 120], shapes: ['wall', 'bubble'] }
   };
 
+  const nebulaTypes = {
+    solid: {
+      color: '#1c193a',
+      innerColor: '#3a2f6b',
+      glow: '#7a5cff',
+      radius: [140, 260],
+      opacity: 0.65
+    },
+    gas: {
+      color: '#143851',
+      innerColor: '#2b8bb3',
+      glow: '#7fd9ff',
+      radius: [200, 320],
+      opacity: 0.35
+    }
+  };
+
+  const powerUpTypes = {
+    speed: {
+      name: 'Impulso Cinético',
+      icon: '⚡',
+      color: '#00FFAA',
+      duration: 8,
+      description: 'Velocidade aumentada'
+    },
+    attack: {
+      name: 'Pico Ofensivo',
+      icon: '🗡️',
+      color: '#FF4477',
+      duration: 10,
+      description: 'Ataques mais fortes e alcance maior'
+    },
+    shield: {
+      name: 'Membrana Prismática',
+      icon: '🛡️',
+      color: '#66AAFF',
+      duration: 6,
+      description: 'Proteção temporária'
+    }
+  };
+
   useEffect(() => {
     audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
     
@@ -323,7 +381,15 @@ const MicroOmegaGame = () => {
     for (let i = 0; i < 30; i++) {
       spawnObstacle();
     }
-    
+
+    for (let i = 0; i < 18; i++) {
+      spawnNebula(i % 4 === 0 ? 'solid' : 'gas');
+    }
+
+    for (let i = 0; i < 4; i++) {
+      spawnPowerUp();
+    }
+
     spawnOrganicMatter(25);
     
     return () => {
@@ -336,7 +402,7 @@ const MicroOmegaGame = () => {
     const types = Object.keys(obstacleTypes);
     const typeKey = types[Math.floor(Math.random() * types.length)];
     const type = obstacleTypes[typeKey];
-    
+
     state.obstacles.push({
       x: Math.random() * 4000,
       y: Math.random() * 4000,
@@ -348,6 +414,85 @@ const MicroOmegaGame = () => {
       rotationSpeed: (Math.random() - 0.5) * 0.3,
       pulsePhase: Math.random() * Math.PI * 2
     });
+  };
+
+  const spawnNebula = (forcedType) => {
+    const state = stateRef.current;
+    const keys = Object.keys(nebulaTypes);
+    const typeKey = forcedType || keys[Math.floor(Math.random() * keys.length)];
+    const type = nebulaTypes[typeKey];
+
+    if (!type) return;
+
+    const radius = type.radius[0] + Math.random() * (type.radius[1] - type.radius[0]);
+
+    const layers = Array.from({ length: 4 }, () => ({
+      offset: Math.random() * Math.PI * 2,
+      scale: 0.6 + Math.random() * 0.5,
+      alpha: type.opacity * (0.4 + Math.random() * 0.6)
+    }));
+
+    state.nebulas.push({
+      id: Date.now() + Math.random(),
+      x: Math.random() * state.worldSize,
+      y: Math.random() * state.worldSize,
+      radius,
+      type: typeKey,
+      rotation: Math.random() * Math.PI * 2,
+      swirlSpeed: (Math.random() * 0.2 + 0.05) * (typeKey === 'gas' ? 1.5 : 1),
+      pulse: Math.random() * Math.PI * 2,
+      layers,
+      color: type.color,
+      innerColor: type.innerColor,
+      glow: type.glow,
+      opacity: type.opacity
+    });
+  };
+
+  const spawnPowerUp = () => {
+    const state = stateRef.current;
+    const keys = Object.keys(powerUpTypes);
+    if (keys.length === 0) return;
+
+    const typeKey = keys[Math.floor(Math.random() * keys.length)];
+    const type = powerUpTypes[typeKey];
+
+    state.powerUps.push({
+      id: Date.now() + Math.random(),
+      x: Math.random() * state.worldSize,
+      y: Math.random() * state.worldSize,
+      type: typeKey,
+      color: type.color,
+      icon: type.icon,
+      pulse: Math.random() * Math.PI * 2
+    });
+  };
+
+  const applyPowerUp = (typeKey) => {
+    const state = stateRef.current;
+    const type = powerUpTypes[typeKey];
+
+    if (!type) return;
+
+    const existing = state.activePowerUps.find(p => p.type === typeKey);
+
+    if (existing) {
+      existing.remaining = type.duration;
+      existing.duration = type.duration;
+    } else {
+      state.activePowerUps.push({
+        type: typeKey,
+        name: type.name,
+        icon: type.icon,
+        color: type.color,
+        remaining: type.duration,
+        duration: type.duration
+      });
+    }
+
+    addNotification(`✨ ${type.name}!`);
+    playSound('powerup');
+    state.uiSyncTimer = 0;
   };
 
   const spawnOrganicMatter = (count) => {
@@ -395,15 +540,40 @@ const MicroOmegaGame = () => {
     const gain = ctx.createGain();
 
     switch(type) {
-      case 'attack': osc.frequency.value = 440; break;
-      case 'collect': osc.frequency.value = 660; break;
-      case 'damage': osc.type = 'sawtooth'; osc.frequency.value = 150; break;
-      case 'dash': osc.frequency.value = 1200; break;
-      default: osc.frequency.value = 440;
+      case 'attack':
+        osc.type = 'triangle';
+        osc.frequency.value = 480;
+        break;
+      case 'collect':
+        osc.type = 'sine';
+        osc.frequency.value = 720;
+        break;
+      case 'damage':
+        osc.type = 'sawtooth';
+        osc.frequency.value = 160;
+        break;
+      case 'dash':
+        osc.type = 'square';
+        osc.frequency.value = 1280;
+        break;
+      case 'powerup':
+        osc.type = 'sine';
+        osc.frequency.value = 950;
+        break;
+      case 'combo':
+        osc.type = 'square';
+        osc.frequency.value = 680;
+        break;
+      case 'boss':
+        osc.type = 'sawtooth';
+        osc.frequency.value = 260;
+        break;
+      default:
+        osc.frequency.value = 440;
     }
 
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    gain.gain.setValueAtTime(type === 'boss' ? 0.2 : 0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (type === 'boss' ? 0.6 : 0.3));
 
     osc.connect(gain);
     gain.connect(ctx.destination);
@@ -443,19 +613,29 @@ const MicroOmegaGame = () => {
   const performDash = () => {
     const state = stateRef.current;
     const org = state.organism;
-    
+
     if (org.dashCharge < 30 || org.dashCooldown > 0 || org.isDashing) return;
-    
+
     org.dashCharge -= 30;
     org.isDashing = true;
     org.invulnerable = true;
-    
-    const dashSpeed = 20 * org.speed;
-    org.vx = Math.cos(org.angle) * dashSpeed;
-    org.vy = Math.sin(org.angle) * dashSpeed;
-    
+
+    const dashSpeed = 25 * org.speed * (org.currentSpeedMultiplier || 1);
+
+    const currentSpeed = Math.sqrt(org.vx * org.vx + org.vy * org.vy);
+
+    if (currentSpeed > 0.5) {
+      const normalizedVx = org.vx / currentSpeed;
+      const normalizedVy = org.vy / currentSpeed;
+      org.vx = normalizedVx * dashSpeed;
+      org.vy = normalizedVy * dashSpeed;
+    } else {
+      org.vx = Math.cos(org.angle) * dashSpeed;
+      org.vy = Math.sin(org.angle) * dashSpeed;
+    }
+
     playSound('dash');
-    
+
     setTimeout(() => {
       org.isDashing = false;
       org.invulnerable = false;
@@ -476,6 +656,7 @@ const MicroOmegaGame = () => {
     const distance = 600;
     
     state.enemies.push({
+      id: Date.now() + Math.random(),
       x: state.organism.x + Math.cos(angle) * distance,
       y: state.organism.y + Math.sin(angle) * distance,
       vx: 0, vy: 0,
@@ -494,67 +675,149 @@ const MicroOmegaGame = () => {
       state: 'wandering',
       animPhase: 0,
       canLeave: true,
-      ticksOutOfRange: 0
+      ticksOutOfRange: 0,
+      boss: false
     });
+  };
+
+  const spawnBoss = () => {
+    const state = stateRef.current;
+    if (state.boss?.active) return;
+
+    const org = state.organism;
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 900;
+
+    const boss = {
+      id: Date.now() + Math.random(),
+      x: org.x + Math.cos(angle) * distance,
+      y: org.y + Math.sin(angle) * distance,
+      vx: 0,
+      vy: 0,
+      type: 'leviathan',
+      size: 160,
+      speed: 1.2,
+      attack: 35,
+      defense: 14,
+      health: 900,
+      maxHealth: 900,
+      points: 800,
+      color: '#FF3A6B',
+      behavior: 'boss',
+      evolutionLevel: state.level,
+      attackCooldown: 0,
+      state: 'aggressive',
+      animPhase: 0,
+      canLeave: false,
+      ticksOutOfRange: 0,
+      boss: true
+    };
+
+    state.enemies.push(boss);
+    state.boss = {
+      active: true,
+      health: boss.health,
+      maxHealth: boss.maxHealth,
+      color: boss.color
+    };
+
+    addNotification('⚠️ Mega-organismo detectado!');
+    playSound('boss');
+    state.uiSyncTimer = 0;
   };
 
   const updateEnemy = (enemy, state, delta) => {
     const org = state.organism;
-    
+
     enemy.animPhase += delta * 3;
     enemy.attackCooldown = Math.max(0, enemy.attackCooldown - delta);
-    
+
     const dx = org.x - enemy.x;
     const dy = org.y - enemy.y;
-    const distToPlayer = Math.sqrt(dx * dx + dy * dy);
-    
-    if (distToPlayer > 1500) {
-      enemy.ticksOutOfRange++;
-      if (enemy.ticksOutOfRange > 100) return false;
+    const distToPlayer = Math.sqrt(dx * dx + dy * dy) || 1;
+
+    if (enemy.boss) {
+      enemy.vx += (dx / distToPlayer) * enemy.speed * 0.12;
+      enemy.vy += (dy / distToPlayer) * enemy.speed * 0.12;
+      enemy.rotation = (enemy.rotation || 0) + delta * 0.4;
+      enemy.animPhase += delta * 2;
     } else {
-      enemy.ticksOutOfRange = 0;
+      if (distToPlayer > 1500) {
+        enemy.ticksOutOfRange++;
+        if (enemy.ticksOutOfRange > 100) return false;
+      } else {
+        enemy.ticksOutOfRange = 0;
+      }
+
+      if (enemy.behavior === 'aggressive' && distToPlayer < 800) {
+        enemy.vx += (dx / distToPlayer) * enemy.speed * 0.1;
+        enemy.vy += (dy / distToPlayer) * enemy.speed * 0.1;
+      } else if (enemy.behavior === 'territorial' && distToPlayer < 500) {
+        enemy.vx += (dx / distToPlayer) * enemy.speed * 0.05;
+        enemy.vy += (dy / distToPlayer) * enemy.speed * 0.05;
+      } else if (enemy.behavior === 'opportunist') {
+        if (distToPlayer < 350) {
+          enemy.vx += (dx / distToPlayer) * enemy.speed * 0.1;
+          enemy.vy += (dy / distToPlayer) * enemy.speed * 0.1;
+        } else {
+          enemy.vx += (Math.random() - 0.5) * enemy.speed * 0.05;
+          enemy.vy += (Math.random() - 0.5) * enemy.speed * 0.05;
+        }
+      } else if (enemy.behavior === 'hunter') {
+        enemy.vx += (dx / distToPlayer) * enemy.speed * 0.12;
+        enemy.vy += (dy / distToPlayer) * enemy.speed * 0.12;
+      }
     }
-    
-    if (enemy.behavior === 'aggressive' && distToPlayer < 800) {
-      enemy.vx += (dx / distToPlayer) * enemy.speed * 0.1;
-      enemy.vy += (dy / distToPlayer) * enemy.speed * 0.1;
-    }
-    
+
     enemy.vx *= 0.95;
     enemy.vy *= 0.95;
-    
+
     const speed = Math.sqrt(enemy.vx * enemy.vx + enemy.vy * enemy.vy);
-    const maxSpeed = enemy.speed * 2;
+    const maxSpeed = (enemy.speed * (enemy.boss ? 1.5 : 2));
     if (speed > maxSpeed) {
       enemy.vx = (enemy.vx / speed) * maxSpeed;
       enemy.vy = (enemy.vy / speed) * maxSpeed;
     }
-    
+
     enemy.x += enemy.vx;
     enemy.y += enemy.vy;
-    
+
     if (distToPlayer < enemy.size + org.size + 10 && enemy.attackCooldown === 0) {
-      if (!org.invulnerable && !org.dying) {
+      const shieldActive = org.hasShieldPowerUp;
+
+      if (!org.invulnerable && !org.dying && !shieldActive) {
         const damage = Math.max(1, enemy.attack - org.defense);
         state.health -= damage;
         addNotification(`-${damage} HP`);
         playSound('damage');
         createEffect(org.x, org.y, 'hit', '#FF0000');
-        
+
         org.eyeExpression = 'hurt';
         setTimeout(() => { org.eyeExpression = 'neutral'; }, 500);
-        
+
         if (state.health <= 0) {
           org.dying = true;
           org.deathTimer = 2;
         }
       }
-      enemy.attackCooldown = 1.5;
-      
+      enemy.attackCooldown = enemy.boss ? 2.2 : 1.5;
+
       org.vx += (dx / distToPlayer) * -3;
       org.vy += (dy / distToPlayer) * -3;
+      state.combo = 0;
+      state.comboTimer = 0;
+      state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
     }
-    
+
+    if (enemy.boss) {
+      state.boss = {
+        active: true,
+        health: enemy.health,
+        maxHealth: enemy.maxHealth,
+        color: enemy.color
+      };
+    }
+
     return enemy.health > 0;
   };
 
@@ -565,23 +828,34 @@ const MicroOmegaGame = () => {
     if (org.attackCooldown > 0 || org.dying) return;
     
     let hitSomething = false;
-    
+    let comboSound = false;
+
+    const comboMultiplier = 1 + (state.combo * 0.05);
+    const attackBonus = org.currentAttackBonus || 0;
+    const rangeBonus = org.currentRangeBonus || 0;
+    const attackRange = org.attackRange + rangeBonus;
+
     state.enemies.forEach(enemy => {
       const dx = enemy.x - org.x;
       const dy = enemy.y - org.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      
-      if (dist < org.attackRange) {
-        const damage = Math.max(1, org.attack - enemy.defense * 0.5);
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+      if (dist < attackRange) {
+        const damage = Math.max(1, (org.attack + attackBonus) * comboMultiplier - enemy.defense * 0.5);
         enemy.health -= damage;
-        
+
         createEffect(enemy.x, enemy.y, 'hit', org.color);
-        
+
         enemy.vx += (dx / dist) * 5;
         enemy.vy += (dy / dist) * 5;
-        
+
         hitSomething = true;
-        
+
+        state.combo += 1;
+        state.comboTimer = 3;
+        if (state.combo > state.maxCombo) state.maxCombo = state.combo;
+        if (state.combo > 0 && state.combo % 6 === 0) comboSound = true;
+
         if (enemy.health <= 0) {
           state.energy += 30;
           state.score += enemy.points;
@@ -589,18 +863,38 @@ const MicroOmegaGame = () => {
           for (let i = 0; i < 15; i++) {
             createParticle(enemy.x, enemy.y, enemy.color);
           }
+          if (enemy.boss) {
+            state.boss = null;
+            state.bossPending = false;
+          }
+        }
+
+        if (enemy.boss && enemy.health > 0) {
+          state.boss = {
+            active: true,
+            health: Math.max(0, enemy.health),
+            maxHealth: enemy.maxHealth,
+            color: enemy.color
+          };
         }
       }
     });
-    
+
     if (hitSomething) {
       playSound('attack');
+      if (comboSound) playSound('combo');
       org.attackCooldown = 0.8;
       org.eyeExpression = 'attacking';
       setTimeout(() => { org.eyeExpression = 'neutral'; }, 300);
       createEffect(org.x, org.y, 'attack', org.color);
+      state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+    } else {
+      state.combo = Math.max(0, state.combo - 1);
+      if (state.combo === 0) {
+        state.comboTimer = 0;
+      }
     }
-    
+
     syncState();
   };
 
@@ -628,23 +922,55 @@ const MicroOmegaGame = () => {
   };
 
   const updateOrganismPhysics = (org, delta) => {
+    const state = stateRef.current;
+
     if (org.dying) {
       org.deathTimer -= delta;
       org.rotation += delta * 5;
       org.size *= 0.98;
-      
+
       if (org.deathTimer <= 0) {
-        stateRef.current.gameOver = true;
+        state.gameOver = true;
         syncState();
       }
       return;
     }
-    
+
+    let speedMultiplier = 1;
+    let attackBonus = 0;
+    let rangeBonus = 0;
+    let shieldActive = false;
+
+    state.activePowerUps = state.activePowerUps.filter(power => {
+      power.remaining -= delta;
+      if (power.remaining > 0) {
+        const intensity = Math.max(0.4, power.remaining / power.duration);
+        if (power.type === 'speed') {
+          speedMultiplier += 0.6 * intensity;
+        } else if (power.type === 'attack') {
+          attackBonus += 6 * intensity;
+          rangeBonus += 20 * intensity;
+        } else if (power.type === 'shield') {
+          shieldActive = true;
+        }
+        return true;
+      }
+
+      addNotification(`${power.name} dissipou.`);
+      state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+      return false;
+    });
+
+    org.currentSpeedMultiplier = speedMultiplier;
+    org.currentAttackBonus = attackBonus;
+    org.currentRangeBonus = rangeBonus;
+    org.hasShieldPowerUp = shieldActive;
+
     const friction = org.isDashing ? 0.98 : 0.92;
-    const baseSpeed = org.isDashing ? 20 : 5 * org.speed;
+    const baseSpeed = org.isDashing ? 20 * speedMultiplier : 5 * org.speed * speedMultiplier;
     const maxSpeed = baseSpeed;
-    
-    const joy = stateRef.current.joystick;
+
+    const joy = state.joystick;
     
     if (joy.active && !org.isDashing) {
       org.vx += joy.x * 0.5;
@@ -751,10 +1077,19 @@ const MicroOmegaGame = () => {
     }
     
     org.attackCooldown = Math.max(0, org.attackCooldown - delta);
-    
+
     Object.keys(org.skillCooldowns).forEach(key => {
       org.skillCooldowns[key] = Math.max(0, org.skillCooldowns[key] - delta);
     });
+
+    if (state.combo > 0) {
+      state.comboTimer -= delta;
+      if (state.comboTimer <= 0) {
+        state.combo = 0;
+        state.comboTimer = 0;
+        state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+      }
+    }
   };
 
   const renderOrganism = (ctx, org, offsetX, offsetY) => {
@@ -801,7 +1136,19 @@ const MicroOmegaGame = () => {
       ctx.globalAlpha = 1;
       ctx.shadowBlur = 0;
     }
-    
+
+    if (org.hasShieldPowerUp) {
+      const shieldPower = stateRef.current.activePowerUps.find(p => p.type === 'shield');
+      const shieldColor = shieldPower?.color || '#66AAFF';
+      ctx.strokeStyle = shieldColor;
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.4 + Math.sin(stateRef.current.pulsePhase * 6) * 0.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, baseSize + 12 + Math.sin(stateRef.current.pulsePhase) * 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
     // Membrana externa com ondulação SUTIL
     ctx.strokeStyle = org.color;
     ctx.lineWidth = 2;
@@ -1052,23 +1399,33 @@ const MicroOmegaGame = () => {
   const renderEnemy = (ctx, enemy, offsetX, offsetY) => {
     ctx.save();
     ctx.translate(enemy.x - offsetX, enemy.y - offsetY);
-    
+
     ctx.shadowBlur = 20;
     ctx.shadowColor = enemy.color;
-    
+
     const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, enemy.size);
     gradient.addColorStop(0, enemy.color);
     gradient.addColorStop(1, enemy.color + '66');
     ctx.fillStyle = gradient;
-    
+
     ctx.beginPath();
     ctx.arc(0, 0, enemy.size, 0, Math.PI * 2);
     ctx.fill();
-    
+
+    if (enemy.boss) {
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = 0.6 + Math.sin(enemy.animPhase) * 0.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, enemy.size + 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
     if (enemy.health < enemy.maxHealth) {
       const barWidth = enemy.size * 2;
       const healthPercent = enemy.health / enemy.maxHealth;
-      
+
       ctx.fillStyle = '#333';
       ctx.fillRect(-barWidth / 2, -enemy.size - 15, barWidth, 4);
       
@@ -1077,6 +1434,55 @@ const MicroOmegaGame = () => {
     }
     
     ctx.shadowBlur = 0;
+    ctx.restore();
+  };
+
+  const renderMinimap = (ctx, canvas, state) => {
+    const minimapSize = 140;
+    const padding = 20;
+    ctx.save();
+    ctx.translate(canvas.width - minimapSize - padding, padding);
+
+    ctx.fillStyle = 'rgba(12, 18, 32, 0.75)';
+    ctx.fillRect(0, 0, minimapSize, minimapSize);
+    ctx.strokeStyle = 'rgba(0, 217, 255, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, minimapSize, minimapSize);
+
+    const scale = minimapSize / state.worldSize;
+
+    state.nebulas.forEach(nebula => {
+      ctx.fillStyle = nebula.type === 'solid' ? 'rgba(120, 90, 220, 0.4)' : 'rgba(80, 170, 240, 0.3)';
+      const radius = nebula.radius * scale;
+      ctx.beginPath();
+      ctx.arc(nebula.x * scale, nebula.y * scale, Math.max(2, radius), 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    state.obstacles.forEach(obs => {
+      ctx.fillStyle = 'rgba(180, 90, 200, 0.6)';
+      ctx.fillRect(obs.x * scale - 2, obs.y * scale - 2, 4, 4);
+    });
+
+    state.powerUps.forEach(power => {
+      ctx.fillStyle = power.color;
+      ctx.beginPath();
+      ctx.arc(power.x * scale, power.y * scale, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    state.enemies.forEach(enemy => {
+      ctx.fillStyle = enemy.boss ? '#FF5577' : '#FFAA33';
+      ctx.beginPath();
+      ctx.arc(enemy.x * scale, enemy.y * scale, enemy.boss ? 4 : 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.fillStyle = '#00D9FF';
+    ctx.beginPath();
+    ctx.arc(state.organism.x * scale, state.organism.y * scale, 4, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.restore();
   };
 
@@ -1152,9 +1558,14 @@ const MicroOmegaGame = () => {
     
     state.level++;
     state.canEvolve = false;
-    
+
     state.evolutionType = state.level % 3 === 0 ? 'form' : 'skill';
-    
+
+    if (state.level >= state.nextBossLevel) {
+      state.bossPending = true;
+      state.nextBossLevel += 3;
+    }
+
     if (state.evolutionType === 'skill') {
       const availableTraits = Object.keys(evolutionaryTraits).filter(
         t => !state.organism.traits.includes(t)
@@ -1211,7 +1622,7 @@ const MicroOmegaGame = () => {
 
   const restartGame = () => {
     const state = stateRef.current;
-    
+
     Object.assign(state, {
       energy: 0,
       health: 100,
@@ -1220,7 +1631,26 @@ const MicroOmegaGame = () => {
       score: 0,
       canEvolve: false,
       gameOver: false,
-      
+      combo: 0,
+      maxCombo: 0,
+      comboTimer: 0,
+      boss: null,
+      bossPending: false,
+      nextBossLevel: 3,
+      fogIntensity: 0,
+      uiSyncTimer: 0,
+      activePowerUps: [],
+      powerUps: [],
+      organicMatter: [],
+      enemies: [],
+      projectiles: [],
+      effects: [],
+      particles: [],
+      nebulas: [],
+      notifications: [],
+      lastEventTime: 0,
+      gameTime: 0,
+
       organism: {
         x: 2000,
         y: 2000,
@@ -1250,6 +1680,10 @@ const MicroOmegaGame = () => {
         maxDashCharge: 100,
         isDashing: false,
         dashCooldown: 0,
+        currentSpeedMultiplier: 1,
+        currentAttackBonus: 0,
+        currentRangeBonus: 0,
+        hasShieldPowerUp: false,
         attack: 10,
         defense: 5,
         speed: 1,
@@ -1260,17 +1694,26 @@ const MicroOmegaGame = () => {
         skillCooldowns: {},
         dying: false,
         deathTimer: 0
-      },
-      
-      enemies: [],
-      projectiles: [],
-      effects: [],
-      particles: [],
-      organicMatter: []
+      }
     });
-    
+
+    state.obstacles = [];
+    for (let i = 0; i < 30; i++) {
+      spawnObstacle();
+    }
+
+    state.nebulas = [];
+    for (let i = 0; i < 18; i++) {
+      spawnNebula(i % 4 === 0 ? 'solid' : 'gas');
+    }
+
+    state.powerUps = [];
+    for (let i = 0; i < 4; i++) {
+      spawnPowerUp();
+    }
+
     spawnOrganicMatter(25);
-    
+
     syncState();
   };
 
@@ -1286,7 +1729,20 @@ const MicroOmegaGame = () => {
       canEvolve: state.canEvolve,
       showEvolutionChoice: state.showEvolutionChoice,
       showMenu: gameState.showMenu,
-      gameOver: state.gameOver
+      gameOver: state.gameOver,
+      combo: state.combo,
+      maxCombo: state.maxCombo,
+      activePowerUps: state.activePowerUps.map(p => ({
+        type: p.type,
+        name: p.name,
+        icon: p.icon,
+        color: p.color,
+        remaining: p.remaining,
+        duration: p.duration
+      })),
+      bossActive: Boolean(state.boss?.active),
+      bossHealth: state.boss?.health || 0,
+      bossMaxHealth: state.boss?.maxHealth || 0
     });
   };
 
@@ -1310,15 +1766,90 @@ const MicroOmegaGame = () => {
       const now = Date.now();
       const delta = (now - lastTime) / 1000;
       lastTime = now;
-      
+
       const state = stateRef.current;
-      
-      const offsetX = state.organism.x - canvas.width / 2;
-      const offsetY = state.organism.y - canvas.height / 2;
-      
+      const org = state.organism;
+
+      let offsetX = org.x - canvas.width / 2;
+      let offsetY = org.y - canvas.height / 2;
+
+      state.fogIntensity = Math.max(0, state.fogIntensity - delta * 0.6);
+      state.gameTime += delta;
+
+      if (state.powerUps.length < 5 && Math.random() < 0.01) {
+        spawnPowerUp();
+      }
+
+      if (state.bossPending && !(state.boss?.active)) {
+        spawnBoss();
+        state.bossPending = false;
+      }
+
       // Renderizar fundo épico
       renderBackground(ctx, canvas, offsetX, offsetY);
-      
+
+      state.nebulas.forEach(nebula => {
+        nebula.rotation += nebula.swirlSpeed * delta;
+        nebula.pulse += delta * 0.4;
+
+        const screenX = nebula.x - offsetX;
+        const screenY = nebula.y - offsetY;
+
+        if (screenX > -nebula.radius - 200 && screenX < canvas.width + nebula.radius + 200 &&
+            screenY > -nebula.radius - 200 && screenY < canvas.height + nebula.radius + 200) {
+          ctx.save();
+          ctx.translate(screenX, screenY);
+          ctx.rotate(nebula.rotation * (nebula.type === 'gas' ? 0.5 : 1));
+
+          const gradient = ctx.createRadialGradient(0, 0, nebula.radius * 0.15, 0, 0, nebula.radius);
+          gradient.addColorStop(0, nebula.innerColor);
+          gradient.addColorStop(0.7, nebula.color);
+          gradient.addColorStop(1, 'rgba(5, 10, 30, 0)');
+
+          ctx.globalAlpha = nebula.opacity;
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(0, 0, nebula.radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          nebula.layers.forEach(layer => {
+            const layerRadius = nebula.radius * layer.scale * (1 + Math.sin(nebula.pulse + layer.offset) * 0.05);
+            ctx.globalAlpha = layer.alpha;
+            ctx.fillStyle = nebula.glow;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, layerRadius, layerRadius * 0.7, layer.offset + nebula.rotation, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          ctx.restore();
+          ctx.globalAlpha = 1;
+        }
+
+        const dx = org.x - nebula.x;
+        const dy = org.y - nebula.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+        if (nebula.type === 'solid') {
+          if (dist < nebula.radius + org.size * 0.6) {
+            const overlap = nebula.radius + org.size * 0.6 - dist;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            org.x += nx * overlap;
+            org.y += ny * overlap;
+            org.vx *= 0.4;
+            org.vy *= 0.4;
+          }
+        } else {
+          const fogFactor = 1 - Math.min(dist / (nebula.radius + org.size * 2), 1);
+          if (fogFactor > 0) {
+            state.fogIntensity = Math.min(0.85, Math.max(state.fogIntensity, fogFactor * nebula.opacity * 1.8));
+          }
+        }
+      });
+
+      offsetX = org.x - canvas.width / 2;
+      offsetY = org.y - canvas.height / 2;
+
       // Obstacles
       state.obstacles.forEach(obs => {
         obs.rotation += obs.rotationSpeed * delta;
@@ -1346,7 +1877,7 @@ const MicroOmegaGame = () => {
         }
       });
       
-      updateOrganismPhysics(state.organism, delta);
+      updateOrganismPhysics(org, delta);
       
       // Organic matter
       state.organicMatter = state.organicMatter.filter(matter => {
@@ -1355,11 +1886,11 @@ const MicroOmegaGame = () => {
         matter.rotation += matter.rotationSpeed * delta;
         matter.pulsePhase += delta * 2;
         
-        const dx = matter.x - state.organism.x;
-        const dy = matter.y - state.organism.y;
+        const dx = matter.x - org.x;
+        const dy = matter.y - org.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist < matter.size + state.organism.size) {
+
+        if (dist < matter.size + org.size) {
           state.energy += matter.energy;
           state.health = Math.min(state.maxHealth, state.health + matter.health);
           state.score += matter.energy;
@@ -1397,20 +1928,66 @@ const MicroOmegaGame = () => {
         
         return true;
       });
-      
+
       if (state.organicMatter.length < 30 && Math.random() < 0.05) {
         spawnOrganicMatter(1);
       }
+
+      // Power-ups
+      state.powerUps = state.powerUps.filter(power => {
+        power.pulse += delta * 3;
+
+        const dx = power.x - org.x;
+        const dy = power.y - org.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < org.size + 24) {
+          applyPowerUp(power.type);
+          return false;
+        }
+
+        const screenX = power.x - offsetX;
+        const screenY = power.y - offsetY;
+
+        if (screenX > -120 && screenX < canvas.width + 120 && screenY > -120 && screenY < canvas.height + 120) {
+          ctx.save();
+          ctx.translate(screenX, screenY);
+          const glow = Math.sin(power.pulse) * 0.25 + 0.75;
+          ctx.fillStyle = power.color;
+          ctx.globalAlpha = 0.8;
+          ctx.shadowBlur = 20;
+          ctx.shadowColor = power.color;
+          ctx.beginPath();
+          ctx.arc(0, 0, 18 + Math.sin(power.pulse * 0.5) * 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 16px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(power.icon, 0, 6);
+          ctx.restore();
+        }
+
+        return true;
+      });
       
       // Enemies
-      state.gameTime += delta;
       if (state.gameTime - state.lastEventTime > state.eventInterval / 1000) {
         spawnEnemy();
         state.lastEventTime = state.gameTime;
       }
-      
+
       state.enemies = state.enemies.filter(e => updateEnemy(e, state, delta));
-      
+
+      const bossEnemy = state.enemies.find(e => e.boss);
+      if (!bossEnemy && state.boss?.active) {
+        addNotification('✨ Mega-organismo neutralizado!');
+        state.boss = null;
+        state.bossPending = false;
+        state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+      }
+
       // Projectiles
       state.projectiles = state.projectiles.filter(proj => {
         proj.x += proj.vx;
@@ -1424,16 +2001,30 @@ const MicroOmegaGame = () => {
           const dx = proj.x - enemy.x;
           const dy = proj.y - enemy.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          
+
           if (dist < enemy.size) {
             enemy.health -= proj.damage;
             createEffect(enemy.x, enemy.y, 'hit', proj.color);
-            
+
             if (enemy.health <= 0) {
               state.energy += 25;
               state.score += enemy.points;
+              if (enemy.boss) {
+                state.boss = null;
+                state.bossPending = false;
+                addNotification('✨ Mega-organismo neutralizado!');
+              }
+              state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+            } else if (enemy.boss) {
+              state.boss = {
+                active: true,
+                health: enemy.health,
+                maxHealth: enemy.maxHealth,
+                color: enemy.color
+              };
+              state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
             }
-            
+
             return false;
           }
         }
@@ -1453,8 +2044,8 @@ const MicroOmegaGame = () => {
       });
       
       state.enemies.forEach(e => renderEnemy(ctx, e, offsetX, offsetY));
-      
-      renderOrganism(ctx, state.organism, offsetX, offsetY);
+
+      renderOrganism(ctx, org, offsetX, offsetY);
       
       // Effects
       state.effects = state.effects.filter(eff => {
@@ -1508,7 +2099,27 @@ const MicroOmegaGame = () => {
         return true;
       });
       ctx.globalAlpha = 1;
-      
+
+      if (state.fogIntensity > 0.01) {
+        const fogGradient = ctx.createRadialGradient(
+          canvas.width / 2,
+          canvas.height / 2,
+          Math.min(canvas.width, canvas.height) * 0.2,
+          canvas.width / 2,
+          canvas.height / 2,
+          Math.max(canvas.width, canvas.height)
+        );
+        fogGradient.addColorStop(0, `rgba(20, 40, 70, ${state.fogIntensity * 0.4})`);
+        fogGradient.addColorStop(1, `rgba(5, 10, 20, ${state.fogIntensity})`);
+        ctx.save();
+        ctx.globalAlpha = state.fogIntensity;
+        ctx.fillStyle = fogGradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+      }
+
+      renderMinimap(ctx, canvas, state);
+
       // Notifications
       state.notifications = state.notifications.filter(n => {
         n.life -= delta;
@@ -1528,11 +2139,17 @@ const MicroOmegaGame = () => {
         return false;
       });
       ctx.globalAlpha = 1;
-      
+
       state.pulsePhase += 0.04;
-      
+
+      state.uiSyncTimer -= delta;
+      if (state.uiSyncTimer <= 0) {
+        syncState();
+        state.uiSyncTimer = 0.2;
+      }
+
       checkEvolution();
-      
+
       requestAnimationFrame(animate);
     };
 
@@ -1594,6 +2211,9 @@ const MicroOmegaGame = () => {
           </div>
           <div style={{ fontSize: '1.1rem', opacity: 0.7 }}>
             🧬 Nível Alcançado: {gameState.level}
+          </div>
+          <div style={{ fontSize: '1.1rem', opacity: 0.7, marginTop: '6px' }}>
+            🔥 Combo Máximo: x{gameState.maxCombo || 0}
           </div>
         </div>
         
@@ -1675,6 +2295,48 @@ const MicroOmegaGame = () => {
         }}
       />
 
+      {gameState.bossActive && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '48px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'min(600px, 80%)',
+            background: 'rgba(40, 12, 30, 0.75)',
+            border: '1px solid rgba(255, 0, 120, 0.4)',
+            borderRadius: '14px',
+            padding: '10px 18px',
+            zIndex: 11,
+            boxShadow: '0 0 30px rgba(255, 0, 120, 0.25)',
+            pointerEvents: 'none'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', marginBottom: '6px' }}>
+            <span>⚠️ Mega-organismo</span>
+            <span>
+              {Math.max(
+                0,
+                Math.round((gameState.bossHealth / (gameState.bossMaxHealth || 1)) * 100)
+              )}%
+            </span>
+          </div>
+          <div style={{ height: '10px', background: 'rgba(255, 255, 255, 0.12)', borderRadius: '6px', overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${Math.max(
+                  0,
+                  Math.min(100, (gameState.bossHealth / (gameState.bossMaxHealth || 1)) * 100)
+                )}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #FF3A6B, #FFD166)',
+                transition: 'width 0.2s ease'
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <div style={{
         position: 'absolute',
         top: '45px',
@@ -1714,6 +2376,70 @@ const MicroOmegaGame = () => {
         }}>
           💨 {Math.floor(gameState.dashCharge)}%
         </div>
+        {gameState.combo > 1 && (
+          <div style={{
+            background: 'rgba(255, 80, 0, 0.25)',
+            backdropFilter: 'blur(8px)',
+            padding: '4px 8px',
+            borderRadius: '6px',
+            fontSize: '0.7rem',
+            color: '#FFAA55'
+          }}>
+            🔥 Combo x{gameState.combo}
+          </div>
+        )}
+        {gameState.maxCombo > 0 && (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            padding: '3px 8px',
+            borderRadius: '6px',
+            fontSize: '0.65rem',
+            color: 'rgba(255, 255, 255, 0.7)'
+          }}>
+            🏅 Máx x{gameState.maxCombo}
+          </div>
+        )}
+        {gameState.activePowerUps?.length > 0 && (
+          <div style={{
+            marginTop: '6px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px'
+          }}>
+            {gameState.activePowerUps.map(power => {
+              const percent = power.duration ? Math.max(0, Math.min(100, (power.remaining / power.duration) * 100)) : 0;
+              return (
+                <div
+                  key={power.type}
+                  style={{
+                    background: `${power.color}22`,
+                    border: `1px solid ${power.color}`,
+                    borderRadius: '8px',
+                    padding: '4px 6px'
+                  }}
+                >
+                  <div style={{ fontSize: '0.65rem', color: power.color }}>
+                    {power.icon} {power.name}
+                  </div>
+                  <div style={{
+                    marginTop: '2px',
+                    height: '4px',
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    borderRadius: '4px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${percent}%`,
+                      height: '100%',
+                      background: power.color,
+                      transition: 'width 0.2s ease'
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div
