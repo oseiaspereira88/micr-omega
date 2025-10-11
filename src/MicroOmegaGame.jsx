@@ -37,6 +37,9 @@ import {
 } from './game/systems';
 import useInputController from './game/input/useInputController';
 import { DEFAULT_JOYSTICK_STATE } from './game/input/utils';
+import GameHud from './ui/components/GameHud';
+import GameOverScreen from './ui/components/GameOverScreen';
+import styles from './MicroOmegaGame.module.css';
 
 const MicroOmegaGame = () => {
   const canvasRef = useRef(null);
@@ -62,7 +65,8 @@ const MicroOmegaGame = () => {
     bossMaxHealth: 0,
     currentSkill: null,
     skillList: [],
-    hasMultipleSkills: false
+    hasMultipleSkills: false,
+    notifications: []
   });
 
   const stateRef = useRef(createInitialState());
@@ -619,7 +623,11 @@ const MicroOmegaGame = () => {
         maxCooldown: (skills[key].cooldown || 0) / 1000,
         isActive: key === currentSkillKey
       })),
-      hasMultipleSkills: organism.skills.length > 1
+      hasMultipleSkills: organism.skills.length > 1,
+      notifications: state.notifications.map(notification => ({
+        id: notification.id,
+        text: notification.text
+      }))
     }));
   };
 
@@ -986,674 +994,81 @@ const MicroOmegaGame = () => {
 
   if (gameState.gameOver) {
     return (
-      <div style={{
-        width: '100vw',
-        height: '100vh',
-        background: 'linear-gradient(135deg, #1a0a0a 0%, #2a0515 50%, #0a0a1a 100%)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: 'system-ui, sans-serif',
-        color: '#fff',
-        padding: '20px',
-        animation: 'fadeIn 0.5s ease'
-      }}>
-        <h1 style={{
-          fontSize: '3.5rem',
-          margin: '0 0 30px 0',
-          background: 'linear-gradient(90deg, #FF0066, #FF6600, #FF0066)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          animation: 'pulse 2s infinite'
-        }}>
-          Game Over
-        </h1>
-        
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          backdropFilter: 'blur(20px)',
-          padding: '40px',
-          borderRadius: '25px',
-          border: '2px solid rgba(255, 255, 255, 0.1)',
-          marginBottom: '40px',
-          textAlign: 'center',
-          boxShadow: '0 10px 50px rgba(0, 0, 0, 0.5)'
-        }}>
-          <div style={{ fontSize: '1.5rem', marginBottom: '20px', opacity: 0.8 }}>
-            Pontuação Final
-          </div>
-          <div style={{
-            fontSize: '4rem',
-            fontWeight: 'bold',
-            background: 'linear-gradient(90deg, #00D9FF, #7B2FFF, #FF00E5)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            marginBottom: '20px'
-          }}>
-            {gameState.score}
-          </div>
-          <div style={{ fontSize: '1.1rem', opacity: 0.7 }}>
-            🧬 Nível Alcançado: {gameState.level}
-          </div>
-          <div style={{ fontSize: '1.1rem', opacity: 0.7, marginTop: '6px' }}>
-            🔥 Combo Máximo: x{gameState.maxCombo || 0}
-          </div>
-        </div>
-        
-        <button
-          onClick={restartGame}
-          style={{
-            background: 'linear-gradient(135deg, #00FF88, #00D9FF)',
-            border: 'none',
-            padding: '20px 50px',
-            borderRadius: '50px',
-            fontSize: '1.4rem',
-            fontWeight: 'bold',
-            color: '#000',
-            cursor: 'pointer',
-            boxShadow: '0 0 40px rgba(0, 217, 255, 0.6)'
-          }}
-        >
-          🔄 Jogar Novamente
-        </button>
-        
-        <style>{`
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes pulse {
-            0%, 100% { filter: brightness(1); }
-            50% { filter: brightness(1.3); }
-          }
-        `}</style>
-      </div>
+      <GameOverScreen
+        score={gameState.score}
+        level={gameState.level}
+        maxCombo={gameState.maxCombo}
+        onRestart={restartGame}
+      />
     );
   }
 
-  return (
-    <div style={{
-      width: '100vw',
-      height: '100vh',
-      background: '#000',
-      display: 'flex',
-      flexDirection: 'column',
-      fontFamily: 'system-ui, sans-serif',
-      color: '#fff',
-      overflow: 'hidden',
-      position: 'relative'
-    }}>
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        padding: '5px 10px',
-        background: 'rgba(0, 0, 0, 0.7)',
-        backdropFilter: 'blur(10px)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        zIndex: 10,
-        height: '40px'
-      }}>
-        <div style={{
-          fontSize: '1rem',
-          fontWeight: 'bold',
-          background: 'linear-gradient(90deg, #00D9FF, #7B2FFF)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
-        }}>
-          MicrΩ • Nv.{gameState.level} • {gameState.score} pts
-        </div>
-      </div>
+  const skillData = {
+    currentSkill: currentSkillInfo,
+    skillList: gameState.skillList,
+    hasMultipleSkills: gameState.hasMultipleSkills,
+    skillCooldownLabel,
+    skillReadyPercent,
+    skillCooldownPercent,
+    skillCoolingDown,
+    skillDisabled,
+  };
 
-      <canvas
-        ref={canvasRef}
-        style={{
-          width: '100vw',
-          height: '100vh',
-          touchAction: 'none',
-          display: 'block'
-        }}
+  return (
+    <div className={styles.container}>
+      <canvas ref={canvasRef} className={styles.canvas} />
+
+      <GameHud
+        level={gameState.level}
+        score={gameState.score}
+        energy={gameState.energy}
+        health={gameState.health}
+        maxHealth={gameState.maxHealth}
+        dashCharge={gameState.dashCharge}
+        combo={gameState.combo}
+        maxCombo={gameState.maxCombo}
+        activePowerUps={gameState.activePowerUps}
+        bossActive={gameState.bossActive}
+        bossHealth={gameState.bossHealth}
+        bossMaxHealth={gameState.bossMaxHealth}
+        skillData={skillData}
+        notifications={gameState.notifications}
+        joystick={joystick}
+        onJoystickStart={inputActions.joystickStart}
+        onJoystickMove={inputActions.joystickMove}
+        onJoystickEnd={inputActions.joystickEnd}
+        onAttackPress={inputActions.attackPress}
+        onAttackRelease={inputActions.attackRelease}
+        onAttack={inputActions.attack}
+        onDash={inputActions.dash}
+        onUseSkill={inputActions.useSkill}
+        onCycleSkill={inputActions.cycleSkill}
+        onOpenEvolutionMenu={inputActions.openEvolutionMenu}
+        canEvolve={gameState.canEvolve}
       />
 
-      {gameState.bossActive && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '48px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 'min(600px, 80%)',
-            background: 'rgba(40, 12, 30, 0.75)',
-            border: '1px solid rgba(255, 0, 120, 0.4)',
-            borderRadius: '14px',
-            padding: '10px 18px',
-            zIndex: 11,
-            boxShadow: '0 0 30px rgba(255, 0, 120, 0.25)',
-            pointerEvents: 'none'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', marginBottom: '6px' }}>
-            <span>⚠️ Mega-organismo</span>
-            <span>
-              {Math.max(
-                0,
-                Math.round((gameState.bossHealth / (gameState.bossMaxHealth || 1)) * 100)
-              )}%
-            </span>
-          </div>
-          <div style={{ height: '10px', background: 'rgba(255, 255, 255, 0.12)', borderRadius: '6px', overflow: 'hidden' }}>
-            <div
-              style={{
-                width: `${Math.max(
-                  0,
-                  Math.min(100, (gameState.bossHealth / (gameState.bossMaxHealth || 1)) * 100)
-                )}%`,
-                height: '100%',
-                background: 'linear-gradient(90deg, #FF3A6B, #FFD166)',
-                transition: 'width 0.2s ease'
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      <div style={{
-        position: 'absolute',
-        top: '45px',
-        left: '8px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '5px',
-        pointerEvents: 'none',
-        zIndex: 10
-      }}>
-        <div style={{
-          background: 'rgba(0, 217, 255, 0.2)',
-          backdropFilter: 'blur(8px)',
-          padding: '4px 8px',
-          borderRadius: '6px',
-          fontSize: '0.7rem'
-        }}>
-          ⚡ {Math.floor(gameState.energy)}
-        </div>
-        
-        <div style={{
-          background: 'rgba(255, 100, 100, 0.2)',
-          backdropFilter: 'blur(8px)',
-          padding: '4px 8px',
-          borderRadius: '6px',
-          fontSize: '0.7rem'
-        }}>
-          ❤️ {Math.floor(gameState.health)}/{gameState.maxHealth}
-        </div>
-        
-        <div style={{
-          background: 'rgba(255, 200, 0, 0.2)',
-          backdropFilter: 'blur(8px)',
-          padding: '4px 8px',
-          borderRadius: '6px',
-          fontSize: '0.7rem'
-        }}>
-          💨 {Math.floor(gameState.dashCharge)}%
-        </div>
-        {gameState.combo > 1 && (
-          <div style={{
-            background: 'rgba(255, 80, 0, 0.25)',
-            backdropFilter: 'blur(8px)',
-            padding: '4px 8px',
-            borderRadius: '6px',
-            fontSize: '0.7rem',
-            color: '#FFAA55'
-          }}>
-            🔥 Combo x{gameState.combo}
-          </div>
-        )}
-        {gameState.maxCombo > 0 && (
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            padding: '3px 8px',
-            borderRadius: '6px',
-            fontSize: '0.65rem',
-            color: 'rgba(255, 255, 255, 0.7)'
-          }}>
-            🏅 Máx x{gameState.maxCombo}
-          </div>
-        )}
-        {gameState.activePowerUps?.length > 0 && (
-          <div style={{
-            marginTop: '6px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px'
-          }}>
-            {gameState.activePowerUps.map(power => {
-              const percent = power.duration ? Math.max(0, Math.min(100, (power.remaining / power.duration) * 100)) : 0;
-              return (
-                <div
-                  key={power.type}
-                  style={{
-                    background: `${power.color}22`,
-                    border: `1px solid ${power.color}`,
-                    borderRadius: '8px',
-                    padding: '4px 6px'
-                  }}
-                >
-                  <div style={{ fontSize: '0.65rem', color: power.color }}>
-                    {power.icon} {power.name}
-                  </div>
-                  <div style={{
-                    marginTop: '2px',
-                    height: '4px',
-                    background: 'rgba(255, 255, 255, 0.15)',
-                    borderRadius: '4px',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{
-                      width: `${percent}%`,
-                      height: '100%',
-                      background: power.color,
-                      transition: 'width 0.2s ease'
-                    }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {(currentSkillInfo || gameState.skillList.length > 0) && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '45px',
-            right: '8px',
-            width: '230px',
-            background: 'rgba(8, 18, 36, 0.78)',
-            border: '1px solid rgba(0, 217, 255, 0.35)',
-            borderRadius: '12px',
-            padding: '10px 14px',
-            zIndex: 10,
-            backdropFilter: 'blur(14px)',
-            boxShadow: '0 8px 28px rgba(0, 0, 0, 0.35)',
-            pointerEvents: 'auto'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#00D9FF' }}>
-              {currentSkillInfo ? `${currentSkillInfo.icon} ${currentSkillInfo.name}` : 'Sem habilidade ativa'}
-            </span>
-            {currentSkillInfo && (
-              <span style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.7)' }}>
-                {currentSkillInfo.cost}⚡
-              </span>
-            )}
-          </div>
-
-          <div style={{
-            fontSize: '0.7rem',
-            color: 'rgba(255, 255, 255, 0.7)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginBottom: '4px'
-          }}>
-            <span>Custo: {currentSkillInfo ? currentSkillInfo.cost : '--'}⚡</span>
-            <span>{skillCooldownLabel}</span>
-          </div>
-
-          <div
-            style={{
-              height: '6px',
-              background: 'rgba(255, 255, 255, 0.12)',
-              borderRadius: '4px',
-              overflow: 'hidden',
-              marginBottom: gameState.skillList.length > 0 ? '8px' : '4px'
-            }}
-          >
-            <div
-              style={{
-                width: `${skillReadyPercent}%`,
-                height: '100%',
-                background: 'linear-gradient(90deg, #00D9FF, #7B2FFF)',
-                transition: 'width 0.2s ease'
-              }}
-            />
-          </div>
-
-          {gameState.skillList.length > 0 && (
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: gameState.hasMultipleSkills ? '8px' : '6px' }}>
-              {gameState.skillList.map(skill => {
-                const cooldownPercent = skill.maxCooldown
-                  ? Math.max(0, Math.min(100, (skill.cooldown / skill.maxCooldown) * 100))
-                  : 0;
-                return (
-                  <div
-                    key={skill.key}
-                    title={`${skill.name}`}
-                    style={{
-                      position: 'relative',
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '10px',
-                      border: skill.isActive ? '2px solid #00D9FF' : '1px solid rgba(255, 255, 255, 0.25)',
-                      background: skill.isActive ? 'rgba(0, 217, 255, 0.18)' : 'rgba(255, 255, 255, 0.08)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1.1rem',
-                      overflow: 'hidden',
-                      boxShadow: skill.isActive ? '0 0 12px rgba(0, 217, 255, 0.4)' : 'none'
-                    }}
-                  >
-                    <span>{skill.icon}</span>
-                    {skill.cooldown > 0 && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: `${Math.max(0, Math.min(100, cooldownPercent))}%`,
-                          background: 'rgba(0, 0, 0, 0.55)'
-                        }}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {gameState.hasMultipleSkills && (
-            <button
-              type="button"
-              onClick={() => inputActions.cycleSkill(1)}
-              onTouchStart={(e) => {
-                e.preventDefault();
-                inputActions.cycleSkill(1);
-              }}
-              style={{
-                width: '100%',
-                padding: '6px 0',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'linear-gradient(90deg, #00D9FF, #7B2FFF)',
-                color: '#000',
-                fontWeight: 600,
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                marginBottom: '4px'
-              }}
-            >
-              🔁 Trocar habilidade (R)
-            </button>
-          )}
-
-          <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.55)', textAlign: 'center' }}>
-            Q: usar habilidade • Shift: dash
-          </div>
-        </div>
-      )}
-
-      <div
-        onTouchStart={inputActions.joystickStart}
-        onTouchMove={inputActions.joystickMove}
-        onTouchEnd={inputActions.joystickEnd}
-        style={{
-          position: 'absolute',
-          bottom: '15px',
-          left: '15px',
-          width: '110px',
-          height: '110px',
-          borderRadius: '50%',
-          background: 'rgba(255, 255, 255, 0.1)',
-          border: '2px solid rgba(255, 255, 255, 0.3)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          touchAction: 'none',
-          backdropFilter: 'blur(5px)',
-          zIndex: 10
-        }}
-      >
-        <div style={{
-          width: '45px',
-          height: '45px',
-          borderRadius: '50%',
-          background: joystick.isTouchActive ? 'rgba(0, 217, 255, 0.7)' : 'rgba(255, 255, 255, 0.4)',
-          border: '2px solid #fff',
-          transform: `translate(${joystick.position.x}px, ${joystick.position.y}px)`,
-          transition: joystick.isTouchActive ? 'none' : 'transform 0.2s',
-          boxShadow: joystick.isTouchActive ? '0 0 20px rgba(0, 217, 255, 0.8)' : 'none'
-        }} />
-      </div>
-
-      <button
-        onTouchStart={(e) => {
-          e.preventDefault();
-          inputActions.attackPress();
-        }}
-        onTouchEnd={(e) => {
-          e.preventDefault();
-          inputActions.attackRelease();
-        }}
-        onMouseDown={inputActions.attackPress}
-        onMouseUp={inputActions.attackRelease}
-        onClick={(e) => {
-          e.preventDefault();
-          inputActions.attack();
-        }}
-        style={{
-          position: 'absolute',
-          bottom: '15px',
-          right: '15px',
-          width: '70px',
-          height: '70px',
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #FF0066, #FF6600)',
-          border: '3px solid #fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '1.8rem',
-          cursor: 'pointer',
-          touchAction: 'none',
-          zIndex: 10,
-          boxShadow: '0 0 20px rgba(255, 0, 102, 0.5)'
-        }}
-      >
-        ⚔️
-      </button>
-
-      <button
-        onClick={inputActions.dash}
-        disabled={gameState.dashCharge < 30}
-        style={{
-          position: 'absolute',
-          bottom: '95px',
-          right: '15px',
-          width: '60px',
-          height: '60px',
-          borderRadius: '50%',
-          background: gameState.dashCharge >= 30
-            ? 'linear-gradient(135deg, #FFD700, #FFA500)'
-            : 'rgba(100, 100, 100, 0.5)',
-          border: '3px solid #fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '1.5rem',
-          cursor: gameState.dashCharge >= 30 ? 'pointer' : 'not-allowed',
-          touchAction: 'none',
-          zIndex: 10,
-          boxShadow: gameState.dashCharge >= 30 ? '0 0 20px rgba(255, 215, 0, 0.6)' : 'none'
-        }}
-      >
-        💨
-      </button>
-
-      <button
-        type="button"
-        onClick={inputActions.useSkill}
-        onTouchStart={(e) => {
-          e.preventDefault();
-          inputActions.useSkill();
-        }}
-        disabled={skillDisabled}
-        title="Q: usar habilidade"
-        style={{
-          position: 'absolute',
-          bottom: '95px',
-          right: '95px',
-          width: '65px',
-          height: '65px',
-          borderRadius: '50%',
-          background: skillDisabled
-            ? 'rgba(100, 100, 100, 0.35)'
-            : 'linear-gradient(135deg, #00D9FF, #7B2FFF)',
-          border: '3px solid #fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '1.6rem',
-          cursor: skillDisabled ? 'not-allowed' : 'pointer',
-          touchAction: 'none',
-          zIndex: 10,
-          color: skillDisabled ? 'rgba(255, 255, 255, 0.75)' : '#000',
-          opacity: skillDisabled ? 0.7 : 1,
-          boxShadow: skillDisabled ? 'none' : '0 0 22px rgba(0, 217, 255, 0.55)'
-        }}
-      >
-        <span>{currentSkillInfo ? currentSkillInfo.icon : '🌀'}</span>
-        {currentSkillInfo && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '6px',
-              fontSize: '0.6rem',
-              fontWeight: 600,
-              color: skillDisabled ? '#fff' : '#001'
-            }}
-          >
-            {skillCoolingDown ? skillCooldownLabel : `${currentSkillInfo.cost}⚡`}
-          </div>
-        )}
-        {!currentSkillInfo && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '6px',
-              fontSize: '0.6rem',
-              fontWeight: 600,
-              color: '#fff'
-            }}
-          >
-            --
-          </div>
-        )}
-        {currentSkillInfo && skillCoolingDown && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: `${Math.max(0, Math.min(100, skillCooldownPercent))}%`,
-              background: 'rgba(0, 0, 0, 0.4)',
-              borderRadius: '0 0 32px 32px',
-              pointerEvents: 'none'
-            }}
-          />
-        )}
-      </button>
-
-      <button
-        onClick={inputActions.openEvolutionMenu}
-        disabled={!gameState.canEvolve}
-        style={{
-          position: 'absolute',
-          bottom: '15px',
-          right: '95px',
-          width: '60px',
-          height: '60px',
-          borderRadius: '50%',
-          background: gameState.canEvolve 
-            ? 'linear-gradient(135deg, #00FF88, #00D9FF)' 
-            : 'rgba(100, 100, 100, 0.3)',
-          border: '3px solid #fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '1.5rem',
-          cursor: gameState.canEvolve ? 'pointer' : 'not-allowed',
-          touchAction: 'none',
-          zIndex: 10,
-          boxShadow: gameState.canEvolve ? '0 0 25px rgba(0, 255, 136, 0.8)' : 'none',
-          animation: gameState.canEvolve ? 'pulse 1s infinite' : 'none'
-        }}
-      >
-        🧬
-      </button>
-
       {gameState.showEvolutionChoice && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.95)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '15px'
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #0a0a2a 0%, #1a0a3a 100%)',
-            padding: '20px',
-            borderRadius: '16px',
-            border: '2px solid rgba(0, 217, 255, 0.5)',
-            maxWidth: '450px',
-            width: '100%',
-            boxShadow: '0 0 60px rgba(0, 217, 255, 0.4)',
-            maxHeight: '85vh',
-            overflow: 'auto'
-          }}>
-            <h2 style={{
-              margin: '0 0 15px 0',
-              fontSize: '1.4rem',
-              textAlign: 'center',
-              background: 'linear-gradient(90deg, #00D9FF, #FF00E5)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}>
-              🧬 Evolução Nível {gameState.level}
-            </h2>
-            
+        <div className={styles.evolutionOverlay}>
+          <div className={styles.evolutionCard}>
+            <h2 className={styles.evolutionTitle}>🧬 Evolução Nível {gameState.level}</h2>
+
             {stateRef.current.evolutionType === 'skill' ? (
               <>
-                <h3 style={{ fontSize: '1rem', marginBottom: '10px' }}>Escolha uma Habilidade:</h3>
-                <div style={{ display: 'grid', gap: '10px' }}>
+                <h3 className={styles.optionHeading}>Escolha uma Habilidade:</h3>
+                <div className={styles.optionList}>
                   {stateRef.current.availableTraits?.map(traitKey => {
                     const trait = evolutionaryTraits[traitKey];
                     return (
                       <div
                         key={traitKey}
-                        onClick={() => chooseTrait(traitKey)}
+                        className={styles.traitCard}
                         style={{
                           background: `linear-gradient(90deg, ${trait.color}33, ${trait.color}11)`,
-                          padding: '12px',
-                          borderRadius: '10px',
                           border: `2px solid ${trait.color}`,
-                          cursor: 'pointer'
                         }}
+                        onClick={() => chooseTrait(traitKey)}
                       >
-                        <div style={{ fontSize: '1rem', fontWeight: 'bold', color: trait.color }}>
+                        <div className={styles.traitTitle} style={{ color: trait.color }}>
                           {trait.icon} {trait.name}
                         </div>
                       </div>
@@ -1663,23 +1078,17 @@ const MicroOmegaGame = () => {
               </>
             ) : (
               <>
-                <h3 style={{ fontSize: '1rem', marginBottom: '10px' }}>Escolha uma Forma:</h3>
-                <div style={{ display: 'grid', gap: '10px' }}>
+                <h3 className={styles.optionHeading}>Escolha uma Forma:</h3>
+                <div className={styles.optionList}>
                   {stateRef.current.availableForms?.map(formKey => {
                     const form = forms[formKey];
                     return (
                       <div
                         key={formKey}
+                        className={styles.formCard}
                         onClick={() => chooseForm(formKey)}
-                        style={{
-                          background: 'rgba(100, 100, 255, 0.2)',
-                          padding: '12px',
-                          borderRadius: '10px',
-                          border: '2px solid #7B2FFF',
-                          cursor: 'pointer'
-                        }}
                       >
-                        <div style={{ fontSize: '1rem', fontWeight: 'bold' }}>
+                        <div className={styles.formTitle}>
                           {form.icon} {form.name}
                         </div>
                       </div>
@@ -1691,13 +1100,6 @@ const MicroOmegaGame = () => {
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-        }
-      `}</style>
     </div>
   );
 };
