@@ -22,6 +22,7 @@ import {
   spawnEnemy as createEnemyEntity,
   spawnBoss as createBossEntity
 } from './game/factories/enemyFactory';
+import { renderFrame } from './game/render/renderFrame.js';
 import {
   performDash as performDashSystem,
   performAttack as performAttackSystem,
@@ -529,403 +530,6 @@ const MicroOmegaGame = () => {
   };
 
 
-  const renderOrganism = (ctx, org, offsetX, offsetY) => {
-    const baseSize = org.size * org.pulseIntensity;
-    
-    ctx.save();
-    ctx.translate(org.x - offsetX, org.y - offsetY);
-    
-    const activePowerUps = stateRef.current.activePowerUps;
-    const hasPowerShield = org.invulnerableFromPowerUp || activePowerUps.some(p => p.type === 'invincibility');
-
-    // Trail suave
-    org.trail.forEach((t, i) => {
-      const trailSize = t.size * (i / org.trail.length);
-      ctx.fillStyle = t.color;
-      ctx.globalAlpha = t.life * 0.2;
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = t.color;
-      ctx.beginPath();
-      ctx.arc(t.x - org.x, t.y - org.y, trailSize, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
-    
-    // Rotação e inclinação SUTIS
-    ctx.rotate(org.angle);
-    
-    // Aplicar inclinação 3D simulada
-    ctx.transform(1 + org.tiltX, org.tiltY, org.tiltX, 1 + org.tiltY, 0, 0);
-    
-    if (org.dying) {
-      ctx.rotate(org.rotation);
-      ctx.globalAlpha = org.deathTimer / 2;
-    }
-    
-    // Shield
-    if (org.invulnerable || hasPowerShield) {
-      ctx.strokeStyle = '#FFD700';
-      ctx.lineWidth = 4;
-      ctx.globalAlpha = 0.6 + Math.sin(stateRef.current.pulsePhase * 10) * 0.3;
-      ctx.shadowBlur = 25;
-      ctx.shadowColor = '#FFD700';
-      ctx.beginPath();
-      ctx.arc(0, 0, baseSize + 15, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
-    }
-
-    if (hasPowerShield) {
-      const shieldPower = activePowerUps.find(p => p.type === 'invincibility');
-      const shieldColor = shieldPower?.color || '#FFD700';
-      ctx.strokeStyle = shieldColor;
-      ctx.lineWidth = 3;
-      ctx.globalAlpha = 0.4 + Math.sin(stateRef.current.pulsePhase * 6) * 0.2;
-      ctx.beginPath();
-      ctx.arc(0, 0, baseSize + 12 + Math.sin(stateRef.current.pulsePhase) * 4, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-
-    // Membrana externa com ondulação SUTIL
-    ctx.strokeStyle = org.color;
-    ctx.lineWidth = 2;
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = org.color;
-    
-    ctx.beginPath();
-    const segments = 64; // Mais segmentos = mais suave
-    for (let i = 0; i <= segments; i++) {
-      const angle = (i / segments) * Math.PI * 2;
-      const wave = Math.sin(angle * 3 + org.swimPhase) * org.bodyWave * baseSize;
-      const r = baseSize + wave + 8;
-      const x = Math.cos(angle) * r;
-      const y = Math.sin(angle) * r;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.globalAlpha = 0.3;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
-    
-    // Corpo principal com gradiente rico
-    const gradient = ctx.createRadialGradient(-baseSize * 0.3, -baseSize * 0.3, 0, 0, 0, baseSize * 1.4);
-    gradient.addColorStop(0, org.tertiaryColor + 'FF');
-    gradient.addColorStop(0.4, org.color);
-    gradient.addColorStop(0.8, org.secondaryColor);
-    gradient.addColorStop(1, org.color + '22');
-    
-    ctx.fillStyle = gradient;
-    ctx.shadowBlur = 40;
-    ctx.shadowColor = org.color;
-    
-    // Renderizar forma com ondulação
-    ctx.beginPath();
-    for (let i = 0; i <= segments; i++) {
-      const angle = (i / segments) * Math.PI * 2;
-      const wave = Math.sin(angle * 3 + org.swimPhase) * org.bodyWave * baseSize;
-      const r = baseSize + wave;
-      const x = Math.cos(angle) * r;
-      const y = Math.sin(angle) * r;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.fill();
-    
-    ctx.shadowBlur = 0;
-    
-    // Organelos internos
-    ctx.fillStyle = org.secondaryColor + '66';
-    for (let i = 0; i < 3; i++) {
-      const angle = (i / 3) * Math.PI * 2 + org.swimPhase * 0.2;
-      const dist = baseSize * 0.3;
-      const size = baseSize * 0.1;
-      ctx.beginPath();
-      ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    
-    // Olhos expressivos
-    const eyeSize = baseSize * 0.25;
-    const eyeDistance = baseSize * 0.4;
-    const eyeY = -eyeSize * 0.3;
-    
-    const expressionOffset = org.eyeExpression === 'hurt' ? 0.3 : 
-                           org.eyeExpression === 'attacking' ? -0.2 : 0;
-    
-    [-1, 1].forEach(side => {
-      ctx.save();
-      ctx.translate(eyeDistance * side, eyeY + expressionOffset * eyeSize);
-      
-      if (org.eyeBlinkState > 0.5) {
-        ctx.strokeStyle = org.secondaryColor;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(-eyeSize, 0);
-        ctx.lineTo(eyeSize, 0);
-        ctx.stroke();
-      } else {
-        ctx.fillStyle = '#FFF';
-        ctx.strokeStyle = org.secondaryColor;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, eyeSize, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        
-        const pupilX = org.eyeLookX * eyeSize * 0.4;
-        const pupilY = org.eyeLookY * eyeSize * 0.4;
-        
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.arc(pupilX, pupilY, eyeSize * 0.5, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#FFF';
-        ctx.globalAlpha = 0.8;
-        ctx.beginPath();
-        ctx.arc(pupilX - eyeSize * 0.15, pupilY - eyeSize * 0.15, eyeSize * 0.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-      ctx.restore();
-    });
-    
-    ctx.restore();
-  };
-
-  const renderBackground = (ctx, canvas, offsetX, offsetY) => {
-    const state = stateRef.current;
-    
-    // Gradiente de fundo complexo
-    const gradient = ctx.createRadialGradient(
-      canvas.width / 2, canvas.height / 2, 0,
-      canvas.width / 2, canvas.height / 2, canvas.width
-    );
-    gradient.addColorStop(0, '#0d1f2d');
-    gradient.addColorStop(0.3, '#0a1820');
-    gradient.addColorStop(0.6, '#071218');
-    gradient.addColorStop(1, '#030a0f');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Camadas de nebulosa
-    state.backgroundLayers.forEach(layer => {
-      layer.pulsePhase += 0.01;
-      const pulse = Math.sin(layer.pulsePhase) * 0.5 + 0.5;
-      
-      const screenX = layer.x - offsetX * layer.depth;
-      const screenY = layer.y - offsetY * layer.depth;
-      
-      const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, layer.size);
-      gradient.addColorStop(0, layer.color);
-      gradient.addColorStop(1, 'transparent');
-      
-      ctx.fillStyle = gradient;
-      ctx.globalAlpha = layer.opacity * pulse;
-      ctx.fillRect(screenX - layer.size, screenY - layer.size, layer.size * 2, layer.size * 2);
-    });
-    ctx.globalAlpha = 1;
-    
-    // Raios de luz
-    state.lightRays.forEach(ray => {
-      ray.y += ray.speed;
-      if (ray.y > 4000) ray.y = -200;
-      
-      const screenX = ray.x - offsetX * 0.3;
-      const screenY = ray.y - offsetY * 0.3;
-      
-      ctx.save();
-      ctx.translate(screenX, screenY);
-      ctx.rotate(ray.angle);
-      
-      const gradient = ctx.createLinearGradient(0, 0, 0, ray.length);
-      gradient.addColorStop(0, `rgba(100, 200, 255, ${ray.opacity})`);
-      gradient.addColorStop(0.5, `rgba(100, 200, 255, ${ray.opacity * 0.5})`);
-      gradient.addColorStop(1, 'transparent');
-      
-      ctx.fillStyle = gradient;
-      ctx.fillRect(-ray.width / 2, 0, ray.width, ray.length);
-      
-      ctx.restore();
-    });
-    
-    // Microorganismos de fundo
-    state.microorganisms.forEach(micro => {
-      micro.x += micro.vx;
-      micro.y += micro.vy;
-      micro.animPhase += 0.05;
-      
-      if (micro.x < 0) micro.x = 4000;
-      if (micro.x > 4000) micro.x = 0;
-      if (micro.y < 0) micro.y = 4000;
-      if (micro.y > 4000) micro.y = 0;
-      
-      const screenX = micro.x - offsetX * micro.depth;
-      const screenY = micro.y - offsetY * micro.depth;
-      
-      if (screenX > -50 && screenX < canvas.width + 50) {
-        const pulse = Math.sin(micro.animPhase) * 0.2 + 1;
-        
-        ctx.fillStyle = micro.color + micro.opacity + ')';
-        ctx.globalAlpha = micro.opacity;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, micro.size * pulse * micro.depth, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    });
-    ctx.globalAlpha = 1;
-    
-    // Partículas bioluminescentes
-    state.glowParticles.forEach(p => {
-      p.x += p.vx;
-      p.y += p.vy;
-      p.pulsePhase += 0.03;
-      
-      if (p.x < 0) p.x = 4000;
-      if (p.x > 4000) p.x = 0;
-      if (p.y < 0) p.y = 4000;
-      if (p.y > 4000) p.y = 0;
-      
-      const screenX = p.x - offsetX * (0.5 + p.depth * 0.5);
-      const screenY = p.y - offsetY * (0.5 + p.depth * 0.5);
-      
-      if (screenX > -50 && screenX < canvas.width + 50) {
-        const glow = Math.sin(p.pulsePhase) * 0.5 + 0.5;
-        
-        ctx.fillStyle = p.color + (p.opacity * glow) + ')';
-        ctx.shadowBlur = p.glowIntensity * glow;
-        ctx.shadowColor = p.color + '1)';
-        ctx.globalAlpha = p.opacity * glow;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, p.size * (0.5 + p.depth), 0, Math.PI * 2);
-        ctx.fill();
-      }
-    });
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
-    
-    // Partículas flutuantes massivas
-    state.floatingParticles.forEach(p => {
-      p.x += p.vx * (1 + p.depth);
-      p.y += p.vy * (1 + p.depth);
-      p.pulsePhase += p.pulseSpeed * 0.02;
-      
-      if (p.x < 0) p.x = 4000;
-      if (p.x > 4000) p.x = 0;
-      if (p.y < 0) p.y = 4000;
-      if (p.y > 4000) p.y = 0;
-      
-      const screenX = p.x - offsetX * (0.3 + p.depth * 0.7);
-      const screenY = p.y - offsetY * (0.3 + p.depth * 0.7);
-      
-      if (screenX > -50 && screenX < canvas.width + 50) {
-        const pulse = Math.sin(p.pulsePhase) * 0.3 + 0.7;
-        const alpha = p.opacity * p.depth * pulse;
-        
-        ctx.fillStyle = `hsl(${p.hue}, 70%, 60%)`;
-        ctx.globalAlpha = alpha;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, p.size * (0.5 + p.depth * 0.5), 0, Math.PI * 2);
-        ctx.fill();
-      }
-    });
-    ctx.globalAlpha = 1;
-  };
-
-  const renderEnemy = (ctx, enemy, offsetX, offsetY) => {
-    ctx.save();
-    ctx.translate(enemy.x - offsetX, enemy.y - offsetY);
-
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = enemy.color;
-
-    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, enemy.size);
-    gradient.addColorStop(0, enemy.color);
-    gradient.addColorStop(1, enemy.color + '66');
-    ctx.fillStyle = gradient;
-
-    ctx.beginPath();
-    ctx.arc(0, 0, enemy.size, 0, Math.PI * 2);
-    ctx.fill();
-
-    if (enemy.boss) {
-      ctx.strokeStyle = '#FFD700';
-      ctx.lineWidth = 4;
-      ctx.globalAlpha = 0.6 + Math.sin(enemy.animPhase) * 0.2;
-      ctx.beginPath();
-      ctx.arc(0, 0, enemy.size + 10, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-
-    if (enemy.health < enemy.maxHealth) {
-      const barWidth = enemy.size * 2;
-      const healthPercent = enemy.health / enemy.maxHealth;
-
-      ctx.fillStyle = '#333';
-      ctx.fillRect(-barWidth / 2, -enemy.size - 15, barWidth, 4);
-      
-      ctx.fillStyle = healthPercent > 0.5 ? '#00FF00' : healthPercent > 0.25 ? '#FFFF00' : '#FF0000';
-      ctx.fillRect(-barWidth / 2, -enemy.size - 15, barWidth * healthPercent, 4);
-    }
-    
-    ctx.shadowBlur = 0;
-    ctx.restore();
-  };
-
-  const renderMinimap = (ctx, canvas, state) => {
-    const minimapSize = 140;
-    const padding = 20;
-    ctx.save();
-    ctx.translate(canvas.width - minimapSize - padding, padding);
-
-    ctx.fillStyle = 'rgba(12, 18, 32, 0.75)';
-    ctx.fillRect(0, 0, minimapSize, minimapSize);
-    ctx.strokeStyle = 'rgba(0, 217, 255, 0.4)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(0, 0, minimapSize, minimapSize);
-
-    const scale = minimapSize / state.worldSize;
-
-    state.nebulas.forEach(nebula => {
-      ctx.fillStyle = nebula.type === 'solid' ? 'rgba(120, 90, 220, 0.4)' : 'rgba(80, 170, 240, 0.3)';
-      const radius = nebula.radius * scale;
-      ctx.beginPath();
-      ctx.arc(nebula.x * scale, nebula.y * scale, Math.max(2, radius), 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    state.obstacles.forEach(obs => {
-      ctx.fillStyle = 'rgba(180, 90, 200, 0.6)';
-      ctx.fillRect(obs.x * scale - 2, obs.y * scale - 2, 4, 4);
-    });
-
-    state.powerUps.forEach(power => {
-      ctx.fillStyle = power.color;
-      ctx.beginPath();
-      ctx.arc(power.x * scale, power.y * scale, 3, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    state.enemies.forEach(enemy => {
-      ctx.fillStyle = enemy.boss ? '#FF5577' : '#FFAA33';
-      ctx.beginPath();
-      ctx.arc(enemy.x * scale, enemy.y * scale, enemy.boss ? 4 : 2, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    ctx.fillStyle = '#00D9FF';
-    ctx.beginPath();
-    ctx.arc(state.organism.x * scale, state.organism.y * scale, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
-  };
-
   const handleJoystickStart = (e) => {
     e.preventDefault();
     const touch = e.touches[0];
@@ -1134,431 +738,282 @@ const MicroOmegaGame = () => {
         state.bossPending = false;
       }
 
-      // Renderizar fundo épico
-      renderBackground(ctx, canvas, offsetX, offsetY);
+      const camera = { offsetX, offsetY };
 
-      state.nebulas.forEach(nebula => {
-        nebula.rotation += nebula.swirlSpeed * delta;
-        nebula.pulse += delta * 0.4;
+      const drawWorld = ({ state, camera, viewport }) => {
+        const org = state.organism;
+        const width = viewport.width;
+        const height = viewport.height;
+        const baseOffsetX = camera.offsetX;
+        const baseOffsetY = camera.offsetY;
 
-        const screenX = nebula.x - offsetX;
-        const screenY = nebula.y - offsetY;
+        state.nebulas.forEach(nebula => {
+          nebula.rotation += nebula.swirlSpeed * delta;
+          nebula.pulse += delta * 0.4;
 
-        if (screenX > -nebula.radius - 200 && screenX < canvas.width + nebula.radius + 200 &&
-            screenY > -nebula.radius - 200 && screenY < canvas.height + nebula.radius + 200) {
-          ctx.save();
-          ctx.translate(screenX, screenY);
-          ctx.rotate(nebula.rotation * (nebula.type === 'gas' ? 0.5 : 1));
+          const screenX = nebula.x - baseOffsetX;
+          const screenY = nebula.y - baseOffsetY;
 
-          const gradient = ctx.createRadialGradient(0, 0, nebula.radius * 0.15, 0, 0, nebula.radius);
-          gradient.addColorStop(0, nebula.innerColor);
-          gradient.addColorStop(0.7, nebula.color);
-          gradient.addColorStop(1, 'rgba(5, 10, 30, 0)');
+          if (
+            screenX > -nebula.radius - 200 && screenX < width + nebula.radius + 200 &&
+            screenY > -nebula.radius - 200 && screenY < height + nebula.radius + 200
+          ) {
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            ctx.rotate(nebula.rotation * (nebula.type === 'gas' ? 0.5 : 1));
 
-          ctx.globalAlpha = nebula.opacity;
-          ctx.fillStyle = gradient;
-          ctx.beginPath();
-          ctx.arc(0, 0, nebula.radius, 0, Math.PI * 2);
-          ctx.fill();
+            const gradient = ctx.createRadialGradient(0, 0, nebula.radius * 0.15, 0, 0, nebula.radius);
+            gradient.addColorStop(0, nebula.innerColor);
+            gradient.addColorStop(0.7, nebula.color);
+            gradient.addColorStop(1, 'rgba(5, 10, 30, 0)');
 
-          nebula.layers.forEach(layer => {
-            const layerRadius = nebula.radius * layer.scale * (1 + Math.sin(nebula.pulse + layer.offset) * 0.05);
-            ctx.globalAlpha = layer.alpha;
-            ctx.fillStyle = nebula.glow;
+            ctx.globalAlpha = nebula.opacity;
+            ctx.fillStyle = gradient;
             ctx.beginPath();
-            ctx.ellipse(0, 0, layerRadius, layerRadius * 0.7, layer.offset + nebula.rotation, 0, Math.PI * 2);
+            ctx.arc(0, 0, nebula.radius, 0, Math.PI * 2);
             ctx.fill();
-          });
 
-          ctx.restore();
-          ctx.globalAlpha = 1;
-        }
+            nebula.layers.forEach(layer => {
+              const layerRadius =
+                nebula.radius * layer.scale * (1 + Math.sin(nebula.pulse + layer.offset) * 0.05);
+              ctx.globalAlpha = layer.alpha;
+              ctx.fillStyle = nebula.glow;
+              ctx.beginPath();
+              ctx.ellipse(0, 0, layerRadius, layerRadius * 0.7, layer.offset + nebula.rotation, 0, Math.PI * 2);
+              ctx.fill();
+            });
 
-        const dx = org.x - nebula.x;
-        const dy = org.y - nebula.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-
-        if (nebula.type === 'solid') {
-          if (dist < nebula.radius + org.size * 0.6) {
-            const overlap = nebula.radius + org.size * 0.6 - dist;
-            const nx = dx / dist;
-            const ny = dy / dist;
-            org.x += nx * overlap;
-            org.y += ny * overlap;
-            org.vx *= 0.4;
-            org.vy *= 0.4;
+            ctx.restore();
+            ctx.globalAlpha = 1;
           }
-        } else {
-          const fogFactor = 1 - Math.min(dist / (nebula.radius + org.size * 2), 1);
-          if (fogFactor > 0) {
-            state.fogIntensity = Math.min(0.85, Math.max(state.fogIntensity, fogFactor * nebula.opacity * 1.8));
+
+          const dx = org.x - nebula.x;
+          const dy = org.y - nebula.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+          if (nebula.type === 'solid') {
+            if (dist < nebula.radius + org.size * 0.6) {
+              const overlap = nebula.radius + org.size * 0.6 - dist;
+              const nx = dx / dist;
+              const ny = dy / dist;
+              org.x += nx * overlap;
+              org.y += ny * overlap;
+              org.vx *= 0.4;
+              org.vy *= 0.4;
+            }
+          } else {
+            const fogFactor = 1 - Math.min(dist / (nebula.radius + org.size * 2), 1);
+            if (fogFactor > 0) {
+              state.fogIntensity = Math.min(
+                0.85,
+                Math.max(state.fogIntensity, fogFactor * nebula.opacity * 1.8)
+              );
+            }
           }
-        }
-      });
+        });
 
-      offsetX = org.x - canvas.width / 2;
-      offsetY = org.y - canvas.height / 2;
+        camera.offsetX = org.x - width / 2;
+        camera.offsetY = org.y - height / 2;
 
-      // Obstacles
-      state.obstacles.forEach(obs => {
-        obs.rotation += obs.rotationSpeed * delta;
-        obs.pulsePhase += delta * 2;
-        
-        const screenX = obs.x - offsetX;
-        const screenY = obs.y - offsetY;
-        
-        if (screenX > -200 && screenX < canvas.width + 200) {
-          ctx.save();
-          ctx.translate(screenX, screenY);
-          ctx.rotate(obs.rotation);
-          
-          ctx.fillStyle = obs.color;
-          ctx.globalAlpha = obs.type === 'membrane' ? 0.6 : 0.8;
-          
-          const pulse = Math.sin(obs.pulsePhase) * 0.1 + 1;
-          
-          ctx.beginPath();
-          ctx.arc(0, 0, obs.size * pulse, 0, Math.PI * 2);
-          ctx.fill();
-          
-          ctx.globalAlpha = 1;
-          ctx.restore();
-        }
-      });
-      
-      runGameSystems(state, delta, getSystemHelpers());
-      
-      // Organic matter
-      state.organicMatter = state.organicMatter.filter(matter => {
-        matter.x += matter.vx;
-        matter.y += matter.vy;
-        matter.rotation += matter.rotationSpeed * delta;
-        matter.pulsePhase += delta * 2;
-        
-        const dx = matter.x - org.x;
-        const dy = matter.y - org.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const offsetX = camera.offsetX;
+        const offsetY = camera.offsetY;
 
-        if (dist < matter.size + org.size) {
-          state.energy += matter.energy;
-          state.health = Math.min(state.maxHealth, state.health + matter.health);
-          state.score += matter.energy;
-          playSound('collect');
-          addNotification(state, `+${matter.energy} ⚡`);
-          for (let i = 0; i < 5; i++) {
-            createParticle(state, matter.x, matter.y, matter.color, 3);
+        state.obstacles.forEach(obs => {
+          obs.rotation += obs.rotationSpeed * delta;
+          obs.pulsePhase += delta * 2;
+
+          const screenX = obs.x - offsetX;
+          const screenY = obs.y - offsetY;
+
+          if (screenX > -200 && screenX < width + 200) {
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            ctx.rotate(obs.rotation);
+
+            ctx.fillStyle = obs.color;
+            ctx.globalAlpha = obs.type === 'membrane' ? 0.6 : 0.8;
+
+            const pulse = Math.sin(obs.pulsePhase) * 0.1 + 1;
+
+            ctx.beginPath();
+            ctx.arc(0, 0, obs.size * pulse, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.globalAlpha = 1;
+            ctx.restore();
           }
-          return false;
-        }
-        
-        const screenX = matter.x - offsetX;
-        const screenY = matter.y - offsetY;
-        
-        if (screenX > -100 && screenX < canvas.width + 100) {
-          ctx.save();
-          ctx.translate(screenX, screenY);
-          ctx.rotate(matter.rotation);
-          
-          const pulse = Math.sin(matter.pulsePhase) * 0.1 + 1;
-          
-          ctx.shadowBlur = 20 * matter.glowIntensity;
-          ctx.shadowColor = matter.color;
-          ctx.fillStyle = matter.color;
-          ctx.globalAlpha = 0.85;
-          
-          ctx.beginPath();
-          ctx.arc(0, 0, matter.size * pulse, 0, Math.PI * 2);
-          ctx.fill();
-          
-          ctx.globalAlpha = 1;
-          ctx.shadowBlur = 0;
-          ctx.restore();
-        }
-        
-        return true;
-      });
+        });
 
-      if (state.organicMatter.length < 30 && Math.random() < 0.05) {
-        spawnOrganicMatter(state, 1);
-      }
+        runGameSystems(state, delta, getSystemHelpers());
 
-      // Power-ups
-      state.powerUps = state.powerUps.filter(power => {
-        power.pulse += delta * 3;
+        state.organicMatter = state.organicMatter.filter(matter => {
+          matter.x += matter.vx;
+          matter.y += matter.vy;
+          matter.rotation += matter.rotationSpeed * delta;
+          matter.pulsePhase += delta * 2;
 
-        const dx = power.x - org.x;
-        const dy = power.y - org.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < org.size + 24) {
-          applyPowerUp(power.type);
-          return false;
-        }
-
-        const screenX = power.x - offsetX;
-        const screenY = power.y - offsetY;
-
-        if (screenX > -120 && screenX < canvas.width + 120 && screenY > -120 && screenY < canvas.height + 120) {
-          ctx.save();
-          ctx.translate(screenX, screenY);
-          const glow = Math.sin(power.pulse) * 0.25 + 0.75;
-          ctx.fillStyle = power.color;
-          ctx.globalAlpha = 0.8;
-          ctx.shadowBlur = 20;
-          ctx.shadowColor = power.color;
-          ctx.beginPath();
-          ctx.arc(0, 0, 18 + Math.sin(power.pulse * 0.5) * 4, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.shadowBlur = 0;
-          ctx.globalAlpha = 1;
-          ctx.fillStyle = '#fff';
-          ctx.font = 'bold 16px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(power.icon, 0, 6);
-          ctx.restore();
-        }
-
-        return true;
-      });
-      
-      // Enemies
-      if (state.gameTime - state.lastEventTime > state.eventInterval / 1000) {
-        spawnEnemy();
-        state.lastEventTime = state.gameTime;
-      }
-
-      const bossEnemy = state.enemies.find(e => e.boss);
-      if (!bossEnemy && state.boss?.active) {
-        addNotification(state, '✨ Mega-organismo neutralizado!');
-        state.boss = null;
-        state.bossPending = false;
-        state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-      }
-
-      // Projectiles
-      state.projectiles = state.projectiles.filter(proj => {
-        proj.x += proj.vx;
-        proj.y += proj.vy;
-        proj.life -= delta;
-        
-        if (proj.life <= 0) return false;
-        
-        for (let i = 0; i < state.enemies.length; i++) {
-          const enemy = state.enemies[i];
-          const dx = proj.x - enemy.x;
-          const dy = proj.y - enemy.y;
+          const dx = matter.x - org.x;
+          const dy = matter.y - org.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
 
-          if (dist < enemy.size) {
-            enemy.health -= proj.damage;
-            createEffect(state, enemy.x, enemy.y, 'hit', proj.color);
-
-            if (enemy.health <= 0) {
-              state.energy += 25;
-              state.score += enemy.points;
-              dropPowerUps(state, enemy);
-              if (enemy.boss) {
-                state.boss = null;
-                state.bossPending = false;
-                addNotification(state, '✨ Mega-organismo neutralizado!');
-              }
-              state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-            } else if (enemy.boss) {
-              state.boss = {
-                active: true,
-                health: enemy.health,
-                maxHealth: enemy.maxHealth,
-                color: enemy.color
-              };
-              state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+          if (dist < matter.size + org.size) {
+            state.energy += matter.energy;
+            state.health = Math.min(state.maxHealth, state.health + matter.health);
+            state.score += matter.energy;
+            playSound('collect');
+            addNotification(state, `+${matter.energy} ⚡`);
+            for (let i = 0; i < 5; i++) {
+              createParticle(state, matter.x, matter.y, matter.color, 3);
             }
-
             return false;
           }
-        }
-        
-        const screenX = proj.x - offsetX;
-        const screenY = proj.y - offsetY;
-        
-        ctx.fillStyle = proj.color;
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = proj.color;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        
-        return true;
-      });
-      
-      state.enemies.forEach(e => renderEnemy(ctx, e, offsetX, offsetY));
 
-      renderOrganism(ctx, org, offsetX, offsetY);
-      
-      // Effects
-      state.effects = state.effects.filter(eff => {
-        const growth = eff.growth ?? 200;
-        const decay = eff.decay ?? 2;
+          const screenX = matter.x - offsetX;
+          const screenY = matter.y - offsetY;
 
-        eff.life -= delta * decay;
-        eff.size = Math.min(eff.maxSize ?? 120, eff.size + delta * growth);
+          if (screenX > -100 && screenX < width + 100) {
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            ctx.rotate(matter.rotation);
 
-        if (eff.spin) {
-          eff.rotation = (eff.rotation || 0) + eff.spin * delta;
-        }
+            const pulse = Math.sin(matter.pulsePhase) * 0.1 + 1;
 
-        if (eff.life <= 0) return false;
+            ctx.shadowBlur = 20 * matter.glowIntensity;
+            ctx.shadowColor = matter.color;
+            ctx.fillStyle = matter.color;
+            ctx.globalAlpha = 0.85;
 
-        const screenX = eff.x - offsetX;
-        const screenY = eff.y - offsetY;
-
-        ctx.save();
-        ctx.translate(screenX, screenY);
-        ctx.globalAlpha = Math.max(0, Math.min(1, eff.life));
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = eff.color;
-
-        const style = eff.style || 'ring';
-        const lineWidth = eff.lineWidth ?? 3;
-
-        switch (style) {
-          case 'filled': {
-            ctx.fillStyle = eff.color;
             ctx.beginPath();
-            ctx.arc(0, 0, Math.max(4, eff.size * 0.4), 0, Math.PI * 2);
+            ctx.arc(0, 0, matter.size * pulse, 0, Math.PI * 2);
             ctx.fill();
-            break;
-          }
-          case 'double-ring': {
-            ctx.strokeStyle = eff.color;
-            ctx.lineWidth = lineWidth;
-            ctx.beginPath();
-            ctx.arc(0, 0, eff.size * 0.6, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.globalAlpha *= 0.6;
-            ctx.beginPath();
-            ctx.arc(0, 0, eff.size, 0, Math.PI * 2);
-            ctx.stroke();
-            break;
-          }
-          case 'pulse': {
-            ctx.fillStyle = eff.color;
-            ctx.beginPath();
-            ctx.arc(0, 0, eff.size, 0, Math.PI * 2);
-            ctx.fill();
-            break;
-          }
-          case 'burst': {
-            ctx.strokeStyle = eff.color;
-            ctx.lineWidth = lineWidth;
-            ctx.lineCap = 'round';
-            const rays = eff.rays || 10;
-            for (let i = 0; i < rays; i++) {
-              const angle = (i / rays) * Math.PI * 2 + (eff.rotation || 0);
-              const inner = eff.size * 0.2;
-              const outer = eff.size;
-              ctx.beginPath();
-              ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
-              ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
-              ctx.stroke();
-            }
-            break;
-          }
-          case 'spiral': {
-            ctx.strokeStyle = eff.color;
-            ctx.lineWidth = lineWidth;
-            ctx.beginPath();
-            const segments = 24;
-            for (let i = 0; i <= segments; i++) {
-              const t = i / segments;
-              const angle = (eff.rotation || 0) + t * Math.PI * 3;
-              const radius = t * eff.size * 0.6;
-              const x = Math.cos(angle) * radius;
-              const y = Math.sin(angle) * radius;
-              if (i === 0) ctx.moveTo(x, y);
-              else ctx.lineTo(x, y);
-            }
-            ctx.stroke();
-            break;
-          }
-          default: {
-            ctx.strokeStyle = eff.color;
-            ctx.lineWidth = lineWidth;
-            ctx.beginPath();
-            ctx.arc(0, 0, eff.size, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-        }
 
-        ctx.restore();
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
+            ctx.restore();
+          }
 
-        return true;
-      });
-      
-      // Particles
-      state.particles = state.particles.filter(p => {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= 0.02;
-        p.vy += 0.15;
-        
-        if (p.life <= 0) return false;
-        
-        const screenX = p.x - offsetX;
-        const screenY = p.y - offsetY;
-        
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.life;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = p.color;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, p.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        
-        return true;
-      });
-      ctx.globalAlpha = 1;
-
-      if (state.fogIntensity > 0.01) {
-        const fogGradient = ctx.createRadialGradient(
-          canvas.width / 2,
-          canvas.height / 2,
-          Math.min(canvas.width, canvas.height) * 0.2,
-          canvas.width / 2,
-          canvas.height / 2,
-          Math.max(canvas.width, canvas.height)
-        );
-        fogGradient.addColorStop(0, `rgba(20, 40, 70, ${state.fogIntensity * 0.4})`);
-        fogGradient.addColorStop(1, `rgba(5, 10, 20, ${state.fogIntensity})`);
-        ctx.save();
-        ctx.globalAlpha = state.fogIntensity;
-        ctx.fillStyle = fogGradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.restore();
-      }
-
-      renderMinimap(ctx, canvas, state);
-
-      // Notifications
-      state.notifications = state.notifications.filter(n => {
-        n.life -= delta;
-        n.y += delta * 20;
-        
-        if (n.life > 0) {
-          ctx.fillStyle = '#fff';
-          ctx.font = 'bold 16px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.globalAlpha = Math.min(n.life, 1);
-          ctx.shadowBlur = 8;
-          ctx.shadowColor = '#000';
-          ctx.fillText(n.text, canvas.width / 2, n.y);
-          ctx.shadowBlur = 0;
           return true;
+        });
+
+        if (state.organicMatter.length < 30 && Math.random() < 0.05) {
+          spawnOrganicMatter(state, 1);
         }
-        return false;
+
+        state.powerUps = state.powerUps.filter(power => {
+          power.pulse += delta * 3;
+
+          const dx = power.x - org.x;
+          const dy = power.y - org.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < org.size + 24) {
+            applyPowerUp(power.type);
+            return false;
+          }
+
+          const screenX = power.x - offsetX;
+          const screenY = power.y - offsetY;
+
+          if (
+            screenX > -120 && screenX < width + 120 &&
+            screenY > -120 && screenY < height + 120
+          ) {
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            const glow = Math.sin(power.pulse) * 0.25 + 0.75;
+            ctx.fillStyle = power.color;
+            ctx.globalAlpha = 0.8;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = power.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, 18 + Math.sin(power.pulse * 0.5) * 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(power.icon, 0, 6);
+            ctx.restore();
+          }
+
+          return true;
+        });
+
+        if (state.gameTime - state.lastEventTime > state.eventInterval / 1000) {
+          spawnEnemy();
+          state.lastEventTime = state.gameTime;
+        }
+
+        const bossEnemy = state.enemies.find(e => e.boss);
+        if (!bossEnemy && state.boss?.active) {
+          addNotification(state, '✨ Mega-organismo neutralizado!');
+          state.boss = null;
+          state.bossPending = false;
+          state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+        }
+
+        state.projectiles = state.projectiles.filter(proj => {
+          proj.x += proj.vx;
+          proj.y += proj.vy;
+          proj.life -= delta;
+
+          if (proj.life <= 0) return false;
+
+          for (let i = 0; i < state.enemies.length; i++) {
+            const enemy = state.enemies[i];
+            const dx = proj.x - enemy.x;
+            const dy = proj.y - enemy.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < enemy.size) {
+              enemy.health -= proj.damage;
+              createEffect(state, enemy.x, enemy.y, 'hit', proj.color);
+
+              if (enemy.health <= 0) {
+                state.energy += 25;
+                state.score += enemy.points;
+                dropPowerUps(state, enemy);
+                if (enemy.boss) {
+                  state.boss = null;
+                  state.bossPending = false;
+                  addNotification(state, '✨ Mega-organismo neutralizado!');
+                }
+                state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+              } else if (enemy.boss) {
+                state.boss = {
+                  active: true,
+                  health: enemy.health,
+                  maxHealth: enemy.maxHealth,
+                  color: enemy.color
+                };
+                state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+              }
+
+              return false;
+            }
+          }
+
+          const screenX = proj.x - offsetX;
+          const screenY = proj.y - offsetY;
+
+          ctx.fillStyle = proj.color;
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = proj.color;
+          ctx.beginPath();
+          ctx.arc(screenX, screenY, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          return true;
+        });
+      };
+
+      renderFrame(ctx, state, camera, {
+        canvas,
+        delta,
+        drawWorld,
       });
-      ctx.globalAlpha = 1;
 
       state.pulsePhase += 0.04;
 
