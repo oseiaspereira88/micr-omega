@@ -11,6 +11,17 @@ import {
   nebulaTypes,
   createPowerUpTypes,
 } from './game/config';
+import { spawnObstacle as createObstacleEntity } from './game/factories/obstacleFactory';
+import { spawnNebula as createNebulaEntity } from './game/factories/nebulaFactory';
+import {
+  spawnPowerUp as createPowerUpEntity,
+  dropPowerUps as calculatePowerUpDrops
+} from './game/factories/powerUpFactory';
+import { spawnOrganicMatter as createOrganicMatterEntities } from './game/factories/organicMatterFactory';
+import {
+  spawnEnemy as createEnemyEntity,
+  spawnBoss as createBossEntity
+} from './game/factories/enemyFactory';
 
 const MicroOmegaGame = () => {
   const canvasRef = useRef(null);
@@ -159,92 +170,69 @@ const MicroOmegaGame = () => {
 
   const spawnObstacle = () => {
     const state = stateRef.current;
-    const types = Object.keys(obstacleTypes);
-    const typeKey = types[Math.floor(Math.random() * types.length)];
-    const type = obstacleTypes[typeKey];
-
-    state.obstacles.push({
-      x: Math.random() * 4000,
-      y: Math.random() * 4000,
-      size: type.sizes[0] + Math.random() * (type.sizes[1] - type.sizes[0]),
-      color: type.colors[Math.floor(Math.random() * type.colors.length)],
-      shape: type.shapes[Math.floor(Math.random() * type.shapes.length)],
-      type: typeKey,
-      rotation: Math.random() * Math.PI * 2,
-      rotationSpeed: (Math.random() - 0.5) * 0.3,
-      pulsePhase: Math.random() * Math.PI * 2
+    const obstacle = createObstacleEntity({
+      worldSize: state.worldSize,
+      types: obstacleTypes,
+      rng: Math.random
     });
+
+    if (obstacle) {
+      state.obstacles.push(obstacle);
+    }
+
+    return obstacle;
   };
 
   const spawnNebula = (forcedType) => {
     const state = stateRef.current;
-    const keys = Object.keys(nebulaTypes);
-    const typeKey = forcedType || keys[Math.floor(Math.random() * keys.length)];
-    const type = nebulaTypes[typeKey];
-
-    if (!type) return;
-
-    const radius = type.radius[0] + Math.random() * (type.radius[1] - type.radius[0]);
-
-    const layers = Array.from({ length: 4 }, () => ({
-      offset: Math.random() * Math.PI * 2,
-      scale: 0.6 + Math.random() * 0.5,
-      alpha: type.opacity * (0.4 + Math.random() * 0.6)
-    }));
-
-    state.nebulas.push({
-      id: Date.now() + Math.random(),
-      x: Math.random() * state.worldSize,
-      y: Math.random() * state.worldSize,
-      radius,
-      type: typeKey,
-      rotation: Math.random() * Math.PI * 2,
-      swirlSpeed: (Math.random() * 0.2 + 0.05) * (typeKey === 'gas' ? 1.5 : 1),
-      pulse: Math.random() * Math.PI * 2,
-      layers,
-      color: type.color,
-      innerColor: type.innerColor,
-      glow: type.glow,
-      opacity: type.opacity
+    const nebula = createNebulaEntity({
+      worldSize: state.worldSize,
+      types: nebulaTypes,
+      forcedType,
+      rng: Math.random
     });
+
+    if (nebula) {
+      state.nebulas.push(nebula);
+    }
+
+    return nebula;
   };
 
   const spawnPowerUp = (x, y, forcedType) => {
     const state = stateRef.current;
-    const keys = Object.keys(powerUpTypes);
-    if (keys.length === 0) return;
+    const hasPosition = typeof x === 'number' && typeof y === 'number';
+    const powerUp = createPowerUpEntity({
+      worldSize: state.worldSize,
+      types: powerUpTypes,
+      forcedType,
+      rng: Math.random,
+      position: hasPosition ? { x, y } : undefined
+    });
 
-    const typeKey = forcedType || keys[Math.floor(Math.random() * keys.length)];
-    const type = powerUpTypes[typeKey];
+    if (powerUp) {
+      state.powerUps.push(powerUp);
+    }
 
-    const powerUp = {
-      id: Date.now() + Math.random(),
-      x: x ?? Math.random() * state.worldSize,
-      y: y ?? Math.random() * state.worldSize,
-      type: typeKey,
-      color: type.color,
-      icon: type.icon,
-      pulse: Math.random() * Math.PI * 2
-    };
-
-    state.powerUps.push(powerUp);
     return powerUp;
   };
 
   const dropPowerUps = (enemy) => {
-    if (!enemy) return;
+    if (!enemy) return [];
 
-    const dropChance = enemy.boss ? 1 : 0.18;
-    if (Math.random() < dropChance) {
-      spawnPowerUp(
-        enemy.x + (Math.random() - 0.5) * 40,
-        enemy.y + (Math.random() - 0.5) * 40
-      );
-    }
+    const state = stateRef.current;
+    const drops = calculatePowerUpDrops(enemy, {
+      types: powerUpTypes,
+      rng: Math.random
+    });
 
-    if (enemy.boss) {
-      spawnPowerUp(enemy.x, enemy.y);
-    }
+    drops.forEach((powerUp) => {
+      if (powerUp) {
+        state.powerUps.push(powerUp);
+      }
+    });
+
+    return drops;
   };
 
   const applyPowerUp = (typeKey) => {
@@ -295,39 +283,20 @@ const MicroOmegaGame = () => {
 
   const spawnOrganicMatter = (count) => {
     const state = stateRef.current;
-    const types = Object.keys(organicMatterTypes);
-    
-    for (let i = 0; i < count; i++) {
-      const typeKey = types[Math.floor(Math.random() * types.length)];
-      const type = organicMatterTypes[typeKey];
-      
-      const isCluster = Math.random() > 0.4;
-      const clusterSize = isCluster ? Math.floor(Math.random() * 5) + 3 : 1;
-      
-      const baseX = Math.random() * 4000;
-      const baseY = Math.random() * 4000;
-      
-      for (let j = 0; j < clusterSize; j++) {
-        const offset = isCluster ? (Math.random() - 0.5) * 40 : 0;
-        
-        state.organicMatter.push({
-          x: baseX + offset,
-          y: baseY + offset,
-          vx: (Math.random() - 0.5) * 0.2,
-          vy: (Math.random() - 0.5) * 0.2,
-          size: type.sizes[0] + Math.random() * (type.sizes[1] - type.sizes[0]),
-          color: type.colors[Math.floor(Math.random() * type.colors.length)],
-          shape: type.shapes[Math.floor(Math.random() * type.shapes.length)],
-          type: typeKey,
-          energy: type.energy,
-          health: type.health,
-          rotationSpeed: (Math.random() - 0.5) * 2,
-          rotation: Math.random() * Math.PI * 2,
-          pulsePhase: Math.random() * Math.PI * 2,
-          glowIntensity: Math.random() * 0.5 + 0.5
-        });
+    const organicItems = createOrganicMatterEntities({
+      count,
+      worldSize: state.worldSize,
+      types: organicMatterTypes,
+      rng: Math.random
+    });
+
+    organicItems.forEach((item) => {
+      if (item) {
+        state.organicMatter.push(item);
       }
-    }
+    });
+
+    return organicItems;
   };
 
   const playSound = (type) => {
@@ -500,83 +469,42 @@ const MicroOmegaGame = () => {
 
   const spawnEnemy = () => {
     const state = stateRef.current;
-    const templates = Object.keys(enemyTemplates);
-    const templateKey = templates[Math.floor(Math.random() * templates.length)];
-    const template = enemyTemplates[templateKey];
-    
-    const levelScale = 1 + (state.level * 0.2);
-    const angle = Math.random() * Math.PI * 2;
-    const distance = 600;
-    
-    state.enemies.push({
-      id: Date.now() + Math.random(),
-      x: state.organism.x + Math.cos(angle) * distance,
-      y: state.organism.y + Math.sin(angle) * distance,
-      vx: 0, vy: 0,
-      type: templateKey,
-      size: template.baseSize * Math.sqrt(levelScale),
-      speed: template.baseSpeed,
-      attack: Math.floor(template.baseAttack * levelScale),
-      defense: Math.floor(template.baseDefense * levelScale),
-      health: Math.floor(template.baseSize * levelScale * 2),
-      maxHealth: Math.floor(template.baseSize * levelScale * 2),
-      points: template.points,
-      color: template.color,
-      behavior: template.behavior,
-      evolutionLevel: Math.floor(levelScale),
-      attackCooldown: 0,
-      state: 'wandering',
-      animPhase: 0,
-      canLeave: true,
-      ticksOutOfRange: 0,
-      boss: false
+    const enemy = createEnemyEntity({
+      level: state.level,
+      organismPosition: { x: state.organism.x, y: state.organism.y },
+      templates: enemyTemplates,
+      rng: Math.random
     });
+
+    if (enemy) {
+      state.enemies.push(enemy);
+    }
+
+    return enemy;
   };
 
   const spawnBoss = () => {
     const state = stateRef.current;
-    if (state.boss?.active) return;
+    if (state.boss?.active) return null;
 
-    const org = state.organism;
-    const angle = Math.random() * Math.PI * 2;
-    const distance = 900;
+    const result = createBossEntity({
+      level: state.level,
+      organismPosition: { x: state.organism.x, y: state.organism.y },
+      rng: Math.random
+    });
 
-    const boss = {
-      id: Date.now() + Math.random(),
-      x: org.x + Math.cos(angle) * distance,
-      y: org.y + Math.sin(angle) * distance,
-      vx: 0,
-      vy: 0,
-      type: 'leviathan',
-      size: 160,
-      speed: 1.2,
-      attack: 35,
-      defense: 14,
-      health: 900,
-      maxHealth: 900,
-      points: 800,
-      color: '#FF3A6B',
-      behavior: 'boss',
-      evolutionLevel: state.level,
-      attackCooldown: 0,
-      state: 'aggressive',
-      animPhase: 0,
-      canLeave: false,
-      ticksOutOfRange: 0,
-      boss: true
-    };
+    if (!result) return null;
+
+    const { boss, bossState } = result;
 
     state.enemies.push(boss);
-    state.boss = {
-      active: true,
-      health: boss.health,
-      maxHealth: boss.maxHealth,
-      color: boss.color
-    };
+    state.boss = bossState;
 
     addNotification('⚠️ Mega-organismo detectado!');
     playSound('boss');
     state.uiSyncTimer = 0;
+
+    return boss;
   };
 
   const updateEnemy = (enemy, state, delta) => {
