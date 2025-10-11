@@ -1,4 +1,7 @@
-export const createSkills = ({ createEffect, playSound, createParticle }) => ({
+import { createVisualEffect } from '../effects/visualEffects';
+import { createParticle as generateParticle } from '../effects/particles';
+
+export const createSkills = ({ playSound }) => ({
   pulse: {
     name: 'Pulso Energético',
     icon: '💥',
@@ -16,10 +19,10 @@ export const createSkills = ({ createEffect, playSound, createParticle }) => ({
           enemy.vx += (dx / dist) * 15;
           enemy.vy += (dy / dist) * 15;
           enemy.health -= org.attack * 0.5;
-          createEffect(enemy.x, enemy.y, 'pulse', '#00D9FF');
+          state.effects.push(createVisualEffect(enemy.x, enemy.y, 'pulse', '#00D9FF'));
         }
       });
-      createEffect(org.x, org.y, 'shockwave', '#00D9FF');
+      state.effects.push(createVisualEffect(org.x, org.y, 'shockwave', '#00D9FF'));
       playSound('skill');
     }
   },
@@ -55,7 +58,7 @@ export const createSkills = ({ createEffect, playSound, createParticle }) => ({
     effect: (state) => {
       state.organism.invulnerable = true;
       setTimeout(() => { state.organism.invulnerable = false; }, 2000);
-      createEffect(state.organism.x, state.organism.y, 'shield', '#FFD700');
+      state.effects.push(createVisualEffect(state.organism.x, state.organism.y, 'shield', '#FFD700'));
       playSound('buff');
     }
   },
@@ -81,18 +84,20 @@ export const createSkills = ({ createEffect, playSound, createParticle }) => ({
 
           for (let i = 0; i < 5; i++) {
             const t = i / 5;
-            createParticle(
-              enemy.x + (org.x - enemy.x) * t,
-              enemy.y + (org.y - enemy.y) * t,
-              '#00FF88',
-              3
+            state.particles.push(
+              generateParticle(
+                enemy.x + (org.x - enemy.x) * t,
+                enemy.y + (org.y - enemy.y) * t,
+                '#00FF88',
+                3
+              )
             );
           }
         }
       });
 
       state.health = Math.min(state.maxHealth, state.health + totalDrain);
-      createEffect(org.x, org.y, 'drain', '#00FF88');
+      state.effects.push(createVisualEffect(org.x, org.y, 'drain', '#00FF88'));
       playSound('drain');
     }
   }
