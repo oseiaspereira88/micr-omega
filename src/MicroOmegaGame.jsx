@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 const MicroOmegaGame = () => {
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
+  const animationFrameRef = useRef(null);
   
   const [gameState, setGameState] = useState({
     energy: 0,
@@ -121,6 +122,8 @@ const MicroOmegaGame = () => {
     showEvolutionChoice: false,
     evolutionType: 'skill',
     notifications: [],
+    availableTraits: [],
+    availableForms: [],
     fogIntensity: 0,
     boss: null,
     bossPending: false,
@@ -324,6 +327,19 @@ const MicroOmegaGame = () => {
       duration: 6,
       message: 'Invencível!'
     }
+  };
+
+  const pickRandomUnique = (array, count) => {
+    if (!array?.length || count <= 0) return [];
+    const pool = [...array];
+    const result = [];
+
+    while (pool.length > 0 && result.length < count) {
+      const index = Math.floor(Math.random() * pool.length);
+      result.push(pool.splice(index, 1)[0]);
+    }
+
+    return result;
   };
 
   useEffect(() => {
@@ -1750,15 +1766,19 @@ const MicroOmegaGame = () => {
     }
 
     if (state.evolutionType === 'skill') {
-      const availableTraits = Object.keys(evolutionaryTraits).filter(
-        t => !state.organism.traits.includes(t)
+      const unusedTraits = Object.keys(evolutionaryTraits).filter(
+        (traitKey) => !state.organism.traits.includes(traitKey)
       );
-      state.availableTraits = availableTraits.slice(0, 3);
+      const traitPool = unusedTraits.length > 0
+        ? unusedTraits
+        : Object.keys(evolutionaryTraits);
+      state.availableTraits = pickRandomUnique(traitPool, Math.min(3, traitPool.length));
     } else {
-      const availableForms = Object.keys(forms).filter(
-        f => f !== state.organism.form
+      const unusedForms = Object.keys(forms).filter(
+        (formKey) => formKey !== state.organism.form
       );
-      state.availableForms = availableForms.slice(0, 3);
+      const formPool = unusedForms.length > 0 ? unusedForms : Object.keys(forms);
+      state.availableForms = pickRandomUnique(formPool, Math.min(3, formPool.length));
     }
 
     state.showEvolutionChoice = true;
@@ -1822,6 +1842,7 @@ const MicroOmegaGame = () => {
       level: 1,
       score: 0,
       canEvolve: false,
+      showEvolutionChoice: false,
       gameOver: false,
       combo: 0,
       maxCombo: 0,
@@ -1833,6 +1854,8 @@ const MicroOmegaGame = () => {
       uiSyncTimer: 0,
       activePowerUps: [],
       powerUps: [],
+      availableTraits: [],
+      availableForms: [],
       organicMatter: [],
       enemies: [],
       projectiles: [],
@@ -2445,13 +2468,17 @@ const MicroOmegaGame = () => {
 
       checkEvolution();
 
-      requestAnimationFrame(animate);
+      animationFrameRef.current = requestAnimationFrame(animate);
     };
 
     animate();
-    
+
     return () => {
       window.removeEventListener('resize', updateCanvasSize);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
     };
   }, []);
 
