@@ -20,7 +20,10 @@ const MicroOmegaGame = () => {
     activePowerUps: [],
     bossActive: false,
     bossHealth: 0,
-    bossMaxHealth: 0
+    bossMaxHealth: 0,
+    currentSkill: null,
+    skillList: [],
+    hasMultipleSkills: false
   });
 
   const [joystickActive, setJoystickActive] = useState(false);
@@ -122,10 +125,12 @@ const MicroOmegaGame = () => {
     nextBossLevel: 3,
     uiSyncTimer: 0.2,
     
-    joystick: { x: 0, y: 0, active: false },
+    joystick: { x: 0, y: 0, active: false, source: 'none' },
     actionButton: false,
     gameOver: false
   });
+
+  const keyboardStateRef = useRef({ up: false, down: false, left: false, right: false });
 
   const forms = {
     sphere: { name: 'Esfera', icon: '⚪', defense: 1.2, speed: 1.0 },
@@ -937,7 +942,7 @@ const MicroOmegaGame = () => {
   const useSkill = () => {
     const state = stateRef.current;
     const org = state.organism;
-    
+
     if (org.skills.length === 0 || org.dying) return;
     
     const currentSkill = org.skills[org.currentSkillIndex];
@@ -953,7 +958,27 @@ const MicroOmegaGame = () => {
     state.energy -= skill.cost;
     skill.effect(state);
     org.skillCooldowns[currentSkill] = skill.cooldown / 1000;
-    
+    state.uiSyncTimer = 0;
+
+    syncState();
+  };
+
+  const cycleSkill = (direction = 1) => {
+    const state = stateRef.current;
+    const org = state.organism;
+
+    if (org.skills.length <= 1 || org.dying) return;
+
+    const total = org.skills.length;
+    org.currentSkillIndex = (org.currentSkillIndex + direction + total) % total;
+
+    const skillKey = org.skills[org.currentSkillIndex];
+    const skill = skills[skillKey];
+    if (skill) {
+      addNotification(`Skill: ${skill.name}`);
+    }
+
+    state.uiSyncTimer = 0;
     syncState();
   };
 
@@ -1528,10 +1553,11 @@ const MicroOmegaGame = () => {
     const rect = e.currentTarget.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    
+
     setJoystickActive(true);
     stateRef.current.joystick.active = true;
-    
+    stateRef.current.joystick.source = 'touch';
+
     updateJoystickPosition(touch.clientX, touch.clientY, centerX, centerY);
   };
 
@@ -1550,7 +1576,22 @@ const MicroOmegaGame = () => {
   const handleJoystickEnd = () => {
     setJoystickActive(false);
     setJoystickPosition({ x: 0, y: 0 });
-    stateRef.current.joystick = { x: 0, y: 0, active: false };
+    const joystick = stateRef.current.joystick;
+    joystick.x = 0;
+    joystick.y = 0;
+    joystick.active = false;
+    joystick.source = 'touch';
+
+    const keys = keyboardStateRef.current;
+    if (keys.up || keys.down || keys.left || keys.right) {
+      const x = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+      const y = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+      const length = Math.hypot(x, y) || 1;
+      joystick.x = x / length;
+      joystick.y = y / length;
+      joystick.active = true;
+      joystick.source = 'keyboard';
+    }
   };
 
   const updateJoystickPosition = (touchX, touchY, centerX, centerY) => {
@@ -1572,8 +1613,29 @@ const MicroOmegaGame = () => {
     stateRef.current.joystick = {
       x: x / maxDist,
       y: y / maxDist,
-      active: true
+      active: true,
+      source: 'touch'
     };
+  };
+
+  const updateKeyboardJoystick = () => {
+    const keys = keyboardStateRef.current;
+    const joystick = stateRef.current.joystick;
+    const x = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    const y = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+
+    if (x !== 0 || y !== 0) {
+      const length = Math.hypot(x, y) || 1;
+      joystick.x = x / length;
+      joystick.y = y / length;
+      joystick.active = true;
+      joystick.source = 'keyboard';
+    } else if (joystick.source === 'keyboard') {
+      joystick.x = 0;
+      joystick.y = 0;
+      joystick.active = false;
+      joystick.source = 'none';
+    }
   };
 
   const checkEvolution = () => {
@@ -1613,9 +1675,10 @@ const MicroOmegaGame = () => {
       );
       state.availableForms = availableForms.slice(0, 3);
     }
-    
+
     state.showEvolutionChoice = true;
     playSound('skill');
+    state.uiSyncTimer = 0;
     syncState();
   };
 
@@ -1626,16 +1689,22 @@ const MicroOmegaGame = () => {
     if (trait) {
       state.organism.traits.push(traitKey);
       trait.effect(state.organism);
-      
+
       state.organism.size += 4;
       state.organism.color = trait.color;
-      
+
+      if (trait.skill && state.organism.skillCooldowns[trait.skill] === undefined) {
+        state.organism.skillCooldowns[trait.skill] = 0;
+      }
+
       state.maxHealth += 30;
       state.health = state.maxHealth;
-      
+
       state.showEvolutionChoice = false;
       addNotification(`✨ ${trait.name}`);
-      
+
+      state.uiSyncTimer = 0;
+
       syncState();
     }
   };
@@ -1648,10 +1717,12 @@ const MicroOmegaGame = () => {
       state.organism.form = formKey;
       state.organism.defense *= form.defense;
       state.organism.speed *= form.speed;
-      
+
       state.showEvolutionChoice = false;
       addNotification(`✨ Forma ${form.name}!`);
-      
+
+      state.uiSyncTimer = 0;
+
       syncState();
     }
   };
@@ -1733,6 +1804,11 @@ const MicroOmegaGame = () => {
       }
     });
 
+    keyboardStateRef.current = { up: false, down: false, left: false, right: false };
+    state.joystick = { x: 0, y: 0, active: false, source: 'none' };
+    setJoystickActive(false);
+    setJoystickPosition({ x: 0, y: 0 });
+
     state.obstacles = [];
     for (let i = 0; i < 30; i++) {
       spawnObstacle();
@@ -1755,16 +1831,21 @@ const MicroOmegaGame = () => {
 
   const syncState = () => {
     const state = stateRef.current;
-    setGameState({
+    const organism = state.organism;
+    const currentSkillKey = organism.skills[organism.currentSkillIndex];
+    const currentSkillDef = currentSkillKey ? skills[currentSkillKey] : null;
+
+    setGameState(prev => ({
+      ...prev,
       energy: state.energy,
       health: state.health,
       maxHealth: state.maxHealth,
       level: state.level,
       score: state.score,
-      dashCharge: state.organism.dashCharge,
+      dashCharge: organism.dashCharge,
       canEvolve: state.canEvolve,
       showEvolutionChoice: state.showEvolutionChoice,
-      showMenu: gameState.showMenu,
+      showMenu: prev.showMenu,
       gameOver: state.gameOver,
       combo: state.combo,
       maxCombo: state.maxCombo,
@@ -1778,8 +1859,27 @@ const MicroOmegaGame = () => {
       })),
       bossActive: Boolean(state.boss?.active),
       bossHealth: state.boss?.health || 0,
-      bossMaxHealth: state.boss?.maxHealth || 0
-    });
+      bossMaxHealth: state.boss?.maxHealth || 0,
+      currentSkill: currentSkillDef
+        ? {
+            key: currentSkillKey,
+            name: currentSkillDef.name,
+            icon: currentSkillDef.icon,
+            cost: currentSkillDef.cost,
+            cooldown: organism.skillCooldowns[currentSkillKey] || 0,
+            maxCooldown: (currentSkillDef.cooldown || 0) / 1000
+          }
+        : null,
+      skillList: organism.skills.map(key => ({
+        key,
+        icon: skills[key].icon,
+        name: skills[key].name,
+        cooldown: organism.skillCooldowns[key] || 0,
+        maxCooldown: (skills[key].cooldown || 0) / 1000,
+        isActive: key === currentSkillKey
+      })),
+      hasMultipleSkills: organism.skills.length > 1
+    }));
   };
 
   useEffect(() => {
@@ -2268,6 +2368,106 @@ const MicroOmegaGame = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      const targetTag = event.target?.tagName?.toLowerCase();
+      if (targetTag && ['input', 'textarea', 'select'].includes(targetTag)) return;
+
+      const key = event.key;
+      const lower = key.toLowerCase();
+      let movementUpdated = false;
+
+      if (key === 'ArrowUp' || lower === 'w') {
+        keyboardStateRef.current.up = true;
+        movementUpdated = true;
+      } else if (key === 'ArrowDown' || lower === 's') {
+        keyboardStateRef.current.down = true;
+        movementUpdated = true;
+      } else if (key === 'ArrowLeft' || lower === 'a') {
+        keyboardStateRef.current.left = true;
+        movementUpdated = true;
+      } else if (key === 'ArrowRight' || lower === 'd') {
+        keyboardStateRef.current.right = true;
+        movementUpdated = true;
+      }
+
+      if (movementUpdated) {
+        event.preventDefault();
+        updateKeyboardJoystick();
+      }
+
+      if (key === ' ' || key === 'Spacebar') {
+        event.preventDefault();
+        performAttack();
+      } else if (key === 'Shift') {
+        event.preventDefault();
+        performDash();
+      } else if (lower === 'q') {
+        event.preventDefault();
+        useSkill();
+      } else if (lower === 'r' || key === 'Tab') {
+        event.preventDefault();
+        cycleSkill(1);
+      } else if (lower === 'e') {
+        event.preventDefault();
+        openEvolutionMenu();
+      }
+    };
+
+    const handleKeyUp = (event) => {
+      const key = event.key;
+      const lower = key.toLowerCase();
+      let movementUpdated = false;
+
+      if (key === 'ArrowUp' || lower === 'w') {
+        keyboardStateRef.current.up = false;
+        movementUpdated = true;
+      } else if (key === 'ArrowDown' || lower === 's') {
+        keyboardStateRef.current.down = false;
+        movementUpdated = true;
+      } else if (key === 'ArrowLeft' || lower === 'a') {
+        keyboardStateRef.current.left = false;
+        movementUpdated = true;
+      } else if (key === 'ArrowRight' || lower === 'd') {
+        keyboardStateRef.current.right = false;
+        movementUpdated = true;
+      }
+
+      if (movementUpdated) {
+        event.preventDefault();
+        updateKeyboardJoystick();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  const currentSkillInfo = gameState.currentSkill;
+  const skillMaxCooldown = currentSkillInfo?.maxCooldown ?? 0;
+  const skillCooldownRemaining = currentSkillInfo?.cooldown ?? 0;
+  const skillReadyPercent = currentSkillInfo
+    ? skillMaxCooldown > 0
+      ? Math.max(0, Math.min(100, ((skillMaxCooldown - skillCooldownRemaining) / skillMaxCooldown) * 100))
+      : 100
+    : 0;
+  const skillCoolingDown = Boolean(currentSkillInfo && skillCooldownRemaining > 0.05);
+  const skillDisabled =
+    !currentSkillInfo || skillCoolingDown || (currentSkillInfo ? gameState.energy < currentSkillInfo.cost : true);
+  const skillCooldownLabel = currentSkillInfo
+    ? skillCoolingDown
+      ? `${skillCooldownRemaining.toFixed(1)}s`
+      : 'Pronta'
+    : 'Sem habilidade';
+  const skillCooldownPercent = currentSkillInfo && skillMaxCooldown
+    ? Math.max(0, Math.min(100, (skillCooldownRemaining / skillMaxCooldown) * 100))
+    : 0;
+
   if (gameState.gameOver) {
     return (
       <div style={{
@@ -2550,6 +2750,139 @@ const MicroOmegaGame = () => {
         )}
       </div>
 
+      {(currentSkillInfo || gameState.skillList.length > 0) && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '45px',
+            right: '8px',
+            width: '230px',
+            background: 'rgba(8, 18, 36, 0.78)',
+            border: '1px solid rgba(0, 217, 255, 0.35)',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            zIndex: 10,
+            backdropFilter: 'blur(14px)',
+            boxShadow: '0 8px 28px rgba(0, 0, 0, 0.35)',
+            pointerEvents: 'auto'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#00D9FF' }}>
+              {currentSkillInfo ? `${currentSkillInfo.icon} ${currentSkillInfo.name}` : 'Sem habilidade ativa'}
+            </span>
+            {currentSkillInfo && (
+              <span style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.7)' }}>
+                {currentSkillInfo.cost}⚡
+              </span>
+            )}
+          </div>
+
+          <div style={{
+            fontSize: '0.7rem',
+            color: 'rgba(255, 255, 255, 0.7)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginBottom: '4px'
+          }}>
+            <span>Custo: {currentSkillInfo ? currentSkillInfo.cost : '--'}⚡</span>
+            <span>{skillCooldownLabel}</span>
+          </div>
+
+          <div
+            style={{
+              height: '6px',
+              background: 'rgba(255, 255, 255, 0.12)',
+              borderRadius: '4px',
+              overflow: 'hidden',
+              marginBottom: gameState.skillList.length > 0 ? '8px' : '4px'
+            }}
+          >
+            <div
+              style={{
+                width: `${skillReadyPercent}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #00D9FF, #7B2FFF)',
+                transition: 'width 0.2s ease'
+              }}
+            />
+          </div>
+
+          {gameState.skillList.length > 0 && (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: gameState.hasMultipleSkills ? '8px' : '6px' }}>
+              {gameState.skillList.map(skill => {
+                const cooldownPercent = skill.maxCooldown
+                  ? Math.max(0, Math.min(100, (skill.cooldown / skill.maxCooldown) * 100))
+                  : 0;
+                return (
+                  <div
+                    key={skill.key}
+                    title={`${skill.name}`}
+                    style={{
+                      position: 'relative',
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '10px',
+                      border: skill.isActive ? '2px solid #00D9FF' : '1px solid rgba(255, 255, 255, 0.25)',
+                      background: skill.isActive ? 'rgba(0, 217, 255, 0.18)' : 'rgba(255, 255, 255, 0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.1rem',
+                      overflow: 'hidden',
+                      boxShadow: skill.isActive ? '0 0 12px rgba(0, 217, 255, 0.4)' : 'none'
+                    }}
+                  >
+                    <span>{skill.icon}</span>
+                    {skill.cooldown > 0 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: `${Math.max(0, Math.min(100, cooldownPercent))}%`,
+                          background: 'rgba(0, 0, 0, 0.55)'
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {gameState.hasMultipleSkills && (
+            <button
+              type="button"
+              onClick={() => cycleSkill(1)}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                cycleSkill(1);
+              }}
+              style={{
+                width: '100%',
+                padding: '6px 0',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'linear-gradient(90deg, #00D9FF, #7B2FFF)',
+                color: '#000',
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                marginBottom: '4px'
+              }}
+            >
+              🔁 Trocar habilidade (R)
+            </button>
+          )}
+
+          <div style={{ fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.55)', textAlign: 'center' }}>
+            Q: usar habilidade • Shift: dash
+          </div>
+        </div>
+      )}
+
       <div
         onTouchStart={handleJoystickStart}
         onTouchMove={handleJoystickMove}
@@ -2620,8 +2953,8 @@ const MicroOmegaGame = () => {
           width: '60px',
           height: '60px',
           borderRadius: '50%',
-          background: gameState.dashCharge >= 30 
-            ? 'linear-gradient(135deg, #FFD700, #FFA500)' 
+          background: gameState.dashCharge >= 30
+            ? 'linear-gradient(135deg, #FFD700, #FFA500)'
             : 'rgba(100, 100, 100, 0.5)',
           border: '3px solid #fff',
           display: 'flex',
@@ -2635,6 +2968,81 @@ const MicroOmegaGame = () => {
         }}
       >
         💨
+      </button>
+
+      <button
+        type="button"
+        onClick={useSkill}
+        onTouchStart={(e) => {
+          e.preventDefault();
+          useSkill();
+        }}
+        disabled={skillDisabled}
+        title="Q: usar habilidade"
+        style={{
+          position: 'absolute',
+          bottom: '95px',
+          right: '95px',
+          width: '65px',
+          height: '65px',
+          borderRadius: '50%',
+          background: skillDisabled
+            ? 'rgba(100, 100, 100, 0.35)'
+            : 'linear-gradient(135deg, #00D9FF, #7B2FFF)',
+          border: '3px solid #fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '1.6rem',
+          cursor: skillDisabled ? 'not-allowed' : 'pointer',
+          touchAction: 'none',
+          zIndex: 10,
+          color: skillDisabled ? 'rgba(255, 255, 255, 0.75)' : '#000',
+          opacity: skillDisabled ? 0.7 : 1,
+          boxShadow: skillDisabled ? 'none' : '0 0 22px rgba(0, 217, 255, 0.55)'
+        }}
+      >
+        <span>{currentSkillInfo ? currentSkillInfo.icon : '🌀'}</span>
+        {currentSkillInfo && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '6px',
+              fontSize: '0.6rem',
+              fontWeight: 600,
+              color: skillDisabled ? '#fff' : '#001'
+            }}
+          >
+            {skillCoolingDown ? skillCooldownLabel : `${currentSkillInfo.cost}⚡`}
+          </div>
+        )}
+        {!currentSkillInfo && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '6px',
+              fontSize: '0.6rem',
+              fontWeight: 600,
+              color: '#fff'
+            }}
+          >
+            --
+          </div>
+        )}
+        {currentSkillInfo && skillCoolingDown && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: `${Math.max(0, Math.min(100, skillCooldownPercent))}%`,
+              background: 'rgba(0, 0, 0, 0.4)',
+              borderRadius: '0 0 32px 32px',
+              pointerEvents: 'none'
+            }}
+          />
+        )}
       </button>
 
       <button
