@@ -1,4 +1,10 @@
-export const createPowerUpTypes = ({ addNotification }) => ({
+import { addNotification as appendNotification } from '../ui/notifications';
+
+const notify = (state, message) => {
+  state.notifications = appendNotification(state.notifications, message);
+};
+
+export const createPowerUpTypes = () => ({
   health: {
     name: 'Cápsula Regenerativa',
     icon: '❤️',
@@ -6,7 +12,7 @@ export const createPowerUpTypes = ({ addNotification }) => ({
     instant: true,
     apply: (state) => {
       state.health = Math.min(state.maxHealth, state.health + 50);
-      addNotification('+50 HP');
+      notify(state, '+50 HP');
     }
   },
   energy: {
@@ -16,7 +22,7 @@ export const createPowerUpTypes = ({ addNotification }) => ({
     instant: true,
     apply: (state) => {
       state.energy += 100;
-      addNotification('+100 Energia');
+      notify(state, '+100 Energia');
     }
   },
   speed: {
@@ -41,3 +47,5 @@ export const createPowerUpTypes = ({ addNotification }) => ({
     message: 'Invencível!'
   }
 });
+
+export default createPowerUpTypes;

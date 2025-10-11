@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createInitialState } from './game/state/initialState';
 import {
@@ -18,6 +18,10 @@ import {
   dropPowerUps as calculatePowerUpDrops
 } from './game/factories/powerUpFactory';
 import { spawnOrganicMatter as createOrganicMatterEntities } from './game/factories/organicMatterFactory';
+import { createSoundEffects } from './game/audio/soundEffects';
+import { createParticle as generateParticle } from './game/effects/particles';
+import { createVisualEffect as generateVisualEffect } from './game/effects/visualEffects';
+import { addNotification as appendNotification } from './game/ui/notifications';
 import {
   spawnEnemy as createEnemyEntity,
   spawnBoss as createBossEntity
@@ -45,6 +49,10 @@ const MicroOmegaGame = () => {
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
   const animationFrameRef = useRef(null);
+  const { playSound } = useMemo(
+    () => createSoundEffects(() => audioCtxRef.current),
+    []
+  );
   
   const [gameState, setGameState] = useState({
     energy: 0,
@@ -324,130 +332,27 @@ const MicroOmegaGame = () => {
     return organicItems;
   };
 
-  const playSound = (type) => {
-    const ctx = audioCtxRef.current;
-    if (!ctx) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    switch(type) {
-      case 'attack':
-        osc.type = 'triangle';
-        osc.frequency.value = 480;
-        break;
-      case 'collect':
-        osc.type = 'sine';
-        osc.frequency.value = 720;
-        break;
-      case 'damage':
-        osc.type = 'sawtooth';
-        osc.frequency.value = 160;
-        break;
-      case 'dash':
-        osc.type = 'square';
-        osc.frequency.value = 1280;
-        break;
-      case 'powerup':
-        osc.type = 'sine';
-        osc.frequency.value = 950;
-        break;
-      case 'skill':
-        osc.type = 'triangle';
-        osc.frequency.value = 880;
-        break;
-      case 'shoot':
-        osc.type = 'square';
-        osc.frequency.value = 1020;
-        break;
-      case 'buff':
-        osc.type = 'sine';
-        osc.frequency.value = 620;
-        break;
-      case 'drain':
-        osc.type = 'triangle';
-        osc.frequency.value = 360;
-        break;
-      case 'combo':
-        osc.type = 'square';
-        osc.frequency.value = 680;
-        break;
-      case 'boss':
-        osc.type = 'sawtooth';
-        osc.frequency.value = 260;
-        break;
-      default:
-        osc.frequency.value = 440;
-    }
-
-    gain.gain.setValueAtTime(type === 'boss' ? 0.2 : 0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (type === 'boss' ? 0.6 : 0.3));
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.5);
-  };
-
   const createParticle = (state, x, y, color, size = 3) => {
-    state.particles.push({
-      x, y,
-      vx: (Math.random() - 0.5) * 5,
-      vy: (Math.random() - 0.5) * 5,
-      life: 1,
-      color,
-      size: Math.random() * size + 2
-    });
-  };
-
-  const effectConfigs = {
-    shockwave: { style: 'ring', growth: 260, decay: 1.6, maxSize: 220, lineWidth: 4 },
-    hit: { style: 'filled', growth: 220, decay: 4.4, maxSize: 60 },
-    attack: { style: 'ring', growth: 240, decay: 2.4, maxSize: 150, lineWidth: 2 },
-    shield: { style: 'double-ring', growth: 160, decay: 1.4, maxSize: 160, lineWidth: 3 },
-    pulse: { style: 'pulse', growth: 230, decay: 1.7, maxSize: 200 },
-    drain: { style: 'spiral', growth: 200, decay: 2.2, maxSize: 160, spin: 3, lineWidth: 2 },
-    dashstart: { style: 'burst', growth: 320, decay: 3.2, maxSize: 160, lineWidth: 3, rays: 12 },
-    dashend: { style: 'pulse', growth: 220, decay: 2.6, maxSize: 120 },
-    default: { style: 'ring', growth: 200, decay: 2, maxSize: 120, lineWidth: 2 }
+    const particle = generateParticle(x, y, color, size);
+    if (particle) {
+      state.particles.push(particle);
+    }
   };
 
   const createEffect = (state, x, y, type, color) => {
-    const config = effectConfigs[type] || effectConfigs.default;
-    state.effects.push({
-      x,
-      y,
-      type,
-      color,
-      style: config.style,
-      life: 1,
-      size: config.initialSize ?? 0,
-      maxSize: config.maxSize,
-      growth: config.growth,
-      decay: config.decay,
-      lineWidth: config.lineWidth ?? 3,
-      rays: config.rays ?? 0,
-      rotation: Math.random() * Math.PI * 2,
-      spin: config.spin ?? 0
-    });
+    const effect = generateVisualEffect(x, y, type, color);
+    if (effect) {
+      state.effects.push(effect);
+    }
   };
 
   const addNotification = (state, text) => {
-    state.notifications.push({
-      text,
-      life: 2,
-      y: 60,
-      id: Date.now() + Math.random()
-    });
+    state.notifications = appendNotification(state.notifications, text);
   };
 
-  const powerUpTypes = createPowerUpTypes({
-    addNotification: (text) => addNotification(stateRef.current, text)
-  });
+  const powerUpTypes = createPowerUpTypes();
   const skills = createSkills({
-    createEffect: (x, y, type, color) => createEffect(stateRef.current, x, y, type, color),
-    playSound,
-    createParticle: (x, y, color, size) => createParticle(stateRef.current, x, y, color, size)
+    playSound
   });
 
   const getSystemHelpers = () => ({
