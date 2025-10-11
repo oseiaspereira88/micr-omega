@@ -1,4 +1,5 @@
 import type { Env } from "./index";
+import { createObservability, serializeError, type Observability } from "./observability";
 import {
   PROTOCOL_VERSION,
   clientMessageSchema,
@@ -44,31 +45,6 @@ const ALARM_KEY = "alarms";
 
 const SUPPORTED_CLIENT_VERSIONS = new Set([PROTOCOL_VERSION]);
 
-type LogLevel = "info" | "warn" | "error";
-
-const structuredLog = (level: LogLevel, event: string, data: Record<string, unknown> = {}) => {
-  console.log(
-    JSON.stringify({
-      level,
-      event,
-      timestamp: new Date().toISOString(),
-      ...data
-    })
-  );
-};
-
-const serializeError = (error: unknown) => {
-  if (error instanceof Error) {
-    return {
-      message: error.message,
-      stack: error.stack
-    };
-  }
-  return {
-    message: String(error)
-  };
-};
-
 class MessageRateLimiter {
   private timestamps: number[] = [];
 
@@ -109,12 +85,15 @@ type StoredPlayer = {
   name: string;
   score: number;
   combo: number;
+  totalSessionDurationMs?: number;
+  sessionCount?: number;
 };
 
 type PlayerInternal = StoredPlayer & {
   connected: boolean;
   lastActiveAt: number;
   lastSeenAt: number;
+  connectedAt: number | null;
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -124,6 +103,7 @@ function clamp(value: number, min: number, max: number): number {
 export class RoomDO {
   private readonly state: DurableObjectState;
   private readonly ready: Promise<void>;
+  private readonly observability: Observability;
 
   private readonly clientsBySocket = new Map<WebSocket, string>();
   private readonly socketsByPlayer = new Map<string, WebSocket>();
@@ -142,9 +122,11 @@ export class RoomDO {
 
   private alarmSchedule: Map<AlarmType, number> = new Map();
 
-  constructor(state: DurableObjectState, _env: Env) {
+  constructor(state: DurableObjectState, env: Env) {
     this.state = state;
+    this.observability = createObservability(env, { component: "RoomDO" });
     this.ready = this.initialize();
+    this.observability.log("info", "room_initialized");
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -164,15 +146,11 @@ export class RoomDO {
     server.accept();
 
     this.setupSession(server).catch((error) => {
-      structuredLog("error", "room_session_failed", {
-        error: serializeError(error)
-      });
+      this.observability.logError("room_session_failed", error);
       try {
         server.close(1011, "internal_error");
       } catch (err) {
-        structuredLog("error", "room_session_close_failed", {
-          error: serializeError(err)
-        });
+        this.observability.logError("room_session_close_failed", err);
       }
     });
 
@@ -245,10 +223,15 @@ export class RoomDO {
 
     this.send(socket, errorMessage);
 
-    structuredLog(scope === "connection" ? "warn" : "error", "rate_limited", {
+    this.observability.log(scope === "connection" ? "warn" : "error", "rate_limited", {
       scope,
       playerId,
-      retryAfterMs
+      retryAfterMs,
+      category: "protocol_error"
+    });
+    this.observability.recordMetric("protocol_errors", 1, {
+      type: "rate_limited",
+      scope
     });
 
     socket.close(1013, "rate_limited");
@@ -263,7 +246,10 @@ export class RoomDO {
           ...stored,
           connected: false,
           lastActiveAt: now,
-          lastSeenAt: now
+          lastSeenAt: now,
+          connectedAt: null,
+          totalSessionDurationMs: stored.totalSessionDurationMs ?? 0,
+          sessionCount: stored.sessionCount ?? 0
         };
         this.players.set(player.id, player);
         this.nameToPlayerId.set(player.name.toLowerCase(), player.id);
@@ -306,9 +292,13 @@ export class RoomDO {
       try {
         json = JSON.parse(data);
       } catch (error) {
-        structuredLog("warn", "client_payload_invalid", {
+        this.observability.log("warn", "client_payload_invalid", {
           stage: "parse",
-          error: serializeError(error)
+          error: serializeError(error),
+          category: "protocol_error"
+        });
+        this.observability.recordMetric("protocol_errors", 1, {
+          type: "invalid_json"
         });
         this.send(socket, { type: "error", reason: "invalid_payload" });
         socket.close(1003, "invalid_payload");
@@ -324,10 +314,15 @@ export class RoomDO {
           path: issue.path,
           message: issue.message
         }));
-        structuredLog("warn", "client_payload_invalid", {
+        this.observability.log("warn", "client_payload_invalid", {
           stage: "schema",
           type: rawType ?? "unknown",
-          issues
+          issues,
+          category: "protocol_error"
+        });
+        this.observability.recordMetric("protocol_errors", 1, {
+          type: "schema_invalid",
+          messageType: rawType ?? "unknown"
         });
 
         if (rawType === "join") {
@@ -441,7 +436,10 @@ export class RoomDO {
         combo: 1,
         connected: true,
         lastActiveAt: now,
-        lastSeenAt: now
+        lastSeenAt: now,
+        connectedAt: now,
+        totalSessionDurationMs: 0,
+        sessionCount: 0
       };
       this.players.set(id, player);
       this.nameToPlayerId.set(nameKey, id);
@@ -454,6 +452,7 @@ export class RoomDO {
       player.connected = true;
       player.lastSeenAt = now;
       player.lastActiveAt = now;
+      player.connectedAt = now;
       this.players.set(player.id, player);
       this.nameToPlayerId.set(nameKey, player.id);
     }
@@ -462,6 +461,18 @@ export class RoomDO {
     this.socketsByPlayer.set(player.id, socket);
 
     await this.persistPlayers();
+
+    const connectedPlayers = this.countConnectedPlayers();
+    const isReconnect = payload.playerId === player.id && !expiredPlayerRemoved;
+    this.observability.log("info", "player_connected", {
+      playerId: player.id,
+      name: player.name,
+      connectedPlayers,
+      isReconnect
+    });
+    this.observability.recordMetric("connected_players", connectedPlayers, {
+      phase: this.phase
+    });
 
     const reconnectUntil = now + RECONNECT_WINDOW_MS;
 
@@ -527,12 +538,13 @@ export class RoomDO {
 
     if (!player.connected) {
       player.connected = true;
+      player.connectedAt = now;
       const playerSocket = this.socketsByPlayer.get(player.id);
       if (playerSocket && playerSocket !== socket) {
         try {
           playerSocket.close(1008, "session_taken");
         } catch (error) {
-          structuredLog("warn", "close_stale_socket_failed", {
+          this.observability.log("warn", "close_stale_socket_failed", {
             playerId: player.id,
             error: serializeError(error)
           });
@@ -628,6 +640,14 @@ export class RoomDO {
 
     player.connected = false;
     player.lastSeenAt = Date.now();
+    const now = player.lastSeenAt;
+    let sessionDurationMs: number | null = null;
+    if (player.connectedAt) {
+      sessionDurationMs = Math.max(0, now - player.connectedAt);
+      player.totalSessionDurationMs = (player.totalSessionDurationMs ?? 0) + sessionDurationMs;
+      player.sessionCount = (player.sessionCount ?? 0) + 1;
+    }
+    player.connectedAt = null;
 
     const diff: SharedGameStateDiff = {
       upsertPlayers: [this.serializePlayer(player)]
@@ -640,6 +660,24 @@ export class RoomDO {
     };
 
     this.broadcast(stateMessage, socket);
+
+    const connectedPlayers = this.countConnectedPlayers();
+    this.observability.log("info", "player_disconnected", {
+      playerId: player.id,
+      name: player.name,
+      connectedPlayers,
+      sessionDurationMs
+    });
+    this.observability.recordMetric("connected_players", connectedPlayers, {
+      phase: this.phase
+    });
+    if (sessionDurationMs !== null) {
+      this.observability.recordMetric("session_duration_ms", sessionDurationMs, {
+        playerId: player.id
+      });
+    }
+
+    await this.persistPlayers();
 
     await this.scheduleCleanupAlarm();
 
@@ -756,6 +794,16 @@ export class RoomDO {
     };
 
     this.broadcast(stateMessage);
+
+    const connectedPlayers = this.countConnectedPlayers();
+    this.observability.log("info", "round_started", {
+      roundId: this.roundId,
+      roundEndsAt: this.roundEndsAt,
+      connectedPlayers
+    });
+    this.observability.recordMetric("connected_players", connectedPlayers, {
+      phase: this.phase
+    });
   }
 
   private async endGame(reason: "timeout" | "completed"): Promise<void> {
@@ -788,6 +836,17 @@ export class RoomDO {
 
     if (reason === "completed") {
       await this.persistPlayers();
+    }
+
+    const duration = this.roundStartedAt ? this.roundEndsAt - this.roundStartedAt : null;
+    this.observability.log("info", "round_ended", {
+      roundId: this.roundId,
+      reason,
+      durationMs: duration,
+      connectedPlayers: this.countConnectedPlayers()
+    });
+    if (duration !== null) {
+      this.observability.recordMetric("round_duration_ms", duration, { reason });
     }
   }
 
@@ -886,7 +945,7 @@ export class RoomDO {
     await this.scheduleCleanupAlarm();
   }
 
-  private async removePlayer(playerId: string, _reason: "expired" | "inactive"): Promise<void> {
+  private async removePlayer(playerId: string, reason: "expired" | "inactive"): Promise<void> {
     const player = this.players.get(playerId);
     if (!player) {
       return;
@@ -914,6 +973,14 @@ export class RoomDO {
     };
 
     this.broadcast(leftMessage);
+
+    this.observability.log("info", "player_removed", {
+      playerId: player.id,
+      name: player.name,
+      reason,
+      totalSessionDurationMs: player.totalSessionDurationMs ?? 0,
+      sessionCount: player.sessionCount ?? 0
+    });
 
     if (this.phase === "active" && this.countConnectedPlayers() === 0) {
       await this.endGame("timeout");
@@ -951,7 +1018,9 @@ export class RoomDO {
       id: player.id,
       name: player.name,
       score: player.score,
-      combo: player.combo
+      combo: player.combo,
+      totalSessionDurationMs: player.totalSessionDurationMs ?? 0,
+      sessionCount: player.sessionCount ?? 0
     }));
     await this.state.storage.put(PLAYERS_KEY, snapshot);
   }

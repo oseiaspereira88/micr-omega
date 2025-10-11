@@ -59,6 +59,8 @@ Scripts úteis adicionais:
 - `npm run test -w worker`: roda somente os testes de integração do Durable Object com Miniflare.
 - `npm run test -w web`: executa apenas os testes unitários de componentes e store com Vitest.
 - `npm run lint`: encadeia linters configurados em cada workspace.
+- `npm run tail:worker`: inicia o pipeline de tail estruturado (`wrangler tail` + arquivo NDJSON/Logflare).
+- `npm run report:metrics`: consolida métricas de sessões e erros a partir do último arquivo de log estruturado.
 
 Consulte `docs/load-testing.md` para instruções de execução do teste de carga com k6 (50–100 conexões simultâneas).
 

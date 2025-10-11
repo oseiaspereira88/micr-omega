@@ -5,6 +5,8 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 # Adicione variáveis de ambiente compartilhadas aqui
+# LOGFLARE_SOURCE_ID = ""
+# LOGFLARE_API_TOKEN = ""
 
 [[durable_objects.bindings]]
 name = "ROOM"
