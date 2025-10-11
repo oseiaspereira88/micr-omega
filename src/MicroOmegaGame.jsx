@@ -35,6 +35,8 @@ import {
   restartGame as restartGameSystem,
   runGameSystems
 } from './game/systems';
+import useInputController from './game/input/useInputController';
+import { DEFAULT_JOYSTICK_STATE } from './game/input/utils';
 
 const MicroOmegaGame = () => {
   const canvasRef = useRef(null);
@@ -63,23 +65,18 @@ const MicroOmegaGame = () => {
     hasMultipleSkills: false
   });
 
-  const [joystickActive, setJoystickActive] = useState(false);
-  const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 });
-
   const stateRef = useRef(createInitialState());
-
-  const keyboardStateRef = useRef({ up: false, down: false, left: false, right: false });
-
-  const resetControls = (state) => {
-    keyboardStateRef.current = { up: false, down: false, left: false, right: false };
-
+  const movementIntentRef = useRef({ ...DEFAULT_JOYSTICK_STATE });
+  const inputResetRef = useRef((state) => {
     const targetState = state ?? stateRef.current;
     if (targetState.joystick) {
-      targetState.joystick = { x: 0, y: 0, active: false, source: 'none' };
+      targetState.joystick = { ...DEFAULT_JOYSTICK_STATE };
     }
+    movementIntentRef.current = { ...DEFAULT_JOYSTICK_STATE };
+  });
 
-    setJoystickActive(false);
-    setJoystickPosition({ x: 0, y: 0 });
+  const resetControls = (state) => {
+    inputResetRef.current(state);
   };
 
   const pickRandomUnique = (array, count) => {
@@ -528,99 +525,6 @@ const MicroOmegaGame = () => {
     const state = stateRef.current;
     cycleSkillSystem(state, getSystemHelpers(), direction);
   };
-
-
-  const handleJoystickStart = (e) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const rect = e.currentTarget.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    setJoystickActive(true);
-    stateRef.current.joystick.active = true;
-    stateRef.current.joystick.source = 'touch';
-
-    updateJoystickPosition(touch.clientX, touch.clientY, centerX, centerY);
-  };
-
-  const handleJoystickMove = (e) => {
-    if (!joystickActive) return;
-    
-    e.preventDefault();
-    const touch = e.touches[0];
-    const rect = e.currentTarget.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    
-    updateJoystickPosition(touch.clientX, touch.clientY, centerX, centerY);
-  };
-
-  const handleJoystickEnd = () => {
-    setJoystickActive(false);
-    setJoystickPosition({ x: 0, y: 0 });
-    const joystick = stateRef.current.joystick;
-    joystick.x = 0;
-    joystick.y = 0;
-    joystick.active = false;
-    joystick.source = 'touch';
-
-    const keys = keyboardStateRef.current;
-    if (keys.up || keys.down || keys.left || keys.right) {
-      const x = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-      const y = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
-      const length = Math.hypot(x, y) || 1;
-      joystick.x = x / length;
-      joystick.y = y / length;
-      joystick.active = true;
-      joystick.source = 'keyboard';
-    }
-  };
-
-  const updateJoystickPosition = (touchX, touchY, centerX, centerY) => {
-    const dx = touchX - centerX;
-    const dy = touchY - centerY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const maxDist = 50;
-    
-    let x = dx;
-    let y = dy;
-    
-    if (dist > maxDist) {
-      x = (dx / dist) * maxDist;
-      y = (dy / dist) * maxDist;
-    }
-    
-    setJoystickPosition({ x, y });
-    
-    stateRef.current.joystick = {
-      x: x / maxDist,
-      y: y / maxDist,
-      active: true,
-      source: 'touch'
-    };
-  };
-
-  const updateKeyboardJoystick = () => {
-    const keys = keyboardStateRef.current;
-    const joystick = stateRef.current.joystick;
-    const x = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    const y = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
-
-    if (x !== 0 || y !== 0) {
-      const length = Math.hypot(x, y) || 1;
-      joystick.x = x / length;
-      joystick.y = y / length;
-      joystick.active = true;
-      joystick.source = 'keyboard';
-    } else if (joystick.source === 'keyboard') {
-      joystick.x = 0;
-      joystick.y = 0;
-      joystick.active = false;
-      joystick.source = 'none';
-    }
-  };
-
   const checkEvolution = () => {
     const state = stateRef.current;
     checkEvolutionSystem(state, getSystemHelpers());
@@ -630,6 +534,26 @@ const MicroOmegaGame = () => {
     const state = stateRef.current;
     openEvolutionMenuSystem(state, getSystemHelpers());
   };
+
+  const { joystick, actions: inputActions } = useInputController({
+    onMovementIntent: (intent) => {
+      movementIntentRef.current = intent;
+    },
+    onAttack: performAttack,
+    onDash: performDash,
+    onUseSkill: useSkill,
+    onCycleSkill: cycleSkill,
+    onOpenEvolutionMenu: openEvolutionMenu,
+    onActionButtonChange: (isPressed) => {
+      stateRef.current.actionButton = isPressed;
+    }
+  });
+
+  const { resetControls: inputResetControls } = inputActions;
+
+  useEffect(() => {
+    inputResetRef.current = inputResetControls;
+  }, [inputResetControls]);
 
   const chooseTrait = (traitKey) => {
     const state = stateRef.current;
@@ -721,6 +645,7 @@ const MicroOmegaGame = () => {
       lastTime = now;
 
       const state = stateRef.current;
+      state.joystick = { ...movementIntentRef.current };
       const org = state.organism;
 
       let offsetX = org.x - canvas.width / 2;
@@ -1036,86 +961,6 @@ const MicroOmegaGame = () => {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      const targetTag = event.target?.tagName?.toLowerCase();
-      if (targetTag && ['input', 'textarea', 'select'].includes(targetTag)) return;
-
-      const key = event.key;
-      const lower = key.toLowerCase();
-      let movementUpdated = false;
-
-      if (key === 'ArrowUp' || lower === 'w') {
-        keyboardStateRef.current.up = true;
-        movementUpdated = true;
-      } else if (key === 'ArrowDown' || lower === 's') {
-        keyboardStateRef.current.down = true;
-        movementUpdated = true;
-      } else if (key === 'ArrowLeft' || lower === 'a') {
-        keyboardStateRef.current.left = true;
-        movementUpdated = true;
-      } else if (key === 'ArrowRight' || lower === 'd') {
-        keyboardStateRef.current.right = true;
-        movementUpdated = true;
-      }
-
-      if (movementUpdated) {
-        event.preventDefault();
-        updateKeyboardJoystick();
-      }
-
-      if (key === ' ' || key === 'Spacebar') {
-        event.preventDefault();
-        performAttack();
-      } else if (key === 'Shift') {
-        event.preventDefault();
-        performDash();
-      } else if (lower === 'q') {
-        event.preventDefault();
-        useSkill();
-      } else if (lower === 'r' || key === 'Tab') {
-        event.preventDefault();
-        cycleSkill(1);
-      } else if (lower === 'e') {
-        event.preventDefault();
-        openEvolutionMenu();
-      }
-    };
-
-    const handleKeyUp = (event) => {
-      const key = event.key;
-      const lower = key.toLowerCase();
-      let movementUpdated = false;
-
-      if (key === 'ArrowUp' || lower === 'w') {
-        keyboardStateRef.current.up = false;
-        movementUpdated = true;
-      } else if (key === 'ArrowDown' || lower === 's') {
-        keyboardStateRef.current.down = false;
-        movementUpdated = true;
-      } else if (key === 'ArrowLeft' || lower === 'a') {
-        keyboardStateRef.current.left = false;
-        movementUpdated = true;
-      } else if (key === 'ArrowRight' || lower === 'd') {
-        keyboardStateRef.current.right = false;
-        movementUpdated = true;
-      }
-
-      if (movementUpdated) {
-        event.preventDefault();
-        updateKeyboardJoystick();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
 
@@ -1526,10 +1371,10 @@ const MicroOmegaGame = () => {
           {gameState.hasMultipleSkills && (
             <button
               type="button"
-              onClick={() => cycleSkill(1)}
+              onClick={() => inputActions.cycleSkill(1)}
               onTouchStart={(e) => {
                 e.preventDefault();
-                cycleSkill(1);
+                inputActions.cycleSkill(1);
               }}
               style={{
                 width: '100%',
@@ -1555,9 +1400,9 @@ const MicroOmegaGame = () => {
       )}
 
       <div
-        onTouchStart={handleJoystickStart}
-        onTouchMove={handleJoystickMove}
-        onTouchEnd={handleJoystickEnd}
+        onTouchStart={inputActions.joystickStart}
+        onTouchMove={inputActions.joystickMove}
+        onTouchEnd={inputActions.joystickEnd}
         style={{
           position: 'absolute',
           bottom: '15px',
@@ -1579,19 +1424,29 @@ const MicroOmegaGame = () => {
           width: '45px',
           height: '45px',
           borderRadius: '50%',
-          background: joystickActive ? 'rgba(0, 217, 255, 0.7)' : 'rgba(255, 255, 255, 0.4)',
+          background: joystick.isTouchActive ? 'rgba(0, 217, 255, 0.7)' : 'rgba(255, 255, 255, 0.4)',
           border: '2px solid #fff',
-          transform: `translate(${joystickPosition.x}px, ${joystickPosition.y}px)`,
-          transition: joystickActive ? 'none' : 'transform 0.2s',
-          boxShadow: joystickActive ? '0 0 20px rgba(0, 217, 255, 0.8)' : 'none'
+          transform: `translate(${joystick.position.x}px, ${joystick.position.y}px)`,
+          transition: joystick.isTouchActive ? 'none' : 'transform 0.2s',
+          boxShadow: joystick.isTouchActive ? '0 0 20px rgba(0, 217, 255, 0.8)' : 'none'
         }} />
       </div>
 
       <button
-        onTouchStart={() => { stateRef.current.actionButton = true; performAttack(); }}
-        onTouchEnd={() => { stateRef.current.actionButton = false; }}
-        onMouseDown={() => { stateRef.current.actionButton = true; performAttack(); }}
-        onMouseUp={() => { stateRef.current.actionButton = false; }}
+        onTouchStart={(e) => {
+          e.preventDefault();
+          inputActions.attackPress();
+        }}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          inputActions.attackRelease();
+        }}
+        onMouseDown={inputActions.attackPress}
+        onMouseUp={inputActions.attackRelease}
+        onClick={(e) => {
+          e.preventDefault();
+          inputActions.attack();
+        }}
         style={{
           position: 'absolute',
           bottom: '15px',
@@ -1615,7 +1470,7 @@ const MicroOmegaGame = () => {
       </button>
 
       <button
-        onClick={performDash}
+        onClick={inputActions.dash}
         disabled={gameState.dashCharge < 30}
         style={{
           position: 'absolute',
@@ -1643,10 +1498,10 @@ const MicroOmegaGame = () => {
 
       <button
         type="button"
-        onClick={useSkill}
+        onClick={inputActions.useSkill}
         onTouchStart={(e) => {
           e.preventDefault();
-          useSkill();
+          inputActions.useSkill();
         }}
         disabled={skillDisabled}
         title="Q: usar habilidade"
@@ -1717,7 +1572,7 @@ const MicroOmegaGame = () => {
       </button>
 
       <button
-        onClick={openEvolutionMenu}
+        onClick={inputActions.openEvolutionMenu}
         disabled={!gameState.canEvolve}
         style={{
           position: 'absolute',
