@@ -22,6 +22,18 @@ import {
   spawnEnemy as createEnemyEntity,
   spawnBoss as createBossEntity
 } from './game/factories/enemyFactory';
+import {
+  performDash as performDashSystem,
+  performAttack as performAttackSystem,
+  useSkill as useSkillSystem,
+  cycleSkill as cycleSkillSystem,
+  checkEvolution as checkEvolutionSystem,
+  openEvolutionMenu as openEvolutionMenuSystem,
+  chooseTrait as chooseTraitSystem,
+  chooseForm as chooseFormSystem,
+  restartGame as restartGameSystem,
+  runGameSystems
+} from './game/systems';
 
 const MicroOmegaGame = () => {
   const canvasRef = useRef(null);
@@ -56,6 +68,18 @@ const MicroOmegaGame = () => {
   const stateRef = useRef(createInitialState());
 
   const keyboardStateRef = useRef({ up: false, down: false, left: false, right: false });
+
+  const resetControls = (state) => {
+    keyboardStateRef.current = { up: false, down: false, left: false, right: false };
+
+    const targetState = state ?? stateRef.current;
+    if (targetState.joystick) {
+      targetState.joystick = { x: 0, y: 0, active: false, source: 'none' };
+    }
+
+    setJoystickActive(false);
+    setJoystickPosition({ x: 0, y: 0 });
+  };
 
   const pickRandomUnique = (array, count) => {
     if (!array?.length || count <= 0) return [];
@@ -150,60 +174,60 @@ const MicroOmegaGame = () => {
     
     // Obstacles
     for (let i = 0; i < 30; i++) {
-      spawnObstacle();
+      spawnObstacle(state);
     }
 
     for (let i = 0; i < 18; i++) {
-      spawnNebula(i % 4 === 0 ? 'solid' : 'gas');
+      spawnNebula(state, i % 4 === 0 ? 'solid' : 'gas');
     }
 
     for (let i = 0; i < 4; i++) {
-      spawnPowerUp();
+      spawnPowerUp(state);
     }
 
-    spawnOrganicMatter(25);
+    spawnOrganicMatter(state, 25);
     
     return () => {
       if (audioCtxRef.current) audioCtxRef.current.close();
     };
   }, []);
 
-  const spawnObstacle = () => {
-    const state = stateRef.current;
+  const spawnObstacle = (state) => {
+    const targetState = state ?? stateRef.current;
     const obstacle = createObstacleEntity({
-      worldSize: state.worldSize,
+      worldSize: targetState.worldSize,
       types: obstacleTypes,
       rng: Math.random
     });
 
     if (obstacle) {
-      state.obstacles.push(obstacle);
+      targetState.obstacles.push(obstacle);
     }
 
     return obstacle;
   };
 
-  const spawnNebula = (forcedType) => {
-    const state = stateRef.current;
+  const spawnNebula = (state, forcedType) => {
+    const targetState = state ?? stateRef.current;
     const nebula = createNebulaEntity({
-      worldSize: state.worldSize,
+      worldSize: targetState.worldSize,
       types: nebulaTypes,
       forcedType,
       rng: Math.random
     });
 
     if (nebula) {
-      state.nebulas.push(nebula);
+      targetState.nebulas.push(nebula);
     }
 
     return nebula;
   };
 
-  const spawnPowerUp = (x, y, forcedType) => {
-    const state = stateRef.current;
+  const spawnPowerUp = (state, x, y, forcedType) => {
+    const targetState = state ?? stateRef.current;
     const hasPosition = typeof x === 'number' && typeof y === 'number';
     const powerUp = createPowerUpEntity({
-      worldSize: state.worldSize,
+      worldSize: targetState.worldSize,
       types: powerUpTypes,
       forcedType,
       rng: Math.random,
@@ -211,16 +235,15 @@ const MicroOmegaGame = () => {
     });
 
     if (powerUp) {
-      state.powerUps.push(powerUp);
+      targetState.powerUps.push(powerUp);
     }
 
     return powerUp;
   };
 
-  const dropPowerUps = (enemy) => {
+  const dropPowerUps = (state, enemy) => {
     if (!enemy) return [];
 
-    const state = stateRef.current;
     const drops = calculatePowerUpDrops(enemy, {
       types: powerUpTypes,
       rng: Math.random
@@ -266,9 +289,9 @@ const MicroOmegaGame = () => {
     }
 
     if (type.message) {
-      addNotification(type.message);
+      addNotification(state, type.message);
     } else {
-      addNotification(`✨ ${type.name}!`);
+      addNotification(state, `✨ ${type.name}!`);
     }
 
     if (typeKey === 'invincibility') {
@@ -281,18 +304,18 @@ const MicroOmegaGame = () => {
     syncState();
   };
 
-  const spawnOrganicMatter = (count) => {
-    const state = stateRef.current;
+  const spawnOrganicMatter = (state, count) => {
+    const targetState = state ?? stateRef.current;
     const organicItems = createOrganicMatterEntities({
       count,
-      worldSize: state.worldSize,
+      worldSize: targetState.worldSize,
       types: organicMatterTypes,
       rng: Math.random
     });
 
     organicItems.forEach((item) => {
       if (item) {
-        state.organicMatter.push(item);
+        targetState.organicMatter.push(item);
       }
     });
 
@@ -364,8 +387,8 @@ const MicroOmegaGame = () => {
     osc.stop(ctx.currentTime + 0.5);
   };
 
-  const createParticle = (x, y, color, size = 3) => {
-    stateRef.current.particles.push({
+  const createParticle = (state, x, y, color, size = 3) => {
+    state.particles.push({
       x, y,
       vx: (Math.random() - 0.5) * 5,
       vy: (Math.random() - 0.5) * 5,
@@ -387,9 +410,9 @@ const MicroOmegaGame = () => {
     default: { style: 'ring', growth: 200, decay: 2, maxSize: 120, lineWidth: 2 }
   };
 
-  const createEffect = (x, y, type, color) => {
+  const createEffect = (state, x, y, type, color) => {
     const config = effectConfigs[type] || effectConfigs.default;
-    stateRef.current.effects.push({
+    state.effects.push({
       x,
       y,
       type,
@@ -407,8 +430,8 @@ const MicroOmegaGame = () => {
     });
   };
 
-  const addNotification = (text) => {
-    stateRef.current.notifications.push({
+  const addNotification = (state, text) => {
+    state.notifications.push({
       text,
       life: 2,
       y: 60,
@@ -416,55 +439,37 @@ const MicroOmegaGame = () => {
     });
   };
 
-  const powerUpTypes = createPowerUpTypes({ addNotification });
-  const skills = createSkills({ createEffect, playSound, createParticle });
+  const powerUpTypes = createPowerUpTypes({
+    addNotification: (text) => addNotification(stateRef.current, text)
+  });
+  const skills = createSkills({
+    createEffect: (x, y, type, color) => createEffect(stateRef.current, x, y, type, color),
+    playSound,
+    createParticle: (x, y, color, size) => createParticle(stateRef.current, x, y, color, size)
+  });
+
+  const getSystemHelpers = () => ({
+    playSound,
+    createEffect,
+    createParticle,
+    addNotification,
+    dropPowerUps,
+    syncState,
+    skills,
+    pickRandomUnique,
+    forms,
+    evolutionaryTraits,
+    spawnObstacle,
+    spawnNebula,
+    spawnPowerUp,
+    spawnOrganicMatter,
+    resetControls,
+    createInitialState
+  });
 
   const performDash = () => {
     const state = stateRef.current;
-    const org = state.organism;
-
-    if (org.dashCharge < 30 || org.dashCooldown > 0 || org.isDashing) return;
-
-    org.dashCharge = Math.max(0, org.dashCharge - 30);
-    org.isDashing = true;
-    org.invulnerable = true;
-
-    const dashSpeed = 25 * org.speed * (org.currentSpeedMultiplier || 1);
-    const currentSpeed = Math.sqrt(org.vx * org.vx + org.vy * org.vy);
-
-    if (currentSpeed > 0.5) {
-      const normalizedVx = org.vx / currentSpeed;
-      const normalizedVy = org.vy / currentSpeed;
-      org.vx = normalizedVx * dashSpeed;
-      org.vy = normalizedVy * dashSpeed;
-    } else {
-      org.vx = Math.cos(org.angle) * dashSpeed;
-      org.vy = Math.sin(org.angle) * dashSpeed;
-    }
-
-    playSound('dash');
-    createEffect(org.x, org.y, 'dashstart', org.color);
-
-    for (let i = 0; i < 10; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const distance = Math.random() * 20;
-      createParticle(
-        org.x + Math.cos(angle) * distance,
-        org.y + Math.sin(angle) * distance,
-        org.color,
-        6
-      );
-    }
-
-    setTimeout(() => {
-      org.isDashing = false;
-      org.invulnerable = false;
-      org.dashCooldown = 1;
-      createEffect(org.x, org.y, 'dashend', org.color);
-      syncState();
-    }, 300);
-
-    syncState();
+    performDashSystem(state, getSystemHelpers());
   };
 
   const spawnEnemy = () => {
@@ -500,404 +505,29 @@ const MicroOmegaGame = () => {
     state.enemies.push(boss);
     state.boss = bossState;
 
-    addNotification('⚠️ Mega-organismo detectado!');
+    addNotification(state, '⚠️ Mega-organismo detectado!');
     playSound('boss');
     state.uiSyncTimer = 0;
 
     return boss;
   };
 
-  const updateEnemy = (enemy, state, delta) => {
-    const org = state.organism;
-
-    enemy.animPhase += delta * 3;
-    enemy.attackCooldown = Math.max(0, enemy.attackCooldown - delta);
-
-    const dx = org.x - enemy.x;
-    const dy = org.y - enemy.y;
-    const distToPlayer = Math.sqrt(dx * dx + dy * dy) || 1;
-
-    if (enemy.boss) {
-      enemy.vx += (dx / distToPlayer) * enemy.speed * 0.12;
-      enemy.vy += (dy / distToPlayer) * enemy.speed * 0.12;
-      enemy.rotation = (enemy.rotation || 0) + delta * 0.4;
-      enemy.animPhase += delta * 2;
-    } else {
-      if (distToPlayer > 1500) {
-        enemy.ticksOutOfRange++;
-        if (enemy.ticksOutOfRange > 100) return false;
-      } else {
-        enemy.ticksOutOfRange = 0;
-      }
-
-      if (enemy.behavior === 'aggressive' && distToPlayer < 800) {
-        enemy.vx += (dx / distToPlayer) * enemy.speed * 0.1;
-        enemy.vy += (dy / distToPlayer) * enemy.speed * 0.1;
-      } else if (enemy.behavior === 'territorial' && distToPlayer < 500) {
-        enemy.vx += (dx / distToPlayer) * enemy.speed * 0.05;
-        enemy.vy += (dy / distToPlayer) * enemy.speed * 0.05;
-      } else if (enemy.behavior === 'opportunist') {
-        if (distToPlayer < 350) {
-          enemy.vx += (dx / distToPlayer) * enemy.speed * 0.1;
-          enemy.vy += (dy / distToPlayer) * enemy.speed * 0.1;
-        } else {
-          enemy.vx += (Math.random() - 0.5) * enemy.speed * 0.05;
-          enemy.vy += (Math.random() - 0.5) * enemy.speed * 0.05;
-        }
-      } else if (enemy.behavior === 'hunter') {
-        enemy.vx += (dx / distToPlayer) * enemy.speed * 0.12;
-        enemy.vy += (dy / distToPlayer) * enemy.speed * 0.12;
-      }
-    }
-
-    enemy.vx *= 0.95;
-    enemy.vy *= 0.95;
-
-    const speed = Math.sqrt(enemy.vx * enemy.vx + enemy.vy * enemy.vy);
-    const maxSpeed = (enemy.speed * (enemy.boss ? 1.5 : 2));
-    if (speed > maxSpeed) {
-      enemy.vx = (enemy.vx / speed) * maxSpeed;
-      enemy.vy = (enemy.vy / speed) * maxSpeed;
-    }
-
-    enemy.x += enemy.vx;
-    enemy.y += enemy.vy;
-
-    if (distToPlayer < enemy.size + org.size + 10 && enemy.attackCooldown === 0) {
-      const powerShieldActive =
-        org.hasShieldPowerUp ||
-        org.invulnerableFromPowerUp ||
-        state.activePowerUps.some(p => p.type === 'invincibility');
-
-      if (!org.invulnerable && !org.dying && !powerShieldActive) {
-        const damage = Math.max(1, enemy.attack - org.defense);
-        state.health -= damage;
-        addNotification(`-${damage} HP`);
-        playSound('damage');
-        createEffect(org.x, org.y, 'hit', '#FF0000');
-
-        org.eyeExpression = 'hurt';
-        setTimeout(() => { org.eyeExpression = 'neutral'; }, 500);
-
-        if (state.health <= 0) {
-          org.dying = true;
-          org.deathTimer = 2;
-        }
-      }
-      enemy.attackCooldown = enemy.boss ? 2.2 : 1.5;
-
-      org.vx += (dx / distToPlayer) * -3;
-      org.vy += (dy / distToPlayer) * -3;
-      state.combo = 0;
-      state.comboTimer = 0;
-      state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-    }
-
-    if (enemy.boss) {
-      state.boss = {
-        active: true,
-        health: enemy.health,
-        maxHealth: enemy.maxHealth,
-        color: enemy.color
-      };
-    }
-
-    return enemy.health > 0;
-  };
 
   const performAttack = () => {
     const state = stateRef.current;
-    const org = state.organism;
-    
-    if (org.attackCooldown > 0 || org.dying) return;
-    
-    let hitSomething = false;
-    let comboSound = false;
-
-    const comboMultiplier = 1 + (state.combo * 0.05);
-    const attackBonus = org.currentAttackBonus || 0;
-    const rangeBonus = org.currentRangeBonus || 0;
-    const attackRange = org.attackRange + rangeBonus;
-
-    state.enemies.forEach(enemy => {
-      const dx = enemy.x - org.x;
-      const dy = enemy.y - org.y;
-      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-
-      if (dist < attackRange) {
-        const damage = Math.max(1, (org.attack + attackBonus) * comboMultiplier - enemy.defense * 0.5);
-        enemy.health -= damage;
-
-        createEffect(enemy.x, enemy.y, 'hit', org.color);
-
-        enemy.vx += (dx / dist) * 5;
-        enemy.vy += (dy / dist) * 5;
-
-        hitSomething = true;
-
-        state.combo += 1;
-        state.comboTimer = 3;
-        if (state.combo > state.maxCombo) state.maxCombo = state.combo;
-        if (state.combo > 0 && state.combo % 6 === 0) comboSound = true;
-
-        if (enemy.health <= 0) {
-          state.energy += 30;
-          state.score += enemy.points;
-          addNotification(`+${enemy.points} pts`);
-          for (let i = 0; i < 15; i++) {
-            createParticle(enemy.x, enemy.y, enemy.color);
-          }
-          dropPowerUps(enemy);
-          if (enemy.boss) {
-            state.boss = null;
-            state.bossPending = false;
-          }
-          state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-        }
-
-        if (enemy.boss && enemy.health > 0) {
-          state.boss = {
-            active: true,
-            health: Math.max(0, enemy.health),
-            maxHealth: enemy.maxHealth,
-            color: enemy.color
-          };
-        }
-      }
-    });
-
-    if (hitSomething) {
-      playSound('attack');
-      if (comboSound) playSound('combo');
-      org.attackCooldown = 0.8;
-      org.eyeExpression = 'attacking';
-      setTimeout(() => { org.eyeExpression = 'neutral'; }, 300);
-      createEffect(org.x, org.y, 'attack', org.color);
-      state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-    } else {
-      state.combo = Math.max(0, state.combo - 1);
-      if (state.combo === 0) {
-        state.comboTimer = 0;
-      }
-    }
-
-    syncState();
+    performAttackSystem(state, getSystemHelpers());
   };
 
   const useSkill = () => {
     const state = stateRef.current;
-    const org = state.organism;
-
-    if (org.skills.length === 0 || org.dying) return;
-    
-    const currentSkill = org.skills[org.currentSkillIndex];
-    const skill = skills[currentSkill];
-    
-    if (!skill || org.skillCooldowns[currentSkill] > 0) return;
-    
-    if (state.energy < skill.cost) {
-      addNotification('Energia insuficiente!');
-      return;
-    }
-    
-    state.energy -= skill.cost;
-    skill.effect(state);
-    org.skillCooldowns[currentSkill] = skill.cooldown / 1000;
-    state.uiSyncTimer = 0;
-
-    syncState();
+    useSkillSystem(state, getSystemHelpers());
   };
 
   const cycleSkill = (direction = 1) => {
     const state = stateRef.current;
-    const org = state.organism;
-
-    if (org.skills.length <= 1 || org.dying) return;
-
-    const total = org.skills.length;
-    org.currentSkillIndex = (org.currentSkillIndex + direction + total) % total;
-
-    const skillKey = org.skills[org.currentSkillIndex];
-    const skill = skills[skillKey];
-    if (skill) {
-      addNotification(`Skill: ${skill.name}`);
-    }
-
-    state.uiSyncTimer = 0;
-    syncState();
+    cycleSkillSystem(state, getSystemHelpers(), direction);
   };
 
-  const updateOrganismPhysics = (org, delta) => {
-    const state = stateRef.current;
-
-    if (org.dying) {
-      org.deathTimer -= delta;
-      org.rotation += delta * 5;
-      org.size *= 0.98;
-
-      if (org.deathTimer <= 0) {
-        state.gameOver = true;
-        syncState();
-      }
-      return;
-    }
-
-    let speedMultiplier = 1;
-    let attackBonus = 0;
-    let rangeBonus = 0;
-    let invincibilityActive = false;
-
-    state.activePowerUps = state.activePowerUps.filter(power => {
-      power.remaining -= delta;
-      if (power.remaining > 0) {
-        const intensity = Math.max(0.4, power.remaining / power.duration);
-        if (power.type === 'speed') {
-          speedMultiplier += 0.6 * intensity;
-        } else if (power.type === 'damage') {
-          attackBonus += 6 * intensity;
-          rangeBonus += 20 * intensity;
-        } else if (power.type === 'invincibility') {
-          invincibilityActive = true;
-        }
-        return true;
-      }
-
-      addNotification(`${power.name} dissipou.`);
-      state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-      return false;
-    });
-
-    org.currentSpeedMultiplier = speedMultiplier;
-    org.currentAttackBonus = attackBonus;
-    org.currentRangeBonus = rangeBonus;
-    org.hasShieldPowerUp = invincibilityActive;
-    org.invulnerableFromPowerUp = invincibilityActive;
-
-    const friction = org.isDashing ? 0.98 : 0.92;
-    const baseSpeed = org.isDashing ? 20 * speedMultiplier : 5 * org.speed * speedMultiplier;
-    const maxSpeed = baseSpeed;
-
-    const joy = state.joystick;
-    
-    if (joy.active && !org.isDashing) {
-      org.vx += joy.x * 0.5;
-      org.vy += joy.y * 0.5;
-      
-      if (joy.x !== 0 || joy.y !== 0) {
-        org.targetAngle = Math.atan2(joy.y, joy.x);
-      }
-    }
-    
-    // Rotação suave
-    let angleDiff = org.targetAngle - org.angle;
-    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    org.angle += angleDiff * 0.1;
-    
-    org.vx *= friction;
-    org.vy *= friction;
-    
-    const speed = Math.sqrt(org.vx * org.vx + org.vy * org.vy);
-    if (speed > maxSpeed) {
-      org.vx = (org.vx / speed) * maxSpeed;
-      org.vy = (org.vy / speed) * maxSpeed;
-    }
-    
-    org.x += org.vx;
-    org.y += org.vy;
-    
-    org.x = Math.max(org.size, Math.min(4000 - org.size, org.x));
-    org.y = Math.max(org.size, Math.min(4000 - org.size, org.y));
-    
-    // Animação de locomoção SUTIL e ORGÂNICA
-    const speedFactor = Math.min(speed / maxSpeed, 1);
-    
-    // Ondulação do corpo (swimming motion)
-    org.swimPhase += delta * (3 + speedFactor * 5);
-    org.bodyWave = Math.sin(org.swimPhase) * speedFactor * 0.08; // Muito sutil!
-    
-    // Pulsação rítmica durante movimento
-    org.pulseIntensity = 1 + Math.sin(org.swimPhase * 0.5) * speedFactor * 0.05;
-    
-    // Inclinação suave baseada na direção
-    if (speedFactor > 0.1) {
-      const tiltAmount = speedFactor * 0.1; // Muito sutil
-      org.tiltX = Math.sin(org.swimPhase) * tiltAmount;
-      org.tiltY = Math.cos(org.swimPhase * 1.3) * tiltAmount;
-    } else {
-      org.tiltX *= 0.9;
-      org.tiltY *= 0.9;
-    }
-    
-    // Trail mais suave
-    if (speed > 1) {
-      if (org.trail.length === 0 || 
-          Math.sqrt((org.x - org.trail[org.trail.length - 1].x) ** 2 + 
-                    (org.y - org.trail[org.trail.length - 1].y) ** 2) > 5) {
-        org.trail.push({ 
-          x: org.x, 
-          y: org.y, 
-          life: 1, 
-          size: org.size * 0.8,
-          color: org.color 
-        });
-        if (org.trail.length > 20) org.trail.shift();
-      }
-    }
-    
-    org.trail = org.trail.map(t => ({ ...t, life: t.life - delta * 1.5 })).filter(t => t.life > 0);
-    
-    // Dash particles
-    if (org.isDashing) {
-      for (let i = 0; i < 3; i++) {
-        createParticle(org.x, org.y, org.color, 4);
-      }
-    }
-    
-    // Dash recharge
-    if (org.dashCharge < org.maxDashCharge) {
-      org.dashCharge = Math.min(org.maxDashCharge, org.dashCharge + delta * 20);
-    }
-    
-    org.dashCooldown = Math.max(0, org.dashCooldown - delta);
-    
-    // Eye animation
-    org.eyeBlinkTimer += delta;
-    if (org.eyeBlinkTimer > 3 + Math.random() * 2) {
-      org.eyeBlinkState = 1;
-      org.eyeBlinkTimer = 0;
-    }
-    
-    if (org.eyeBlinkState > 0) {
-      org.eyeBlinkState -= delta * 8;
-      if (org.eyeBlinkState < 0) org.eyeBlinkState = 0;
-    }
-    
-    if (speed > 0.5) {
-      const targetLookX = (org.vx / maxSpeed) * 0.5;
-      const targetLookY = (org.vy / maxSpeed) * 0.5;
-      org.eyeLookX += (targetLookX - org.eyeLookX) * 0.1;
-      org.eyeLookY += (targetLookY - org.eyeLookY) * 0.1;
-    } else {
-      org.eyeLookX *= 0.9;
-      org.eyeLookY *= 0.9;
-    }
-    
-    org.attackCooldown = Math.max(0, org.attackCooldown - delta);
-
-    Object.keys(org.skillCooldowns).forEach(key => {
-      org.skillCooldowns[key] = Math.max(0, org.skillCooldowns[key] - delta);
-    });
-
-    if (state.combo > 0) {
-      state.comboTimer -= delta;
-      if (state.comboTimer <= 0) {
-        state.combo = 0;
-        state.comboTimer = 0;
-        state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-      }
-    }
-  };
 
   const renderOrganism = (ctx, org, offsetX, offsetY) => {
     const baseSize = org.size * org.pulseIntensity;
@@ -1389,201 +1019,27 @@ const MicroOmegaGame = () => {
 
   const checkEvolution = () => {
     const state = stateRef.current;
-    const thresholds = [0, 200, 500, 1000, 1800, 3000, 5000];
-    const nextThreshold = thresholds[state.level + 1];
-    
-    if (nextThreshold && state.energy >= nextThreshold) {
-      state.canEvolve = true;
-      syncState();
-    }
+    checkEvolutionSystem(state, getSystemHelpers());
   };
 
   const openEvolutionMenu = () => {
     const state = stateRef.current;
-    
-    if (!state.canEvolve) return;
-    
-    state.level++;
-    state.canEvolve = false;
-
-    state.evolutionType = state.level % 3 === 0 ? 'form' : 'skill';
-
-    if (state.level >= state.nextBossLevel) {
-      state.bossPending = true;
-      state.nextBossLevel += 3;
-    }
-
-    if (state.evolutionType === 'skill') {
-      const unusedTraits = Object.keys(evolutionaryTraits).filter(
-        (traitKey) => !state.organism.traits.includes(traitKey)
-      );
-      const traitPool = unusedTraits.length > 0
-        ? unusedTraits
-        : Object.keys(evolutionaryTraits);
-      state.availableTraits = pickRandomUnique(traitPool, Math.min(3, traitPool.length));
-    } else {
-      const unusedForms = Object.keys(forms).filter(
-        (formKey) => formKey !== state.organism.form
-      );
-      const formPool = unusedForms.length > 0 ? unusedForms : Object.keys(forms);
-      state.availableForms = pickRandomUnique(formPool, Math.min(3, formPool.length));
-    }
-
-    state.showEvolutionChoice = true;
-    playSound('skill');
-    state.uiSyncTimer = 0;
-    syncState();
+    openEvolutionMenuSystem(state, getSystemHelpers());
   };
 
   const chooseTrait = (traitKey) => {
     const state = stateRef.current;
-    const trait = evolutionaryTraits[traitKey];
-    
-    if (trait) {
-      state.organism.traits.push(traitKey);
-      trait.effect(state.organism);
-
-      state.organism.size += 4;
-      state.organism.color = trait.color;
-
-      if (trait.skill && state.organism.skillCooldowns[trait.skill] === undefined) {
-        state.organism.skillCooldowns[trait.skill] = 0;
-      }
-
-      state.maxHealth += 30;
-      state.health = state.maxHealth;
-
-      state.showEvolutionChoice = false;
-      addNotification(`✨ ${trait.name}`);
-
-      state.uiSyncTimer = 0;
-
-      syncState();
-    }
+    chooseTraitSystem(state, getSystemHelpers(), traitKey);
   };
 
   const chooseForm = (formKey) => {
     const state = stateRef.current;
-    const form = forms[formKey];
-    
-    if (form) {
-      state.organism.form = formKey;
-      state.organism.defense *= form.defense;
-      state.organism.speed *= form.speed;
-
-      state.showEvolutionChoice = false;
-      addNotification(`✨ Forma ${form.name}!`);
-
-      state.uiSyncTimer = 0;
-
-      syncState();
-    }
+    chooseFormSystem(state, getSystemHelpers(), formKey);
   };
 
   const restartGame = () => {
     const state = stateRef.current;
-
-    Object.assign(state, {
-      energy: 0,
-      health: 100,
-      maxHealth: 100,
-      level: 1,
-      score: 0,
-      canEvolve: false,
-      showEvolutionChoice: false,
-      gameOver: false,
-      combo: 0,
-      maxCombo: 0,
-      comboTimer: 0,
-      boss: null,
-      bossPending: false,
-      nextBossLevel: 3,
-      fogIntensity: 0,
-      uiSyncTimer: 0,
-      activePowerUps: [],
-      powerUps: [],
-      availableTraits: [],
-      availableForms: [],
-      organicMatter: [],
-      enemies: [],
-      projectiles: [],
-      effects: [],
-      particles: [],
-      nebulas: [],
-      notifications: [],
-      lastEventTime: 0,
-      gameTime: 0,
-
-      organism: {
-        x: 2000,
-        y: 2000,
-        vx: 0,
-        vy: 0,
-        size: 32,
-        form: 'sphere',
-        color: '#00D9FF',
-        secondaryColor: '#0088FF',
-        tertiaryColor: '#00FFFF',
-        traits: [],
-        angle: 0,
-        targetAngle: 0,
-        swimPhase: 0,
-        bodyWave: 0,
-        pulseIntensity: 1,
-        rotation: 0,
-        tiltX: 0,
-        tiltY: 0,
-        eyeBlinkTimer: 0,
-        eyeBlinkState: 0,
-        eyeLookX: 0,
-        eyeLookY: 0,
-        eyeExpression: 'neutral',
-        trail: [],
-        dashCharge: 100,
-        maxDashCharge: 100,
-        isDashing: false,
-        dashCooldown: 0,
-        currentSpeedMultiplier: 1,
-        currentAttackBonus: 0,
-        currentRangeBonus: 0,
-        hasShieldPowerUp: false,
-        invulnerableFromPowerUp: false,
-        attack: 10,
-        defense: 5,
-        speed: 1,
-        attackRange: 80,
-        attackCooldown: 0,
-        skills: [],
-        currentSkillIndex: 0,
-        skillCooldowns: {},
-        dying: false,
-        deathTimer: 0
-      }
-    });
-
-    keyboardStateRef.current = { up: false, down: false, left: false, right: false };
-    state.joystick = { x: 0, y: 0, active: false, source: 'none' };
-    setJoystickActive(false);
-    setJoystickPosition({ x: 0, y: 0 });
-
-    state.obstacles = [];
-    for (let i = 0; i < 30; i++) {
-      spawnObstacle();
-    }
-
-    state.nebulas = [];
-    for (let i = 0; i < 18; i++) {
-      spawnNebula(i % 4 === 0 ? 'solid' : 'gas');
-    }
-
-    state.powerUps = [];
-    for (let i = 0; i < 4; i++) {
-      spawnPowerUp();
-    }
-
-    spawnOrganicMatter(25);
-
-    syncState();
+    restartGameSystem(state, getSystemHelpers());
   };
 
   const syncState = () => {
@@ -1670,7 +1126,7 @@ const MicroOmegaGame = () => {
       state.gameTime += delta;
 
       if (state.powerUps.length < 5 && Math.random() < 0.01) {
-        spawnPowerUp();
+        spawnPowerUp(state);
       }
 
       if (state.bossPending && !(state.boss?.active)) {
@@ -1770,7 +1226,7 @@ const MicroOmegaGame = () => {
         }
       });
       
-      updateOrganismPhysics(org, delta);
+      runGameSystems(state, delta, getSystemHelpers());
       
       // Organic matter
       state.organicMatter = state.organicMatter.filter(matter => {
@@ -1788,9 +1244,9 @@ const MicroOmegaGame = () => {
           state.health = Math.min(state.maxHealth, state.health + matter.health);
           state.score += matter.energy;
           playSound('collect');
-          addNotification(`+${matter.energy} ⚡`);
+          addNotification(state, `+${matter.energy} ⚡`);
           for (let i = 0; i < 5; i++) {
-            createParticle(matter.x, matter.y, matter.color, 3);
+            createParticle(state, matter.x, matter.y, matter.color, 3);
           }
           return false;
         }
@@ -1823,7 +1279,7 @@ const MicroOmegaGame = () => {
       });
 
       if (state.organicMatter.length < 30 && Math.random() < 0.05) {
-        spawnOrganicMatter(1);
+        spawnOrganicMatter(state, 1);
       }
 
       // Power-ups
@@ -1871,11 +1327,9 @@ const MicroOmegaGame = () => {
         state.lastEventTime = state.gameTime;
       }
 
-      state.enemies = state.enemies.filter(e => updateEnemy(e, state, delta));
-
       const bossEnemy = state.enemies.find(e => e.boss);
       if (!bossEnemy && state.boss?.active) {
-        addNotification('✨ Mega-organismo neutralizado!');
+        addNotification(state, '✨ Mega-organismo neutralizado!');
         state.boss = null;
         state.bossPending = false;
         state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
@@ -1897,16 +1351,16 @@ const MicroOmegaGame = () => {
 
           if (dist < enemy.size) {
             enemy.health -= proj.damage;
-            createEffect(enemy.x, enemy.y, 'hit', proj.color);
+            createEffect(state, enemy.x, enemy.y, 'hit', proj.color);
 
             if (enemy.health <= 0) {
               state.energy += 25;
               state.score += enemy.points;
-              dropPowerUps(enemy);
+              dropPowerUps(state, enemy);
               if (enemy.boss) {
                 state.boss = null;
                 state.bossPending = false;
-                addNotification('✨ Mega-organismo neutralizado!');
+                addNotification(state, '✨ Mega-organismo neutralizado!');
               }
               state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
             } else if (enemy.boss) {
