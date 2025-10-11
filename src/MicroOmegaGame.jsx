@@ -84,9 +84,11 @@ const MicroOmegaGame = () => {
       skills: [],
       currentSkillIndex: 0,
       skillCooldowns: {},
-      
+
       dying: false,
-      deathTimer: 0
+      deathTimer: 0,
+      hasShieldPowerUp: false,
+      invulnerableFromPowerUp: false
     },
     
     particles: [],
@@ -281,26 +283,46 @@ const MicroOmegaGame = () => {
   };
 
   const powerUpTypes = {
+    health: {
+      name: 'Cápsula Regenerativa',
+      icon: '❤️',
+      color: '#FF4444',
+      instant: true,
+      apply: (state) => {
+        state.health = Math.min(state.maxHealth, state.health + 50);
+        addNotification('+50 HP');
+      }
+    },
+    energy: {
+      name: 'Nódulo Energético',
+      icon: '⚡',
+      color: '#FFD700',
+      instant: true,
+      apply: (state) => {
+        state.energy += 100;
+        addNotification('+100 Energia');
+      }
+    },
     speed: {
       name: 'Impulso Cinético',
-      icon: '⚡',
+      icon: '💨',
       color: '#00FFAA',
       duration: 8,
-      description: 'Velocidade aumentada'
+      message: 'Velocidade 2x!'
     },
-    attack: {
+    damage: {
       name: 'Pico Ofensivo',
-      icon: '🗡️',
+      icon: '⚔️',
       color: '#FF4477',
       duration: 10,
-      description: 'Ataques mais fortes e alcance maior'
+      message: 'Ataque Potente!'
     },
-    shield: {
-      name: 'Membrana Prismática',
+    invincibility: {
+      name: 'Escudo Estelar',
       icon: '🛡️',
-      color: '#66AAFF',
+      color: '#FFD700',
       duration: 6,
-      description: 'Proteção temporária'
+      message: 'Invencível!'
     }
   };
 
@@ -479,6 +501,14 @@ const MicroOmegaGame = () => {
 
     if (!type) return;
 
+    if (type.instant) {
+      type.apply?.(state);
+      playSound(type.sound || 'powerup');
+      state.uiSyncTimer = 0;
+      syncState();
+      return;
+    }
+
     const existing = state.activePowerUps.find(p => p.type === typeKey);
 
     if (existing) {
@@ -495,9 +525,20 @@ const MicroOmegaGame = () => {
       });
     }
 
-    addNotification(`✨ ${type.name}!`);
-    playSound('powerup');
+    if (type.message) {
+      addNotification(type.message);
+    } else {
+      addNotification(`✨ ${type.name}!`);
+    }
+
+    if (typeKey === 'invincibility') {
+      state.organism.invulnerableFromPowerUp = true;
+      state.organism.hasShieldPowerUp = true;
+    }
+
+    playSound(type.sound || 'powerup');
     state.uiSyncTimer = 0;
+    syncState();
   };
 
   const spawnOrganicMatter = (count) => {
@@ -564,6 +605,22 @@ const MicroOmegaGame = () => {
       case 'powerup':
         osc.type = 'sine';
         osc.frequency.value = 950;
+        break;
+      case 'skill':
+        osc.type = 'triangle';
+        osc.frequency.value = 880;
+        break;
+      case 'shoot':
+        osc.type = 'square';
+        osc.frequency.value = 1020;
+        break;
+      case 'buff':
+        osc.type = 'sine';
+        osc.frequency.value = 620;
+        break;
+      case 'drain':
+        osc.type = 'triangle';
+        osc.frequency.value = 360;
         break;
       case 'combo':
         osc.type = 'square';
@@ -824,9 +881,12 @@ const MicroOmegaGame = () => {
     enemy.y += enemy.vy;
 
     if (distToPlayer < enemy.size + org.size + 10 && enemy.attackCooldown === 0) {
-      const shieldActive = org.hasShieldPowerUp;
+      const powerShieldActive =
+        org.hasShieldPowerUp ||
+        org.invulnerableFromPowerUp ||
+        state.activePowerUps.some(p => p.type === 'invincibility');
 
-      if (!org.invulnerable && !org.dying && !shieldActive) {
+      if (!org.invulnerable && !org.dying && !powerShieldActive) {
         const damage = Math.max(1, enemy.attack - org.defense);
         state.health -= damage;
         addNotification(`-${damage} HP`);
@@ -1000,7 +1060,7 @@ const MicroOmegaGame = () => {
     let speedMultiplier = 1;
     let attackBonus = 0;
     let rangeBonus = 0;
-    let shieldActive = false;
+    let invincibilityActive = false;
 
     state.activePowerUps = state.activePowerUps.filter(power => {
       power.remaining -= delta;
@@ -1008,11 +1068,11 @@ const MicroOmegaGame = () => {
         const intensity = Math.max(0.4, power.remaining / power.duration);
         if (power.type === 'speed') {
           speedMultiplier += 0.6 * intensity;
-        } else if (power.type === 'attack') {
+        } else if (power.type === 'damage') {
           attackBonus += 6 * intensity;
           rangeBonus += 20 * intensity;
-        } else if (power.type === 'shield') {
-          shieldActive = true;
+        } else if (power.type === 'invincibility') {
+          invincibilityActive = true;
         }
         return true;
       }
@@ -1025,7 +1085,8 @@ const MicroOmegaGame = () => {
     org.currentSpeedMultiplier = speedMultiplier;
     org.currentAttackBonus = attackBonus;
     org.currentRangeBonus = rangeBonus;
-    org.hasShieldPowerUp = shieldActive;
+    org.hasShieldPowerUp = invincibilityActive;
+    org.invulnerableFromPowerUp = invincibilityActive;
 
     const friction = org.isDashing ? 0.98 : 0.92;
     const baseSpeed = org.isDashing ? 20 * speedMultiplier : 5 * org.speed * speedMultiplier;
@@ -1159,6 +1220,9 @@ const MicroOmegaGame = () => {
     ctx.save();
     ctx.translate(org.x - offsetX, org.y - offsetY);
     
+    const activePowerUps = stateRef.current.activePowerUps;
+    const hasPowerShield = org.invulnerableFromPowerUp || activePowerUps.some(p => p.type === 'invincibility');
+
     // Trail suave
     org.trail.forEach((t, i) => {
       const trailSize = t.size * (i / org.trail.length);
@@ -1185,7 +1249,7 @@ const MicroOmegaGame = () => {
     }
     
     // Shield
-    if (org.invulnerable) {
+    if (org.invulnerable || hasPowerShield) {
       ctx.strokeStyle = '#FFD700';
       ctx.lineWidth = 4;
       ctx.globalAlpha = 0.6 + Math.sin(stateRef.current.pulsePhase * 10) * 0.3;
@@ -1198,9 +1262,9 @@ const MicroOmegaGame = () => {
       ctx.shadowBlur = 0;
     }
 
-    if (org.hasShieldPowerUp) {
-      const shieldPower = stateRef.current.activePowerUps.find(p => p.type === 'shield');
-      const shieldColor = shieldPower?.color || '#66AAFF';
+    if (hasPowerShield) {
+      const shieldPower = activePowerUps.find(p => p.type === 'invincibility');
+      const shieldColor = shieldPower?.color || '#FFD700';
       ctx.strokeStyle = shieldColor;
       ctx.lineWidth = 3;
       ctx.globalAlpha = 0.4 + Math.sin(stateRef.current.pulsePhase * 6) * 0.2;
@@ -1791,6 +1855,7 @@ const MicroOmegaGame = () => {
         currentAttackBonus: 0,
         currentRangeBonus: 0,
         hasShieldPowerUp: false,
+        invulnerableFromPowerUp: false,
         attack: 10,
         defense: 5,
         speed: 1,
