@@ -11,10 +11,14 @@ import {
   gameStore,
   useGameStore,
 } from "../store/gameStore";
+import {
+  MAX_NAME_LENGTH,
+  MIN_NAME_LENGTH,
+  sanitizePlayerName,
+} from "../utils/messageTypes";
 import styles from "./PlayerNameModal.module.css";
 
 const STORAGE_KEY = "micr-omega:player-name";
-const NAME_REGEX = /^[A-Za-z0-9]{3,16}$/;
 
 type PlayerNameModalProps = {
   isOpen?: boolean;
@@ -28,7 +32,12 @@ const readStoredName = () => {
 
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored ?? "";
+    if (!stored) {
+      return "";
+    }
+
+    const sanitized = sanitizePlayerName(stored);
+    return sanitized ?? "";
   } catch (err) {
     console.warn("Não foi possível ler o nome do jogador salvo", err);
     return "";
@@ -41,7 +50,12 @@ const persistName = (name: string) => {
   }
 
   try {
-    window.localStorage.setItem(STORAGE_KEY, name);
+    const sanitized = sanitizePlayerName(name);
+    if (!sanitized) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(STORAGE_KEY, sanitized);
   } catch (err) {
     console.warn("Não foi possível salvar o nome do jogador", err);
   }
@@ -52,8 +66,8 @@ const getValidationMessage = (value: string) => {
     return "Informe um nome para entrar na sala.";
   }
 
-  if (!NAME_REGEX.test(value)) {
-    return "Use apenas letras e números entre 3 e 16 caracteres.";
+  if (!sanitizePlayerName(value)) {
+    return `Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos (letras, números, espaços, hífens ou sublinhados).`;
   }
 
   return null;
@@ -117,14 +131,22 @@ const PlayerNameModal = ({ isOpen, onSubmit }: PlayerNameModalProps) => {
         return;
       }
 
+      const sanitized = sanitizePlayerName(trimmed);
+      if (!sanitized) {
+        setLocalError(
+          `Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos (letras, números, espaços, hífens ou sublinhados).`
+        );
+        return;
+      }
+
       setLocalError(null);
-      persistName(trimmed);
-      if (storedName && storedName !== trimmed) {
+      persistName(sanitized);
+      if (storedName && storedName !== sanitized) {
         gameStore.actions.setPlayerId(null);
       }
-      gameStore.actions.setPlayerName(trimmed);
+      gameStore.actions.setPlayerName(sanitized);
       gameStore.actions.setJoinError(null);
-      onSubmit?.(trimmed);
+      onSubmit?.(sanitized);
     },
     [inputValue, onSubmit, storedName]
   );
@@ -179,7 +201,7 @@ const PlayerNameModal = ({ isOpen, onSubmit }: PlayerNameModalProps) => {
               placeholder="Herói da Micro-Órbita"
               autoFocus
               autoComplete="off"
-              maxLength={16}
+              maxLength={MAX_NAME_LENGTH}
               disabled={isSubmitting}
             />
             {errorMessage ? (
@@ -188,7 +210,8 @@ const PlayerNameModal = ({ isOpen, onSubmit }: PlayerNameModalProps) => {
               </span>
             ) : (
               <span className={styles.helperText}>
-                Entre 3 e 16 caracteres. Apenas letras e números são permitidos.
+                Entre {MIN_NAME_LENGTH} e {MAX_NAME_LENGTH} caracteres. Letras, números, espaços,
+                hífens e sublinhados são permitidos.
               </span>
             )}
           </div>
