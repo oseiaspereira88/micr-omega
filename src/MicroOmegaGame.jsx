@@ -1,5 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+import { createInitialState } from './game/state/initialState';
+import {
+  forms,
+  createSkills,
+  evolutionaryTraits,
+  organicMatterTypes,
+  enemyTemplates,
+  obstacleTypes,
+  nebulaTypes,
+  createPowerUpTypes,
+} from './game/config';
+
 const MicroOmegaGame = () => {
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -30,304 +42,9 @@ const MicroOmegaGame = () => {
   const [joystickActive, setJoystickActive] = useState(false);
   const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 });
 
-  const stateRef = useRef({
-    energy: 0,
-    health: 100,
-    maxHealth: 100,
-    level: 1,
-    score: 0,
-    canEvolve: false,
-    
-    organism: {
-      x: 2000,
-      y: 2000,
-      vx: 0,
-      vy: 0,
-      size: 32,
-      form: 'sphere',
-      color: '#00D9FF',
-      secondaryColor: '#0088FF',
-      tertiaryColor: '#00FFFF',
-      traits: [],
-      angle: 0,
-      targetAngle: 0,
-      
-      // Animação de locomoção melhorada
-      swimPhase: 0,
-      bodyWave: 0,
-      pulseIntensity: 1,
-      rotation: 0,
-      tiltX: 0,
-      tiltY: 0,
-      
-      // Olhos
-      eyeBlinkTimer: 0,
-      eyeBlinkState: 0,
-      eyeLookX: 0,
-      eyeLookY: 0,
-      eyeExpression: 'neutral',
-      
-      // Trail
-      trail: [],
-      
-      // Dash
-      dashCharge: 100,
-      maxDashCharge: 100,
-      isDashing: false,
-      dashCooldown: 0,
-      
-      attack: 10,
-      defense: 5,
-      speed: 1,
-      attackRange: 80,
-      attackCooldown: 0,
-      
-      skills: [],
-      currentSkillIndex: 0,
-      skillCooldowns: {},
-
-      dying: false,
-      deathTimer: 0,
-      hasShieldPowerUp: false,
-      invulnerableFromPowerUp: false
-    },
-    
-    particles: [],
-    floatingParticles: [],
-    glowParticles: [],
-    microorganisms: [],
-    organicMatter: [],
-    obstacles: [],
-    nebulas: [],
-    powerUps: [],
-    activePowerUps: [],
-    enemies: [],
-    projectiles: [],
-    effects: [],
-    
-    // Fundo dinâmico
-    backgroundLayers: [],
-    lightRays: [],
-    
-    worldSize: 4000,
-    
-    lastEventTime: 0,
-    eventInterval: 5000,
-    pulsePhase: 0,
-    gameTime: 0,
-    combo: 0,
-    maxCombo: 0,
-    comboTimer: 0,
-    
-    showEvolutionChoice: false,
-    evolutionType: 'skill',
-    notifications: [],
-    availableTraits: [],
-    availableForms: [],
-    fogIntensity: 0,
-    boss: null,
-    bossPending: false,
-    nextBossLevel: 3,
-    uiSyncTimer: 0.2,
-    
-    joystick: { x: 0, y: 0, active: false, source: 'none' },
-    actionButton: false,
-    gameOver: false
-  });
+  const stateRef = useRef(createInitialState());
 
   const keyboardStateRef = useRef({ up: false, down: false, left: false, right: false });
-
-  const forms = {
-    sphere: { name: 'Esfera', icon: '⚪', defense: 1.2, speed: 1.0 },
-    elongated: { name: 'Alongada', icon: '🏈', defense: 0.8, speed: 1.4 },
-    star: { name: 'Estrela', icon: '⭐', defense: 0.9, speed: 1.1 },
-    amoeba: { name: 'Ameba', icon: '💧', defense: 1.0, speed: 0.9 },
-    geometric: { name: 'Geométrica', icon: '💎', defense: 1.5, speed: 0.7 }
-  };
-
-  const skills = {
-    pulse: {
-      name: 'Pulso Energético',
-      icon: '💥',
-      cooldown: 3000,
-      cost: 20,
-      color: '#00D9FF',
-      effect: (state) => {
-        const org = state.organism;
-        state.enemies.forEach(enemy => {
-          const dx = enemy.x - org.x;
-          const dy = enemy.y - org.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          if (dist < 200) {
-            enemy.vx += (dx / dist) * 15;
-            enemy.vy += (dy / dist) * 15;
-            enemy.health -= org.attack * 0.5;
-            createEffect(enemy.x, enemy.y, 'pulse', '#00D9FF');
-          }
-        });
-        createEffect(org.x, org.y, 'shockwave', '#00D9FF');
-        playSound('skill');
-      }
-    },
-    spike: {
-      name: 'Lança de Espinhos',
-      icon: '🔱',
-      cooldown: 2000,
-      cost: 15,
-      color: '#FF0066',
-      effect: (state) => {
-        const org = state.organism;
-        for (let i = 0; i < 3; i++) {
-          state.projectiles.push({
-            x: org.x,
-            y: org.y,
-            vx: Math.cos(org.angle + (i - 1) * 0.3) * 8,
-            vy: Math.sin(org.angle + (i - 1) * 0.3) * 8,
-            damage: org.attack * 1.5,
-            life: 2,
-            color: '#FF0066',
-            type: 'spike'
-          });
-        }
-        playSound('shoot');
-      }
-    },
-    shield: {
-      name: 'Escudo Celular',
-      icon: '🛡️',
-      cooldown: 5000,
-      cost: 25,
-      color: '#FFD700',
-      effect: (state) => {
-        state.organism.invulnerable = true;
-        setTimeout(() => { state.organism.invulnerable = false; }, 2000);
-        createEffect(state.organism.x, state.organism.y, 'shield', '#FFD700');
-        playSound('buff');
-      }
-    },
-    drain: {
-      name: 'Absorção Vital',
-      icon: '🌀',
-      cooldown: 4000,
-      cost: 30,
-      color: '#00FF88',
-      effect: (state) => {
-        const org = state.organism;
-        let totalDrain = 0;
-        
-        state.enemies.forEach(enemy => {
-          const dx = enemy.x - org.x;
-          const dy = enemy.y - org.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          if (dist < 250) {
-            const drain = Math.min(enemy.health, 15);
-            enemy.health -= drain;
-            totalDrain += drain;
-            
-            for (let i = 0; i < 5; i++) {
-              const t = i / 5;
-              createParticle(enemy.x + (org.x - enemy.x) * t, enemy.y + (org.y - enemy.y) * t, '#00FF88', 3);
-            }
-          }
-        });
-        
-        state.health = Math.min(state.maxHealth, state.health + totalDrain);
-        createEffect(org.x, org.y, 'drain', '#00FF88');
-        playSound('drain');
-      }
-    }
-  };
-
-  const evolutionaryTraits = {
-    flagellum: { name: 'Flagelo', icon: '🦎', color: '#00FFB3', skill: 'pulse', effect: (org) => { org.speed *= 1.5; org.skills.push('pulse'); } },
-    spikes: { name: 'Espinhos', icon: '⚡', color: '#FF0066', skill: 'spike', effect: (org) => { org.attack *= 1.8; org.skills.push('spike'); } },
-    membrane: { name: 'Membrana', icon: '🛡️', color: '#FF6B00', skill: 'shield', effect: (org) => { org.defense *= 1.6; org.skills.push('shield'); } },
-    nucleus: { name: 'Núcleo Vital', icon: '💎', color: '#FFD700', skill: 'drain', effect: (org) => { org.maxHealth += 50; org.skills.push('drain'); } }
-  };
-
-  const organicMatterTypes = {
-    protein: { colors: ['#FF6B9D', '#FF1493', '#C71585'], sizes: [8, 12], energy: 15, health: 5, shapes: ['cluster', 'chain'] },
-    lipid: { colors: ['#FFD700', '#FFA500', '#FF8C00'], sizes: [6, 10], energy: 10, health: 0, shapes: ['blob', 'droplet'] },
-    carbohydrate: { colors: ['#00FF88', '#00FA9A', '#3CB371'], sizes: [10, 15], energy: 20, health: 0, shapes: ['crystal', 'cluster'] },
-    vitamin: { colors: ['#00D9FF', '#1E90FF', '#4169E1'], sizes: [5, 8], energy: 5, health: 15, shapes: ['star', 'sphere'] }
-  };
-
-  const enemyTemplates = {
-    virus: { name: 'Vírus', baseSize: 18, baseSpeed: 2.5, baseAttack: 8, baseDefense: 2, color: '#FF3333', behavior: 'aggressive', points: 100 },
-    bacteria: { name: 'Bactéria', baseSize: 25, baseSpeed: 1.8, baseAttack: 12, baseDefense: 5, color: '#FF6600', behavior: 'territorial', points: 150 },
-    parasite: { name: 'Parasita', baseSize: 20, baseSpeed: 3.0, baseAttack: 6, baseDefense: 3, color: '#66FF33', behavior: 'opportunist', points: 120 },
-    predator: { name: 'Predador', baseSize: 40, baseSpeed: 1.5, baseAttack: 20, baseDefense: 10, color: '#9933FF', behavior: 'hunter', points: 300 }
-  };
-
-  const obstacleTypes = {
-    rock: { colors: ['#666666', '#555555', '#777777'], sizes: [40, 80], shapes: ['angular', 'round'] },
-    crystal: { colors: ['#00FFFF', '#00DDDD', '#00BBBB'], sizes: [30, 60], shapes: ['geometric', 'cluster'] },
-    plant: { colors: ['#00AA00', '#00CC00', '#009900'], sizes: [50, 100], shapes: ['branched', 'leafy'] },
-    membrane: { colors: ['#FF00FF44', '#FF00AA44', '#AA00FF44'], sizes: [60, 120], shapes: ['wall', 'bubble'] }
-  };
-
-  const nebulaTypes = {
-    solid: {
-      color: '#1c193a',
-      innerColor: '#3a2f6b',
-      glow: '#7a5cff',
-      radius: [140, 260],
-      opacity: 0.65
-    },
-    gas: {
-      color: '#143851',
-      innerColor: '#2b8bb3',
-      glow: '#7fd9ff',
-      radius: [200, 320],
-      opacity: 0.35
-    }
-  };
-
-  const powerUpTypes = {
-    health: {
-      name: 'Cápsula Regenerativa',
-      icon: '❤️',
-      color: '#FF4444',
-      instant: true,
-      apply: (state) => {
-        state.health = Math.min(state.maxHealth, state.health + 50);
-        addNotification('+50 HP');
-      }
-    },
-    energy: {
-      name: 'Nódulo Energético',
-      icon: '⚡',
-      color: '#FFD700',
-      instant: true,
-      apply: (state) => {
-        state.energy += 100;
-        addNotification('+100 Energia');
-      }
-    },
-    speed: {
-      name: 'Impulso Cinético',
-      icon: '💨',
-      color: '#00FFAA',
-      duration: 8,
-      message: 'Velocidade 2x!'
-    },
-    damage: {
-      name: 'Pico Ofensivo',
-      icon: '⚔️',
-      color: '#FF4477',
-      duration: 10,
-      message: 'Ataque Potente!'
-    },
-    invincibility: {
-      name: 'Escudo Estelar',
-      icon: '🛡️',
-      color: '#FFD700',
-      duration: 6,
-      message: 'Invencível!'
-    }
-  };
 
   const pickRandomUnique = (array, count) => {
     if (!array?.length || count <= 0) return [];
@@ -729,6 +446,9 @@ const MicroOmegaGame = () => {
       id: Date.now() + Math.random()
     });
   };
+
+  const powerUpTypes = createPowerUpTypes({ addNotification });
+  const skills = createSkills({ createEffect, playSound, createParticle });
 
   const performDash = () => {
     const state = stateRef.current;
