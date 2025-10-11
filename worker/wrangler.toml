@@ -1,6 +1,7 @@
 name = "micr-omega-worker"
 main = "src/index.ts"
-compatibility_date = "2024-10-01"
+compatibility_date = "2025-02-14"
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 # Adicione variáveis de ambiente compartilhadas aqui
@@ -8,6 +9,10 @@ compatibility_date = "2024-10-01"
 [[durable_objects.bindings]]
 name = "ROOM"
 class_name = "RoomDO"
+
+routes = [
+  { pattern = "realtime.example.com/ws", custom_domain = true }
+]
 
 [[migrations]]
 tag = "v1"

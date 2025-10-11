@@ -8,7 +8,9 @@
     "worker"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build:web",
+    "build:web": "npm run build --workspace web",
+    "build:all": "npm run build --workspaces",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "dev:web": "npm run dev --workspace web",
