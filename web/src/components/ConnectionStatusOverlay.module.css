@@ -1,0 +1,89 @@
+.container {
+  min-width: 220px;
+  max-width: 280px;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: rgba(8, 12, 30, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f6f8ff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+  font-size: 0.8rem;
+  pointer-events: auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.statusDot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #a3abff;
+  box-shadow: 0 0 0 2px rgba(163, 171, 255, 0.2);
+}
+
+.statusConnected {
+  background: #4ade80;
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
+}
+
+.statusConnecting {
+  background: #facc15;
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.2);
+}
+
+.statusReconnecting {
+  background: #fb923c;
+  box-shadow: 0 0 0 2px rgba(251, 146, 60, 0.25);
+}
+
+.statusDisconnected {
+  background: #f87171;
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.25);
+}
+
+.statusIdle {
+  background: #94a3b8;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.2);
+}
+
+.metrics {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: rgba(226, 232, 255, 0.85);
+}
+
+.metric strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.alert {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(248, 113, 113, 0.25);
+  color: #fecaca;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 720px) {
+  .container {
+    max-width: 220px;
+    padding: 0.6rem 0.75rem;
+  }
+}

@@ -12,6 +12,20 @@ type RankingRow = {
   isLocal: boolean;
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  idle: "Aguardando",
+  connecting: "Conectando",
+  connected: "Ao vivo",
+  reconnecting: "Reconectando",
+  disconnected: "Offline",
+};
+
+const STATUS_CLASS: Record<string, string> = {
+  connected: styles.statusConnected,
+  reconnecting: styles.statusReconnecting,
+  disconnected: styles.statusDisconnected,
+};
+
 const RankingPanel = () => {
   const ranking = useGameStore((state) => state.ranking);
   const players = useGameStore((state) => state.players);
@@ -45,11 +59,14 @@ const RankingPanel = () => {
     );
   }
 
+  const statusLabel = STATUS_LABEL[connectionStatus] ?? connectionStatus;
+  const statusClass = STATUS_CLASS[connectionStatus] ?? "";
+
   return (
     <aside className={styles.panel} aria-label="Ranking da partida">
       <header className={styles.header}>
         <h3 className={styles.title}>Ranking</h3>
-        <span className={styles.statusBadge}>{connectionStatus}</span>
+        <span className={`${styles.statusBadge} ${statusClass}`}>{statusLabel}</span>
       </header>
       <ol className={styles.list}>
         {rows.map((row, index) => {
@@ -67,9 +84,12 @@ const RankingPanel = () => {
           return (
             <li key={row.playerId} className={itemClass}>
               <span className={styles.rankBadge}>{index + 1}</span>
-              <span className={styles.name} title={row.name}>
-                {row.name}
-              </span>
+              <div className={styles.nameCell}>
+                <span className={styles.name} title={row.name}>
+                  {row.name}
+                </span>
+                {row.isLocal ? <span className={styles.localTag}>Você</span> : null}
+              </div>
               <span className={styles.score}>
                 {row.score.toLocaleString("pt-BR")}
                 {!row.connected ? (

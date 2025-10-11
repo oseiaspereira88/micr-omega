@@ -5,6 +5,8 @@ import SkillWheel from './SkillWheel';
 import Notifications from './Notifications';
 import TouchControls from './TouchControls';
 import styles from './GameHud.module.css';
+import RankingPanel from '../../components/RankingPanel';
+import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
 
 const GameHud = ({
   level,
@@ -38,6 +40,11 @@ const GameHud = ({
 
   return (
     <div className={styles.hud}>
+      <div className={styles.sidebar}>
+        <RankingPanel />
+        <ConnectionStatusOverlay />
+      </div>
+
       <HudBar
         level={level}
         score={score}
