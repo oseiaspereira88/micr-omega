@@ -61,16 +61,22 @@
 │  │  ├─ components/PlayerNameModal.tsx
 │  │  ├─ components/RankingPanel.tsx
 │  │  └─ utils/messageTypes.ts
-│  └─ ...
+│  ├─ package.json
+│  └─ tsconfig.json
 ├─ worker/
 │  ├─ src/index.ts
 │  ├─ src/RoomDO.ts
 │  ├─ src/types.ts
-│  ├─ wrangler.toml
-│  └─ package.json
+│  ├─ package.json
+│  ├─ tsconfig.json
+│  └─ wrangler.toml
+├─ package.json
+├─ tsconfig.json
 └─ docs/
    └─ multiplayer-plan.md
 ```
+
+> **Comandos base**: `npm run dev:web` sobe o Vite no workspace `web/`, enquanto `npm run dev:worker` usa o Wrangler localmente. Para builds, `npm run build -w web` gera o front-end e `npm run deploy -w worker` publica o Worker.
 
 ### 3.4 Mensagens WebSocket (exemplo)
 ```ts

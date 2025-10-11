@@ -1,4 +1,6 @@
 node_modules/
-dist/
+web/dist/
+worker/dist/
 .vite/
 .DS_Store
+worker/.wrangler/
