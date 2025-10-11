@@ -10,3 +10,37 @@
   position: absolute;
   inset: 0;
 }
+
+.sidebar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: stretch;
+  width: clamp(240px, 26vw, 320px);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.sidebar > * {
+  pointer-events: auto;
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: clamp(220px, 38vw, 300px);
+  }
+}
+
+@media (max-width: 720px) {
+  .sidebar {
+    position: fixed;
+    top: auto;
+    bottom: 16px;
+    right: 16px;
+    width: min(320px, calc(100vw - 32px));
+    gap: 10px;
+  }
+}

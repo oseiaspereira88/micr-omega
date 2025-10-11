@@ -41,6 +41,8 @@ const errorReasonToMessage = (error: ErrorMessage): string => {
       return "Jogador desconhecido. Tente reconectar.";
     case "game_not_active":
       return "A sala não está ativa no momento.";
+    case "room_full":
+      return "A sala está cheia no momento. Aguarde uma vaga.";
     case "invalid_payload":
     default:
       return "Erro ao comunicar com o servidor. Tente novamente.";
@@ -231,6 +233,7 @@ export const useGameSocket = (
       case "error": {
         gameStore.actions.setJoinError(errorReasonToMessage(message));
         shouldReconnectRef.current = false;
+        gameStore.actions.setConnectionStatus("disconnected");
         stopSocket();
         break;
       }
@@ -239,6 +242,7 @@ export const useGameSocket = (
           "Versão desatualizada. Atualize a página para continuar."
         );
         shouldReconnectRef.current = false;
+        gameStore.actions.setConnectionStatus("disconnected");
         stopSocket();
         break;
       }
