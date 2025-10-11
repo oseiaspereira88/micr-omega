@@ -476,23 +476,42 @@ const MicroOmegaGame = () => {
     });
   };
 
-  const spawnPowerUp = () => {
+  const spawnPowerUp = (x, y, forcedType) => {
     const state = stateRef.current;
     const keys = Object.keys(powerUpTypes);
     if (keys.length === 0) return;
 
-    const typeKey = keys[Math.floor(Math.random() * keys.length)];
+    const typeKey = forcedType || keys[Math.floor(Math.random() * keys.length)];
     const type = powerUpTypes[typeKey];
 
-    state.powerUps.push({
+    const powerUp = {
       id: Date.now() + Math.random(),
-      x: Math.random() * state.worldSize,
-      y: Math.random() * state.worldSize,
+      x: x ?? Math.random() * state.worldSize,
+      y: y ?? Math.random() * state.worldSize,
       type: typeKey,
       color: type.color,
       icon: type.icon,
       pulse: Math.random() * Math.PI * 2
-    });
+    };
+
+    state.powerUps.push(powerUp);
+    return powerUp;
+  };
+
+  const dropPowerUps = (enemy) => {
+    if (!enemy) return;
+
+    const dropChance = enemy.boss ? 1 : 0.18;
+    if (Math.random() < dropChance) {
+      spawnPowerUp(
+        enemy.x + (Math.random() - 0.5) * 40,
+        enemy.y + (Math.random() - 0.5) * 40
+      );
+    }
+
+    if (enemy.boss) {
+      spawnPowerUp(enemy.x, enemy.y);
+    }
   };
 
   const applyPowerUp = (typeKey) => {
@@ -964,10 +983,12 @@ const MicroOmegaGame = () => {
           for (let i = 0; i < 15; i++) {
             createParticle(enemy.x, enemy.y, enemy.color);
           }
+          dropPowerUps(enemy);
           if (enemy.boss) {
             state.boss = null;
             state.bossPending = false;
           }
+          state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
         }
 
         if (enemy.boss && enemy.health > 0) {
@@ -2210,6 +2231,7 @@ const MicroOmegaGame = () => {
             if (enemy.health <= 0) {
               state.energy += 25;
               state.score += enemy.points;
+              dropPowerUps(enemy);
               if (enemy.boss) {
                 state.boss = null;
                 state.bossPending = false;
