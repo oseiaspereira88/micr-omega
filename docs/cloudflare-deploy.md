@@ -11,7 +11,7 @@ Este documento descreve, passo a passo, como sair de uma conta Cloudflare vazia 
 ## 0. Pré-requisitos
 
 1. Conta ativa no [Cloudflare](https://dash.cloudflare.com/) e um domínio cujo DNS possa ser delegado para a plataforma.
-2. Node.js 20+, npm e Git instalados localmente para executar builds e comandos Wrangler.
+2. Node.js 20+, npm, Git e o Wrangler CLI 4.x instalados localmente (`npm install -g wrangler@^4`) para executar builds e comandos Wrangler.
 3. Repositório clonado (`git clone ... && npm install` na raiz) para acessar scripts e configuração do projeto.
 4. (Opcional) Tokens das ferramentas de observabilidade que deseja integrar (Logflare, Sentry, etc.).
 
