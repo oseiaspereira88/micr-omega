@@ -576,14 +576,25 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
 
-    const ctx = canvas.getContext('2d');
-
     const updateCanvasSize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight - 40;
     };
 
     updateCanvasSize();
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.warn('Canvas 2D context not available; aborting game loop setup.');
+      return () => {
+        window.removeEventListener('resize', updateCanvasSize);
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
+      };
+    }
+
     window.addEventListener('resize', updateCanvasSize);
 
     let lastTime = Date.now();
@@ -667,7 +678,6 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
         const offsetX = cameraOffsetX;
         const offsetY = cameraOffsetY;
         const state = stateRef.current;
-        const ctx = canvas.getContext('2d');
 
         const pulse = Math.sin(state.pulsePhase) * 0.05 + 1;
 
