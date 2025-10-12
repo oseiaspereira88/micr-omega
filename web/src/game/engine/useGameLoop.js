@@ -1182,9 +1182,12 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
           ctx.globalAlpha = enemy.opacity;
 
           const gradient = ctx.createRadialGradient(0, 0, enemy.size * 0.3, 0, 0, enemy.size);
-          gradient.addColorStop(0, `${enemy.coreColor}1)`);
-          gradient.addColorStop(0.5, `${enemy.color}0.8)`);
-          gradient.addColorStop(1, `${enemy.color}0.2)`);
+          const innerColor = enemy.coreColor || enemy.color;
+          const midColor = enemy.midColor || enemy.color;
+          const outerColor = enemy.outerColor || enemy.color;
+          gradient.addColorStop(0, innerColor);
+          gradient.addColorStop(0.5, midColor);
+          gradient.addColorStop(1, outerColor);
           ctx.fillStyle = gradient;
 
           ctx.beginPath();
@@ -1193,8 +1196,8 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
 
           ctx.globalAlpha = 1;
           ctx.shadowBlur = 20;
-          ctx.shadowColor = `${enemy.coreColor}0.8)`;
-          ctx.strokeStyle = `${enemy.color}0.6)`;
+          ctx.shadowColor = enemy.shadowColor || innerColor || enemy.color;
+          ctx.strokeStyle = enemy.strokeColor || midColor || enemy.color;
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.arc(0, 0, enemy.size * (1 + Math.sin(state.gameTime * enemy.pulseSpeed) * 0.1), 0, Math.PI * 2);
