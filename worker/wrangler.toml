@@ -13,7 +13,7 @@ name = "ROOM"
 class_name = "RoomDO"
 
 routes = [
-  { pattern = "realtime.example.com/ws", custom_domain = true }
+  { pattern = "realtime.micromundo.uk/ws", custom_domain = true }
 ]
 
 [[migrations]]
