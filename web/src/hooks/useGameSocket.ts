@@ -15,9 +15,11 @@ const DEFAULT_PING_INTERVAL = 15000;
 const DEFAULT_RECONNECT_BASE = 1500;
 const DEFAULT_RECONNECT_MAX = 12000;
 
-const resolveWebSocketUrl = (explicitUrl?: string) => {
+const normalizeRealtimeUrl = (url: string) => url.trim().replace(/\/+$/, "");
+
+export const resolveWebSocketUrl = (explicitUrl?: string) => {
   if (explicitUrl) {
-    return explicitUrl;
+    return normalizeRealtimeUrl(explicitUrl);
   }
 
   if (typeof window === "undefined") {
@@ -28,11 +30,28 @@ const resolveWebSocketUrl = (explicitUrl?: string) => {
     import.meta.env.VITE_REALTIME_URL ?? import.meta.env.VITE_WS_URL ?? "";
 
   if (envUrl) {
-    return envUrl;
+    return normalizeRealtimeUrl(envUrl);
   }
 
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}/`;
+  const { hostname, protocol, port } = window.location;
+  const websocketProtocol = protocol === "https:" ? "wss:" : "ws:";
+
+  const isLoopbackHost = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(
+    hostname
+  );
+
+  if (isLoopbackHost) {
+    const portSuffix = port ? `:${port}` : "";
+    return `${websocketProtocol}//${hostname}${portSuffix}`;
+  }
+
+  const hostnameParts = hostname.split(".").filter(Boolean);
+  const apexDomain =
+    hostnameParts.length >= 2
+      ? hostnameParts.slice(-2).join(".")
+      : hostname;
+
+  return `${websocketProtocol}//realtime.${apexDomain}`;
 };
 
 const errorReasonToMessage = (error: ErrorMessage): string => {

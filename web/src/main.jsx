@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 import App from './App.jsx';
+import { resolveWebSocketUrl } from './hooks/useGameSocket';
 
 import './styles.css';
 
@@ -33,10 +34,11 @@ if (sentryDsn) {
     tracesSampleRate: Number(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE ?? '0.1'),
   });
 
-  Sentry.setTag(
-    'realtime_url',
-    import.meta.env.VITE_REALTIME_URL ?? import.meta.env.VITE_WS_URL ?? 'auto'
+  const realtimeUrl = resolveWebSocketUrl(
+    import.meta.env.VITE_REALTIME_URL ?? import.meta.env.VITE_WS_URL ?? undefined
   );
+
+  Sentry.setTag('realtime_url', realtimeUrl || 'auto');
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
