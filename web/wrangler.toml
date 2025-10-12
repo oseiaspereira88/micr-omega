@@ -4,4 +4,4 @@ build_command = "npm ci && npm run build"
 compatibility_date = "2025-02-14"
 
 [vars]
-VITE_REALTIME_URL = "wss://realtime.example.com/ws"
+VITE_REALTIME_URL = "wss://realtime.example.com/"

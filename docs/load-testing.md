@@ -5,18 +5,18 @@ Este diretório contém o roteiro de carga `scripts/load-testing/k6-room.js`, pr
 ## Pré-requisitos
 
 * [k6](https://k6.io/) instalado localmente (`brew install k6`, `choco install k6` ou download manual).
-* Um endpoint WebSocket acessível do computador local. Para ambientes de preview (Cloudflare Workers), utilize a URL `wss://<seu-preview>/ws`. Em desenvolvimento local com o Worker rodando via `wrangler dev`, use `ws://127.0.0.1:8787/ws`.
+* Um endpoint WebSocket acessível do computador local. Para ambientes de preview (Cloudflare Workers), utilize a URL `wss://<seu-preview>/`. Em desenvolvimento local com o Worker rodando via `wrangler dev`, use `ws://127.0.0.1:8787/`.
 
 ## Execução sugerida
 
 ```bash
 # Executa por 60 segundos com 50 usuários virtuais (padrão)
 k6 run scripts/load-testing/k6-room.js \
-  --env WS_URL="wss://preview.example.com/ws"
+  --env WS_URL="wss://preview.example.com/"
 
 # Escala para 100 conexões durante 90 segundos
 k6 run scripts/load-testing/k6-room.js \
-  --env WS_URL="wss://preview.example.com/ws" \
+  --env WS_URL="wss://preview.example.com/" \
   --env VUS=100 \
   --env HOLD_SECONDS=90
 ```
@@ -25,7 +25,7 @@ Variáveis suportadas:
 
 | Variável | Descrição | Valor padrão |
 | --- | --- | --- |
-| `WS_URL` | Endpoint WebSocket do Room DO. | `ws://localhost:8787/ws` |
+| `WS_URL` | Endpoint WebSocket do Room DO. | `ws://localhost:8787/` |
 | `VUS` | Quantidade de conexões simultâneas (50-100 recomendadas). | `50` |
 | `HOLD_SECONDS` | Duração do teste (segundos). | `60` |
 

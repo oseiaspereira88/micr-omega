@@ -32,7 +32,7 @@ const resolveWebSocketUrl = (explicitUrl?: string) => {
   }
 
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}/ws`;
+  return `${protocol}//${window.location.host}/`;
 };
 
 const errorReasonToMessage = (error: ErrorMessage): string => {

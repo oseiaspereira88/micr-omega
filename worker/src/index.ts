@@ -16,11 +16,14 @@ export default {
     const observability = createObservability(env, { component: "Worker" });
     const url = new URL(request.url);
 
-    if (url.pathname === "/ws") {
+    const isSupportedRoute = url.pathname === "/" || url.pathname === "/ws";
+
+    if (isSupportedRoute) {
       if (!isWebSocketRequest(request)) {
         observability.log("warn", "ws_upgrade_missing", {
           category: "protocol_error",
-          url: url.toString()
+          url: url.toString(),
+          path: url.pathname
         });
         return new Response("Expected WebSocket", { status: 426 });
       }
@@ -28,14 +31,16 @@ export default {
       const id = env.ROOM.idFromName(ROOM_ID);
       const stub = env.ROOM.get(id);
       observability.log("info", "ws_upgrade_forwarded", {
-        roomId: ROOM_ID
+        roomId: ROOM_ID,
+        path: url.pathname
       });
       return stub.fetch(request);
     }
 
     observability.log("warn", "unexpected_route", {
       category: "protocol_error",
-      path: url.pathname
+      path: url.pathname,
+      expectedPaths: ["/", "/ws"]
     });
     return new Response("Not Found", { status: 404 });
   }
