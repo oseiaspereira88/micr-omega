@@ -155,7 +155,7 @@
 ### 5.2 Cloudflare Workers + Durable Objects
 - `wrangler.toml` com binding `ROOM` apontando para classe `RoomDO`.
 - Definir `compatibility_date` atual e `compatibility_flags = ["nodejs_compat"]` se necessário.
-- Configurar roteamento via subdomínio (ex.: `realtime.<domínio>.com/`).
+- Configurar roteamento via subdomínio (ex.: `realtime.<domínio>.com`).
 - Habilitar logs em `wrangler tail` para debug.
 - Planejar limites: monitorar consumo de CPU/memória do DO, ajustar `durable_objects.storage` para snapshots.
 
