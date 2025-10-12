@@ -576,24 +576,43 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
 
-    const updateCanvasSize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight - 40;
-    };
-
-    updateCanvasSize();
-
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       console.warn('Canvas 2D context not available; aborting game loop setup.');
       return () => {
-        window.removeEventListener('resize', updateCanvasSize);
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;
         }
       };
     }
+
+    const updateCanvasSize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const width = window.innerWidth;
+      const height = window.innerHeight - 40;
+
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+
+      const displayWidth = Math.round(width * dpr);
+      const displayHeight = Math.round(height * dpr);
+
+      if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+
+        if (typeof ctx.resetTransform === 'function') {
+          ctx.resetTransform();
+        } else {
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
+
+        ctx.scale(dpr, dpr);
+      }
+    };
+
+    updateCanvasSize();
 
     window.addEventListener('resize', updateCanvasSize);
 
@@ -605,8 +624,9 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
       lastTime = now;
 
       const state = stateRef.current;
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
+      const dpr = window.devicePixelRatio || 1;
+      const canvasWidth = canvas.clientWidth || canvas.width / dpr;
+      const canvasHeight = canvas.clientHeight || canvas.height / dpr;
       const ctxWidth = canvasWidth;
       const ctxHeight = canvasHeight;
 
@@ -1278,6 +1298,10 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
         canvas,
         delta,
         drawWorld,
+        viewport: {
+          width: ctxWidth,
+          height: ctxHeight,
+        },
       });
 
       state.pulsePhase += 0.04;
