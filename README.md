@@ -41,9 +41,9 @@ O arquivo `package.json` na raiz declara os workspaces `web/` e `worker/` e conc
    ```bash
    npm install
    ```
-3. Crie um arquivo `web/.env.local` apontando para o Worker local (Wrangler expõe o WebSocket em `http://127.0.0.1:8787/ws`):
+3. Crie um arquivo `web/.env.local` apontando para o Worker local (Wrangler expõe o WebSocket na raiz `http://127.0.0.1:8787/`):
    ```bash
-   echo "VITE_REALTIME_URL=ws://127.0.0.1:8787/ws" > web/.env.local
+   echo "VITE_REALTIME_URL=ws://127.0.0.1:8787/" > web/.env.local
    ```
 4. Em uma aba/terminal, suba o Worker localmente com Wrangler (requer `wrangler` 4.x autenticado). O comando habilita WebSocket sobre HTTPS em produção, mas no modo dev responde via `ws://`:
    ```bash
@@ -75,9 +75,9 @@ Consulte `docs/load-testing.md` para instruções de execução do teste de carg
 
 ### Cloudflare Pages + Worker Realtime
 
-- O Worker está configurado para responder no caminho `/ws`, com roteamento HTTPS/WSS via domínio dedicado `realtime.<seu-dominio>.com/ws`.
-- O projeto Cloudflare Pages utiliza o diretório `web/`, com build `npm ci && npm run build` (script do workspace `web`). A configuração em `web/wrangler.toml` define `VITE_REALTIME_URL` como `wss://realtime.example.com/ws`; ajuste o host conforme o domínio real no painel de variáveis da Pages se preferir.
-- Para ambientes locais, `VITE_REALTIME_URL` deve apontar para `ws://127.0.0.1:8787/ws`, permitindo que o `vite dev` se conecte ao `wrangler dev` simultaneamente.
+- O Worker está configurado para responder no caminho `/`, com roteamento HTTPS/WSS via domínio dedicado `realtime.<seu-dominio>.com/` (a rota legada `/ws` continua aceita para clientes antigos).
+- O projeto Cloudflare Pages utiliza o diretório `web/`, com build `npm ci && npm run build` (script do workspace `web`). A configuração em `web/wrangler.toml` define `VITE_REALTIME_URL` como `wss://realtime.example.com/`; ajuste o host conforme o domínio real no painel de variáveis da Pages se preferir.
+- Para ambientes locais, `VITE_REALTIME_URL` deve apontar para `ws://127.0.0.1:8787/`, permitindo que o `vite dev` se conecte ao `wrangler dev` simultaneamente.
 
 ## Controles
 

@@ -36,7 +36,7 @@ export async function createMiniflare() {
 }
 
 export async function openSocket(mf: Miniflare) {
-  const response = await mf.dispatchFetch("http://localhost/ws", {
+  const response = await mf.dispatchFetch("http://localhost/", {
     headers: { Upgrade: "websocket" },
   });
   if (response.status !== 101 || !response.webSocket) {
