@@ -43,6 +43,7 @@ import { DEFAULT_JOYSTICK_STATE } from '../input/utils';
 
 const useGameLoop = ({ canvasRef, dispatch }) => {
   const audioCtxRef = useRef(null);
+  const audioWarningLoggedRef = useRef(false);
   const animationFrameRef = useRef(null);
   const stateRef = useRef(createInitialState());
   const movementIntentRef = useRef({ ...DEFAULT_JOYSTICK_STATE });
@@ -450,7 +451,31 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
   }, [inputResetControls]);
 
   useEffect(() => {
-    audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    const AudioContextCtor =
+      typeof window !== 'undefined' &&
+      (window.AudioContext || window.webkitAudioContext);
+
+    if (audioCtxRef.current) {
+      return undefined;
+    }
+
+    if (!AudioContextCtor) {
+      audioCtxRef.current = null;
+      if (!audioWarningLoggedRef.current) {
+        console.warn('Web Audio API unavailable; game audio disabled.');
+        audioWarningLoggedRef.current = true;
+      }
+    } else {
+      try {
+        audioCtxRef.current = new AudioContextCtor();
+      } catch (error) {
+        audioCtxRef.current = null;
+        if (!audioWarningLoggedRef.current) {
+          console.warn('Failed to initialize Web Audio API; game audio disabled.', error);
+          audioWarningLoggedRef.current = true;
+        }
+      }
+    }
 
     const state = stateRef.current;
 
@@ -541,7 +566,9 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
     spawnOrganicMatter(state, 25);
 
     return () => {
-      if (audioCtxRef.current) audioCtxRef.current.close();
+      if (audioCtxRef.current && typeof audioCtxRef.current.close === 'function') {
+        audioCtxRef.current.close();
+      }
     };
   }, [spawnNebula, spawnObstacle, spawnOrganicMatter, spawnPowerUp]);
 
