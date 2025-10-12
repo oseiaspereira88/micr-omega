@@ -9,11 +9,13 @@ export const enemyRenderer = {
       ctx.translate(enemy.x - camera.offsetX, enemy.y - camera.offsetY);
 
       ctx.shadowBlur = 20;
-      ctx.shadowColor = enemy.color;
+      const innerColor = enemy.coreColor || enemy.color;
+      const outerColor = enemy.outerColor || enemy.color;
+      ctx.shadowColor = enemy.shadowColor || innerColor || enemy.color;
 
       const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, enemy.size);
-      gradient.addColorStop(0, enemy.color);
-      gradient.addColorStop(1, enemy.color + '66');
+      gradient.addColorStop(0, innerColor);
+      gradient.addColorStop(1, outerColor);
       ctx.fillStyle = gradient;
 
       ctx.beginPath();
