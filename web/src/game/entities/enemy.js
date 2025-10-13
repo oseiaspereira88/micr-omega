@@ -72,6 +72,28 @@ const ensureColorWithAlpha = (color, alpha) => {
   return trimmed;
 };
 
+const toFiniteNumber = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
+
+const resolveNumericValue = (value, fallback = 0) => {
+  const normalizedFallback = toFiniteNumber(fallback);
+  const fallbackNumber = normalizedFallback ?? 0;
+  const normalizedValue = toFiniteNumber(value);
+  return normalizedValue ?? fallbackNumber;
+};
+
 export const createEnemyFromTemplate = (
   templateKey,
   template,
@@ -142,6 +164,10 @@ export const createEnemyFromTemplate = (
     health: overrides.health ?? baseHealth,
     maxHealth: overrides.maxHealth ?? baseHealth,
     points: overrides.points ?? template.points,
+    energyReward: resolveNumericValue(
+      overrides.energyReward ?? template.energyReward,
+      0
+    ),
     baseColor: baseColorInput,
     color,
     coreColor,
@@ -184,6 +210,7 @@ export const createEnemyFromTemplate = (
   enemy.shadowColor = shadowColor;
   enemy.strokeColor = strokeColor;
   enemy.opacity = overrides.opacity ?? enemy.opacity ?? 1;
+  enemy.energyReward = resolveNumericValue(enemy.energyReward, defaultEnemy.energyReward);
 
   return enemy;
 };
@@ -217,6 +244,7 @@ export const createBossEnemy = (
     health: config.health ?? 500,
     maxHealth: config.maxHealth ?? config.health ?? 500,
     points: config.points ?? 500,
+    energyReward: resolveNumericValue(config.energyReward ?? overrides.energyReward, 50),
     color: config.color ?? '#FFFFFF',
     behavior: config.behavior ?? 'boss',
     evolutionLevel: config.evolutionLevel ?? 1,
@@ -228,7 +256,7 @@ export const createBossEnemy = (
     boss: true
   };
 
-  return {
+  const boss = {
     ...defaults,
     ...config,
     ...overrides,
@@ -241,4 +269,8 @@ export const createBossEnemy = (
     canLeave: overrides.canLeave ?? config.canLeave ?? false,
     maxHealth: overrides.maxHealth ?? config.maxHealth ?? defaults.maxHealth
   };
+
+  boss.energyReward = resolveNumericValue(boss.energyReward, defaults.energyReward);
+
+  return boss;
 };

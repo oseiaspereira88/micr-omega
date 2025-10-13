@@ -391,7 +391,8 @@ export const updateGameState = ({
     if (enemy.health <= 0) {
       state.combo += 1;
       state.maxCombo = Math.max(state.maxCombo, state.combo);
-      state.energy += enemy.energyReward;
+      const energyReward = ensureNumber(enemy.energyReward, 0);
+      state.energy += energyReward;
       state.score += enemy.points;
       createEffect(state, enemy.x, enemy.y, 'hit', enemy.color);
       playSound('enemyDie');

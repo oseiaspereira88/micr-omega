@@ -122,5 +122,40 @@ describe('updateGameState enemy collisions', () => {
     expect(state.health).toBe(100);
     expect(Number.isFinite(state.health)).toBe(true);
   });
+
+  it('converts enemy energy rewards to finite numbers before awarding energy', () => {
+    const state = createState({
+      energy: 10,
+      enemies: [
+        createEnemy({
+          health: 0,
+          energyReward: '15',
+          points: 25,
+        }),
+      ],
+    });
+
+    updateGameState({ state, delta: 0.016 });
+
+    expect(state.energy).toBe(25);
+    expect(Number.isFinite(state.energy)).toBe(true);
+  });
+
+  it('ignores invalid energy reward values when enemies are defeated', () => {
+    const state = createState({
+      energy: 5,
+      enemies: [
+        createEnemy({
+          health: -1,
+          energyReward: 'invalid',
+        }),
+      ],
+    });
+
+    updateGameState({ state, delta: 0.016 });
+
+    expect(state.energy).toBe(5);
+    expect(Number.isFinite(state.energy)).toBe(true);
+  });
 });
 
