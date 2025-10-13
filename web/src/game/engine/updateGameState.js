@@ -23,6 +23,7 @@ export const updateGameState = ({
     addNotification = () => {},
     dropPowerUps = () => [],
     playSound = () => {},
+    getAveragePlayerLevel = () => 1,
   } = helpers;
 
   const organism = state.organism;
@@ -32,6 +33,16 @@ export const updateGameState = ({
 
   const camera = state.camera;
   const worldSize = ensureNumber(state.worldSize, 4000);
+
+  const averageLevelRaw = Number(getAveragePlayerLevel?.() ?? 1);
+  const normalizedAverageLevel = Number.isFinite(averageLevelRaw) ? averageLevelRaw : 1;
+  const clampedAverageLevel = Math.max(1, normalizedAverageLevel);
+  const baseEnemyCap = 10;
+  const enemyCapGrowth = 2;
+  const maxEnemiesAllowed = Math.max(
+    4,
+    Math.round(baseEnemyCap + (clampedAverageLevel - 1) * enemyCapGrowth)
+  );
 
   state.joystick = movementIntent || state.joystick || {};
 
@@ -81,7 +92,9 @@ export const updateGameState = ({
     state.gameTime += delta;
 
     if (state.gameTime - state.lastSpawnTime > state.spawnInterval / 1000) {
-      spawnEnemy?.();
+      if (state.enemies.length < maxEnemiesAllowed) {
+        spawnEnemy?.();
+      }
       state.lastSpawnTime = state.gameTime;
       state.spawnInterval = Math.max(800, state.spawnInterval - 20);
 
@@ -306,7 +319,7 @@ export const updateGameState = ({
     return true;
   });
 
-  if (state.enemies.length < 10 && Math.random() < 0.005) {
+  if (state.enemies.length < maxEnemiesAllowed && Math.random() < 0.005) {
     spawnEnemy?.();
   }
 
