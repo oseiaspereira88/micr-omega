@@ -1,0 +1,43 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { resolveWebSocketUrl } from "./useGameSocket";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("resolveWebSocketUrl", () => {
+  it("returns explicit url when provided", () => {
+    expect(resolveWebSocketUrl("wss://custom.example.com/path/")).toBe(
+      "wss://custom.example.com/path"
+    );
+  });
+
+  it("derives realtime subdomain for standard domains", () => {
+    vi.stubGlobal("window", {
+      location: { hostname: "game.example.com", protocol: "https:", port: "" }
+    } as Window);
+
+    expect(resolveWebSocketUrl()).toBe("wss://realtime.example.com");
+  });
+
+  it("keeps registrable domain for multi-level ccTLDs", () => {
+    vi.stubGlobal("window", {
+      location: { hostname: "arena.example.com.br", protocol: "https:", port: "" }
+    } as Window);
+
+    expect(resolveWebSocketUrl()).toBe("wss://realtime.example.com.br");
+  });
+
+  it("handles secondary domains like co.uk", () => {
+    vi.stubGlobal("window", {
+      location: { hostname: "beta.service.co.uk", protocol: "https:", port: "" }
+    } as Window);
+
+    expect(resolveWebSocketUrl()).toBe("wss://realtime.service.co.uk");
+  });
+
+  it("falls back to host when window is unavailable", () => {
+    vi.stubGlobal("window", undefined as unknown as Window);
+    expect(resolveWebSocketUrl()).toBe("");
+  });
+});

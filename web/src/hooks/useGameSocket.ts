@@ -17,6 +17,20 @@ const DEFAULT_RECONNECT_MAX = 12000;
 
 const normalizeRealtimeUrl = (url: string) => url.trim().replace(/\/+$/, "");
 
+const SECOND_LEVEL_DOMAINS = new Set([
+  "ac",
+  "co",
+  "com",
+  "edu",
+  "gov",
+  "id",
+  "me",
+  "mil",
+  "net",
+  "nom",
+  "org"
+]);
+
 export const resolveWebSocketUrl = (explicitUrl?: string) => {
   if (explicitUrl) {
     return normalizeRealtimeUrl(explicitUrl);
@@ -46,10 +60,20 @@ export const resolveWebSocketUrl = (explicitUrl?: string) => {
   }
 
   const hostnameParts = hostname.split(".").filter(Boolean);
-  const apexDomain =
-    hostnameParts.length >= 2
-      ? hostnameParts.slice(-2).join(".")
-      : hostname;
+  let apexDomain = hostname;
+
+  if (hostnameParts.length >= 2) {
+    const tld = hostnameParts.at(-1) ?? "";
+    const secondLevel = hostnameParts.at(-2)?.toLowerCase();
+    const requiresThirdLevel =
+      hostnameParts.length >= 3 &&
+      tld.length === 2 &&
+      !!secondLevel &&
+      SECOND_LEVEL_DOMAINS.has(secondLevel);
+
+    const sliceStart = requiresThirdLevel ? -3 : -2;
+    apexDomain = hostnameParts.slice(sliceStart).join(".");
+  }
 
   return `${websocketProtocol}//realtime.${apexDomain}`;
 };
