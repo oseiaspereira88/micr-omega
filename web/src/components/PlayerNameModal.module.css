@@ -111,6 +111,23 @@
   transform: none;
 }
 
+.secondaryButton {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  padding: 0.75rem 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: rgba(9, 11, 20, 0.7);
+  color: rgba(245, 247, 255, 0.9);
+  transition: background 0.2s ease, color 0.2s ease, border 0.2s ease;
+}
+
+.secondaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .helperText {
   font-size: 0.8rem;
   color: rgba(245, 247, 255, 0.65);

@@ -8,7 +8,7 @@ import { useGameStore } from './store/gameStore';
 const TOAST_DURATION = 5000;
 
 const App = () => {
-  const { connect } = useGameSocket();
+  const { connect, disconnect } = useGameSocket();
   const joinError = useGameStore((state) => state.joinError);
   const [toasts, setToasts] = useState([]);
   const timersRef = useRef(new Map());
@@ -72,7 +72,7 @@ const App = () => {
   return (
     <>
       <MicroOmegaGame />
-      <PlayerNameModal onSubmit={handleNameSubmit} />
+      <PlayerNameModal onSubmit={handleNameSubmit} onLeave={disconnect} />
       <ToastStack toasts={toasts} onDismiss={removeToast} />
     </>
   );
