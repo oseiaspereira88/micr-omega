@@ -89,6 +89,32 @@ export const updateGameState = ({
       camera.y += ((organism.y - camera.y) * 0.08) * delta * 60;
     }
 
+    const currentDashCharge = Math.max(0, ensureNumber(organism.dashCharge, 0));
+    const maxDashCharge = Math.max(
+      0,
+      ensureNumber(organism.maxDashCharge, Math.max(currentDashCharge, 100))
+    );
+    if (maxDashCharge > 0) {
+      const dashCharge = Math.min(maxDashCharge, currentDashCharge);
+      const dashRegenRate = Math.max(
+        0,
+        ensureNumber(organism.dashChargeRegenRate, 20)
+      );
+      const regeneratedCharge = dashCharge + dashRegenRate * delta;
+      organism.dashCharge = Math.min(maxDashCharge, regeneratedCharge);
+    } else {
+      organism.dashCharge = currentDashCharge;
+    }
+
+    organism.attackCooldown = Math.max(
+      0,
+      ensureNumber(organism.attackCooldown, 0) - delta
+    );
+    organism.dashCooldown = Math.max(
+      0,
+      ensureNumber(organism.dashCooldown, 0) - delta
+    );
+
     state.gameTime += delta;
 
     if (state.gameTime - state.lastSpawnTime > state.spawnInterval / 1000) {
