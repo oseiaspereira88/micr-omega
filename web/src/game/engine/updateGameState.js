@@ -36,8 +36,10 @@ export const updateGameState = ({
   state.joystick = movementIntent || state.joystick || {};
 
   if (!state.gameOver) {
-    const speed = organism.speed * delta;
-    if (movementIntent?.x || movementIntent?.y) {
+    const frameFactor = Math.min(delta * 60, 3);
+    const moving = Boolean(movementIntent?.x || movementIntent?.y);
+
+    if (moving && frameFactor > 0) {
       const length = Math.sqrt(
         movementIntent.x * movementIntent.x +
           movementIntent.y * movementIntent.y
@@ -45,13 +47,25 @@ export const updateGameState = ({
       const normX = movementIntent.x / (length || 1);
       const normY = movementIntent.y / (length || 1);
 
-      organism.vx += normX * speed * 0.6;
-      organism.vy += normY * speed * 0.6;
+      const acceleration = organism.speed * frameFactor * 0.9;
+      organism.vx += normX * acceleration;
+      organism.vy += normY * acceleration;
+
+      const maxSpeed = organism.speed * 12;
+      const currentSpeed = Math.sqrt(organism.vx * organism.vx + organism.vy * organism.vy);
+      if (currentSpeed > maxSpeed) {
+        const scale = maxSpeed / currentSpeed;
+        organism.vx *= scale;
+        organism.vy *= scale;
+      }
+
       organism.rotation = Math.atan2(normY, normX);
-    } else {
-      organism.vx *= 0.94;
-      organism.vy *= 0.94;
     }
+
+    const frictionBase = moving ? 0.92 : 0.78;
+    const friction = frameFactor > 0 ? Math.pow(frictionBase, frameFactor) : frictionBase;
+    organism.vx *= friction;
+    organism.vy *= friction;
 
     organism.x += organism.vx;
     organism.y += organism.vy;
