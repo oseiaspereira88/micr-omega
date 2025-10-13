@@ -122,15 +122,43 @@ const mergeDiffIntoPlayers = (
   return nextPlayers;
 };
 
+const isFullState = (
+  state: SharedGameState | SharedGameStateDiff
+): state is SharedGameState => Array.isArray((state as SharedGameState).players);
+
 const deriveRoomFromState = (
   state: SharedGameState | SharedGameStateDiff,
   previousRoom: RoomStateSnapshot
-): RoomStateSnapshot => ({
-  phase: state.phase ?? previousRoom.phase,
-  roundId: state.roundId ?? previousRoom.roundId,
-  roundStartedAt: state.roundStartedAt ?? previousRoom.roundStartedAt,
-  roundEndsAt: state.roundEndsAt ?? previousRoom.roundEndsAt,
-});
+): RoomStateSnapshot => {
+  if (isFullState(state)) {
+    return {
+      phase: state.phase,
+      roundId: state.roundId,
+      roundStartedAt: state.roundStartedAt,
+      roundEndsAt: state.roundEndsAt,
+    };
+  }
+
+  const nextRoom: RoomStateSnapshot = { ...previousRoom };
+
+  if (state.phase !== undefined) {
+    nextRoom.phase = state.phase;
+  }
+
+  if (state.roundId !== undefined) {
+    nextRoom.roundId = state.roundId;
+  }
+
+  if (state.roundStartedAt !== undefined) {
+    nextRoom.roundStartedAt = state.roundStartedAt;
+  }
+
+  if (state.roundEndsAt !== undefined) {
+    nextRoom.roundEndsAt = state.roundEndsAt;
+  }
+
+  return nextRoom;
+};
 
 const setConnectionStatus = (status: ConnectionStatus) => {
   applyState((prev) => {
