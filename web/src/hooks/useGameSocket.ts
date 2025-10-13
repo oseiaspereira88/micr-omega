@@ -59,7 +59,7 @@ const errorReasonToMessage = (error: ErrorMessage): string => {
     case "invalid_name":
       return "Nome inválido. Use entre 3 e 24 caracteres válidos.";
     case "name_taken":
-      return "Este nome já está em uso. Escolha outro.";
+      return "Este nome já está em uso. Digite outro nome ou saia da sala atual.";
     case "unknown_player":
       return "Jogador desconhecido. Tente reconectar.";
     case "game_not_active":
@@ -116,6 +116,7 @@ export const useGameSocket = (
   const playerName = useGameStore((state) => state.playerName);
   const playerId = useGameStore((state) => state.playerId);
   const connectionStatus = useGameStore((state) => state.connectionStatus);
+  const joinError = useGameStore((state) => state.joinError);
 
   const playerNameRef = useStableLatest(playerName);
   const playerIdRef = useStableLatest(playerId);
@@ -272,6 +273,7 @@ export const useGameSocket = (
         gameStore.actions.setJoinError(errorReasonToMessage(message));
         shouldReconnectRef.current = false;
         gameStore.actions.setConnectionStatus("disconnected");
+        lastRequestedNameRef.current = null;
         stopSocket();
         break;
       }
@@ -443,8 +445,12 @@ export const useGameSocket = (
       return;
     }
 
+    if (joinError) {
+      return;
+    }
+
     connect(playerName);
-  }, [autoConnect, connect, connectionStatus, playerName]);
+  }, [autoConnect, connect, connectionStatus, joinError, playerName]);
 
   useEffect(() => () => disconnect(), [disconnect]);
 
