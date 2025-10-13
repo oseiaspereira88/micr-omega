@@ -33,7 +33,22 @@ const RankingPanel = () => {
   const connectionStatus = useGameStore((state) => state.connectionStatus);
 
   const rows = useMemo<RankingRow[]>(() => {
-    return ranking.map((entry) => {
+    if (ranking.length === 0) {
+      return [];
+    }
+
+    const sortedEntries = [...ranking].sort((a, b) => {
+      if (a.score !== b.score) {
+        return b.score - a.score;
+      }
+      const nameComparison = a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" });
+      if (nameComparison !== 0) {
+        return nameComparison;
+      }
+      return a.playerId.localeCompare(b.playerId);
+    });
+
+    return sortedEntries.map((entry) => {
       const player = players[entry.playerId];
       return {
         playerId: entry.playerId,
