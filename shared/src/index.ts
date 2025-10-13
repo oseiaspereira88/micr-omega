@@ -163,6 +163,7 @@ export const errorMessageSchema = z.object({
     z.literal("invalid_payload"),
     z.literal("invalid_name"),
     z.literal("name_taken"),
+    z.literal("room_full"),
     z.literal("unknown_player"),
     z.literal("game_not_active"),
     z.literal("rate_limited")
