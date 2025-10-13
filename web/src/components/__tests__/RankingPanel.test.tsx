@@ -35,9 +35,25 @@ describe("RankingPanel", () => {
     render(<RankingPanel />);
 
     expect(screen.getByRole("complementary", { name: "Ranking da partida" })).toBeInTheDocument();
-    expect(screen.getByText("Sem dados")).toBeVisible();
+    expect(screen.getByText("Aguardando")).toBeVisible();
     expect(
-      screen.getByText("Aguarde o servidor enviar a classificação em tempo real.")
+      screen.getByText("Aguardando o início da partida para receber o ranking.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows connection-aware placeholder messages", () => {
+    render(<RankingPanel />);
+
+    act(() => {
+      gameStore.setState(() => ({
+        ...snapshot(),
+        connectionStatus: "disconnected",
+      }));
+    });
+
+    expect(screen.getByText("Offline")).toBeVisible();
+    expect(
+      screen.getByText("Conexão perdida. Atualizaremos assim que o servidor responder novamente.")
     ).toBeInTheDocument();
   });
 
