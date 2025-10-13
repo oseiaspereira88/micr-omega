@@ -35,6 +35,7 @@ const GameHud = ({
   onCycleSkill,
   onOpenEvolutionMenu,
   canEvolve,
+  showTouchControls = false,
 }) => {
   const currentSkill = skillData?.currentSkill ?? null;
 
@@ -70,27 +71,29 @@ const GameHud = ({
 
       <Notifications notifications={notifications} />
 
-      <TouchControls
-        joystick={joystick}
-        onJoystickStart={onJoystickStart}
-        onJoystickMove={onJoystickMove}
-        onJoystickEnd={onJoystickEnd}
-        onAttackPress={onAttackPress}
-        onAttackRelease={onAttackRelease}
-        onAttack={onAttack}
-        onDash={onDash}
-        dashCharge={dashCharge}
-        onUseSkill={onUseSkill}
-        skillDisabled={skillData?.skillDisabled}
-        skillCoolingDown={skillData?.skillCoolingDown}
-        skillCooldownLabel={skillData?.skillCooldownLabel}
-        skillCooldownPercent={skillData?.skillCooldownPercent ?? 0}
-        currentSkillIcon={currentSkill?.icon}
-        currentSkillCost={currentSkill?.cost}
-        hasCurrentSkill={Boolean(currentSkill)}
-        onOpenEvolutionMenu={onOpenEvolutionMenu}
-        canEvolve={canEvolve}
-      />
+      {showTouchControls ? (
+        <TouchControls
+          joystick={joystick}
+          onJoystickStart={onJoystickStart}
+          onJoystickMove={onJoystickMove}
+          onJoystickEnd={onJoystickEnd}
+          onAttackPress={onAttackPress}
+          onAttackRelease={onAttackRelease}
+          onAttack={onAttack}
+          onDash={onDash}
+          dashCharge={dashCharge}
+          onUseSkill={onUseSkill}
+          skillDisabled={skillData?.skillDisabled}
+          skillCoolingDown={skillData?.skillCoolingDown}
+          skillCooldownLabel={skillData?.skillCooldownLabel}
+          skillCooldownPercent={skillData?.skillCooldownPercent ?? 0}
+          currentSkillIcon={currentSkill?.icon}
+          currentSkillCost={currentSkill?.cost}
+          hasCurrentSkill={Boolean(currentSkill)}
+          onOpenEvolutionMenu={onOpenEvolutionMenu}
+          canEvolve={canEvolve}
+        />
+      ) : null}
     </div>
   );
 };

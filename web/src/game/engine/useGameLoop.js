@@ -43,7 +43,47 @@ import useInputController from '../input/useInputController';
 import { DEFAULT_JOYSTICK_STATE } from '../input/utils';
 import { gameStore } from '../../store/gameStore';
 
-const useGameLoop = ({ canvasRef, dispatch }) => {
+const DEFAULT_SETTINGS = {
+  audioEnabled: true,
+  visualDensity: 'medium',
+  showTouchControls: false,
+};
+
+const DENSITY_SCALE = {
+  low: 0.6,
+  medium: 1,
+  high: 1.4,
+};
+
+const useCountScaler = (densityScale = 1) => {
+  const remainderRef = useRef(0);
+
+  useEffect(() => {
+    remainderRef.current = 0;
+  }, [densityScale]);
+
+  return useCallback(
+    (baseCount = 1) => {
+      if (!densityScale || baseCount <= 0) {
+        remainderRef.current = 0;
+        return 0;
+      }
+
+      const desired = baseCount * densityScale + remainderRef.current;
+      const count = Math.floor(desired);
+      remainderRef.current = desired - count;
+
+      if (count === 0 && desired > 0) {
+        return 0;
+      }
+
+      return count;
+    },
+    [densityScale]
+  );
+};
+
+const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   const audioCtxRef = useRef(null);
   const audioWarningLoggedRef = useRef(false);
   const animationFrameRef = useRef(null);
@@ -61,6 +101,25 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
   useEffect(() => {
     dispatchRef.current = dispatch;
   }, [dispatch]);
+
+  const resolvedSettings = useMemo(
+    () => ({
+      ...DEFAULT_SETTINGS,
+      ...(settings || {}),
+    }),
+    [settings]
+  );
+
+  const densityScale = useMemo(
+    () => DENSITY_SCALE[resolvedSettings.visualDensity] ?? DENSITY_SCALE.medium,
+    [resolvedSettings.visualDensity]
+  );
+
+  const obstacleCountScaler = useCountScaler(densityScale);
+  const nebulaCountScaler = useCountScaler(densityScale);
+  const powerUpCountScaler = useCountScaler(densityScale);
+  const organicMatterCountScaler = useCountScaler(densityScale);
+  const enemyCountScaler = useCountScaler(densityScale);
 
   const { playSound } = useMemo(
     () => createSoundEffects(() => audioCtxRef.current),
@@ -142,61 +201,79 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
   }, []);
 
   const spawnObstacle = useCallback(
-    (state) => {
+    (state, count = 1) => {
       const targetState = state ?? stateRef.current;
-      const obstacle = createObstacleEntity({
-        worldSize: targetState.worldSize,
-        types: obstacleTypes,
-        rng: Math.random,
-      });
+      const spawnCount = obstacleCountScaler(count);
+      let lastObstacle = null;
 
-      if (obstacle) {
-        targetState.obstacles.push(obstacle);
+      for (let i = 0; i < spawnCount; i++) {
+        const obstacle = createObstacleEntity({
+          worldSize: targetState.worldSize,
+          types: obstacleTypes,
+          rng: Math.random,
+        });
+
+        if (obstacle) {
+          targetState.obstacles.push(obstacle);
+          lastObstacle = obstacle;
+        }
       }
 
-      return obstacle;
+      return lastObstacle;
     },
-    []
+    [obstacleCountScaler]
   );
 
   const spawnNebula = useCallback(
-    (state, forcedType) => {
+    (state, forcedType, count = 1) => {
       const targetState = state ?? stateRef.current;
-      const nebula = createNebulaEntity({
-        worldSize: targetState.worldSize,
-        types: nebulaTypes,
-        forcedType,
-        rng: Math.random,
-      });
+      const spawnCount = nebulaCountScaler(count);
+      let lastNebula = null;
 
-      if (nebula) {
-        targetState.nebulas.push(nebula);
+      for (let i = 0; i < spawnCount; i++) {
+        const nebula = createNebulaEntity({
+          worldSize: targetState.worldSize,
+          types: nebulaTypes,
+          forcedType,
+          rng: Math.random,
+        });
+
+        if (nebula) {
+          targetState.nebulas.push(nebula);
+          lastNebula = nebula;
+        }
       }
 
-      return nebula;
+      return lastNebula;
     },
-    []
+    [nebulaCountScaler]
   );
 
   const spawnPowerUp = useCallback(
-    (state, x, y, forcedType) => {
+    (state, x, y, forcedType, count = 1) => {
       const targetState = state ?? stateRef.current;
       const hasPosition = typeof x === 'number' && typeof y === 'number';
-      const powerUp = createPowerUpEntity({
-        worldSize: targetState.worldSize,
-        types: powerUpTypes,
-        forcedType,
-        rng: Math.random,
-        position: hasPosition ? { x, y } : undefined,
-      });
+      const spawnCount = powerUpCountScaler(count);
+      let lastPowerUp = null;
 
-      if (powerUp) {
-        targetState.powerUps.push(powerUp);
+      for (let i = 0; i < spawnCount; i++) {
+        const powerUp = createPowerUpEntity({
+          worldSize: targetState.worldSize,
+          types: powerUpTypes,
+          forcedType,
+          rng: Math.random,
+          position: hasPosition ? { x, y } : undefined,
+        });
+
+        if (powerUp) {
+          targetState.powerUps.push(powerUp);
+          lastPowerUp = powerUp;
+        }
       }
 
-      return powerUp;
+      return lastPowerUp;
     },
-    [powerUpTypes]
+    [powerUpCountScaler, powerUpTypes]
   );
 
   const dropPowerUps = useCallback((state, enemy) => {
@@ -248,10 +325,15 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
   }, []);
 
   const spawnOrganicMatter = useCallback(
-    (state, count) => {
+    (state, count = 1) => {
       const targetState = state ?? stateRef.current;
+      const spawnCount = organicMatterCountScaler(count);
+      if (spawnCount <= 0) {
+        return [];
+      }
+
       const organicItems = createOrganicMatterEntities({
-        count,
+        count: spawnCount,
         worldSize: targetState.worldSize,
         types: organicMatterTypes,
         rng: Math.random,
@@ -265,7 +347,7 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
 
       return organicItems;
     },
-    []
+    [organicMatterCountScaler]
   );
 
   const getAveragePlayerLevel = useCallback(() => {
@@ -388,19 +470,25 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
 
   const spawnEnemy = useCallback(() => {
     const state = stateRef.current;
-    const enemy = createEnemyEntity({
-      level: state.level,
-      organismPosition: { x: state.organism.x, y: state.organism.y },
-      templates: enemyTemplates,
-      rng: Math.random,
-    });
+    const spawnCount = enemyCountScaler(1);
+    let lastEnemy = null;
 
-    if (enemy) {
-      state.enemies.push(enemy);
+    for (let i = 0; i < spawnCount; i++) {
+      const enemy = createEnemyEntity({
+        level: state.level,
+        organismPosition: { x: state.organism.x, y: state.organism.y },
+        templates: enemyTemplates,
+        rng: Math.random,
+      });
+
+      if (enemy) {
+        state.enemies.push(enemy);
+        lastEnemy = enemy;
+      }
     }
 
-    return enemy;
-  }, []);
+    return lastEnemy;
+  }, [enemyCountScaler]);
 
   const spawnBoss = useCallback(() => {
     const state = stateRef.current;
@@ -487,13 +575,17 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
   }, [inputResetControls]);
 
   useEffect(() => {
+    if (!resolvedSettings.audioEnabled) {
+      if (audioCtxRef.current && typeof audioCtxRef.current.close === 'function') {
+        audioCtxRef.current.close();
+      }
+      audioCtxRef.current = null;
+      return;
+    }
+
     const AudioContextCtor =
       typeof window !== 'undefined' &&
       (window.AudioContext || window.webkitAudioContext);
-
-    if (audioCtxRef.current) {
-      return undefined;
-    }
 
     if (!AudioContextCtor) {
       audioCtxRef.current = null;
@@ -501,21 +593,50 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
         console.warn('Web Audio API unavailable; game audio disabled.');
         audioWarningLoggedRef.current = true;
       }
-    } else {
-      try {
-        audioCtxRef.current = new AudioContextCtor();
-      } catch (error) {
-        audioCtxRef.current = null;
-        if (!audioWarningLoggedRef.current) {
-          console.warn('Failed to initialize Web Audio API; game audio disabled.', error);
-          audioWarningLoggedRef.current = true;
-        }
-      }
+      return;
     }
 
+    if (audioCtxRef.current) {
+      return;
+    }
+
+    try {
+      audioCtxRef.current = new AudioContextCtor();
+    } catch (error) {
+      audioCtxRef.current = null;
+      if (!audioWarningLoggedRef.current) {
+        console.warn('Failed to initialize Web Audio API; game audio disabled.', error);
+        audioWarningLoggedRef.current = true;
+      }
+    }
+  }, [resolvedSettings.audioEnabled]);
+
+  useEffect(() => () => {
+    if (audioCtxRef.current && typeof audioCtxRef.current.close === 'function') {
+      audioCtxRef.current.close();
+    }
+  }, []);
+
+  useEffect(() => {
     const state = stateRef.current;
 
-    for (let i = 0; i < 500; i++) {
+    state.floatingParticles = [];
+    state.glowParticles = [];
+    state.microorganisms = [];
+    state.lightRays = [];
+    state.backgroundLayers = [];
+    state.obstacles = state.obstacles || [];
+    state.nebulas = state.nebulas || [];
+    state.powerUps = state.powerUps || [];
+    state.organicMatter = state.organicMatter || [];
+
+    state.obstacles.length = 0;
+    state.nebulas.length = 0;
+    state.powerUps.length = 0;
+    state.organicMatter.length = 0;
+
+    const floatingCount = Math.max(150, Math.round(500 * densityScale));
+    for (let i = 0; i < floatingCount; i++) {
       state.floatingParticles.push({
         x: Math.random() * 4000,
         y: Math.random() * 4000,
@@ -530,7 +651,8 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
       });
     }
 
-    for (let i = 0; i < 150; i++) {
+    const glowCount = Math.max(60, Math.round(150 * densityScale));
+    for (let i = 0; i < glowCount; i++) {
       state.glowParticles.push({
         x: Math.random() * 4000,
         y: Math.random() * 4000,
@@ -547,7 +669,8 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
       });
     }
 
-    for (let i = 0; i < 80; i++) {
+    const microorganismCount = Math.max(30, Math.round(80 * densityScale));
+    for (let i = 0; i < microorganismCount; i++) {
       state.microorganisms.push({
         x: Math.random() * 4000,
         y: Math.random() * 4000,
@@ -563,7 +686,8 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
       });
     }
 
-    for (let i = 0; i < 5; i++) {
+    const lightRayCount = Math.max(3, Math.round(5 * densityScale));
+    for (let i = 0; i < lightRayCount; i++) {
       state.lightRays.push({
         x: Math.random() * 4000,
         y: -200,
@@ -600,13 +724,7 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
     }
 
     spawnOrganicMatter(state, 25);
-
-    return () => {
-      if (audioCtxRef.current && typeof audioCtxRef.current.close === 'function') {
-        audioCtxRef.current.close();
-      }
-    };
-  }, [spawnNebula, spawnObstacle, spawnOrganicMatter, spawnPowerUp]);
+  }, [densityScale, spawnNebula, spawnObstacle, spawnOrganicMatter, spawnPowerUp]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
