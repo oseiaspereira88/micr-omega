@@ -41,6 +41,7 @@ import {
 } from '../systems';
 import useInputController from '../input/useInputController';
 import { DEFAULT_JOYSTICK_STATE } from '../input/utils';
+import { gameStore } from '../../store/gameStore';
 
 const useGameLoop = ({ canvasRef, dispatch }) => {
   const audioCtxRef = useRef(null);
@@ -267,6 +268,38 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
     []
   );
 
+  const getAveragePlayerLevel = useCallback(() => {
+    const storeState = gameStore.getState();
+    const { players = {}, playerId = null } = storeState;
+    const levels = [];
+
+    Object.values(players).forEach((player) => {
+      const level = typeof player.level === 'number' ? player.level : null;
+      if (level !== null && Number.isFinite(level)) {
+        levels.push(level);
+      }
+    });
+
+    const localLevel = stateRef.current?.level;
+    if (
+      typeof localLevel === 'number' &&
+      Number.isFinite(localLevel) &&
+      (levels.length === 0 ||
+        !playerId ||
+        typeof players[playerId]?.level !== 'number' ||
+        !Number.isFinite(players[playerId].level))
+    ) {
+      levels.push(localLevel);
+    }
+
+    if (levels.length === 0) {
+      return 1;
+    }
+
+    const total = levels.reduce((sum, level) => sum + level, 0);
+    return total / levels.length;
+  }, []);
+
   const getSystemHelpers = useCallback(() => ({
     playSound,
     createEffect,
@@ -284,6 +317,7 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
     spawnOrganicMatter,
     resetControls,
     createInitialState,
+    getAveragePlayerLevel,
   }), [
     playSound,
     createEffect,
@@ -298,6 +332,7 @@ const useGameLoop = ({ canvasRef, dispatch }) => {
     spawnPowerUp,
     spawnOrganicMatter,
     resetControls,
+    getAveragePlayerLevel,
   ]);
 
   const applyPowerUp = useCallback((typeKey) => {
