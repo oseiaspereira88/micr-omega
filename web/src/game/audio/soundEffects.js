@@ -26,11 +26,16 @@ export const createSoundEffects = (audioContextOrGetter) => {
 
   const playSound = (type = 'default') => {
     const ctx = getContext?.();
-    if (!ctx) return;
+    if (!ctx || typeof ctx.createOscillator !== 'function' || typeof ctx.createGain !== 'function') {
+      return;
+    }
 
     const profile = SOUND_PROFILES[type] || SOUND_PROFILES.default;
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
+    if (!ctx.destination || typeof gainNode.connect !== 'function' || typeof oscillator.connect !== 'function') {
+      return;
+    }
 
     oscillator.type = profile.wave;
     oscillator.frequency.value = profile.frequency;

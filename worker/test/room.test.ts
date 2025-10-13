@@ -1,71 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Miniflare } from "miniflare";
-import { build } from "esbuild";
-
-type MessagePayload = { type: string; [key: string]: unknown };
+import type { Miniflare } from "miniflare";
+import {
+  createMiniflare,
+  onceMessage,
+  openSocket,
+  waitForRanking,
+  type MessagePayload,
+} from "./utils/miniflare";
 
 describe("RoomDO", () => {
-  let mf: Miniflare | null = null;
-
-  async function createMiniflare(): Promise<Miniflare> {
-    const bundle = await build({
-      entryPoints: ["src/index.ts"],
-      bundle: true,
-      format: "esm",
-      platform: "neutral",
-      target: "es2022",
-      mainFields: ["module", "main"],
-      write: false,
-      sourcemap: "inline"
-    });
-
-    const script = bundle.outputFiles[0]?.text ?? "";
-
-    return new Miniflare({
-      modules: true,
-      script,
-      compatibilityDate: "2024-10-01",
-      durableObjects: {
-        ROOM: { className: "RoomDO" }
-      }
-    });
-  }
-
-  async function openSocket(instance: Miniflare) {
-    const response = await instance.dispatchFetch("http://localhost/ws", {
-      headers: { Upgrade: "websocket" }
-    });
-    expect(response.status).toBe(101);
-    const socket = response.webSocket;
-    expect(socket).toBeDefined();
-    socket!.accept();
-    return socket!;
-  }
-
-  function onceMessage<T extends MessagePayload>(socket: WebSocket, type?: string): Promise<T> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        socket.removeEventListener("message", onMessage as EventListener);
-        reject(new Error("Timed out waiting for message"));
-      }, 1000);
-
-      const onMessage = (event: MessageEvent) => {
-        const data = typeof event.data === "string" ? event.data : String(event.data);
-        const parsed = JSON.parse(data) as T;
-        if (!type || parsed.type === type) {
-          clearTimeout(timeout);
-          socket.removeEventListener("message", onMessage as EventListener);
-          resolve(parsed);
-        }
-      };
-
-      socket.addEventListener("message", onMessage as EventListener);
-    });
-  }
+  let mf: Miniflare;
 
   const createClient = async () => {
-    const socket = await openSocket(mf!);
+    const socket = await openSocket(mf);
     const queue: MessagePayload[] = [];
+
     socket.addEventListener("message", (event: MessageEvent) => {
       const data = typeof event.data === "string" ? event.data : String(event.data);
       queue.push(JSON.parse(data));
@@ -73,8 +22,8 @@ describe("RoomDO", () => {
 
     return {
       socket,
-      drain: <T extends MessagePayload>(predicate: (payload: T) => boolean, timeout = 2_000) =>
-        new Promise<T>((resolve, reject) => {
+      drain<T extends MessagePayload>(predicate: (payload: T) => boolean, timeout = 2_000) {
+        return new Promise<T>((resolve, reject) => {
           const start = Date.now();
 
           const checkQueue = () => {
@@ -95,7 +44,8 @@ describe("RoomDO", () => {
           };
 
           checkQueue();
-        })
+        });
+      },
     };
   };
 
@@ -104,14 +54,11 @@ describe("RoomDO", () => {
   });
 
   afterEach(async () => {
-    if (mf) {
-      await mf.dispose();
-      mf = null;
-    }
+    await mf.dispose();
   });
 
   it("responds with joined payload when a player joins", async () => {
-    const socket = await openSocket(mf!);
+    const socket = await openSocket(mf);
     const joinedPromise = onceMessage<{
       type: string;
       playerId: string;
@@ -129,15 +76,15 @@ describe("RoomDO", () => {
       {
         playerId: joined.playerId,
         name: "Alice",
-        score: 0
-      }
+        score: 0,
+      },
     ]);
 
     socket.close();
   });
 
   it("rejects invalid player names", async () => {
-    const socket = await openSocket(mf!);
+    const socket = await openSocket(mf);
     const errorPromise = onceMessage<{ type: string; reason: string }>(socket, "error");
 
     socket.send(JSON.stringify({ type: "join", name: "!!" }));
@@ -152,7 +99,7 @@ describe("RoomDO", () => {
         () => {
           resolve();
         },
-        { once: true }
+        { once: true },
       );
     });
   });
@@ -184,12 +131,12 @@ describe("RoomDO", () => {
 
     expect(joinedB.state.players.map((player) => player.name)).toEqual([
       "Alice",
-      "Bob"
+      "Bob",
     ]);
     expect(joinedB.ranking.map((entry) => entry.name)).toEqual(["Alice", "Bob"]);
 
     const broadcastToAlice = await clientA.drain<{ type: string; ranking: { name: string }[] }>(
-      (payload) => payload.type === "ranking" && payload.ranking.length === 2
+      (payload) => payload.type === "ranking" && Array.isArray(payload.ranking) && payload.ranking.length === 2,
     );
     expect(broadcastToAlice.ranking.map((entry) => entry.name)).toEqual(["Alice", "Bob"]);
 
@@ -208,27 +155,29 @@ describe("RoomDO", () => {
     clientB.socket.send(JSON.stringify({ type: "join", name: "Bob" }));
     await joinBPromise;
 
-    await clientA.drain((payload: MessagePayload) => payload.type === "state");
+    await clientA.drain((payload) => payload.type === "state");
 
-    const rankingUpdateA = clientA.drain<{ type: string; ranking: { playerId: string; score: number }[] }>(
-      (payload) => payload.type === "ranking" && payload.ranking[0]?.score === 5_000
+    const rankingUpdateA = waitForRanking(
+      clientA.socket,
+      (ranking) => ranking[0]?.score === 5_000,
     );
-    const rankingUpdateB = clientB.drain<{ type: string; ranking: { playerId: string; score: number }[] }>(
-      (payload) => payload.type === "ranking" && payload.ranking[0]?.score === 5_000
+    const rankingUpdateB = waitForRanking(
+      clientB.socket,
+      (ranking) => ranking[0]?.score === 5_000,
     );
 
     clientA.socket.send(
       JSON.stringify({
         type: "action",
         playerId: joinedA.playerId,
-        action: { type: "score", amount: 5_000 }
-      })
+        action: { type: "score", amount: 5_000 },
+      }),
     );
 
     const [rankingA, rankingB] = await Promise.all([rankingUpdateA, rankingUpdateB]);
 
-    expect(rankingA.ranking[0]).toMatchObject({ playerId: joinedA.playerId, score: 5_000 });
-    expect(rankingB.ranking[0]).toMatchObject({ playerId: joinedA.playerId, score: 5_000 });
+    expect(rankingA[0]).toMatchObject({ playerId: joinedA.playerId, score: 5_000 });
+    expect(rankingB[0]).toMatchObject({ playerId: joinedA.playerId, score: 5_000 });
 
     clientA.socket.close();
     clientB.socket.close();

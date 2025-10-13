@@ -33,19 +33,23 @@ O arquivo `package.json` na raiz declara os workspaces `web/` e `worker/` e conc
 
 ## Configuração e desenvolvimento local
 
-1. Instale as dependências na raiz do repositório:
+1. Certifique-se de ter o [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) na versão 4.x (recomendamos `^4.42.0`). Se preferir instalar globalmente, execute:
+   ```bash
+   npm install -g wrangler@^4
+   ```
+2. Instale as dependências na raiz do repositório:
    ```bash
    npm install
    ```
-2. Crie um arquivo `web/.env.local` apontando para o Worker local (Wrangler expõe o WebSocket em `http://127.0.0.1:8787/ws`):
+3. Crie um arquivo `web/.env.local` apontando para o Worker local (Wrangler expõe o WebSocket em `http://127.0.0.1:8787/ws`):
    ```bash
    echo "VITE_REALTIME_URL=ws://127.0.0.1:8787/ws" > web/.env.local
    ```
-3. Em uma aba/terminal, suba o Worker localmente com Wrangler (requer `wrangler` autenticado). O comando habilita WebSocket sobre HTTPS em produção, mas no modo dev responde via `ws://`:
+4. Em uma aba/terminal, suba o Worker localmente com Wrangler (requer `wrangler` 4.x autenticado). O comando habilita WebSocket sobre HTTPS em produção, mas no modo dev responde via `ws://`:
    ```bash
    npm run dev:worker
    ```
-4. Em outra aba/terminal, inicie o front-end (Vite) apontando para o workspace `web`. O Vite recarrega automaticamente e usa a URL em `VITE_REALTIME_URL` para conectar ao Worker:
+5. Em outra aba/terminal, inicie o front-end (Vite) apontando para o workspace `web`. O Vite recarrega automaticamente e usa a URL em `VITE_REALTIME_URL` para conectar ao Worker:
    ```bash
    npm run dev:web
    ```
@@ -54,8 +58,15 @@ Scripts úteis adicionais:
 
 - `npm run build`: build apenas do front-end (para Cloudflare Pages).
 - `npm run build:all`: executa os builds de todos os workspaces.
-- `npm run test`: roda os testes definidos em cada workspace (por exemplo, Playwright no front-end).
+- `npm run test`: roda os testes definidos em cada workspace (Vitest no front-end e suíte Miniflare no worker).
+- `npm run test:e2e -w web`: executa a suíte de ponta a ponta com Playwright (requer variáveis `PLAYWRIGHT_BASE_URL` e `PLAYWRIGHT_WS_URL`).
+- `npm run test -w worker`: roda somente os testes de integração do Durable Object com Miniflare.
+- `npm run test -w web`: executa apenas os testes unitários de componentes e store com Vitest.
 - `npm run lint`: encadeia linters configurados em cada workspace.
+- `npm run tail:worker`: inicia o pipeline de tail estruturado (`wrangler tail` + arquivo NDJSON/Logflare).
+- `npm run report:metrics`: consolida métricas de sessões e erros a partir do último arquivo de log estruturado.
+
+Consulte `docs/load-testing.md` para instruções de execução do teste de carga com k6 (50–100 conexões simultâneas).
 
 ## Fluxo de publicação
 

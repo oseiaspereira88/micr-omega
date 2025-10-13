@@ -14,7 +14,9 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "dev:web": "npm run dev --workspace web",
-    "dev:worker": "npm run dev --workspace worker"
+    "dev:worker": "npm run dev --workspace worker",
+    "tail:worker": "node ./scripts/observability/tail-pipeline.mjs",
+    "report:metrics": "node ./scripts/observability/generate-metrics-report.mjs"
   },
   "dependencies": {
     "zod": "^3.23.8"

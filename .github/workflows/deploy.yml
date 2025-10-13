@@ -27,14 +27,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Publish Worker
+      - name: Deploy Worker
         id: publish-worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          command: publish
+          command: deploy
 
   deploy-pages:
     name: Deploy Pages

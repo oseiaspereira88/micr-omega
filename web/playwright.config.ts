@@ -1,25 +1,28 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const previewBaseUrl = process.env.PREVIEW_BASE_URL ?? "http://localhost:5173";
+const baseURL =
+  process.env.PLAYWRIGHT_BASE_URL ??
+  process.env.PREVIEW_BASE_URL ??
+  "http://127.0.0.1:4173";
 
 export default defineConfig({
-  testDir: "./e2e",
+  testDir: "./tests/e2e",
   timeout: 60_000,
   expect: {
-    timeout: 10_000
+    timeout: 10_000,
   },
-  fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
+  reporter: [["list"], ["html", { outputFolder: "playwright-report" }]],
   use: {
-    baseURL: previewBaseUrl,
-    trace: "retain-on-failure",
+    baseURL,
+    trace: "on-first-retry",
+    video: "retain-on-failure",
     screenshot: "only-on-failure",
-    video: "retain-on-failure"
   },
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] }
-    }
-  ]
+      use: { ...devices["Desktop Chrome"], baseURL },
+    },
+  ],
 });

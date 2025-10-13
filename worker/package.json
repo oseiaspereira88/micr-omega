@@ -16,6 +16,6 @@
     "esbuild": "^0.24.0",
     "miniflare": "^3.20241022.0",
     "vitest": "^1.6.0",
-    "wrangler": "^3.78.7"
+    "wrangler": "^4.42.0"
   }
 }

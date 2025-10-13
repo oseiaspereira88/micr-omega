@@ -1,40 +1,29 @@
-import { render, screen } from "@testing-library/react";
-import { describe, beforeEach, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { act, render, screen, within } from "@testing-library/react";
 import RankingPanel from "../RankingPanel";
-import { gameStore } from "../../store/gameStore";
-import type { GameStoreState } from "../../store/gameStore";
+import { gameStore, type GameStoreState } from "../../store/gameStore";
 
-type PartialState = Pick<
-  GameStoreState,
-  "connectionStatus" | "playerId" | "players" | "ranking"
->;
+const baseState = gameStore.getState();
 
-const resetStore = (partial?: PartialState) => {
-  const baseline: GameStoreState = {
-    connectionStatus: "idle",
-    reconnectAttempts: 0,
-    reconnectUntil: null,
-    playerId: null,
-    playerName: null,
-    joinError: null,
-    lastPingAt: null,
-    lastPongAt: null,
-    room: {
-      phase: "waiting",
-      roundId: null,
-      roundStartedAt: null,
-      roundEndsAt: null
-    },
-    players: {},
-    ranking: []
-  };
+const snapshot = (): GameStoreState => ({
+  ...baseState,
+  room: { ...baseState.room },
+  players: {},
+  ranking: [],
+  connectionStatus: "idle",
+  reconnectAttempts: 0,
+  reconnectUntil: null,
+  playerId: null,
+  playerName: null,
+  joinError: null,
+  lastPingAt: null,
+  lastPongAt: null,
+});
 
-  gameStore.setState(() => ({
-    ...baseline,
-    ...partial,
-    players: partial?.players ?? baseline.players,
-    ranking: partial?.ranking ?? baseline.ranking
-  }));
+const resetStore = () => {
+  act(() => {
+    gameStore.setState(() => snapshot());
+  });
 };
 
 describe("RankingPanel", () => {
@@ -42,57 +31,71 @@ describe("RankingPanel", () => {
     resetStore();
   });
 
-  it("renders placeholder when ranking is empty", () => {
+  afterEach(() => {
+    resetStore();
+  });
+
+  it("renders placeholder content when no ranking is available", () => {
     render(<RankingPanel />);
 
-    expect(
-      screen.getByRole("complementary", { name: "Ranking da partida" })
-    ).toBeInTheDocument();
-    expect(screen.getByText("Sem dados")).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Ranking da partida" })).toBeInTheDocument();
+    expect(screen.getByText("Sem dados")).toBeVisible();
     expect(
       screen.getByText("Aguarde o servidor enviar a classificação em tempo real.")
     ).toBeInTheDocument();
   });
 
-  it("highlights the local player and connection status", () => {
-    resetStore({
-      connectionStatus: "connected",
-      playerId: "alice",
-      players: {
-        alice: {
-          id: "alice",
-          name: "Alice",
-          score: 900,
-          combo: 3,
-          connected: true,
-          lastActiveAt: 10_000
-        },
-        bob: {
-          id: "bob",
-          name: "Bob",
-          score: 700,
-          combo: 2,
-          connected: false,
-          lastActiveAt: 8_000
-        }
-      },
-      ranking: [
-        { playerId: "alice", name: "Alice", score: 900 },
-        { playerId: "bob", name: "Bob", score: 700 }
-      ]
-    });
-
+  it("highlights ordering, connection badges and the local player", () => {
     render(<RankingPanel />);
 
-    const panel = screen.getByRole("complementary", { name: "Ranking da partida" });
-    expect(panel).toBeInTheDocument();
-    expect(screen.getByText("Ao vivo")).toBeInTheDocument();
-    expect(screen.getByText("Você")).toBeInTheDocument();
+    act(() => {
+      const players: GameStoreState["players"] = {
+        alpha: {
+          id: "alpha",
+          name: "Alice",
+          connected: true,
+          score: 4200,
+          combo: 2,
+          lastActiveAt: 10_000,
+        },
+        beta: {
+          id: "beta",
+          name: "Bruno",
+          connected: false,
+          score: 3150,
+          combo: 1,
+          lastActiveAt: 9_000,
+        },
+      };
 
-    const rankingItems = panel.querySelectorAll("li");
-    expect(rankingItems.length).toBe(2);
-    expect(rankingItems[0]?.textContent).toContain("Alice");
-    expect(rankingItems[1]?.textContent).toContain("Bob");
-    expect(rankingItems[1]?.textContent).toContain("⚠️");
+      gameStore.setState(() => ({
+        ...snapshot(),
+        connectionStatus: "connected",
+        playerId: "beta",
+        players,
+        ranking: [
+          { playerId: "alpha", name: "Alice", score: 4200 },
+          { playerId: "beta", name: "Bruno", score: 3150 },
+        ],
+      }));
+    });
+
+    expect(screen.getByText("Ranking")).toBeInTheDocument();
+    expect(screen.getByText("Ao vivo")).toBeVisible();
+
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+
+    const firstRow = within(items[0]!);
+    expect(firstRow.getByText("1")).toBeVisible();
+    expect(firstRow.getByText("Alice")).toBeVisible();
+    expect(firstRow.getByText("4.200")).toBeVisible();
+
+    const secondRow = within(items[1]!);
+    expect(secondRow.getByText("2")).toBeVisible();
+    expect(secondRow.getByText("Bruno")).toBeVisible();
+    expect(secondRow.getByText("3.150")).toBeVisible();
+    expect(secondRow.getByText("Você")).toBeVisible();
+    expect(secondRow.getByLabelText("Jogador desconectado")).toBeVisible();
   });
 });

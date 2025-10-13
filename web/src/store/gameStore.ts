@@ -6,6 +6,7 @@ import {
   SharedGameStateDiff,
   SharedPlayerState,
 } from "../utils/messageTypes";
+import { reportRealtimeLatency } from "../utils/observability";
 
 export type ConnectionStatus =
   | "idle"
@@ -254,10 +255,18 @@ const markPing = (timestamp: number) => {
 };
 
 const markPong = (timestamp: number) => {
-  applyState((prev) => ({
-    ...prev,
-    lastPongAt: timestamp,
-  }));
+  applyState((prev) => {
+    const latency =
+      typeof prev.lastPingAt === "number" ? Math.max(0, timestamp - prev.lastPingAt) : null;
+    if (latency !== null) {
+      reportRealtimeLatency(latency, { source: "ws", phase: prev.room.phase });
+    }
+
+    return {
+      ...prev,
+      lastPongAt: timestamp,
+    };
+  });
 };
 
 const resetGameState = () => {
