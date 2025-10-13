@@ -3,11 +3,12 @@ import { enemyRenderer } from './enemyRenderer.js';
 import { organismRenderer } from './organismRenderer.js';
 import { hudRenderer } from './hudRenderer.js';
 import { effectsRenderer } from './effectsRenderer.js';
+import { environmentRenderer } from './environmentRenderer.js';
 
 export const renderFrame = (ctx, state, camera, assets = {}) => {
   if (!ctx || !state || !camera) return;
 
-  const { canvas, delta = 0, drawWorld } = assets;
+  const { canvas, delta = 0 } = assets;
   const viewport = assets.viewport || {
     width: canvas?.width ?? camera.viewport?.width ?? 0,
     height: canvas?.height ?? camera.viewport?.height ?? 0,
@@ -27,9 +28,7 @@ export const renderFrame = (ctx, state, camera, assets = {}) => {
     extendedCamera
   );
 
-  if (typeof drawWorld === 'function') {
-    drawWorld({ ctx, state, camera: extendedCamera, viewport });
-  }
+  environmentRenderer.render(ctx, state, extendedCamera);
 
   enemyRenderer.render(ctx, { enemies: state.enemies }, extendedCamera);
   organismRenderer.render(

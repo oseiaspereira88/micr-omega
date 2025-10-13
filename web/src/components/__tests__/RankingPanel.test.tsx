@@ -39,9 +39,25 @@ describe("RankingPanel", () => {
     render(<RankingPanel />);
 
     expect(screen.getByRole("complementary", { name: "Ranking da partida" })).toBeInTheDocument();
-    expect(screen.getByText("Sem dados")).toBeVisible();
+    expect(screen.getByText("Aguardando")).toBeVisible();
     expect(
-      screen.getByText("Aguarde o servidor enviar a classificação em tempo real.")
+      screen.getByText("Aguardando o início da partida para receber o ranking.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows connection-aware placeholder messages", () => {
+    render(<RankingPanel />);
+
+    act(() => {
+      gameStore.setState(() => ({
+        ...snapshot(),
+        connectionStatus: "disconnected",
+      }));
+    });
+
+    expect(screen.getByText("Offline")).toBeVisible();
+    expect(
+      screen.getByText("Conexão perdida. Atualizaremos assim que o servidor responder novamente.")
     ).toBeInTheDocument();
   });
 
@@ -97,5 +113,57 @@ describe("RankingPanel", () => {
     expect(secondRow.getByText("3.150")).toBeVisible();
     expect(secondRow.getByText("Você")).toBeVisible();
     expect(secondRow.getByLabelText("Jogador desconectado")).toBeVisible();
+  });
+
+  it("orders ranking entries by score and name for ties", () => {
+    render(<RankingPanel />);
+
+    act(() => {
+      const players: GameStoreState["players"] = {
+        a: {
+          id: "a",
+          name: "Ana",
+          connected: true,
+          score: 2_500,
+          combo: 1,
+          lastActiveAt: 1_000,
+        },
+        b: {
+          id: "b",
+          name: "Bruno",
+          connected: true,
+          score: 3_000,
+          combo: 1,
+          lastActiveAt: 2_000,
+        },
+        c: {
+          id: "c",
+          name: "Carla",
+          connected: true,
+          score: 3_000,
+          combo: 1,
+          lastActiveAt: 3_000,
+        },
+      };
+
+      gameStore.setState(() => ({
+        ...snapshot(),
+        connectionStatus: "connected",
+        players,
+        ranking: [
+          { playerId: "a", name: "Ana", score: 2_500 },
+          { playerId: "c", name: "Carla", score: 3_000 },
+          { playerId: "b", name: "Bruno", score: 3_000 },
+        ],
+      }));
+    });
+
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+
+    const [first, second, third] = items;
+    expect(within(first!).getByText("Bruno")).toBeVisible();
+    expect(within(second!).getByText("Carla")).toBeVisible();
+    expect(within(third!).getByText("Ana")).toBeVisible();
   });
 });

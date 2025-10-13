@@ -15,21 +15,67 @@ const DEFAULT_PING_INTERVAL = 15000;
 const DEFAULT_RECONNECT_BASE = 1500;
 const DEFAULT_RECONNECT_MAX = 12000;
 
-const resolveWebSocketUrl = (explicitUrl?: string) => {
+const normalizeRealtimeUrl = (url: string) => url.trim().replace(/\/+$/, "");
+
+const SECOND_LEVEL_DOMAINS = new Set([
+  "ac",
+  "co",
+  "com",
+  "edu",
+  "gov",
+  "id",
+  "me",
+  "mil",
+  "net",
+  "nom",
+  "org"
+]);
+
+export const resolveWebSocketUrl = (explicitUrl?: string) => {
   if (explicitUrl) {
-    return explicitUrl;
+    return normalizeRealtimeUrl(explicitUrl);
   }
 
   if (typeof window === "undefined") {
     return "";
   }
 
-  if (import.meta.env.VITE_WS_URL) {
-    return import.meta.env.VITE_WS_URL as string;
+  const envUrl =
+    import.meta.env.VITE_REALTIME_URL ?? import.meta.env.VITE_WS_URL ?? "";
+
+  if (envUrl) {
+    return normalizeRealtimeUrl(envUrl);
   }
 
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}/ws`;
+  const { hostname, protocol, port } = window.location;
+  const websocketProtocol = protocol === "https:" ? "wss:" : "ws:";
+
+  const isLoopbackHost = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(
+    hostname
+  );
+
+  if (isLoopbackHost) {
+    const portSuffix = port ? `:${port}` : "";
+    return `${websocketProtocol}//${hostname}${portSuffix}`;
+  }
+
+  const hostnameParts = hostname.split(".").filter(Boolean);
+  let apexDomain = hostname;
+
+  if (hostnameParts.length >= 2) {
+    const tld = hostnameParts.at(-1) ?? "";
+    const secondLevel = hostnameParts.at(-2)?.toLowerCase();
+    const requiresThirdLevel =
+      hostnameParts.length >= 3 &&
+      tld.length === 2 &&
+      !!secondLevel &&
+      SECOND_LEVEL_DOMAINS.has(secondLevel);
+
+    const sliceStart = requiresThirdLevel ? -3 : -2;
+    apexDomain = hostnameParts.slice(sliceStart).join(".");
+  }
+
+  return `${websocketProtocol}//realtime.${apexDomain}`;
 };
 
 const errorReasonToMessage = (error: ErrorMessage): string => {
@@ -37,7 +83,7 @@ const errorReasonToMessage = (error: ErrorMessage): string => {
     case "invalid_name":
       return "Nome inválido. Use entre 3 e 24 caracteres válidos.";
     case "name_taken":
-      return "Este nome já está em uso. Escolha outro.";
+      return "Este nome já está em uso. Digite outro nome ou saia da sala atual.";
     case "unknown_player":
       return "Jogador desconhecido. Tente reconectar.";
     case "game_not_active":
@@ -94,6 +140,7 @@ export const useGameSocket = (
   const playerName = useGameStore((state) => state.playerName);
   const playerId = useGameStore((state) => state.playerId);
   const connectionStatus = useGameStore((state) => state.connectionStatus);
+  const joinError = useGameStore((state) => state.joinError);
 
   const playerNameRef = useStableLatest(playerName);
   const playerIdRef = useStableLatest(playerId);
@@ -250,6 +297,7 @@ export const useGameSocket = (
         gameStore.actions.setJoinError(errorReasonToMessage(message));
         shouldReconnectRef.current = false;
         gameStore.actions.setConnectionStatus("disconnected");
+        lastRequestedNameRef.current = null;
         stopSocket();
         break;
       }
@@ -421,8 +469,12 @@ export const useGameSocket = (
       return;
     }
 
+    if (joinError) {
+      return;
+    }
+
     connect(playerName);
-  }, [autoConnect, connect, connectionStatus, playerName]);
+  }, [autoConnect, connect, connectionStatus, joinError, playerName]);
 
   useEffect(() => () => disconnect(), [disconnect]);
 

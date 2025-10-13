@@ -23,6 +23,7 @@ const STORAGE_KEY = "micr-omega:player-name";
 type PlayerNameModalProps = {
   isOpen?: boolean;
   onSubmit?: (name: string) => void;
+  onLeave?: () => void;
 };
 
 const readStoredName = () => {
@@ -94,10 +95,11 @@ const shouldShowModal = (
   return connectionStatus === "disconnected";
 };
 
-const PlayerNameModal = ({ isOpen, onSubmit }: PlayerNameModalProps) => {
+const PlayerNameModal = ({ isOpen, onSubmit, onLeave }: PlayerNameModalProps) => {
   const connectionStatus = useGameStore((state) => state.connectionStatus);
   const storedName = useGameStore((state) => state.playerName);
   const joinError = useGameStore((state) => state.joinError);
+  const playerId = useGameStore((state) => state.playerId);
 
   const [inputValue, setInputValue] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -164,6 +166,17 @@ const PlayerNameModal = ({ isOpen, onSubmit }: PlayerNameModalProps) => {
     [joinError, localError]
   );
 
+  const handleLeave = useCallback(() => {
+    onLeave?.();
+    persistName("");
+    setInputValue("");
+    setLocalError(null);
+    gameStore.actions.setJoinError(null);
+    gameStore.actions.setPlayerName(null);
+    gameStore.actions.setPlayerId(null);
+    gameStore.actions.resetGameState();
+  }, [onLeave]);
+
   const modalVisible = shouldShowModal(
     isOpen,
     Boolean(storedName),
@@ -177,6 +190,8 @@ const PlayerNameModal = ({ isOpen, onSubmit }: PlayerNameModalProps) => {
 
   const isSubmitting =
     connectionStatus === "connecting" || connectionStatus === "reconnecting";
+
+  const isConnected = connectionStatus === "connected" && Boolean(playerId);
 
   return (
     <div className={styles.overlay} role="presentation">
@@ -219,6 +234,16 @@ const PlayerNameModal = ({ isOpen, onSubmit }: PlayerNameModalProps) => {
             <button className={styles.primaryButton} type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Conectando..." : "Entrar na partida"}
             </button>
+            {isConnected ? (
+              <button
+                className={styles.secondaryButton}
+                type="button"
+                onClick={handleLeave}
+                disabled={isSubmitting}
+              >
+                Sair da sala atual
+              </button>
+            ) : null}
           </div>
         </form>
       </div>

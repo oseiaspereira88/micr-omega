@@ -16,20 +16,44 @@ export const performDash = (state, helpers = {}) => {
   }
 
   organism.dashCharge = Math.max(0, organism.dashCharge - 30);
+  const dashDuration = 0.3;
+  organism.dashTimer = Math.max(dashDuration, organism.dashTimer || 0);
   organism.isDashing = true;
   organism.invulnerable = true;
 
   const dashSpeed = 25 * organism.speed * (organism.currentSpeedMultiplier || 1);
   const currentSpeed = Math.sqrt(organism.vx * organism.vx + organism.vy * organism.vy);
+  const joystick = state.joystick || {};
+  const intentX = typeof joystick.x === 'number' ? joystick.x : 0;
+  const intentY = typeof joystick.y === 'number' ? joystick.y : 0;
+  const intentMagnitude = Math.sqrt(intentX * intentX + intentY * intentY);
+  const hasIntent = intentMagnitude > 0.001;
+
+  let directionX;
+  let directionY;
 
   if (currentSpeed > 0.5) {
     const normalizedVx = organism.vx / currentSpeed;
     const normalizedVy = organism.vy / currentSpeed;
-    organism.vx = normalizedVx * dashSpeed;
-    organism.vy = normalizedVy * dashSpeed;
+    directionX = normalizedVx;
+    directionY = normalizedVy;
+  } else if (hasIntent) {
+    directionX = intentX / (intentMagnitude || 1);
+    directionY = intentY / (intentMagnitude || 1);
   } else {
-    organism.vx = Math.cos(organism.angle) * dashSpeed;
-    organism.vy = Math.sin(organism.angle) * dashSpeed;
+    directionX = Math.cos(organism.angle);
+    directionY = Math.sin(organism.angle);
+  }
+
+  organism.vx = directionX * dashSpeed;
+  organism.vy = directionY * dashSpeed;
+
+  const dashAngle = Math.atan2(directionY, directionX);
+  if (Number.isFinite(dashAngle)) {
+    organism.rotation = dashAngle;
+    if (typeof organism.targetAngle === 'number') {
+      organism.targetAngle = dashAngle;
+    }
   }
 
   playSound?.('dash');
@@ -47,14 +71,6 @@ export const performDash = (state, helpers = {}) => {
     );
   }
 
-  setTimeout(() => {
-    organism.isDashing = false;
-    organism.invulnerable = false;
-    organism.dashCooldown = 1;
-    createEffect?.(state, organism.x, organism.y, 'dashend', organism.color);
-    syncState?.(state);
-  }, 300);
-
   syncState?.(state);
   return state;
 };
@@ -64,7 +80,24 @@ export const updateOrganismPhysics = (state, helpers = {}, delta = 0) => {
   const organism = state.organism;
   if (!organism) return state;
 
-  const { createParticle, addNotification, syncState } = helpers;
+  const { createParticle, addNotification, syncState, createEffect } = helpers;
+
+  const previousDashTimer = Math.max(0, organism.dashTimer || 0);
+  const wasDashing = Boolean(organism.isDashing || previousDashTimer > 0);
+  const updatedDashTimer = Math.max(0, previousDashTimer - delta);
+  organism.dashTimer = updatedDashTimer;
+  const dashActive = updatedDashTimer > 0;
+  organism.isDashing = dashActive;
+
+  if (dashActive) {
+    organism.invulnerable = true;
+  }
+
+  if (wasDashing && !dashActive) {
+    organism.invulnerable = Boolean(organism.invulnerableFromPowerUp);
+    organism.dashCooldown = Math.max(organism.dashCooldown || 0, 1);
+    createEffect?.(state, organism.x, organism.y, 'dashend', organism.color);
+  }
 
   if (organism.dying) {
     organism.deathTimer -= delta;
@@ -110,8 +143,8 @@ export const updateOrganismPhysics = (state, helpers = {}, delta = 0) => {
   organism.hasShieldPowerUp = invincibilityActive;
   organism.invulnerableFromPowerUp = invincibilityActive;
 
-  const friction = organism.isDashing ? 0.98 : 0.92;
-  const baseSpeed = organism.isDashing ? 20 * speedMultiplier : 5 * organism.speed * speedMultiplier;
+  const friction = dashActive ? 0.99 : 0.92;
+  const baseSpeed = dashActive ? 20 * speedMultiplier : 5 * organism.speed * speedMultiplier;
   const maxSpeed = baseSpeed;
 
   const joystick = state.joystick;
@@ -134,7 +167,7 @@ export const updateOrganismPhysics = (state, helpers = {}, delta = 0) => {
   organism.vy *= friction;
 
   const speed = Math.sqrt(organism.vx * organism.vx + organism.vy * organism.vy);
-  if (speed > maxSpeed) {
+  if (!dashActive && speed > maxSpeed) {
     organism.vx = (organism.vx / speed) * maxSpeed;
     organism.vy = (organism.vy / speed) * maxSpeed;
   }

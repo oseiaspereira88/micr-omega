@@ -5,7 +5,7 @@ Este documento descreve, passo a passo, como sair de uma conta Cloudflare vazia 
 ## Visão geral da arquitetura
 
 - **Front-end**: Aplicação React+Vite no diretório `web/`, compilada com `npm run build` para gerar `web/dist/`. Publicamos como projeto Cloudflare Pages com variáveis `VITE_*` para apontar para o backend e habilitar monitoramento.
-- **Backend realtime**: Worker em `worker/` que expõe um endpoint WebSocket (`/ws`) e encaminha as sessões para um Durable Object `RoomDO`. O `wrangler.toml` já declara o binding `ROOM` e o roteamento via domínio dedicado `realtime.example.com/ws` (personalize para o seu domínio real).
+- **Backend realtime**: Worker em `worker/` que expõe um endpoint WebSocket (`/`) e encaminha as sessões para um Durable Object `RoomDO`. O `wrangler.toml` já declara o binding `ROOM` e o roteamento via domínio dedicado `realtime.example.com` (personalize para o seu domínio real). Durante a transição, a rota legada `/ws` continua aceita.
 - **Observabilidade**: Logs estruturados via `createObservability`, suporte opcional a Logflare e métricas Sentry no front. Scripts auxiliares vivem em `scripts/observability/` e são acionados por `npm run tail:worker` e `npm run report:metrics`.
 
 ## 0. Pré-requisitos
@@ -51,7 +51,7 @@ Este documento descreve, passo a passo, como sair de uma conta Cloudflare vazia 
 
 1. Atualize o arquivo para refletir seu domínio real. Os valores que normalmente mudam:
    - `name`: identificador único do Worker (ex.: `micr-omega-worker-prod`).
-   - Entrada `routes`: substitua `realtime.example.com/ws` por `realtime.<seu-dominio>.com/ws` ou outro subdomínio desejado.
+   - Entrada `routes`: substitua `realtime.example.com` por `realtime.<seu-dominio>.com` ou outro subdomínio desejado.
 2. Se quiser isolar ambientes (staging vs production), utilize múltiplas seções `[env.<nome>]` no `wrangler.toml`, cada uma com `routes` e variáveis próprias.
 
 ### 3.3 Criar o registro DNS para o domínio realtime
@@ -76,7 +76,7 @@ Este documento descreve, passo a passo, como sair de uma conta Cloudflare vazia 
    ```
    - O comando usa `wrangler deploy`, compila `worker/src/index.ts` e registra o Durable Object `RoomDO` com o tag `v1` definido no arquivo de configuração.
 2. Após o deploy, verifique em **Workers & Pages → micr-omega-worker → Durable Objects** que a classe `RoomDO` está ativa.
-3. Valide o WebSocket executando `wscat -c wss://realtime.<seu-dominio>.com/ws` ou outro cliente para garantir que a conexão 101 está sendo retornada.
+3. Valide o WebSocket executando `wscat -c wss://realtime.<seu-dominio>.com` (a rota antiga `/ws` permanece funcional) ou outro cliente para garantir que a conexão 101 está sendo retornada.
 
 ## 4. Configurar o front-end no Cloudflare Pages
 
@@ -94,7 +94,7 @@ Este documento descreve, passo a passo, como sair de uma conta Cloudflare vazia 
 ### 4.2 Variáveis de ambiente do front-end
 
 1. Em **Pages → Settings → Environment Variables**, configure ao menos:
-   - `VITE_REALTIME_URL = wss://realtime.<seu-dominio>.com/ws` (ou use `VITE_WS_URL` se preferir).
+   - `VITE_REALTIME_URL = wss://realtime.<seu-dominio>.com` (ou use `VITE_WS_URL` se preferir). Mantenha `/ws` apenas para clientes legados.
    - `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`, `VITE_SENTRY_TRACES_SAMPLE_RATE`, `VITE_SENTRY_REPLAY_SESSION_SAMPLE_RATE`, `VITE_SENTRY_REPLAY_ERROR_SAMPLE_RATE` conforme suas credenciais Sentry.
 2. Para ambientes de preview, você pode definir variáveis específicas (por exemplo, apontando para um Worker de staging usando `wrangler environments`).
 3. Caso use Playwright ou outros testes de preview, adicione também `PLAYWRIGHT_BASE_URL` e `PLAYWRIGHT_WS_URL` nas configurações de *Preview* para pipelines automatizados.

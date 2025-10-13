@@ -2,7 +2,7 @@ import ws from "k6/ws";
 import { check, sleep } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
 
-const ROOM_WS_URL = __ENV.WS_URL ?? "ws://localhost:8787/ws";
+const ROOM_WS_URL = __ENV.WS_URL ?? "ws://localhost:8787";
 const HOLD_SECONDS = Number(__ENV.HOLD_SECONDS ?? "60");
 const VUS = Number(__ENV.VUS ?? "50");
 

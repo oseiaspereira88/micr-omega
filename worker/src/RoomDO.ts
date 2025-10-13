@@ -132,8 +132,10 @@ export class RoomDO {
   async fetch(request: Request): Promise<Response> {
     await this.ready;
     const url = new URL(request.url);
+    const pathname = url.pathname === "" ? "/" : url.pathname;
+    const isSupportedRoute = pathname === "/" || pathname === "/ws";
 
-    if (url.pathname !== "/ws") {
+    if (!isSupportedRoute) {
       return new Response("Not Found", { status: 404 });
     }
 

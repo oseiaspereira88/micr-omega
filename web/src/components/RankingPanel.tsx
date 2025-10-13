@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useGameStore } from "../store/gameStore";
+import { useGameStore, type ConnectionStatus } from "../store/gameStore";
 import styles from "./RankingPanel.module.css";
 
 const DISCONNECTED_ICON = "\u26A0\uFE0F"; // ⚠️
@@ -26,6 +26,15 @@ const STATUS_CLASS: Record<string, string> = {
   disconnected: styles.statusDisconnected,
 };
 
+const PLACEHOLDER_MESSAGE: Record<ConnectionStatus | "default", string> = {
+  idle: "Aguardando o início da partida para receber o ranking.",
+  connecting: "Conectando ao servidor para obter a classificação...",
+  reconnecting: "Tentando reconectar para recuperar a classificação...",
+  disconnected: "Conexão perdida. Atualizaremos assim que o servidor responder novamente.",
+  connected: "Aguarde o servidor enviar a classificação em tempo real.",
+  default: "Aguarde o servidor enviar a classificação em tempo real.",
+};
+
 const RankingPanel = () => {
   const ranking = useGameStore((state) => state.ranking);
   const players = useGameStore((state) => state.players);
@@ -33,7 +42,22 @@ const RankingPanel = () => {
   const connectionStatus = useGameStore((state) => state.connectionStatus);
 
   const rows = useMemo<RankingRow[]>(() => {
-    return ranking.map((entry) => {
+    if (ranking.length === 0) {
+      return [];
+    }
+
+    const sortedEntries = [...ranking].sort((a, b) => {
+      if (a.score !== b.score) {
+        return b.score - a.score;
+      }
+      const nameComparison = a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" });
+      if (nameComparison !== 0) {
+        return nameComparison;
+      }
+      return a.playerId.localeCompare(b.playerId);
+    });
+
+    return sortedEntries.map((entry) => {
       const player = players[entry.playerId];
       return {
         playerId: entry.playerId,
@@ -45,22 +69,24 @@ const RankingPanel = () => {
     });
   }, [localPlayerId, players, ranking]);
 
+  const statusLabel = STATUS_LABEL[connectionStatus] ?? connectionStatus;
+  const statusClass = STATUS_CLASS[connectionStatus] ?? "";
+
   if (rows.length === 0) {
+    const placeholderMessage =
+      PLACEHOLDER_MESSAGE[connectionStatus] ?? PLACEHOLDER_MESSAGE.default;
     return (
       <aside className={styles.panel} aria-label="Ranking da partida">
         <header className={styles.header}>
           <h3 className={styles.title}>Ranking</h3>
-          <span className={styles.statusBadge}>Sem dados</span>
+          <span className={`${styles.statusBadge} ${statusClass}`}>{statusLabel}</span>
         </header>
         <div className={styles.placeholder}>
-          Aguarde o servidor enviar a classificação em tempo real.
+          {placeholderMessage}
         </div>
       </aside>
     );
   }
-
-  const statusLabel = STATUS_LABEL[connectionStatus] ?? connectionStatus;
-  const statusClass = STATUS_CLASS[connectionStatus] ?? "";
 
   return (
     <aside className={styles.panel} aria-label="Ranking da partida">

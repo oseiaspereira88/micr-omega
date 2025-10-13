@@ -45,7 +45,7 @@
 - **Persistência leve**: `RoomDO` usa `state.storage` para snapshots opcionais (ex.: ranking final, histórico). Persistência não crítica.
 
 ### 3.2 Fluxo de Comunicação
-1. Cliente requisita nome → envia `join` ao endpoint WebSocket `/ws` do Worker.
+1. Cliente requisita nome → envia `join` ao endpoint WebSocket `/` do Worker (rota antiga `/ws` permanece aceita durante a transição).
 2. Worker encaminha conexão ao `RoomDO` (ID fixo `public-room`).
 3. `RoomDO` valida nome, cria registro e transmite estado inicial.
 4. Eventos de jogo são processados no `RoomDO`, que atualiza o estado e publica ranking atualizado.
@@ -155,7 +155,7 @@
 ### 5.2 Cloudflare Workers + Durable Objects
 - `wrangler.toml` com binding `ROOM` apontando para classe `RoomDO`.
 - Definir `compatibility_date` atual e `compatibility_flags = ["nodejs_compat"]` se necessário.
-- Configurar roteamento via subdomínio (ex.: `realtime.<domínio>.com/ws`).
+- Configurar roteamento via subdomínio (ex.: `realtime.<domínio>.com`).
 - Habilitar logs em `wrangler tail` para debug.
 - Planejar limites: monitorar consumo de CPU/memória do DO, ajustar `durable_objects.storage` para snapshots.
 
