@@ -48,9 +48,26 @@ export const updateGameState = ({
 
   if (!state.gameOver) {
     const frameFactor = Math.min(delta * 60, 3);
+    const previousDashTimer = Math.max(0, ensureNumber(organism.dashTimer, 0));
+    const wasDashing = Boolean(organism.isDashing || previousDashTimer > 0);
+    const updatedDashTimer = Math.max(0, previousDashTimer - delta);
+    organism.dashTimer = updatedDashTimer;
+    const dashActive = updatedDashTimer > 0;
+    organism.isDashing = dashActive;
+
+    if (dashActive) {
+      organism.invulnerable = true;
+    }
+
+    if (wasDashing && !dashActive) {
+      organism.invulnerable = Boolean(organism.invulnerableFromPowerUp);
+      organism.dashCooldown = Math.max(1, ensureNumber(organism.dashCooldown, 0));
+      createEffect(state, organism.x, organism.y, 'dashend', organism.color);
+    }
+
     const moving = Boolean(movementIntent?.x || movementIntent?.y);
 
-    if (moving && frameFactor > 0) {
+    if (!dashActive && moving && frameFactor > 0) {
       const length = Math.sqrt(
         movementIntent.x * movementIntent.x +
           movementIntent.y * movementIntent.y
@@ -71,12 +88,24 @@ export const updateGameState = ({
       }
 
       organism.rotation = Math.atan2(normY, normX);
+    } else if (dashActive && (organism.vx !== 0 || organism.vy !== 0)) {
+      organism.rotation = Math.atan2(organism.vy, organism.vx);
     }
 
-    const frictionBase = moving ? 0.92 : 0.78;
+    const frictionBase = dashActive ? 0.99 : moving ? 0.92 : 0.78;
     const friction = frameFactor > 0 ? Math.pow(frictionBase, frameFactor) : frictionBase;
     organism.vx *= friction;
     organism.vy *= friction;
+
+    if (!dashActive) {
+      const maxSpeed = organism.speed * 12;
+      const currentSpeed = Math.sqrt(organism.vx * organism.vx + organism.vy * organism.vy);
+      if (currentSpeed > maxSpeed) {
+        const scale = maxSpeed / currentSpeed;
+        organism.vx *= scale;
+        organism.vy *= scale;
+      }
+    }
 
     organism.x += organism.vx;
     organism.y += organism.vy;
