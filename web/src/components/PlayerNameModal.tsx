@@ -92,7 +92,7 @@ const shouldShowModal = (
     return true;
   }
 
-  return connectionStatus === "disconnected";
+  return connectionStatus !== "connected";
 };
 
 const PlayerNameModal = ({ isOpen, onSubmit, onLeave }: PlayerNameModalProps) => {
