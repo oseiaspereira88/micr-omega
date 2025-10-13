@@ -33,6 +33,7 @@ export const createOrganism = (overrides = {}) => {
     dashCharge: 100,
     maxDashCharge: 100,
     isDashing: false,
+    dashTimer: 0,
     dashCooldown: 0,
     attack: 10,
     defense: 5,
