@@ -68,7 +68,7 @@ const getValidationMessage = (value: string) => {
   }
 
   if (!sanitizePlayerName(value)) {
-    return `Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos (letras, números, espaços, hífens ou sublinhados).`;
+    return `Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos (letras, incluindo acentos, números, espaços, hífens ou sublinhados).`;
   }
 
   return null;
@@ -136,7 +136,7 @@ const PlayerNameModal = ({ isOpen, onSubmit, onLeave }: PlayerNameModalProps) =>
       const sanitized = sanitizePlayerName(trimmed);
       if (!sanitized) {
         setLocalError(
-          `Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos (letras, números, espaços, hífens ou sublinhados).`
+          `Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos (letras, incluindo acentos, números, espaços, hífens ou sublinhados).`
         );
         return;
       }
