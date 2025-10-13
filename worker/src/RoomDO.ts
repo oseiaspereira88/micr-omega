@@ -592,7 +592,10 @@ export class RoomDO {
     switch (action.type) {
       case "score": {
         const amount = clamp(Math.round(action.amount), -MAX_SCORE_DELTA, MAX_SCORE_DELTA);
-        const combo = action.comboMultiplier ? clamp(action.comboMultiplier, 1, MAX_COMBO_MULTIPLIER) : player.combo;
+        const combo =
+          action.comboMultiplier !== undefined
+            ? clamp(action.comboMultiplier, 1, MAX_COMBO_MULTIPLIER)
+            : player.combo;
         const delta = amount * combo;
         player.score = Math.max(0, player.score + delta);
         player.combo = combo;
@@ -608,7 +611,10 @@ export class RoomDO {
         return true;
       }
       case "ability": {
-        const value = action.value ? clamp(Math.round(action.value), -MAX_SCORE_DELTA, MAX_SCORE_DELTA) : 0;
+        const value =
+          action.value !== undefined
+            ? clamp(Math.round(action.value), -MAX_SCORE_DELTA, MAX_SCORE_DELTA)
+            : 0;
         if (value !== 0) {
           player.score = Math.max(0, player.score + value);
         }
