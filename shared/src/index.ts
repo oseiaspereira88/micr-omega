@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const PROTOCOL_VERSION = "1.0.0" as const;
 
-export const NAME_PATTERN = /^[A-Za-z0-9 _-]+$/;
+export const NAME_PATTERN = /^[\p{L}\p{N} _-]+$/u;
 export const ABILITY_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export const MIN_NAME_LENGTH = 3;
