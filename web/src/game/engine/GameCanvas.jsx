@@ -7,7 +7,7 @@ import styles from '../../MicroOmegaGame.module.css';
 import { useGameDispatch, useGameState } from './GameContext';
 import useGameLoop from './useGameLoop';
 
-const GameCanvas = () => {
+const GameCanvas = ({ settings }) => {
   const canvasRef = useRef(null);
   const gameState = useGameState();
   const dispatch = useGameDispatch();
@@ -15,6 +15,7 @@ const GameCanvas = () => {
   const { joystick, inputActions, chooseTrait, chooseForm, restartGame } = useGameLoop({
     canvasRef,
     dispatch,
+    settings,
   });
 
   const skillData = useMemo(() => {
@@ -100,6 +101,7 @@ const GameCanvas = () => {
         onCycleSkill={inputActions.cycleSkill}
         onOpenEvolutionMenu={inputActions.openEvolutionMenu}
         canEvolve={gameState.canEvolve}
+        showTouchControls={Boolean(settings?.showTouchControls)}
       />
 
       {gameState.showEvolutionChoice && (

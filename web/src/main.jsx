@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 import App from './App.jsx';
 import { resolveWebSocketUrl } from './hooks/useGameSocket';
+import { GameSettingsProvider } from './store/gameSettings';
 
 import './styles.css';
 
@@ -43,6 +44,8 @@ if (sentryDsn) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <GameSettingsProvider>
+      <App />
+    </GameSettingsProvider>
   </React.StrictMode>
 );

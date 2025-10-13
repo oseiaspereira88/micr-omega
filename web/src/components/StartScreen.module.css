@@ -1,0 +1,204 @@
+.root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  background: radial-gradient(circle at top, rgba(30, 48, 90, 0.6), rgba(5, 8, 15, 0.95));
+  backdrop-filter: blur(6px);
+  color: #f5f7ff;
+  overflow-y: auto;
+}
+
+.panel {
+  width: min(560px, 100%);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(160deg, rgba(16, 19, 33, 0.92), rgba(24, 28, 46, 0.92));
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.45);
+  padding: clamp(1.75rem, 2vw + 1rem, 2.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.6rem, 1.3rem + 1vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  opacity: 0.8;
+  max-width: 42ch;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(245, 247, 255, 0.85);
+}
+
+.input {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.85rem 1rem;
+  font-size: 1rem;
+  background: rgba(9, 11, 20, 0.85);
+  color: inherit;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(111, 137, 255, 0.75);
+  box-shadow: 0 0 0 3px rgba(111, 137, 255, 0.35);
+}
+
+.inputError {
+  border-color: rgba(255, 99, 132, 0.85);
+  box-shadow: 0 0 0 3px rgba(255, 99, 132, 0.2);
+}
+
+.errorMessage {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #ff6f91;
+}
+
+.options {
+  display: grid;
+  gap: 1rem;
+}
+
+.optionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(12, 14, 28, 0.7);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.optionContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.optionTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.optionDescription {
+  font-size: 0.85rem;
+  color: rgba(245, 247, 255, 0.65);
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.primaryButton {
+  border: none;
+  border-radius: 12px;
+  padding: 0.9rem 1.2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6f89ff, #4a5bff);
+  color: white;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.primaryButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  transform: none;
+}
+
+.secondaryButton {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  padding: 0.85rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: rgba(9, 11, 20, 0.7);
+  color: rgba(245, 247, 255, 0.9);
+  transition: background 0.2s ease, color 0.2s ease, border 0.2s ease;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  background: rgba(13, 16, 30, 0.9);
+}
+
+.secondaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.select,
+.checkbox,
+.toggle {
+  accent-color: #6f89ff;
+}
+
+.toggleWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 520px) {
+  .panel {
+    gap: 1.5rem;
+  }
+
+  .optionRow {
+    align-items: flex-start;
+  }
+
+  .actions {
+    gap: 0.65rem;
+  }
+}
