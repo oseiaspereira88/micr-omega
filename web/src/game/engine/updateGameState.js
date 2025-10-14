@@ -1,4 +1,6 @@
 import { DROP_TABLES } from '../config/enemyTemplates';
+import { HOSTILITY_MATRIX } from '../config/ecosystem';
+import { resolveNpcCombat } from '../systems/ai';
 import {
   AFFINITY_LABELS,
   AFFINITY_TYPES,
@@ -611,6 +613,10 @@ const mapMicroorganisms = (entities = [], previous = new Map()) =>
       opacity: 0.6,
       animPhase: prior ? prior.animPhase ?? 0 : Math.random() * Math.PI * 2,
       depth: 0.5,
+      scars: Array.isArray(entity.scars) ? entity.scars.map((scar) => ({ ...scar })) : [],
+      decision: entity.ai?.lastDecision ?? null,
+      targetId: entity.ai?.targetId ?? null,
+      evolutionLevel: entity.evolutionLevel ?? 1,
     };
   });
 
@@ -817,7 +823,26 @@ export const updateGameState = ({
 
   const localRenderPlayer = updateRenderPlayers(renderState, sharedPlayers, delta, localPlayerId);
   updateCamera(renderState, localRenderPlayer, delta);
-  updateWorldView(renderState, sharedState.world);
+  const aiMemory = renderState.aiMemory || { threatManagers: {} };
+  const aiResult = resolveNpcCombat(sharedState.world, {
+    delta,
+    rng: helpers.rng ?? Math.random,
+    now: helpers.now ?? Date.now(),
+    dropTables: helpers.dropTables ?? DROP_TABLES,
+    hostilityMatrix: helpers.hostilityMatrix ?? HOSTILITY_MATRIX,
+    temperamentProfiles: helpers.temperamentProfiles,
+    memory: aiMemory,
+    biome: sharedState.world?.biome ?? 'default',
+  });
+  renderState.aiMemory = aiResult?.memory ?? { threatManagers: {} };
+  const worldSnapshot = aiResult?.world ?? sharedState.world;
+  updateWorldView(renderState, worldSnapshot);
+  if (aiResult?.events?.length && typeof helpers.onNpcEvents === 'function') {
+    helpers.onNpcEvents(aiResult.events, worldSnapshot);
+  }
+  if (aiResult?.drops?.length && typeof helpers.onNpcDrops === 'function') {
+    helpers.onNpcDrops(aiResult.drops, worldSnapshot);
+  }
 
   if (typeof helpers.createEffect === 'function' && localRenderPlayer?.combatStatus?.state === 'engaged') {
     const now = Date.now();

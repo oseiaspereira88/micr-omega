@@ -9,3 +9,5 @@ export { enemyTemplates } from './enemyTemplates';
 export { obstacleTypes } from './obstacleTypes';
 export { nebulaTypes } from './nebulaTypes';
 export { createPowerUpTypes } from './powerUpTypes';
+export { HOSTILITY_MATRIX, TEMPERAMENT_PROFILES } from './ecosystem';
+export { getHostilityWeight, getTemperamentProfile, enumerateHostileSpecies } from './ecosystem';

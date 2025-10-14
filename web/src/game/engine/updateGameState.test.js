@@ -8,6 +8,7 @@ import {
   XP_DISTRIBUTION,
   calculateDamageWithResistances,
 } from './updateGameState';
+import { DROP_TABLES } from '../config/enemyTemplates';
 import { AFFINITY_TYPES, ELEMENT_TYPES } from '../../shared/combat';
 
 const createRenderState = () => ({
@@ -447,6 +448,66 @@ describe('updateGameState', () => {
     });
     expect(renderState.worldView.organicMatter[0]).toMatchObject({ id: 'nutrient-1', quantity: 4 });
     expect(renderState.worldView.roomObjects[0]).toMatchObject({ id: 'console-1', type: 'control' });
+  });
+
+  it('propagates NPC combat decisions and loot through helpers', () => {
+    const renderState = createRenderState();
+    const sharedState = createSharedState({
+      world: {
+        biome: 'delta',
+        microorganisms: [
+          {
+            id: 'npc-virus',
+            species: 'virus',
+            position: { x: 0, y: 0 },
+            movementVector: { x: 0, y: 0 },
+            health: { current: 8, max: 8 },
+            attack: 12,
+            defense: 1,
+            element: ELEMENT_TYPES.BIO,
+            dropTier: 'minion',
+            dropProfile: DROP_TABLES.minion,
+            baseDropProfile: DROP_TABLES.minion,
+          },
+          {
+            id: 'npc-bacteria',
+            species: 'bacteria',
+            position: { x: 14, y: 0 },
+            movementVector: { x: 0, y: 0 },
+            health: { current: 4, max: 4 },
+            attack: 4,
+            defense: 0,
+            element: ELEMENT_TYPES.CHEMICAL,
+            dropTier: 'minion',
+            dropProfile: DROP_TABLES.minion,
+            baseDropProfile: DROP_TABLES.minion,
+          },
+        ],
+      },
+    });
+
+    const events = [];
+    const drops = [];
+
+    updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.2,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+      helpers: {
+        rng: () => 0.05,
+        onNpcEvents: (payload) => events.push(...payload),
+        onNpcDrops: (payload) => drops.push(...payload),
+      },
+    });
+
+    expect(events.some((event) => event.type === 'attack')).toBe(true);
+    expect(events.some((event) => event.type === 'kill')).toBe(true);
+    expect(renderState.worldView.microorganisms.length).toBe(1);
+    expect(Array.isArray(renderState.worldView.microorganisms[0].scars)).toBe(true);
+    expect(drops.length).toBeGreaterThan(0);
+    expect(renderState.aiMemory).toBeDefined();
   });
 });
 
