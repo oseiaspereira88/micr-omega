@@ -151,6 +151,7 @@ const GameHud = ({
             elementLabel={elementLabel}
             affinityLabel={affinityLabel}
             resistances={resistances}
+            statusEffects={gameState.statusEffects}
           />
 
           <BossHealthBar active={bossActive} health={bossHealth} maxHealth={bossMaxHealth} />
@@ -184,7 +185,7 @@ const GameHud = ({
             skillCooldownLabel={skillData?.skillCooldownLabel}
             skillCooldownPercent={skillData?.skillCooldownPercent ?? 0}
             currentSkillIcon={currentSkill?.icon}
-            currentSkillCost={currentSkill?.cost}
+            currentSkillCost={skillData?.costLabel ?? '0⚡'}
             hasCurrentSkill={Boolean(currentSkill)}
             onOpenEvolutionMenu={onOpenEvolutionMenu}
             canEvolve={canEvolve}

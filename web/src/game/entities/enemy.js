@@ -6,6 +6,10 @@ import {
   normalizeWeaknessProfile,
   resolveResistanceProfile,
 } from '../../shared/combat';
+import {
+  createStatusResistanceProfile,
+  createStatusState,
+} from '../systems/statusEffects';
 
 const getRandom = (rng = Math.random) => (typeof rng === 'function' ? rng : Math.random);
 
@@ -373,7 +377,37 @@ export const createEnemyFromTemplate = (
     behaviorInterval:
       overrides.behaviorInterval ?? template.behaviorInterval ?? random() * 2 + 0.5,
     attackTimer: overrides.attackTimer ?? 0,
-    phaseTimer: overrides.phaseTimer ?? 0
+    phaseTimer: overrides.phaseTimer ?? 0,
+    penetration: Number.isFinite(overrides.penetration)
+      ? overrides.penetration
+      : Number.isFinite(template.penetration)
+      ? template.penetration
+      : 0,
+    range: Number.isFinite(overrides.range)
+      ? overrides.range
+      : Number.isFinite(template.range)
+      ? template.range
+      : template.attackRange ?? template.baseSize * 3,
+    criticalChance: Number.isFinite(overrides.criticalChance)
+      ? overrides.criticalChance
+      : Number.isFinite(template.criticalChance)
+      ? template.criticalChance
+      : 0.05,
+    criticalMultiplier: Number.isFinite(overrides.criticalMultiplier)
+      ? overrides.criticalMultiplier
+      : Number.isFinite(template.criticalMultiplier)
+      ? template.criticalMultiplier
+      : 1.5,
+    mass: Number.isFinite(overrides.mass)
+      ? overrides.mass
+      : Number.isFinite(template.mass)
+      ? template.mass
+      : Math.max(1, template.baseSize / 8),
+    stability: Number.isFinite(overrides.stability)
+      ? overrides.stability
+      : Number.isFinite(template.stability)
+      ? template.stability
+      : 1,
   };
 
   const enemy = {
@@ -502,6 +536,11 @@ export const createEnemyFromTemplate = (
     health: enemy.health,
   };
   recomputeResistances(enemy);
+  enemy.statusResistances = createStatusResistanceProfile({
+    ...(template.statusResistances || {}),
+    ...(overrides.statusResistances || {}),
+  });
+  enemy.status = createStatusState(overrides.status);
 
   return enemy;
 };

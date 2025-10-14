@@ -83,6 +83,10 @@ export const STATUS_EFFECTS = Object.freeze({
   BARRIER: 'barrier',
   LEECH: 'leech',
   RESTORE: 'restore',
+  FISSURE: 'fissure',
+  CORROSION: 'corrosion',
+  PHOTOLESION: 'photolesion',
+  ENTANGLED: 'entangled',
 });
 
 export const STATUS_LABELS = Object.freeze({
@@ -93,6 +97,10 @@ export const STATUS_LABELS = Object.freeze({
   [STATUS_EFFECTS.BARRIER]: 'Barreira',
   [STATUS_EFFECTS.LEECH]: 'Drenar',
   [STATUS_EFFECTS.RESTORE]: 'Cura',
+  [STATUS_EFFECTS.FISSURE]: 'Fissura',
+  [STATUS_EFFECTS.CORROSION]: 'Corrosão',
+  [STATUS_EFFECTS.PHOTOLESION]: 'Fotolesão',
+  [STATUS_EFFECTS.ENTANGLED]: 'Enredamento',
 });
 
 export const ELEMENTAL_RPS_TABLE = Object.freeze({

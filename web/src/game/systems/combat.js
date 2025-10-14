@@ -1,5 +1,15 @@
 import { calculateDamageWithResistances } from '../engine/updateGameState';
 import { AFFINITY_TYPES, ELEMENT_TYPES } from '../../shared/combat';
+import {
+  STATUS_METADATA,
+  getStatusCriticalBonus,
+  getStatusDamageModifier,
+  getStatusDefensePenalty,
+  getStatusEffectVisual,
+  getStatusMovementMultiplier,
+  shouldTriggerPhagocytosis,
+  tickStatusEffects,
+} from './statusEffects';
 
 export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   if (!state || !enemy) return false;
@@ -8,6 +18,16 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   const organism = state.organism;
   if (!organism) return false;
 
+  tickStatusEffects(enemy, delta, {
+    onDamage: ({ damage, status }) => {
+      const normalizedDamage = Math.max(0, damage);
+      if (normalizedDamage <= 0) return;
+      enemy.health = Math.max(0, enemy.health - normalizedDamage);
+      const color = STATUS_METADATA[status]?.color ?? enemy.color;
+      createEffect?.(state, enemy.x, enemy.y, getStatusEffectVisual(status), color);
+    },
+  });
+
   enemy.animPhase += delta * 3;
   enemy.attackCooldown = Math.max(0, enemy.attackCooldown - delta);
 
@@ -15,9 +35,12 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   const dy = organism.y - enemy.y;
   const distToPlayer = Math.sqrt(dx * dx + dy * dy) || 1;
 
+  const statusSpeedMultiplier = getStatusMovementMultiplier(enemy);
+  const effectiveSpeed = enemy.speed * statusSpeedMultiplier;
+
   if (enemy.boss) {
-    enemy.vx += (dx / distToPlayer) * enemy.speed * 0.12;
-    enemy.vy += (dy / distToPlayer) * enemy.speed * 0.12;
+    enemy.vx += (dx / distToPlayer) * effectiveSpeed * 0.12;
+    enemy.vy += (dy / distToPlayer) * effectiveSpeed * 0.12;
     enemy.rotation = (enemy.rotation || 0) + delta * 0.4;
     enemy.animPhase += delta * 2;
   } else {
@@ -29,22 +52,22 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
     }
 
     if (enemy.behavior === 'aggressive' && distToPlayer < 800) {
-      enemy.vx += (dx / distToPlayer) * enemy.speed * 0.1;
-      enemy.vy += (dy / distToPlayer) * enemy.speed * 0.1;
+      enemy.vx += (dx / distToPlayer) * effectiveSpeed * 0.1;
+      enemy.vy += (dy / distToPlayer) * effectiveSpeed * 0.1;
     } else if (enemy.behavior === 'territorial' && distToPlayer < 500) {
-      enemy.vx += (dx / distToPlayer) * enemy.speed * 0.05;
-      enemy.vy += (dy / distToPlayer) * enemy.speed * 0.05;
+      enemy.vx += (dx / distToPlayer) * effectiveSpeed * 0.05;
+      enemy.vy += (dy / distToPlayer) * effectiveSpeed * 0.05;
     } else if (enemy.behavior === 'opportunist') {
       if (distToPlayer < 350) {
-        enemy.vx += (dx / distToPlayer) * enemy.speed * 0.1;
-        enemy.vy += (dy / distToPlayer) * enemy.speed * 0.1;
+        enemy.vx += (dx / distToPlayer) * effectiveSpeed * 0.1;
+        enemy.vy += (dy / distToPlayer) * effectiveSpeed * 0.1;
       } else {
-        enemy.vx += (Math.random() - 0.5) * enemy.speed * 0.05;
-        enemy.vy += (Math.random() - 0.5) * enemy.speed * 0.05;
+        enemy.vx += (Math.random() - 0.5) * effectiveSpeed * 0.05;
+        enemy.vy += (Math.random() - 0.5) * effectiveSpeed * 0.05;
       }
     } else if (enemy.behavior === 'hunter') {
-      enemy.vx += (dx / distToPlayer) * enemy.speed * 0.12;
-      enemy.vy += (dy / distToPlayer) * enemy.speed * 0.12;
+      enemy.vx += (dx / distToPlayer) * effectiveSpeed * 0.12;
+      enemy.vy += (dy / distToPlayer) * effectiveSpeed * 0.12;
     }
   }
 
@@ -52,7 +75,7 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   enemy.vy *= 0.95;
 
   const speed = Math.sqrt(enemy.vx * enemy.vx + enemy.vy * enemy.vy);
-  const maxSpeed = enemy.speed * (enemy.boss ? 1.5 : 2);
+  const maxSpeed = effectiveSpeed * (enemy.boss ? 1.5 : 2);
   if (speed > maxSpeed) {
     enemy.vx = (enemy.vx / speed) * maxSpeed;
     enemy.vy = (enemy.vy / speed) * maxSpeed;
@@ -70,9 +93,36 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
     if (!organism.invulnerable && !organism.dying && !powerShieldActive) {
       const attackMultiplier = enemy.dynamicModifiers?.attackMultiplier ?? 1;
       const attackBonus = enemy.dynamicModifiers?.attackBonus ?? 0;
+      const penetration = Number.isFinite(enemy.penetration) ? enemy.penetration : 0;
+      const critBonus = getStatusCriticalBonus(enemy);
+      const rng = helpers?.rng ?? Math.random;
+      const criticalChance = Math.max(
+        0,
+        Math.min(0.75, (enemy.criticalChance ?? 0) + critBonus)
+      );
+      const criticalMultiplier = Math.max(1, enemy.criticalMultiplier ?? 1.5);
       const effectiveAttack = Math.max(0, (enemy.attack + attackBonus) * attackMultiplier);
-      const defenseValue = Math.max(0, organism.defense ?? 0);
-      const baseDamage = Math.max(0, effectiveAttack - defenseValue);
+      const defensePenalty = getStatusDefensePenalty(organism);
+      const rawDefense = Math.max(0, (organism.defense ?? 0) * Math.max(0.5, organism.stability ?? 1));
+      const adjustedDefense = Math.max(0, rawDefense * Math.max(0, 1 - defensePenalty));
+      const mitigatedDefense = Math.max(0, adjustedDefense - penetration);
+      const defenseReductionCap = Math.max(
+        0.35,
+        Math.min(0.8, 0.5 + (organism.stability ?? 1) * 0.12)
+      );
+      const reducedDamage = Math.max(
+        effectiveAttack * (1 - defenseReductionCap),
+        effectiveAttack - mitigatedDefense
+      );
+      const criticalRoll = typeof rng === 'function' ? rng() : Math.random();
+      const criticalHit = criticalRoll < criticalChance;
+      const baseDamage = criticalHit ? reducedDamage * criticalMultiplier : reducedDamage;
+      const situationalModifiers = [];
+      const attackElement = enemy.attackElement ?? enemy.element ?? ELEMENT_TYPES.BIO;
+      const statusBonus = getStatusDamageModifier({ target: organism, attackElement });
+      if (statusBonus !== 0) {
+        situationalModifiers.push(statusBonus);
+      }
       const damageResult = calculateDamageWithResistances({
         baseDamage,
         attackerElement: enemy.element ?? ELEMENT_TYPES.BIO,
@@ -80,13 +130,17 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
         attackerAffinity: enemy.affinity ?? AFFINITY_TYPES.NEUTRAL,
         targetElement: organism.element ?? ELEMENT_TYPES.BIO,
         targetResistances: organism.resistances ?? {},
-        situationalModifiers: [],
+        situationalModifiers,
       });
       const damage = Math.max(1, damageResult.damage);
       state.health -= damage;
       addNotification?.(state, `-${damage} HP`);
       playSound?.('damage');
       createEffect?.(state, organism.x, organism.y, 'hit', '#FF0000');
+
+      if (criticalHit) {
+        addNotification?.(state, '💥 Golpe crítico inimigo!');
+      }
 
       if (damageResult.relation === 'advantage') {
         addNotification?.(state, '⚠️ Afinidade inimiga explorou sua fraqueza!');
@@ -132,7 +186,7 @@ export const performAttack = (state, helpers = {}) => {
     createParticle,
     addNotification,
     dropPowerUps,
-    syncState
+    syncState,
   } = helpers;
 
   const organism = state.organism;
@@ -146,7 +200,9 @@ export const performAttack = (state, helpers = {}) => {
   const comboMultiplier = 1 + (state.combo * 0.05);
   const attackBonus = organism.currentAttackBonus || 0;
   const rangeBonus = organism.currentRangeBonus || 0;
-  const attackRange = organism.attackRange + rangeBonus;
+  const attackRange = (organism.range ?? organism.attackRange) + rangeBonus;
+  const rng = helpers?.rng ?? Math.random;
+  const attackerStability = Math.max(0.6, organism.stability ?? 1);
 
   state.enemies.forEach(enemy => {
     const dx = enemy.x - organism.x;
@@ -156,17 +212,47 @@ export const performAttack = (state, helpers = {}) => {
     if (dist < attackRange) {
       const defenseMultiplier = enemy.dynamicModifiers?.defenseMultiplier ?? 1;
       const defenseBonus = enemy.dynamicModifiers?.defenseBonus ?? 0;
-      const effectiveDefense = Math.max(0, (enemy.defense + defenseBonus) * defenseMultiplier * 0.5);
-      const baseAttackValue = Math.max(0, organism.attack + attackBonus);
-      const baseDamage = Math.max(0, baseAttackValue - effectiveDefense);
+      const penetration = Number.isFinite(organism.penetration) ? organism.penetration : 0;
+      const critBonus = getStatusCriticalBonus(organism);
+      const criticalChance = Math.max(
+        0,
+        Math.min(0.85, (organism.criticalChance ?? 0) + critBonus)
+      );
+      const criticalMultiplier = Math.max(1, organism.criticalMultiplier ?? 1.5);
+      const baseAttackValue = Math.max(0, (organism.attack + attackBonus) * attackerStability);
+      const defensePenalty = getStatusDefensePenalty(enemy);
+      const baseDefense = Math.max(
+        0,
+        (enemy.defense + defenseBonus) * defenseMultiplier * Math.max(0.5, enemy.stability ?? 1)
+      );
+      const adjustedDefense = Math.max(0, baseDefense * Math.max(0, 1 - defensePenalty));
+      const mitigatedDefense = Math.max(0, adjustedDefense - penetration);
+      const defenseReductionCap = Math.max(
+        0.32,
+        Math.min(0.85, 0.45 + (enemy.stability ?? 1) * 0.1)
+      );
+      const reducedDamage = Math.max(
+        baseAttackValue * (1 - defenseReductionCap),
+        baseAttackValue - mitigatedDefense
+      );
+      const critRoll = typeof rng === 'function' ? rng() : Math.random();
+      const criticalHit = critRoll < criticalChance;
+      const baseDamage = criticalHit ? reducedDamage * criticalMultiplier : reducedDamage;
+      const situationalModifiers = [];
+      const attackElement = organism.attackElement ?? organism.element ?? ELEMENT_TYPES.BIO;
+      const statusBonus = getStatusDamageModifier({ target: enemy, attackElement });
+      if (statusBonus !== 0) {
+        situationalModifiers.push(statusBonus);
+      }
+
       const damageResult = calculateDamageWithResistances({
         baseDamage,
         attackerElement: organism.element ?? ELEMENT_TYPES.BIO,
-        attackElement: organism.attackElement ?? organism.element ?? ELEMENT_TYPES.BIO,
+        attackElement,
         attackerAffinity: organism.affinity ?? AFFINITY_TYPES.NEUTRAL,
         targetElement: enemy.element ?? ELEMENT_TYPES.BIO,
         targetResistances: enemy.resistances ?? {},
-        situationalModifiers: [],
+        situationalModifiers,
         combo: { value: state.combo, multiplier: comboMultiplier },
         hooks: organism.comboHooks ?? {},
       });
@@ -177,6 +263,11 @@ export const performAttack = (state, helpers = {}) => {
 
       enemy.vx += (dx / dist) * 5;
       enemy.vy += (dy / dist) * 5;
+
+      if (criticalHit) {
+        addNotification?.(state, '✨ Crítico!');
+        createEffect?.(state, enemy.x, enemy.y, 'critical', organism.color);
+      }
 
       hitSomething = true;
 
@@ -208,6 +299,19 @@ export const performAttack = (state, helpers = {}) => {
           state.bossPending = false;
         }
         state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+
+        if (shouldTriggerPhagocytosis({ attacker: organism, target: enemy })) {
+          const heal = Math.max(5, Math.round(enemy.maxHealth * 0.12));
+          state.health = Math.min(state.maxHealth, state.health + heal);
+          state.energy += Math.round(enemy.points * 0.1);
+          addNotification?.(state, '🧫 Fagocitose!');
+          playSound?.('drain');
+          createEffect?.(state, enemy.x, enemy.y, 'phagocytosis', organism.color);
+        } else if (organism.mass > (enemy.mass ?? 1) && damage > enemy.maxHealth * 0.2) {
+          enemy.vx += (dx / dist) * 6;
+          enemy.vy += (dy / dist) * 6;
+          createEffect?.(state, enemy.x, enemy.y, 'knockback', organism.color);
+        }
       }
 
       if (enemy.boss && enemy.health > 0) {
