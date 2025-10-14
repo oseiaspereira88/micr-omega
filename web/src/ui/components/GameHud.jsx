@@ -19,6 +19,15 @@ const GameHud = ({
   combo,
   maxCombo,
   activePowerUps,
+  xp,
+  geneticMaterial,
+  characteristicPoints,
+  geneFragments,
+  stableGenes,
+  evolutionSlots,
+  reroll,
+  dropPity,
+  recentRewards,
   bossActive,
   bossHealth,
   bossMaxHealth,
@@ -115,6 +124,15 @@ const GameHud = ({
             combo={combo}
             maxCombo={maxCombo}
             activePowerUps={activePowerUps}
+            xp={xp}
+            geneticMaterial={geneticMaterial}
+            characteristicPoints={characteristicPoints}
+            geneFragments={geneFragments}
+            stableGenes={stableGenes}
+            evolutionSlots={evolutionSlots}
+            reroll={reroll}
+            dropPity={dropPity}
+            recentRewards={recentRewards}
           />
 
           <BossHealthBar active={bossActive} health={bossHealth} maxHealth={bossMaxHealth} />

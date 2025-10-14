@@ -1,3 +1,5 @@
+import { DROP_TABLES, ELEMENTAL_ADVANTAGE_MULTIPLIER } from '../config/enemyTemplates';
+
 const MOVEMENT_EPSILON = 0.05;
 const POSITION_SMOOTHING = 7.5;
 const CAMERA_SMOOTHING = 4;
@@ -18,6 +20,225 @@ const SPECIES_COLORS = {
 };
 
 const DEFAULT_SPECIES_COLOR = '#8fb8ff';
+
+export const XP_DISTRIBUTION = {
+  perDamage: 0.45,
+  perObjective: 120,
+  baseKillXp: {
+    minion: 40,
+    elite: 120,
+    boss: 400,
+  },
+};
+
+const FRAGMENT_KEY_BY_TIER = {
+  minion: 'minor',
+  elite: 'major',
+  boss: 'apex',
+};
+
+const STABLE_KEY_BY_TIER = {
+  minion: 'minor',
+  elite: 'major',
+  boss: 'apex',
+};
+
+const DEFAULT_RESOURCE_STUB = {
+  current: 0,
+  next: 120,
+  total: 0,
+  level: 1,
+};
+
+const createGeneCounter = () => ({ minor: 0, major: 0, apex: 0 });
+
+export const calculateExperienceFromEvents = (events = {}, xpConfig = XP_DISTRIBUTION) => {
+  if (!events) return 0;
+  const damageEvents = Array.isArray(events.damage) ? events.damage : [];
+  const objectiveEvents = Array.isArray(events.objectives) ? events.objectives : [];
+  const killEvents = Array.isArray(events.kills) ? events.kills : [];
+
+  const damageXp = damageEvents.reduce((total, event) => {
+    const amount = Number.isFinite(event?.amount) ? event.amount : 0;
+    const multiplier = Number.isFinite(event?.multiplier) ? event.multiplier : 1;
+    return total + Math.max(0, amount) * (xpConfig.perDamage ?? 0) * Math.max(multiplier, 0);
+  }, 0);
+
+  const objectiveXp = objectiveEvents.reduce((total, event) => {
+    if (Number.isFinite(event?.xp)) {
+      return total + Math.max(0, event.xp);
+    }
+    return total + (xpConfig.perObjective ?? 0);
+  }, 0);
+
+  const killXp = killEvents.reduce((total, kill) => {
+    const tier = kill?.dropTier ?? kill?.tier ?? 'minion';
+    const base = xpConfig.baseKillXp?.[tier] ?? xpConfig.baseKillXp?.minion ?? 0;
+    const multiplier = Number.isFinite(kill?.xpMultiplier) ? kill.xpMultiplier : 1;
+    return total + base * Math.max(multiplier, 0);
+  }, 0);
+
+  return Math.max(0, damageXp + objectiveXp + killXp);
+};
+
+const clampChance = (value) => Math.min(1, Math.max(0, value ?? 0));
+
+const computePityChance = (baseChance, pityCounter, config) => {
+  if (!config) return clampChance(baseChance);
+  const threshold = Number.isFinite(config.pityThreshold) ? config.pityThreshold : Infinity;
+  const increment = Number.isFinite(config.pityIncrement) ? config.pityIncrement : 0;
+  if (!Number.isFinite(pityCounter) || pityCounter < threshold) {
+    return clampChance(baseChance);
+  }
+
+  const stacks = Math.max(0, pityCounter - threshold + 1);
+  return clampChance((baseChance ?? 0) + stacks * increment);
+};
+
+const rollValueBetween = (min, max, roll) => {
+  const lower = Number.isFinite(min) ? min : 0;
+  const upper = Number.isFinite(max) ? max : lower;
+  if (upper <= lower) return lower;
+  const normalized = clampChance(roll);
+  return lower + Math.round((upper - lower) * normalized);
+};
+
+export const aggregateDrops = (
+  kills = [],
+  {
+    dropTables = DROP_TABLES,
+    rng = Math.random,
+    initialPity = { fragment: 0, stableGene: 0 },
+  } = {}
+) => {
+  const counters = {
+    geneticMaterial: 0,
+    fragments: createGeneCounter(),
+    stableGenes: createGeneCounter(),
+    pity: {
+      fragment: Number.isFinite(initialPity?.fragment) ? initialPity.fragment : 0,
+      stableGene: Number.isFinite(initialPity?.stableGene) ? initialPity.stableGene : 0,
+    },
+  };
+
+  kills.forEach((kill) => {
+    const tier = kill?.dropTier ?? kill?.tier ?? 'minion';
+    const profile = dropTables?.[tier] ?? dropTables?.minion;
+    if (!profile) return;
+
+    const advantageMultiplier = kill?.advantage ? ELEMENTAL_ADVANTAGE_MULTIPLIER : 1;
+    const baseMin = Number.isFinite(profile.geneticMaterial?.min)
+      ? profile.geneticMaterial.min
+      : 0;
+    const baseMax = Number.isFinite(profile.geneticMaterial?.max)
+      ? profile.geneticMaterial.max
+      : baseMin;
+    const mgRoll = kill?.rolls?.mg ?? rng();
+    const mgGain = Math.max(
+      baseMin,
+      Math.round(rollValueBetween(baseMin, baseMax, mgRoll) * Math.max(advantageMultiplier, 0))
+    );
+    counters.geneticMaterial += mgGain;
+
+    const fragmentKey = FRAGMENT_KEY_BY_TIER[tier] ?? 'minor';
+    const fragmentConfig = profile.fragment ?? {};
+    const fragmentChance = computePityChance(
+      fragmentConfig.chance,
+      counters.pity.fragment,
+      fragmentConfig
+    );
+    const fragmentRoll = kill?.rolls?.fragment ?? rng();
+    if (fragmentRoll < fragmentChance) {
+      const amount = rollValueBetween(
+        fragmentConfig.min ?? 1,
+        fragmentConfig.max ?? fragmentConfig.min ?? 1,
+        kill?.rolls?.fragmentAmount ?? rng()
+      );
+      counters.fragments[fragmentKey] =
+        (counters.fragments[fragmentKey] ?? 0) + Math.max(1, amount);
+      counters.pity.fragment = 0;
+    } else {
+      counters.pity.fragment += 1;
+    }
+
+    const stableKey = STABLE_KEY_BY_TIER[tier] ?? 'minor';
+    const stableConfig = profile.stableGene ?? {};
+    const stableChance = computePityChance(
+      stableConfig.chance,
+      counters.pity.stableGene,
+      stableConfig
+    );
+    const stableRoll = kill?.rolls?.stableGene ?? rng();
+    if (stableRoll < stableChance) {
+      const amount = Number.isFinite(stableConfig.amount) ? stableConfig.amount : 1;
+      counters.stableGenes[stableKey] =
+        (counters.stableGenes[stableKey] ?? 0) + Math.max(1, amount);
+      counters.pity.stableGene = 0;
+    } else {
+      counters.pity.stableGene += 1;
+    }
+  });
+
+  return counters;
+};
+
+export const applyProgressionEvents = (
+  hudSnapshot,
+  progression = {},
+  { dropTables = DROP_TABLES, rng = Math.random, xpConfig = XP_DISTRIBUTION } = {}
+) => {
+  if (!hudSnapshot || !progression) return hudSnapshot;
+
+  const xpGain = calculateExperienceFromEvents(progression, xpConfig);
+  if (xpGain > 0) {
+    const baseXp = hudSnapshot.xp ? { ...hudSnapshot.xp } : { ...DEFAULT_RESOURCE_STUB };
+    baseXp.current = (baseXp.current ?? 0) + xpGain;
+    baseXp.total = (baseXp.total ?? 0) + xpGain;
+    hudSnapshot.xp = baseXp;
+  }
+
+  const dropResults = aggregateDrops(progression.kills, {
+    dropTables,
+    rng,
+    initialPity: progression.dropPity ?? hudSnapshot.dropPity,
+  });
+
+  if (!hudSnapshot.geneticMaterial) {
+    hudSnapshot.geneticMaterial = { current: 0, total: 0, bonus: 0 };
+  }
+  hudSnapshot.geneticMaterial = {
+    ...hudSnapshot.geneticMaterial,
+    current: (hudSnapshot.geneticMaterial.current ?? 0) + dropResults.geneticMaterial,
+    total: (hudSnapshot.geneticMaterial.total ?? 0) + dropResults.geneticMaterial,
+  };
+
+  const mergeGenes = (target = {}, increments = {}) => ({
+    minor: (target.minor ?? 0) + (increments.minor ?? 0),
+    major: (target.major ?? 0) + (increments.major ?? 0),
+    apex: (target.apex ?? 0) + (increments.apex ?? 0),
+  });
+
+  hudSnapshot.geneFragments = mergeGenes(hudSnapshot.geneFragments, dropResults.fragments);
+  hudSnapshot.stableGenes = mergeGenes(hudSnapshot.stableGenes, dropResults.stableGenes);
+  hudSnapshot.dropPity = { ...dropResults.pity };
+
+  if (!hudSnapshot.recentRewards) {
+    hudSnapshot.recentRewards = { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 };
+  }
+  hudSnapshot.recentRewards = {
+    xp: (hudSnapshot.recentRewards.xp ?? 0) + xpGain,
+    geneticMaterial:
+      (hudSnapshot.recentRewards.geneticMaterial ?? 0) + dropResults.geneticMaterial,
+    fragments:
+      (hudSnapshot.recentRewards.fragments ?? 0) +
+      Object.values(dropResults.fragments || {}).reduce((sum, value) => sum + value, 0),
+    stableGenes:
+      (hudSnapshot.recentRewards.stableGenes ?? 0) +
+      Object.values(dropResults.stableGenes || {}).reduce((sum, value) => sum + value, 0),
+  };
+
+  return hudSnapshot;
+};
 
 const hashId = (id = '') => {
   let hash = 0;
@@ -250,6 +471,35 @@ const updateWorldView = (renderState, sharedWorld) => {
 };
 
 const buildHudSnapshot = (localPlayer, playerList, notifications, camera) => {
+  const resourceBag = localPlayer?.resources || {};
+  const xp = resourceBag.xp || localPlayer?.xp || { ...DEFAULT_RESOURCE_STUB };
+  const geneticMaterial = resourceBag.geneticMaterial || { current: 0, total: 0, bonus: 0 };
+  const characteristicPoints = resourceBag.characteristicPoints || {
+    total: 0,
+    available: 0,
+    spent: 0,
+    perLevel: [],
+  };
+  const evolutionSlots = resourceBag.evolutionSlots || {
+    small: { used: 0, max: 0 },
+    medium: { used: 0, max: 0 },
+    large: { used: 0, max: 0 },
+  };
+  const reroll = resourceBag.reroll || { baseCost: 25, cost: 25, count: 0, pity: 0 };
+  const dropPity = resourceBag.dropPity || { fragment: 0, stableGene: 0 };
+  const geneFragments = {
+    minor: 0,
+    major: 0,
+    apex: 0,
+    ...(resourceBag.geneFragments || localPlayer?.geneFragments || {}),
+  };
+  const stableGenes = {
+    minor: 0,
+    major: 0,
+    apex: 0,
+    ...(resourceBag.stableGenes || localPlayer?.stableGenes || {}),
+  };
+
   const opponents = playerList
     .filter((player) => !player.isLocal)
     .map((player) => ({
@@ -288,6 +538,19 @@ const buildHudSnapshot = (localPlayer, playerList, notifications, camera) => {
     gameOver: false,
     cameraZoom: camera?.zoom ?? 1,
     opponents,
+    xp: { ...xp },
+    geneticMaterial: { ...geneticMaterial },
+    characteristicPoints: { ...characteristicPoints },
+    geneFragments,
+    stableGenes,
+    evolutionSlots: {
+      small: { ...(evolutionSlots.small || { used: 0, max: 0 }) },
+      medium: { ...(evolutionSlots.medium || { used: 0, max: 0 }) },
+      large: { ...(evolutionSlots.large || { used: 0, max: 0 }) },
+    },
+    reroll: { ...reroll },
+    dropPity: { ...dropPity },
+    recentRewards: { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 },
   };
 };
 
@@ -369,6 +632,12 @@ export const updateGameState = ({
     renderState.notifications,
     renderState.camera
   );
+
+  applyProgressionEvents(hudSnapshot, sharedState.progression, {
+    dropTables: helpers.dropTables ?? DROP_TABLES,
+    rng: helpers.rng ?? Math.random,
+    xpConfig: helpers.xpConfig ?? XP_DISTRIBUTION,
+  });
 
   if (typeof helpers.playSound === 'function' && commands.attacks.length > 0) {
     helpers.playSound('attack');

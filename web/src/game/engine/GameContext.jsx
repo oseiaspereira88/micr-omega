@@ -1,7 +1,11 @@
 import React, { createContext, useContext, useReducer } from 'react';
 
+import { createResourceProfile } from '../state/resourceProfile';
+
 const GameStateContext = createContext(undefined);
 const GameDispatchContext = createContext(undefined);
+
+const baseResources = createResourceProfile();
 
 const initialState = {
   energy: 0,
@@ -31,6 +35,18 @@ const initialState = {
   evolutionType: null,
   cameraZoom: 1,
   opponents: [],
+  resources: baseResources,
+  xp: baseResources.xp,
+  characteristicPoints: baseResources.characteristicPoints,
+  geneticMaterial: baseResources.geneticMaterial,
+  geneFragments: baseResources.geneFragments,
+  stableGenes: baseResources.stableGenes,
+  evolutionSlots: baseResources.evolutionSlots,
+  reroll: baseResources.reroll,
+  dropPity: baseResources.dropPity,
+  progressionQueue: [],
+  recentRewards: { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 },
+  evolutionContext: null,
 };
 
 function gameReducer(state, action) {

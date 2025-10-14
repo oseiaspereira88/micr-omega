@@ -1,9 +1,13 @@
 import { createOrganism } from '../entities/organism';
+import { createResourceProfile } from './resourceProfile';
 
 export const createInitialState = () => {
   const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1280;
   const viewportHeight =
     typeof window !== 'undefined' ? Math.max(0, window.innerHeight - 40) : 720;
+
+  const resources = createResourceProfile();
+  const organism = createOrganism({ resources });
 
   return {
     energy: 0,
@@ -13,7 +17,19 @@ export const createInitialState = () => {
     score: 0,
     canEvolve: false,
 
-    organism: createOrganism(),
+    organism,
+    resources,
+    xp: resources.xp,
+    characteristicPoints: resources.characteristicPoints,
+    geneticMaterial: resources.geneticMaterial,
+    geneFragments: resources.geneFragments,
+    stableGenes: resources.stableGenes,
+    evolutionSlots: resources.evolutionSlots,
+    reroll: resources.reroll,
+    dropPity: resources.dropPity,
+    progressionQueue: [],
+    recentRewards: { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 },
+    evolutionContext: null,
 
     particles: [],
     floatingParticles: [],

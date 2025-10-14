@@ -1,141 +1,134 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { createInitialState } from '../state/initialState';
 import { evolutionaryTraits } from '../config/evolutionaryTraits';
-import { chooseForm, chooseTrait } from './progression';
+import { forms } from '../config/forms';
+import {
+  checkEvolution,
+  openEvolutionMenu,
+  chooseTrait,
+  chooseForm,
+  requestEvolutionReroll,
+} from './progression';
 
-const createTraitState = () => ({
-  organism: {
-    traits: [],
-    skills: [],
-    skillCooldowns: {},
-    size: 32,
-    color: '#ffffff',
-    form: 'sphere',
-    speed: 1,
-    attack: 10,
-    defense: 5,
-    maxHealth: 100,
-    health: 100,
-  },
-  maxHealth: 100,
-  health: 100,
-  showEvolutionChoice: true,
-});
+const createState = () => {
+  const state = createInitialState();
+  state.organism.traits = [];
+  state.organism.skills = [];
+  state.organism.skillCooldowns = {};
+  state.geneticMaterial.current = 200;
+  state.geneticMaterial.total = 200;
+  state.geneFragments.major = 3;
+  state.geneFragments.apex = 2;
+  state.stableGenes.apex = 1;
+  state.stableGenes.major = 1;
+  state.characteristicPoints.available = 5;
+  state.characteristicPoints.total = 5;
+  state.evolutionSlots.small.max = 5;
+  state.evolutionSlots.medium.max = 2;
+  state.evolutionSlots.large.max = 1;
+  state.reroll.cost = state.reroll.baseCost;
+  return state;
+};
 
-const createTraitHelpers = () => ({
+const helpers = {
   evolutionaryTraits,
+  forms,
+  pickRandomUnique: (list, count) => list.slice(0, count),
   addNotification: vi.fn(),
+  playSound: vi.fn(),
   syncState: vi.fn(),
+};
+
+describe('checkEvolution', () => {
+  it('levels up and enqueues tiers when XP exceeds thresholds', () => {
+    const state = createState();
+    state.xp.current = state.xp.next + 50;
+
+    checkEvolution(state, helpers);
+
+    expect(state.level).toBe(2);
+    expect(state.xp.current).toBeGreaterThanOrEqual(0);
+    expect(state.progressionQueue).toContain('medium');
+    expect(state.characteristicPoints.available).toBeGreaterThan(0);
+  });
 });
 
-const traitTestCases = [
-  {
-    key: 'flagellum',
-    expectedStat: 1.5,
-    statGetter: (state) => state.organism.speed,
-  },
-  {
-    key: 'spikes',
-    expectedStat: 18,
-    statGetter: (state) => state.organism.attack,
-  },
-  {
-    key: 'membrane',
-    expectedStat: 8,
-    statGetter: (state) => state.organism.defense,
-  },
-  {
-    key: 'nucleus',
-    expectedStat: 150,
-    statGetter: (state) => state.organism.maxHealth,
-  },
-];
+describe('openEvolutionMenu and chooseTrait', () => {
+  it('consumes characteristic points for small evolutions', () => {
+    const state = createState();
+    state.progressionQueue.push('small');
 
-describe('chooseTrait', () => {
-  it.each(traitTestCases)(
-    'prevents duplicate application of %s',
-    ({ key, expectedStat, statGetter }) => {
-      const state = createTraitState();
-      const helpers = createTraitHelpers();
-      const { skill } = evolutionaryTraits[key];
+    openEvolutionMenu(state, helpers);
+    const before = state.characteristicPoints.available;
 
-      chooseTrait(state, helpers, key);
+    chooseTrait(state, helpers, 'flagellum');
 
-      const statAfterFirstChoice = statGetter(state);
-      const skillsAfterFirstChoice = [...state.organism.skills];
-      const traitsAfterFirstChoice = [...state.organism.traits];
-      const stateMaxHealthAfterFirstChoice = state.maxHealth;
-      const skillOccurrencesAfterFirstChoice = skillsAfterFirstChoice.filter(
-        (value) => value === skill
-      ).length;
+    expect(state.characteristicPoints.available).toBe(before - 1);
+    expect(state.organism.traits).toContain('flagellum');
+  });
 
-      expect(traitsAfterFirstChoice).toEqual([key]);
-      expect(statAfterFirstChoice).toBeCloseTo(expectedStat, 5);
-      expect(skillOccurrencesAfterFirstChoice).toBe(1);
+  it('requires MG and fragments for medium evolutions', () => {
+    const state = createState();
+    state.progressionQueue.push('medium');
 
-      chooseTrait(state, helpers, key);
+    openEvolutionMenu(state, helpers);
+    const mgBefore = state.geneticMaterial.current;
+    const fragmentsBefore = state.geneFragments.major;
 
-      const skillOccurrencesAfterSecondChoice = state.organism.skills.filter(
-        (value) => value === skill
-      ).length;
+    chooseTrait(state, helpers, 'spikes');
 
-      expect(state.organism.traits).toEqual(traitsAfterFirstChoice);
-      expect(statGetter(state)).toBe(statAfterFirstChoice);
-      expect(state.organism.skills).toEqual(skillsAfterFirstChoice);
-      expect(skillOccurrencesAfterSecondChoice).toBe(1);
-      expect(state.maxHealth).toBe(stateMaxHealthAfterFirstChoice);
-    }
-  );
+    expect(state.geneticMaterial.current).toBeLessThan(mgBefore);
+    expect(state.geneFragments.major).toBe(fragmentsBefore - 1);
+    expect(state.organism.traits).toContain('spikes');
+  });
+
+  it('prevents duplicate trait applications even across tiers', () => {
+    const state = createState();
+    state.progressionQueue.push('small');
+    openEvolutionMenu(state, helpers);
+    chooseTrait(state, helpers, 'membrane');
+
+    state.progressionQueue.push('medium');
+    openEvolutionMenu(state, helpers);
+    chooseTrait(state, helpers, 'membrane');
+
+    const occurrences = state.organism.traits.filter((trait) => trait === 'membrane');
+    expect(occurrences).toHaveLength(1);
+  });
 });
 
 describe('chooseForm', () => {
-  const forms = {
-    sphere: { name: 'Sphere', defense: 1.5, speed: 1.2 },
-    star: { name: 'Star', defense: 0.8, speed: 1.4 },
-  };
+  it('spends MG and stable genes for large evolutions', () => {
+    const state = createState();
+    state.progressionQueue.push('large');
+    state.stableGenes.apex = 1;
 
-  const createFormState = () => ({
-    organism: {
-      form: 'sphere',
-      defense: 10,
-      speed: 2,
-      formDefenseMultiplier: 1,
-      formSpeedMultiplier: 1,
-      traits: [],
-      skillCooldowns: {},
-    },
-    showEvolutionChoice: true,
-    formReapplyNotice: false,
-    uiSyncTimer: 0,
+    openEvolutionMenu(state, helpers);
+    const mgBefore = state.geneticMaterial.current;
+    const stableBefore = state.stableGenes.apex;
+
+    chooseForm(state, helpers, 'star');
+
+    expect(state.geneticMaterial.current).toBeLessThan(mgBefore);
+    expect(state.stableGenes.apex).toBe(stableBefore - 1);
+    expect(state.organism.form).toBe('star');
   });
+});
 
-  it('does not stack defense and speed when reselecting the same form', () => {
-    const state = createFormState();
+describe('requestEvolutionReroll', () => {
+  it('increments reroll cost and deducts MG', () => {
+    const state = createState();
+    state.progressionQueue.push('small');
+    openEvolutionMenu(state, helpers);
+    state.showEvolutionChoice = true;
+    const costBefore = state.reroll.cost;
+    const mgBefore = state.geneticMaterial.current;
 
-    chooseForm(state, { forms }, 'sphere');
-    const defenseAfterFirstSelection = state.organism.defense;
-    const speedAfterFirstSelection = state.organism.speed;
+    requestEvolutionReroll(state, helpers);
 
-    chooseForm(state, { forms }, 'sphere');
-
-    expect(state.organism.defense).toBeCloseTo(defenseAfterFirstSelection);
-    expect(state.organism.speed).toBeCloseTo(speedAfterFirstSelection);
-  });
-
-  it('recalculates stats relative to the previous multiplier when switching forms', () => {
-    const state = createFormState();
-
-    chooseForm(state, { forms }, 'sphere');
-    const defenseAfterSphere = state.organism.defense;
-    const speedAfterSphere = state.organism.speed;
-
-    chooseForm(state, { forms }, 'star');
-
-    expect(state.organism.defense).toBeCloseTo(
-      defenseAfterSphere * (forms.star.defense / forms.sphere.defense)
-    );
-    expect(state.organism.speed).toBeCloseTo(
-      speedAfterSphere * (forms.star.speed / forms.sphere.speed)
-    );
+    expect(state.geneticMaterial.current).toBe(mgBefore - costBefore);
+    expect(state.reroll.cost).toBeGreaterThan(costBefore);
+    expect(state.reroll.count).toBe(1);
   });
 });
