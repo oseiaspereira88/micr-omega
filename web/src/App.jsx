@@ -87,7 +87,7 @@ const App = () => {
 
   return (
     <>
-      {isGameActive ? <MicroOmegaGame settings={settings} /> : null}
+      {isGameActive ? <MicroOmegaGame settings={settings} onQuit={handleQuit} /> : null}
       {!isGameActive ? (
         <StartScreen onStart={handleStart} onQuit={handleQuit} />
       ) : null}

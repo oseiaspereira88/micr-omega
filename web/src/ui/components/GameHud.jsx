@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import HudBar from './HudBar';
 import BossHealthBar from './BossHealthBar';
 import SkillWheel from './SkillWheel';
@@ -39,18 +39,43 @@ const GameHud = ({
   showTouchControls = false,
   cameraZoom = 1,
   onCameraZoomChange,
+  onQuit,
 }) => {
   const currentSkill = skillData?.currentSkill ?? null;
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const handleToggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => !prev);
+  }, []);
 
   return (
-    <div className={styles.hud}>
-      <div className={styles.sidebar}>
-        <RankingPanel />
-        <ConnectionStatusOverlay />
-        <CameraControls zoom={cameraZoom} onChange={onCameraZoomChange} />
-      </div>
+    <>
+      <button
+        type="button"
+        className={styles.sidebarToggle}
+        onClick={handleToggleSidebar}
+        aria-expanded={isSidebarOpen}
+      >
+        {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
+      </button>
 
-      <HudBar
+      <div className={styles.hud}>
+        <div
+          className={`${styles.sidebar} ${
+            isSidebarOpen ? styles.sidebarOpen : styles.sidebarClosed
+          }`}
+        >
+          <RankingPanel />
+          <ConnectionStatusOverlay />
+          <CameraControls zoom={cameraZoom} onChange={onCameraZoomChange} />
+          {onQuit ? (
+            <button type="button" className={styles.leaveButton} onClick={onQuit}>
+              Sair da sala
+            </button>
+          ) : null}
+        </div>
+
+        <HudBar
         level={level}
         score={score}
         energy={energy}
@@ -75,30 +100,31 @@ const GameHud = ({
 
       <Notifications notifications={notifications} />
 
-      {showTouchControls ? (
-        <TouchControls
-          joystick={joystick}
-          onJoystickStart={onJoystickStart}
-          onJoystickMove={onJoystickMove}
-          onJoystickEnd={onJoystickEnd}
-          onAttackPress={onAttackPress}
-          onAttackRelease={onAttackRelease}
-          onAttack={onAttack}
-          onDash={onDash}
-          dashCharge={dashCharge}
-          onUseSkill={onUseSkill}
-          skillDisabled={skillData?.skillDisabled}
-          skillCoolingDown={skillData?.skillCoolingDown}
-          skillCooldownLabel={skillData?.skillCooldownLabel}
-          skillCooldownPercent={skillData?.skillCooldownPercent ?? 0}
-          currentSkillIcon={currentSkill?.icon}
-          currentSkillCost={currentSkill?.cost}
-          hasCurrentSkill={Boolean(currentSkill)}
-          onOpenEvolutionMenu={onOpenEvolutionMenu}
-          canEvolve={canEvolve}
-        />
-      ) : null}
-    </div>
+        {showTouchControls ? (
+          <TouchControls
+            joystick={joystick}
+            onJoystickStart={onJoystickStart}
+            onJoystickMove={onJoystickMove}
+            onJoystickEnd={onJoystickEnd}
+            onAttackPress={onAttackPress}
+            onAttackRelease={onAttackRelease}
+            onAttack={onAttack}
+            onDash={onDash}
+            dashCharge={dashCharge}
+            onUseSkill={onUseSkill}
+            skillDisabled={skillData?.skillDisabled}
+            skillCoolingDown={skillData?.skillCoolingDown}
+            skillCooldownLabel={skillData?.skillCooldownLabel}
+            skillCooldownPercent={skillData?.skillCooldownPercent ?? 0}
+            currentSkillIcon={currentSkill?.icon}
+            currentSkillCost={currentSkill?.cost}
+            hasCurrentSkill={Boolean(currentSkill)}
+            onOpenEvolutionMenu={onOpenEvolutionMenu}
+            canEvolve={canEvolve}
+          />
+        ) : null}
+      </div>
+    </>
   );
 };
 

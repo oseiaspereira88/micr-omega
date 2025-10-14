@@ -8,7 +8,7 @@ import { useGameDispatch, useGameState } from './GameContext';
 import useGameLoop from './useGameLoop';
 import useIsTouchDevice from '../../hooks/useIsTouchDevice';
 
-const GameCanvas = ({ settings }) => {
+const GameCanvas = ({ settings, onQuit }) => {
   const canvasRef = useRef(null);
   const gameState = useGameState();
   const dispatch = useGameDispatch();
@@ -107,6 +107,7 @@ const GameCanvas = ({ settings }) => {
         showTouchControls={Boolean(settings?.showTouchControls && isTouchDevice)}
         cameraZoom={gameState.cameraZoom ?? gameState.camera?.zoom ?? 1}
         onCameraZoomChange={setCameraZoom}
+        onQuit={onQuit}
       />
 
       {gameState.showEvolutionChoice && (
