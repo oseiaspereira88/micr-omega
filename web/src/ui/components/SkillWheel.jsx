@@ -15,6 +15,18 @@ const SkillWheel = ({
     return null;
   }
 
+  const handleCycleClick = () => {
+    onCycleSkill?.(1);
+  };
+
+  const handleCyclePointerDown = (event) => {
+    const pointerType = event.pointerType ?? event.nativeEvent?.pointerType;
+    if (pointerType && (pointerType === 'touch' || pointerType === 'pen' || pointerType === 'stylus')) {
+      event.preventDefault();
+      onCycleSkill?.(1);
+    }
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -69,11 +81,8 @@ const SkillWheel = ({
         <button
           type="button"
           className={styles.cycleButton}
-          onClick={() => onCycleSkill?.(1)}
-          onTouchStart={event => {
-            event.preventDefault();
-            onCycleSkill?.(1);
-          }}
+          onClick={handleCycleClick}
+          onPointerDown={handleCyclePointerDown}
         >
           🔁 Trocar habilidade (R)
         </button>
