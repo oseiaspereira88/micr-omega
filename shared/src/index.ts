@@ -61,6 +61,13 @@ export const combatStatusSchema = z.object({
   lastAttackAt: z.number().finite().nullable().default(null)
 });
 
+export const combatAttributesSchema = z.object({
+  attack: z.number().finite().nonnegative(),
+  defense: z.number().finite().nonnegative(),
+  speed: z.number().finite().nonnegative(),
+  range: z.number().finite().nonnegative()
+});
+
 export const sharedPlayerStateSchema = z.object({
   id: playerIdSchema,
   name: playerNameSchema,
@@ -72,7 +79,8 @@ export const sharedPlayerStateSchema = z.object({
   movementVector: vector2Schema,
   orientation: orientationSchema,
   health: healthSchema,
-  combatStatus: combatStatusSchema
+  combatStatus: combatStatusSchema,
+  combatAttributes: combatAttributesSchema
 });
 
 export const microorganismSchema = z.object({
@@ -152,6 +160,24 @@ export const sharedGameStateSchema = z.object({
   world: sharedWorldStateSchema
 });
 
+export const combatLogEntrySchema = z.object({
+  timestamp: z.number().finite(),
+  attackerId: playerIdSchema.optional(),
+  targetId: playerIdSchema.optional(),
+  targetKind: z
+    .union([
+      z.literal("player"),
+      z.literal("microorganism"),
+      z.literal("organic_matter"),
+      z.literal("obstacle")
+    ]),
+  targetObjectId: worldObjectIdSchema.optional(),
+  damage: z.number().finite().nonnegative(),
+  outcome: z.union([z.literal("hit"), z.literal("defeated"), z.literal("blocked"), z.literal("collected")]),
+  remainingHealth: z.number().finite().nonnegative().optional(),
+  scoreAwarded: z.number().finite().optional()
+});
+
 export const sharedGameStateDiffSchema = z.object({
   phase: sharedGameStateSchema.shape.phase.optional(),
   roundId: sharedGameStateSchema.shape.roundId.optional(),
@@ -159,7 +185,8 @@ export const sharedGameStateDiffSchema = z.object({
   roundEndsAt: sharedGameStateSchema.shape.roundEndsAt.optional(),
   upsertPlayers: z.array(sharedPlayerStateSchema).optional(),
   removedPlayerIds: z.array(playerIdSchema).optional(),
-  world: sharedWorldStateDiffSchema.optional()
+  world: sharedWorldStateDiffSchema.optional(),
+  combatLog: z.array(combatLogEntrySchema).optional()
 });
 
 export const rankingEntrySchema = z.object({
@@ -385,11 +412,13 @@ export type Vector2 = z.infer<typeof vector2Schema>;
 export type OrientationState = z.infer<typeof orientationSchema>;
 export type HealthState = z.infer<typeof healthSchema>;
 export type CombatStatus = z.infer<typeof combatStatusSchema>;
+export type CombatAttributes = z.infer<typeof combatAttributesSchema>;
 export type SharedPlayerState = z.infer<typeof sharedPlayerStateSchema>;
 export type SharedGameState = z.infer<typeof sharedGameStateSchema>;
 export type SharedGameStateDiff = z.infer<typeof sharedGameStateDiffSchema>;
 export type SharedWorldState = z.infer<typeof sharedWorldStateSchema>;
 export type SharedWorldStateDiff = z.infer<typeof sharedWorldStateDiffSchema>;
+export type CombatLogEntry = z.infer<typeof combatLogEntrySchema>;
 export type Microorganism = z.infer<typeof microorganismSchema>;
 export type OrganicMatter = z.infer<typeof organicMatterSchema>;
 export type Obstacle = z.infer<typeof obstacleSchema>;

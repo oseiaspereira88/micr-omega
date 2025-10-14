@@ -26,6 +26,12 @@ import {
   type SharedGameState,
   type SharedGameStateDiff,
   type SharedWorldState,
+  type SharedWorldStateDiff,
+  type CombatAttributes,
+  type CombatLogEntry,
+  type Microorganism,
+  type OrganicMatter,
+  type Obstacle,
   type StateDiffMessage,
   type StateFullMessage,
   type Vector2,
@@ -49,7 +55,21 @@ const MAX_MESSAGES_PER_CONNECTION = 120;
 const MAX_MESSAGES_GLOBAL = 600;
 
 const PLAYERS_KEY = "players";
+const WORLD_KEY = "world";
 const ALARM_KEY = "alarms";
+
+const WORLD_TICK_INTERVAL_MS = 250;
+const PLAYER_ATTACK_COOLDOWN_MS = 800;
+const PLAYER_COLLECT_RADIUS = 60;
+const PLAYER_ATTACK_RANGE_BUFFER = 4;
+const OBSTACLE_PADDING = 12;
+
+const WORLD_BOUNDS = {
+  minX: -500,
+  maxX: 500,
+  minY: -500,
+  maxY: 500
+} as const;
 
 const SUPPORTED_CLIENT_VERSIONS = new Set([PROTOCOL_VERSION]);
 
@@ -84,7 +104,7 @@ class MessageRateLimiter {
   }
 }
 
-type AlarmType = "waiting_start" | "round_end" | "reset" | "cleanup";
+type AlarmType = "waiting_start" | "round_end" | "reset" | "cleanup" | "world_tick";
 
 type AlarmSnapshot = Record<AlarmType, number | null>;
 
@@ -98,18 +118,34 @@ type StoredPlayer = {
   orientation: OrientationState;
   health: HealthState;
   combatStatus: CombatStatus;
+  combatAttributes: CombatAttributes;
   totalSessionDurationMs?: number;
   sessionCount?: number;
 };
 
-type StoredPlayerSnapshot = Omit<StoredPlayer, "position" | "movementVector" | "orientation" | "health" | "combatStatus"> &
-  Partial<Pick<StoredPlayer, "position" | "movementVector" | "orientation" | "health" | "combatStatus">>;
+type StoredPlayerSnapshot = Omit<
+  StoredPlayer,
+  "position" | "movementVector" | "orientation" | "health" | "combatStatus" | "combatAttributes"
+> &
+  Partial<
+    Pick<
+      StoredPlayer,
+      "position" | "movementVector" | "orientation" | "health" | "combatStatus" | "combatAttributes"
+    >
+  >;
 
 type PlayerInternal = StoredPlayer & {
   connected: boolean;
   lastActiveAt: number;
   lastSeenAt: number;
   connectedAt: number | null;
+};
+
+type ApplyPlayerActionResult = {
+  updatedPlayers: PlayerInternal[];
+  worldDiff?: SharedWorldStateDiff;
+  combatLog?: CombatLogEntry[];
+  scoresChanged?: boolean;
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -165,11 +201,25 @@ const cloneCombatStatusState = (status: CombatStatus): CombatStatus => ({
   lastAttackAt: status.lastAttackAt,
 });
 
-const createEmptyWorldState = (): SharedWorldState => ({
-  microorganisms: [],
-  organicMatter: [],
-  obstacles: [],
-  roomObjects: [],
+const DEFAULT_COMBAT_ATTRIBUTES: CombatAttributes = {
+  attack: 8,
+  defense: 4,
+  speed: 140,
+  range: 80,
+};
+
+const createCombatAttributes = (attributes?: CombatAttributes): CombatAttributes => ({
+  attack: attributes?.attack ?? DEFAULT_COMBAT_ATTRIBUTES.attack,
+  defense: attributes?.defense ?? DEFAULT_COMBAT_ATTRIBUTES.defense,
+  speed: attributes?.speed ?? DEFAULT_COMBAT_ATTRIBUTES.speed,
+  range: attributes?.range ?? DEFAULT_COMBAT_ATTRIBUTES.range,
+});
+
+const cloneCombatAttributes = (attributes: CombatAttributes): CombatAttributes => ({
+  attack: attributes.attack,
+  defense: attributes.defense,
+  speed: attributes.speed,
+  range: attributes.range,
 });
 
 const cloneWorldState = (world: SharedWorldState): SharedWorldState => ({
@@ -199,6 +249,142 @@ const cloneWorldState = (world: SharedWorldState): SharedWorldState => ({
   })),
 });
 
+const cloneMicroorganism = (entity: Microorganism): Microorganism => ({
+  ...entity,
+  position: cloneVector(entity.position),
+  movementVector: cloneVector(entity.movementVector),
+  orientation: cloneOrientation(entity.orientation),
+  health: cloneHealthState(entity.health),
+  attributes: { ...entity.attributes },
+});
+
+const cloneOrganicMatter = (matter: OrganicMatter): OrganicMatter => ({
+  ...matter,
+  position: cloneVector(matter.position),
+  nutrients: { ...matter.nutrients },
+});
+
+const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
+  microorganisms: [
+    {
+      id: "micro-alpha",
+      kind: "microorganism",
+      species: "bacillus",
+      position: { x: -200, y: -150 },
+      movementVector: { x: 1, y: 0 },
+      orientation: { angle: 0 },
+      health: { current: 40, max: 40 },
+      aggression: "neutral",
+      attributes: { speed: 40, damage: 6, resilience: 3 },
+    },
+    {
+      id: "micro-beta",
+      kind: "microorganism",
+      species: "amoeba",
+      position: { x: 220, y: 160 },
+      movementVector: { x: -0.6, y: 0.8 },
+      orientation: { angle: Math.PI / 2 },
+      health: { current: 55, max: 55 },
+      aggression: "hostile",
+      attributes: { speed: 50, damage: 9, resilience: 4 },
+    },
+    {
+      id: "micro-gamma",
+      kind: "microorganism",
+      species: "ciliate",
+      position: { x: 0, y: 260 },
+      movementVector: { x: 0, y: -1 },
+      orientation: { angle: Math.PI },
+      health: { current: 35, max: 35 },
+      aggression: "neutral",
+      attributes: { speed: 30, damage: 5, resilience: 2 },
+    },
+  ],
+  organicMatter: [
+    {
+      id: "organic-alpha",
+      kind: "organic_matter",
+      position: { x: 140, y: -120 },
+      quantity: 24,
+      nutrients: { carbon: 10, nitrogen: 4 },
+    },
+    {
+      id: "organic-beta",
+      kind: "organic_matter",
+      position: { x: -260, y: 200 },
+      quantity: 18,
+      nutrients: { carbon: 6 },
+    },
+    {
+      id: "organic-gamma",
+      kind: "organic_matter",
+      position: { x: 80, y: 40 },
+      quantity: 30,
+      nutrients: { phosphorus: 5 },
+    },
+  ],
+  obstacles: [
+    {
+      id: "obstacle-alpha",
+      kind: "obstacle",
+      position: { x: 0, y: 0 },
+      size: { x: 160, y: 120 },
+      impassable: true,
+    },
+    {
+      id: "obstacle-beta",
+      kind: "obstacle",
+      position: { x: -320, y: -200 },
+      size: { x: 100, y: 160 },
+      impassable: true,
+    },
+  ],
+  roomObjects: [],
+};
+
+const createInitialWorldState = (): SharedWorldState => cloneWorldState(INITIAL_WORLD_TEMPLATE);
+
+const PLAYER_SPAWN_POSITIONS: Vector2[] = [
+  { x: -360, y: -360 },
+  { x: 360, y: -360 },
+  { x: -360, y: 360 },
+  { x: 360, y: 360 },
+  { x: 0, y: -360 },
+  { x: 0, y: 360 },
+  { x: 360, y: 0 },
+  { x: -360, y: 0 },
+];
+
+const hashString = (value: string): number => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash;
+};
+
+const getSpawnPositionForPlayer = (playerId: string): Vector2 => {
+  const index = hashString(playerId) % PLAYER_SPAWN_POSITIONS.length;
+  const position = PLAYER_SPAWN_POSITIONS[index];
+  return { x: position.x, y: position.y };
+};
+
+const getDeterministicCombatAttributesForPlayer = (playerId: string): CombatAttributes => {
+  const hash = hashString(playerId);
+  const attackBonus = hash % 5;
+  const defenseBonus = Math.floor(hash / 5) % 4;
+  const speedBonus = Math.floor(hash / 17) % 5;
+  const rangeBonus = Math.floor(hash / 29) % 4;
+
+  return createCombatAttributes({
+    attack: DEFAULT_COMBAT_ATTRIBUTES.attack + attackBonus,
+    defense: DEFAULT_COMBAT_ATTRIBUTES.defense + defenseBonus,
+    speed: DEFAULT_COMBAT_ATTRIBUTES.speed + speedBonus * 8,
+    range: DEFAULT_COMBAT_ATTRIBUTES.range + rangeBonus * 6,
+  });
+};
+
 export class RoomDO {
   private readonly state: DurableObjectState;
   private readonly ready: Promise<void>;
@@ -219,7 +405,12 @@ export class RoomDO {
   private roundStartedAt: number | null = null;
   private roundEndsAt: number | null = null;
 
-  private world: SharedWorldState = createEmptyWorldState();
+  private world: SharedWorldState = createInitialWorldState();
+  private microorganisms = new Map<string, Microorganism>();
+  private organicMatter = new Map<string, OrganicMatter>();
+  private obstacles = new Map<string, Obstacle>();
+  private microorganismBehavior = new Map<string, { lastAttackAt: number }>();
+  private lastWorldTickAt: number | null = null;
 
   private alarmSchedule: Map<AlarmType, number> = new Map();
 
@@ -296,6 +487,9 @@ export class RoomDO {
         case "cleanup":
           await this.handleCleanupAlarm();
           break;
+        case "world_tick":
+          await this.handleWorldTickAlarm(now);
+          break;
       }
     }
 
@@ -355,6 +549,7 @@ export class RoomDO {
           orientation: createOrientation(stored.orientation),
           health: createHealthState(stored.health),
           combatStatus: createCombatStatusState(stored.combatStatus),
+          combatAttributes: createCombatAttributes(stored.combatAttributes),
           totalSessionDurationMs: stored.totalSessionDurationMs ?? 0,
           sessionCount: stored.sessionCount ?? 0
         };
@@ -370,6 +565,16 @@ export class RoomDO {
       }
     }
 
+    const storedWorld = await this.state.storage.get<SharedWorldState>(WORLD_KEY);
+    if (storedWorld) {
+      this.world = cloneWorldState(storedWorld);
+    } else {
+      this.world = createInitialWorldState();
+      await this.state.storage.put(WORLD_KEY, cloneWorldState(this.world));
+    }
+    this.rebuildWorldCaches();
+    this.lastWorldTickAt = Date.now();
+
     const storedAlarms = await this.state.storage.get<AlarmSnapshot>(ALARM_KEY);
     if (storedAlarms) {
       this.alarmSchedule = new Map(
@@ -377,7 +582,413 @@ export class RoomDO {
       );
     }
 
+    let alarmsModified = false;
+    if (!this.alarmSchedule.has("world_tick")) {
+      this.scheduleWorldTick(this.lastWorldTickAt);
+      alarmsModified = true;
+    }
+
+    if (alarmsModified) {
+      await this.persistAlarms();
+    }
+
     await this.syncAlarms();
+  }
+
+  private rebuildWorldCaches(): void {
+    this.microorganisms = new Map(this.world.microorganisms.map((entity) => [entity.id, entity]));
+    this.organicMatter = new Map(this.world.organicMatter.map((matter) => [matter.id, matter]));
+    this.obstacles = new Map(this.world.obstacles.map((obstacle) => [obstacle.id, obstacle]));
+    const now = Date.now();
+    this.microorganismBehavior.clear();
+    for (const microorganism of this.microorganisms.values()) {
+      this.microorganismBehavior.set(microorganism.id, { lastAttackAt: now });
+    }
+  }
+
+  private scheduleWorldTick(reference: number = Date.now()): void {
+    this.alarmSchedule.set("world_tick", reference + WORLD_TICK_INTERVAL_MS);
+  }
+
+  private clampPosition(position: Vector2): Vector2 {
+    return {
+      x: clamp(position.x, WORLD_BOUNDS.minX, WORLD_BOUNDS.maxX),
+      y: clamp(position.y, WORLD_BOUNDS.minY, WORLD_BOUNDS.maxY),
+    };
+  }
+
+  private isBlockedByObstacle(position: Vector2): boolean {
+    for (const obstacle of this.obstacles.values()) {
+      const halfWidth = obstacle.size.x / 2 + OBSTACLE_PADDING;
+      const halfHeight = obstacle.size.y / 2 + OBSTACLE_PADDING;
+      if (
+        Math.abs(position.x - obstacle.position.x) <= halfWidth &&
+        Math.abs(position.y - obstacle.position.y) <= halfHeight
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private distanceSquared(a: Vector2, b: Vector2): number {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return dx * dx + dy * dy;
+  }
+
+  private distance(a: Vector2, b: Vector2): number {
+    return Math.sqrt(this.distanceSquared(a, b));
+  }
+
+  private movePlayerDuringTick(player: PlayerInternal, deltaMs: number): boolean {
+    const movement = player.movementVector;
+    const magnitude = Math.sqrt(movement.x ** 2 + movement.y ** 2);
+    if (!Number.isFinite(magnitude) || magnitude === 0) {
+      return false;
+    }
+
+    const speed = Math.max(0, player.combatAttributes.speed);
+    if (speed <= 0) {
+      return false;
+    }
+
+    const normalizedX = movement.x / magnitude;
+    const normalizedY = movement.y / magnitude;
+    const distance = (speed * deltaMs) / 1000;
+    const candidate = this.clampPosition({
+      x: player.position.x + normalizedX * distance,
+      y: player.position.y + normalizedY * distance,
+    });
+
+    if (this.isBlockedByObstacle(candidate)) {
+      return false;
+    }
+
+    if (candidate.x === player.position.x && candidate.y === player.position.y) {
+      return false;
+    }
+
+    player.position = candidate;
+    return true;
+  }
+
+  private handleCollectionsDuringTick(
+    player: PlayerInternal,
+    worldDiff: SharedWorldStateDiff,
+    combatLog: CombatLogEntry[],
+    now: number
+  ): { playerUpdated: boolean; worldChanged: boolean; scoresChanged: boolean } {
+    const collectedEntries: { id: string; matter: OrganicMatter }[] = [];
+    for (const [id, matter] of this.organicMatter.entries()) {
+      const distance = this.distance(player.position, matter.position);
+      if (distance <= PLAYER_COLLECT_RADIUS) {
+        collectedEntries.push({ id, matter });
+      }
+    }
+
+    if (collectedEntries.length === 0) {
+      return { playerUpdated: false, worldChanged: false, scoresChanged: false };
+    }
+
+    const idSet = new Set(collectedEntries.map((entry) => entry.id));
+    for (const { id } of collectedEntries) {
+      this.organicMatter.delete(id);
+    }
+    this.world.organicMatter = this.world.organicMatter.filter((matter) => !idSet.has(matter.id));
+
+    const removedIds = collectedEntries.map((entry) => entry.id);
+    worldDiff.removeOrganicMatterIds = [
+      ...(worldDiff.removeOrganicMatterIds ?? []),
+      ...removedIds,
+    ];
+
+    let totalScore = 0;
+    for (const { matter } of collectedEntries) {
+      const awarded = Math.max(1, Math.round(matter.quantity));
+      totalScore += awarded;
+      combatLog.push({
+        timestamp: now,
+        attackerId: player.id,
+        targetKind: "organic_matter",
+        targetObjectId: matter.id,
+        damage: 0,
+        outcome: "collected",
+        remainingHealth: matter.quantity,
+        scoreAwarded: awarded,
+      });
+    }
+
+    if (totalScore > 0) {
+      player.score = Math.max(0, player.score + totalScore);
+    }
+
+    return {
+      playerUpdated: true,
+      worldChanged: true,
+      scoresChanged: totalScore > 0,
+    };
+  }
+
+  private resolvePlayerAttackDuringTick(
+    player: PlayerInternal,
+    now: number,
+    worldDiff: SharedWorldStateDiff,
+    combatLog: CombatLogEntry[],
+    updatedPlayers: Map<string, PlayerInternal>
+  ): { worldChanged: boolean; scoresChanged: boolean } {
+    let worldChanged = false;
+    let scoresChanged = false;
+
+    const status = player.combatStatus;
+    if (status.state !== "engaged") {
+      return { worldChanged, scoresChanged };
+    }
+
+    if (status.lastAttackAt && now - status.lastAttackAt < PLAYER_ATTACK_COOLDOWN_MS) {
+      return { worldChanged, scoresChanged };
+    }
+
+    if (status.targetPlayerId) {
+      const target = this.players.get(status.targetPlayerId);
+      if (!target) {
+        player.combatStatus = createCombatStatusState({ state: "idle" });
+        updatedPlayers.set(player.id, player);
+        return { worldChanged, scoresChanged };
+      }
+
+      const range = player.combatAttributes.range + PLAYER_ATTACK_RANGE_BUFFER;
+      const distance = this.distance(player.position, target.position);
+      if (distance > range) {
+        return { worldChanged, scoresChanged };
+      }
+
+      const baseDamage = Math.max(1, Math.round(player.combatAttributes.attack));
+      const mitigation = Math.max(0, Math.round(target.combatAttributes.defense / 3));
+      const damage = Math.max(1, baseDamage - mitigation);
+      const nextHealth = Math.max(0, target.health.current - damage);
+
+      target.health = {
+        current: nextHealth,
+        max: target.health.max,
+      };
+      player.combatStatus = createCombatStatusState({
+        state: "engaged",
+        targetPlayerId: target.id,
+        targetObjectId: null,
+        lastAttackAt: now,
+      });
+
+      updatedPlayers.set(player.id, player);
+      updatedPlayers.set(target.id, target);
+
+      const outcome = nextHealth === 0 ? "defeated" : "hit";
+      const scoreAwarded = outcome === "defeated" ? 150 : 10;
+      player.score = Math.max(0, player.score + scoreAwarded);
+      scoresChanged = true;
+
+      if (outcome === "defeated") {
+        target.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
+      }
+
+      combatLog.push({
+        timestamp: now,
+        attackerId: player.id,
+        targetId: target.id,
+        targetKind: "player",
+        damage,
+        outcome,
+        remainingHealth: nextHealth,
+        scoreAwarded,
+      });
+
+      return { worldChanged, scoresChanged };
+    }
+
+    if (status.targetObjectId) {
+      const objectId = status.targetObjectId;
+      const microorganism = this.microorganisms.get(objectId);
+
+      if (!microorganism) {
+        player.combatStatus = createCombatStatusState({ state: "idle" });
+        updatedPlayers.set(player.id, player);
+        return { worldChanged, scoresChanged };
+      }
+
+      const range = player.combatAttributes.range + PLAYER_ATTACK_RANGE_BUFFER;
+      const distance = this.distance(player.position, microorganism.position);
+      if (distance > range) {
+        return { worldChanged, scoresChanged };
+      }
+
+      const baseDamage = Math.max(1, Math.round(player.combatAttributes.attack));
+      const mitigation = Math.max(0, Math.round((microorganism.attributes.resilience ?? 0) / 2));
+      const damage = Math.max(1, baseDamage - mitigation);
+      const nextHealth = Math.max(0, microorganism.health.current - damage);
+
+      microorganism.health = {
+        current: nextHealth,
+        max: microorganism.health.max,
+      };
+
+      player.combatStatus = createCombatStatusState({
+        state: "engaged",
+        targetPlayerId: null,
+        targetObjectId: microorganism.id,
+        lastAttackAt: now,
+      });
+      updatedPlayers.set(player.id, player);
+
+      if (nextHealth === 0) {
+        this.microorganisms.delete(microorganism.id);
+        this.microorganismBehavior.delete(microorganism.id);
+        this.world.microorganisms = this.world.microorganisms.filter((entity) => entity.id !== microorganism.id);
+        worldDiff.removeMicroorganismIds = [
+          ...(worldDiff.removeMicroorganismIds ?? []),
+          microorganism.id,
+        ];
+        worldChanged = true;
+
+        const remainsId = `${microorganism.id}-remains`;
+        const remains: OrganicMatter = {
+          id: remainsId,
+          kind: "organic_matter",
+          position: cloneVector(microorganism.position),
+          quantity: Math.max(5, Math.round(microorganism.health.max / 2)),
+          nutrients: { residue: microorganism.health.max },
+        };
+        this.organicMatter.set(remains.id, remains);
+        this.world.organicMatter.push(remains);
+        worldDiff.upsertOrganicMatter = [
+          ...(worldDiff.upsertOrganicMatter ?? []),
+          cloneOrganicMatter(remains),
+        ];
+
+        const scoreAwarded = 120;
+        player.score = Math.max(0, player.score + scoreAwarded);
+        scoresChanged = true;
+
+        combatLog.push({
+          timestamp: now,
+          attackerId: player.id,
+          targetKind: "microorganism",
+          targetObjectId: microorganism.id,
+          damage,
+          outcome: "defeated",
+          remainingHealth: nextHealth,
+          scoreAwarded,
+        });
+      } else {
+        worldDiff.upsertMicroorganisms = [
+          ...(worldDiff.upsertMicroorganisms ?? []),
+          cloneMicroorganism(microorganism),
+        ];
+        combatLog.push({
+          timestamp: now,
+          attackerId: player.id,
+          targetKind: "microorganism",
+          targetObjectId: microorganism.id,
+          damage,
+          outcome: "hit",
+          remainingHealth: nextHealth,
+        });
+        worldChanged = true;
+      }
+
+      return { worldChanged, scoresChanged };
+    }
+
+    return { worldChanged, scoresChanged };
+  }
+
+  private updateMicroorganismsDuringTick(
+    deltaMs: number,
+    now: number,
+    worldDiff: SharedWorldStateDiff,
+    combatLog: CombatLogEntry[],
+    updatedPlayers: Map<string, PlayerInternal>
+  ): { worldChanged: boolean; scoresChanged: boolean } {
+    let worldChanged = false;
+    let scoresChanged = false;
+
+    for (const microorganism of this.microorganisms.values()) {
+      const movement = microorganism.movementVector;
+      const magnitude = Math.sqrt(movement.x ** 2 + movement.y ** 2);
+      if (Number.isFinite(magnitude) && magnitude > 0) {
+        const speed = Math.max(0, microorganism.attributes.speed ?? 30);
+        if (speed > 0) {
+          const normalizedX = movement.x / magnitude;
+          const normalizedY = movement.y / magnitude;
+          const distance = (speed * deltaMs) / 1000;
+          const candidate = this.clampPosition({
+            x: microorganism.position.x + normalizedX * distance,
+            y: microorganism.position.y + normalizedY * distance,
+          });
+          if (!this.isBlockedByObstacle(candidate)) {
+            microorganism.position = candidate;
+            worldDiff.upsertMicroorganisms = [
+              ...(worldDiff.upsertMicroorganisms ?? []),
+              cloneMicroorganism(microorganism),
+            ];
+            worldChanged = true;
+          }
+        }
+      }
+
+      if (microorganism.aggression !== "hostile") {
+        continue;
+      }
+
+      const behavior = this.microorganismBehavior.get(microorganism.id) ?? { lastAttackAt: 0 };
+      const cooldown = PLAYER_ATTACK_COOLDOWN_MS + 400;
+      if (behavior.lastAttackAt && now - behavior.lastAttackAt < cooldown) {
+        continue;
+      }
+
+      let closest: { player: PlayerInternal; distance: number } | null = null;
+      for (const player of this.players.values()) {
+        const distance = this.distance(player.position, microorganism.position);
+        if (!closest || distance < closest.distance) {
+          closest = { player, distance };
+        }
+      }
+
+      if (!closest) {
+        continue;
+      }
+
+      const attackRange = 100;
+      if (closest.distance > attackRange) {
+        continue;
+      }
+
+      const baseDamage = Math.max(1, Math.round(microorganism.attributes.damage ?? 6));
+      const mitigation = Math.max(0, Math.round(closest.player.combatAttributes.defense / 4));
+      const damage = Math.max(1, baseDamage - mitigation);
+      const nextHealth = Math.max(0, closest.player.health.current - damage);
+      closest.player.health = {
+        current: nextHealth,
+        max: closest.player.health.max,
+      };
+      updatedPlayers.set(closest.player.id, closest.player);
+      this.microorganismBehavior.set(microorganism.id, { lastAttackAt: now });
+
+      if (nextHealth === 0) {
+        closest.player.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
+      }
+
+      combatLog.push({
+        timestamp: now,
+        targetId: closest.player.id,
+        targetKind: "player",
+        targetObjectId: microorganism.id,
+        damage,
+        outcome: nextHealth === 0 ? "defeated" : "hit",
+        remainingHealth: nextHealth,
+      });
+    }
+
+    return { worldChanged, scoresChanged };
   }
 
   private async setupSession(socket: WebSocket): Promise<void> {
@@ -591,16 +1202,18 @@ export class RoomDO {
 
     if (!player) {
       const id = crypto.randomUUID();
+      const spawnPosition = this.clampPosition(getSpawnPositionForPlayer(id));
       player = {
         id,
         name: normalizedName,
         score: 0,
         combo: 1,
-        position: createVector(),
+        position: createVector(spawnPosition),
         movementVector: createVector(),
         orientation: createOrientation(),
         health: createHealthState(),
         combatStatus: createCombatStatusState(),
+        combatAttributes: getDeterministicCombatAttributesForPlayer(id),
         connected: true,
         lastActiveAt: now,
         lastSeenAt: now,
@@ -620,6 +1233,7 @@ export class RoomDO {
       player.lastSeenAt = now;
       player.lastActiveAt = now;
       player.connectedAt = now;
+      player.combatAttributes = createCombatAttributes(player.combatAttributes);
       this.players.set(player.id, player);
       this.nameToPlayerId.set(nameKey, player.id);
     }
@@ -736,33 +1350,51 @@ export class RoomDO {
       return;
     }
 
-    await this.persistPlayers();
+    if (result.updatedPlayers.length > 0 || result.scoresChanged) {
+      await this.persistPlayers();
+    }
 
-    const diff: SharedGameStateDiff = {
-      upsertPlayers: [this.serializePlayer(player)]
-    };
+    if (result.worldDiff) {
+      await this.persistWorld();
+    }
 
-    const stateMessage: StateDiffMessage = {
-      type: "state",
-      mode: "diff",
-      state: diff
-    };
+    const diff: SharedGameStateDiff = {};
+    if (result.updatedPlayers.length > 0) {
+      diff.upsertPlayers = result.updatedPlayers.map((playerState) => this.serializePlayer(playerState));
+    }
+    if (result.worldDiff) {
+      diff.world = result.worldDiff;
+    }
+    if (result.combatLog && result.combatLog.length > 0) {
+      diff.combatLog = result.combatLog;
+    }
 
-    this.broadcast(stateMessage);
+    if (Object.keys(diff).length > 0) {
+      const stateMessage: StateDiffMessage = {
+        type: "state",
+        mode: "diff",
+        state: diff
+      };
+      this.broadcast(stateMessage);
+    }
 
-    const rankingMessage: RankingMessage = {
-      type: "ranking",
-      ranking: this.getRanking()
-    };
+    if (result.scoresChanged) {
+      const rankingMessage: RankingMessage = {
+        type: "ranking",
+        ranking: this.getRanking()
+      };
 
-    this.broadcast(rankingMessage);
+      this.broadcast(rankingMessage);
+    }
   }
 
   private applyPlayerAction(
     player: PlayerInternal,
     action: PlayerAction,
     clientTime?: number
-  ): boolean {
+  ): ApplyPlayerActionResult | null {
+    const updatedPlayers: PlayerInternal[] = [];
+
     switch (action.type) {
       case "score": {
         const amount = clamp(Math.round(action.amount), -MAX_SCORE_DELTA, MAX_SCORE_DELTA);
@@ -771,14 +1403,18 @@ export class RoomDO {
             ? clamp(action.comboMultiplier, 1, MAX_COMBO_MULTIPLIER)
             : player.combo;
         const delta = amount * combo;
-        player.score = Math.max(0, player.score + delta);
+        if (delta !== 0) {
+          player.score = Math.max(0, player.score + delta);
+        }
         player.combo = combo;
-        return true;
+        updatedPlayers.push(player);
+        return { updatedPlayers, scoresChanged: delta !== 0 };
       }
       case "combo": {
         const multiplier = clamp(action.multiplier, 1, MAX_COMBO_MULTIPLIER);
         player.combo = multiplier;
-        return true;
+        updatedPlayers.push(player);
+        return { updatedPlayers };
       }
       case "ability": {
         const value =
@@ -788,16 +1424,60 @@ export class RoomDO {
         if (value !== 0) {
           player.score = Math.max(0, player.score + value);
         }
-        return true;
+        updatedPlayers.push(player);
+        return { updatedPlayers, scoresChanged: value !== 0 };
       }
       case "movement": {
-        player.position = cloneVector(action.position);
-        player.movementVector = cloneVector(action.movementVector);
+        const targetPosition = this.clampPosition(cloneVector(action.position));
+        const normalizedMovement = cloneVector(action.movementVector);
+        const magnitude = Math.sqrt(normalizedMovement.x ** 2 + normalizedMovement.y ** 2);
+        if (!Number.isFinite(magnitude)) {
+          return null;
+        }
+        if (magnitude > 1) {
+          normalizedMovement.x /= magnitude;
+          normalizedMovement.y /= magnitude;
+        }
+
+        if (!this.isBlockedByObstacle(targetPosition)) {
+          player.position = targetPosition;
+        } else {
+          player.position = this.clampPosition(player.position);
+          normalizedMovement.x = 0;
+          normalizedMovement.y = 0;
+        }
+
+        player.movementVector = normalizedMovement;
         player.orientation = cloneOrientation(action.orientation);
-        return true;
+        updatedPlayers.push(player);
+        return { updatedPlayers };
       }
       case "attack": {
-        const lastAttackAt = clientTime ?? Date.now();
+        const hasTargetPlayer = action.targetPlayerId !== undefined && action.targetPlayerId !== null;
+        const hasTargetObject = action.targetObjectId !== undefined && action.targetObjectId !== null;
+        if (!hasTargetPlayer && !hasTargetObject) {
+          return null;
+        }
+
+        if (hasTargetPlayer) {
+          const targetPlayer = this.players.get(action.targetPlayerId!);
+          if (!targetPlayer) {
+            return null;
+          }
+        }
+
+        if (hasTargetObject) {
+          const objectId = action.targetObjectId!;
+          if (
+            !this.microorganisms.has(objectId) &&
+            !this.organicMatter.has(objectId) &&
+            !this.obstacles.has(objectId)
+          ) {
+            return null;
+          }
+        }
+
+        const lastAttackAt = clientTime !== undefined ? Math.min(clientTime, Date.now()) : Date.now();
         player.combatStatus = createCombatStatusState({
           state: action.state ?? "engaged",
           targetPlayerId: action.targetPlayerId ?? null,
@@ -808,25 +1488,32 @@ export class RoomDO {
         if (action.resultingHealth) {
           player.health = createHealthState(action.resultingHealth);
         } else if (typeof action.damage === "number") {
-          const next = Math.max(0, player.health.current - action.damage);
+          const next = Math.max(0, player.health.current - Math.max(0, action.damage));
           player.health = {
             current: Math.max(0, Math.min(player.health.max, next)),
             max: player.health.max,
           };
         }
-        return true;
+
+        updatedPlayers.push(player);
+        return { updatedPlayers };
       }
       case "collect": {
+        if (!this.organicMatter.has(action.objectId) && !this.microorganisms.has(action.objectId)) {
+          return null;
+        }
+
         player.combatStatus = createCombatStatusState({
           state: "idle",
           targetPlayerId: null,
           targetObjectId: action.objectId,
           lastAttackAt: player.combatStatus.lastAttackAt,
         });
-        return true;
+        updatedPlayers.push(player);
+        return { updatedPlayers };
       }
       default:
-        return false;
+        return null;
     }
   }
 
@@ -949,6 +1636,122 @@ export class RoomDO {
     await this.cleanupInactivePlayers(Date.now());
   }
 
+  private async handleWorldTickAlarm(now: number): Promise<void> {
+    const scheduled = this.alarmSchedule.get("world_tick");
+    if (!scheduled) {
+      this.scheduleWorldTick(now);
+      return;
+    }
+
+    this.alarmSchedule.delete("world_tick");
+
+    const lastTick = this.lastWorldTickAt ?? now;
+    const deltaMs = Math.max(1, now - lastTick);
+    this.lastWorldTickAt = now;
+
+    const updatedPlayers = new Map<string, PlayerInternal>();
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    let worldChanged = false;
+    let scoresChanged = false;
+
+    for (const player of this.players.values()) {
+      if (this.movePlayerDuringTick(player, deltaMs)) {
+        updatedPlayers.set(player.id, player);
+      }
+
+      const collectionResult = this.handleCollectionsDuringTick(player, worldDiff, combatLog, now);
+      if (collectionResult.playerUpdated) {
+        updatedPlayers.set(player.id, player);
+      }
+      if (collectionResult.worldChanged) {
+        worldChanged = true;
+      }
+      if (collectionResult.scoresChanged) {
+        scoresChanged = true;
+      }
+
+      const attackResult = this.resolvePlayerAttackDuringTick(
+        player,
+        now,
+        worldDiff,
+        combatLog,
+        updatedPlayers
+      );
+      if (attackResult.worldChanged) {
+        worldChanged = true;
+      }
+      if (attackResult.scoresChanged) {
+        scoresChanged = true;
+      }
+    }
+
+    const microorganismResult = this.updateMicroorganismsDuringTick(
+      deltaMs,
+      now,
+      worldDiff,
+      combatLog,
+      updatedPlayers
+    );
+    if (microorganismResult.worldChanged) {
+      worldChanged = true;
+    }
+    if (microorganismResult.scoresChanged) {
+      scoresChanged = true;
+    }
+
+    const hasPlayerUpdates = updatedPlayers.size > 0;
+    const hasWorldDiff = Boolean(
+      worldDiff.upsertMicroorganisms?.length ||
+        worldDiff.removeMicroorganismIds?.length ||
+        worldDiff.upsertOrganicMatter?.length ||
+        worldDiff.removeOrganicMatterIds?.length ||
+        worldDiff.upsertObstacles?.length ||
+        worldDiff.removeObstacleIds?.length ||
+        worldDiff.upsertRoomObjects?.length ||
+        worldDiff.removeRoomObjectIds?.length
+    );
+    const hasCombatLog = combatLog.length > 0;
+
+    if (hasPlayerUpdates || scoresChanged) {
+      await this.persistPlayers();
+    }
+
+    if (hasWorldDiff || worldChanged) {
+      await this.persistWorld();
+    }
+
+    const diff: SharedGameStateDiff = {};
+    if (hasPlayerUpdates) {
+      diff.upsertPlayers = Array.from(updatedPlayers.values()).map((player) => this.serializePlayer(player));
+    }
+    if (hasWorldDiff) {
+      diff.world = worldDiff;
+    }
+    if (hasCombatLog) {
+      diff.combatLog = combatLog;
+    }
+
+    if (diff.upsertPlayers || diff.world || diff.combatLog) {
+      const stateMessage: StateDiffMessage = {
+        type: "state",
+        mode: "diff",
+        state: diff,
+      };
+      this.broadcast(stateMessage);
+    }
+
+    if (scoresChanged) {
+      const rankingMessage: RankingMessage = {
+        type: "ranking",
+        ranking: this.getRanking(),
+      };
+      this.broadcast(rankingMessage);
+    }
+
+    this.scheduleWorldTick(now);
+  }
+
   private async maybeStartGame(): Promise<void> {
     if (this.phase !== "waiting") {
       return;
@@ -1068,7 +1871,8 @@ export class RoomDO {
     this.roundId = null;
     this.roundStartedAt = null;
     this.roundEndsAt = null;
-    this.world = createEmptyWorldState();
+    this.world = createInitialWorldState();
+    this.rebuildWorldCaches();
 
     for (const player of this.players.values()) {
       player.combo = 1;
@@ -1080,6 +1884,12 @@ export class RoomDO {
     await this.syncAlarms();
 
     await this.persistPlayers();
+    await this.persistWorld();
+
+    this.lastWorldTickAt = Date.now();
+    this.scheduleWorldTick(this.lastWorldTickAt);
+    await this.persistAlarms();
+    await this.syncAlarms();
 
     const message: StateFullMessage = {
       type: "state",
@@ -1104,7 +1914,8 @@ export class RoomDO {
       movementVector: cloneVector(player.movementVector),
       orientation: cloneOrientation(player.orientation),
       health: cloneHealthState(player.health),
-      combatStatus: cloneCombatStatusState(player.combatStatus)
+      combatStatus: cloneCombatStatusState(player.combatStatus),
+      combatAttributes: cloneCombatAttributes(player.combatAttributes)
     };
   }
 
@@ -1310,10 +2121,15 @@ export class RoomDO {
       orientation: cloneOrientation(player.orientation),
       health: cloneHealthState(player.health),
       combatStatus: cloneCombatStatusState(player.combatStatus),
+      combatAttributes: cloneCombatAttributes(player.combatAttributes),
       totalSessionDurationMs: player.totalSessionDurationMs ?? 0,
       sessionCount: player.sessionCount ?? 0
     }));
     await this.state.storage.put(PLAYERS_KEY, snapshot);
+  }
+
+  private async persistWorld(): Promise<void> {
+    await this.state.storage.put(WORLD_KEY, cloneWorldState(this.world));
   }
 
   private async persistAlarms(): Promise<void> {
@@ -1321,7 +2137,8 @@ export class RoomDO {
       waiting_start: this.alarmSchedule.get("waiting_start") ?? null,
       round_end: this.alarmSchedule.get("round_end") ?? null,
       reset: this.alarmSchedule.get("reset") ?? null,
-      cleanup: this.alarmSchedule.get("cleanup") ?? null
+      cleanup: this.alarmSchedule.get("cleanup") ?? null,
+      world_tick: this.alarmSchedule.get("world_tick") ?? null
     };
     await this.state.storage.put(ALARM_KEY, serialized);
   }
