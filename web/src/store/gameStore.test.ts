@@ -4,9 +4,40 @@ import type {
   RankingEntry,
   SharedGameState,
   SharedGameStateDiff,
+  SharedPlayerState,
+  SharedWorldState,
 } from "../utils/messageTypes";
 
 const baseState = gameStore.getState();
+
+const createWorld = (): SharedWorldState => ({
+  microorganisms: [],
+  organicMatter: [],
+  obstacles: [],
+  roomObjects: [],
+});
+
+const createPlayerState = (
+  overrides: Partial<SharedPlayerState> & Pick<SharedPlayerState, "id" | "name">
+): SharedPlayerState => ({
+  id: overrides.id,
+  name: overrides.name,
+  connected: overrides.connected ?? true,
+  score: overrides.score ?? 0,
+  combo: overrides.combo ?? 1,
+  lastActiveAt: overrides.lastActiveAt ?? 0,
+  position: overrides.position ?? { x: 0, y: 0 },
+  movementVector: overrides.movementVector ?? { x: 0, y: 0 },
+  orientation: overrides.orientation ?? { angle: 0 },
+  health: overrides.health ?? { current: 100, max: 100 },
+  combatStatus:
+    overrides.combatStatus ?? {
+      state: "idle",
+      targetPlayerId: null,
+      targetObjectId: null,
+      lastAttackAt: null,
+    },
+});
 
 const createFreshState = (): GameStoreState => ({
   ...baseState,
@@ -21,6 +52,7 @@ const createFreshState = (): GameStoreState => ({
   joinError: null,
   lastPingAt: null,
   lastPongAt: null,
+  world: createWorld(),
 });
 
 beforeEach(() => {
@@ -29,21 +61,38 @@ beforeEach(() => {
 
 describe("gameStore", () => {
   it("applies full state snapshots and merges subsequent diffs", () => {
+    const microorganism = {
+      id: "micro-1",
+      kind: "microorganism" as const,
+      species: "amoeba",
+      position: { x: 1, y: 1 },
+      movementVector: { x: 0, y: 0 },
+      orientation: { angle: 0 },
+      health: { current: 4, max: 10 },
+      aggression: "neutral" as const,
+      attributes: {},
+    };
+
+    const fullWorld = createWorld();
+    fullWorld.microorganisms.push(microorganism);
+
     const fullState: SharedGameState = {
       phase: "active",
       roundId: "round-1",
       roundStartedAt: 1000,
       roundEndsAt: 2000,
       players: [
-        {
+        createPlayerState({
           id: "p1",
           name: "Alice",
-          connected: true,
           score: 10,
           combo: 1,
           lastActiveAt: 1000,
-        },
+          position: { x: 1, y: 1 },
+          health: { current: 95, max: 100 },
+        }),
       ],
+      world: fullWorld,
     };
 
     gameStore.actions.applyFullState(fullState);
@@ -57,18 +106,41 @@ describe("gameStore", () => {
     });
     expect(afterFull.players).toHaveProperty("p1");
     expect(afterFull.players.p1?.name).toBe("Alice");
+    expect(afterFull.world.microorganisms).toHaveLength(1);
+    expect(afterFull.world.microorganisms[0]).toMatchObject({ id: "micro-1", species: "amoeba" });
 
     const diff: SharedGameStateDiff = {
       upsertPlayers: [
-        {
+        createPlayerState({
           id: "p1",
           name: "Alice",
-          connected: true,
           score: 250,
           combo: 3,
           lastActiveAt: 1500,
-        },
+          position: { x: 5, y: 5 },
+          movementVector: { x: 1, y: 0 },
+          orientation: { angle: Math.PI / 2 },
+          health: { current: 80, max: 100 },
+          combatStatus: {
+            state: "engaged",
+            targetPlayerId: "p2",
+            targetObjectId: null,
+            lastAttackAt: 1500,
+          },
+        }),
       ],
+      world: {
+        upsertOrganicMatter: [
+          {
+            id: "om-1",
+            kind: "organic_matter" as const,
+            position: { x: 3, y: 4 },
+            quantity: 12,
+            nutrients: { protein: 5 },
+          },
+        ],
+        removeMicroorganismIds: ["micro-1"],
+      },
     };
 
     gameStore.actions.applyStateDiff(diff);
@@ -76,6 +148,17 @@ describe("gameStore", () => {
     const updated = gameStore.getState();
     expect(updated.players.p1?.score).toBe(250);
     expect(updated.players.p1?.combo).toBe(3);
+    expect(updated.players.p1?.combatStatus.state).toBe("engaged");
+    expect(updated.world.microorganisms).toHaveLength(0);
+    expect(updated.world.organicMatter).toEqual([
+      {
+        id: "om-1",
+        kind: "organic_matter",
+        position: { x: 3, y: 4 },
+        quantity: 12,
+        nutrients: { protein: 5 },
+      },
+    ]);
 
     gameStore.actions.applyStateDiff({ removedPlayerIds: ["p1"] });
     expect(gameStore.getState().players.p1).toBeUndefined();
@@ -88,6 +171,7 @@ describe("gameStore", () => {
       roundStartedAt: 10_000,
       roundEndsAt: 20_000,
       players: [],
+      world: createWorld(),
     };
 
     gameStore.actions.applyFullState(fullState);
