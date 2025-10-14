@@ -37,23 +37,48 @@ const createPlayerState = (
       targetObjectId: null,
       lastAttackAt: null,
     },
+  combatAttributes:
+    overrides.combatAttributes ?? {
+      attack: 1,
+      defense: 1,
+      speed: 1,
+      range: 1,
+    },
 });
 
-const createFreshState = (): GameStoreState => ({
-  ...baseState,
-  room: { ...baseState.room },
-  players: {},
-  ranking: [],
-  connectionStatus: "idle",
-  reconnectAttempts: 0,
-  reconnectUntil: null,
-  playerId: null,
-  playerName: null,
-  joinError: null,
-  lastPingAt: null,
-  lastPongAt: null,
-  world: createWorld(),
-});
+const createFreshState = (): GameStoreState => {
+  const emptyPlayers = { byId: {}, all: [] };
+  const emptyMicroorganisms = { byId: {}, all: [] };
+  const emptyOrganic = { byId: {}, all: [] };
+  const emptyObstacles = { byId: {}, all: [] };
+  const emptyRoomObjects = { byId: {}, all: [] };
+
+  return {
+    ...baseState,
+    room: { ...baseState.room },
+    players: emptyPlayers.byId,
+    remotePlayers: emptyPlayers,
+    ranking: [],
+    microorganisms: emptyMicroorganisms,
+    organicMatter: emptyOrganic,
+    obstacles: emptyObstacles,
+    roomObjects: emptyRoomObjects,
+    connectionStatus: "idle",
+    reconnectAttempts: 0,
+    reconnectUntil: null,
+    playerId: null,
+    playerName: null,
+    joinError: null,
+    lastPingAt: null,
+    lastPongAt: null,
+    world: {
+      microorganisms: emptyMicroorganisms.all,
+      organicMatter: emptyOrganic.all,
+      obstacles: emptyObstacles.all,
+      roomObjects: emptyRoomObjects.all,
+    },
+  };
+};
 
 beforeEach(() => {
   gameStore.setState(() => createFreshState());
@@ -106,8 +131,11 @@ describe("gameStore", () => {
     });
     expect(afterFull.players).toHaveProperty("p1");
     expect(afterFull.players.p1?.name).toBe("Alice");
+    expect(afterFull.remotePlayers.all).toHaveLength(1);
+    expect(afterFull.remotePlayers.byId.p1?.position).toEqual({ x: 1, y: 1 });
     expect(afterFull.world.microorganisms).toHaveLength(1);
     expect(afterFull.world.microorganisms[0]).toMatchObject({ id: "micro-1", species: "amoeba" });
+    expect(afterFull.microorganisms.all).toHaveLength(1);
 
     const diff: SharedGameStateDiff = {
       upsertPlayers: [
@@ -149,6 +177,8 @@ describe("gameStore", () => {
     expect(updated.players.p1?.score).toBe(250);
     expect(updated.players.p1?.combo).toBe(3);
     expect(updated.players.p1?.combatStatus.state).toBe("engaged");
+    expect(updated.remotePlayers.byId.p1?.movementVector).toEqual({ x: 1, y: 0 });
+    expect(updated.remotePlayers.all[0]?.orientation).toEqual({ angle: Math.PI / 2 });
     expect(updated.world.microorganisms).toHaveLength(0);
     expect(updated.world.organicMatter).toEqual([
       {
@@ -159,9 +189,12 @@ describe("gameStore", () => {
         nutrients: { protein: 5 },
       },
     ]);
+    expect(updated.microorganisms.all).toHaveLength(0);
+    expect(updated.organicMatter.all).toHaveLength(1);
 
     gameStore.actions.applyStateDiff({ removedPlayerIds: ["p1"] });
     expect(gameStore.getState().players.p1).toBeUndefined();
+    expect(gameStore.getState().remotePlayers.all).toHaveLength(0);
   });
 
   it("clears round metadata when diffs reset values", () => {
