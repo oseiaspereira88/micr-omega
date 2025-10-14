@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import type { DurableObjectState } from "@cloudflare/workers-types";
+import { describe, expect, it, vi } from "vitest";
+import type { DurableObjectState, WebSocket } from "@cloudflare/workers-types";
 
 import { RoomDO } from "../src/RoomDO";
 import type { Env } from "../src";
@@ -55,5 +55,62 @@ describe("RoomDO alarms", () => {
     expect(mockState.storageImpl.getPutCount("alarms")).toBe(1);
     const stored = mockState.storageImpl.data.get("alarms") as Record<string, number | null>;
     expect(stored).toMatchObject({ cleanup: expect.any(Number) });
+  });
+
+  it("pauses world ticks when everyone disconnects until a new player joins", async () => {
+    const { room } = await createRoom();
+    const roomAny = room as any;
+
+    const originalWebSocket = globalThis.WebSocket;
+    (globalThis as any).WebSocket = { OPEN: 1 };
+
+    try {
+      const firstSocket = {
+        readyState: 1,
+        send: vi.fn(),
+        close: vi.fn(),
+      } as unknown as WebSocket;
+
+      const firstPlayerId = await roomAny.handleJoin(firstSocket, {
+        type: "join",
+        name: "Alice",
+      });
+
+      expect(firstPlayerId).toBeTypeOf("string");
+      expect(roomAny.alarmSchedule.has("world_tick")).toBe(true);
+
+      roomAny.alarmSchedule.set("world_tick", Date.now() - 1);
+      await room.alarm();
+      expect(roomAny.alarmSchedule.has("world_tick")).toBe(true);
+
+      await roomAny.handleDisconnect(firstSocket, firstPlayerId);
+
+      roomAny.alarmSchedule.set("world_tick", Date.now() - 1);
+      await room.alarm();
+      expect(roomAny.alarmSchedule.has("world_tick")).toBe(false);
+
+      await room.alarm();
+      expect(roomAny.alarmSchedule.has("world_tick")).toBe(false);
+
+      const secondSocket = {
+        readyState: 1,
+        send: vi.fn(),
+        close: vi.fn(),
+      } as unknown as WebSocket;
+
+      const secondPlayerId = await roomAny.handleJoin(secondSocket, {
+        type: "join",
+        name: "Bob",
+      });
+
+      expect(secondPlayerId).toBeTypeOf("string");
+      expect(roomAny.alarmSchedule.has("world_tick")).toBe(true);
+    } finally {
+      if (originalWebSocket === undefined) {
+        delete (globalThis as any).WebSocket;
+      } else {
+        (globalThis as any).WebSocket = originalWebSocket;
+      }
+    }
   });
 });

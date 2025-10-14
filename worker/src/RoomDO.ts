@@ -638,8 +638,9 @@ export class RoomDO {
     }
 
     const startupNow = Date.now();
-    this.lastWorldTickAt = startupNow;
-    if (!this.alarmSchedule.has("world_tick")) {
+    const shouldRunWorldTick = this.shouldRunWorldTickLoop();
+    this.lastWorldTickAt = shouldRunWorldTick ? startupNow : null;
+    if (!this.alarmSchedule.has("world_tick") && shouldRunWorldTick) {
       // World ticks are transient and are rescheduled relative to "now" so they recover
       // immediately after a restart even though they are not persisted.
       this.scheduleWorldTick(startupNow);
@@ -696,7 +697,33 @@ export class RoomDO {
   }
 
   private scheduleWorldTick(reference: number = Date.now()): void {
-    this.alarmSchedule.set("world_tick", reference + WORLD_TICK_INTERVAL_MS);
+    if (!this.shouldRunWorldTickLoop()) {
+      this.cancelWorldTick();
+      return;
+    }
+
+    const desired = reference + WORLD_TICK_INTERVAL_MS;
+    const current = this.alarmSchedule.get("world_tick");
+    const nextTickAt = typeof current === "number" ? Math.min(current, desired) : desired;
+    if (typeof current === "number" && current === nextTickAt) {
+      return;
+    }
+
+    this.alarmSchedule.set("world_tick", nextTickAt);
+    this.commitWorldTickScheduleChange();
+  }
+
+  private cancelWorldTick(): void {
+    const removed = this.alarmSchedule.delete("world_tick");
+    this.lastWorldTickAt = null;
+    if (!removed) {
+      return;
+    }
+
+    this.commitWorldTickScheduleChange();
+  }
+
+  private commitWorldTickScheduleChange(): void {
     this.markAlarmsDirty();
     void this.syncAlarms().catch((error) => {
       this.observability.logError("alarm_sync_failed", error, {
@@ -1466,6 +1493,8 @@ export class RoomDO {
 
     this.broadcast(rankingMessage, socket);
 
+    this.scheduleWorldTick();
+
     await this.maybeStartGame();
 
     return player.id;
@@ -1832,7 +1861,16 @@ export class RoomDO {
 
   private async handleWorldTickAlarm(now: number): Promise<void> {
     const scheduled = this.alarmSchedule.get("world_tick");
-    if (!scheduled) {
+    if (!this.shouldRunWorldTickLoop()) {
+      if (scheduled !== undefined) {
+        this.cancelWorldTick();
+      } else {
+        this.lastWorldTickAt = null;
+      }
+      return;
+    }
+
+    if (scheduled === undefined) {
       this.scheduleWorldTick(now);
       return;
     }
@@ -2001,6 +2039,10 @@ export class RoomDO {
 
     this.broadcast(stateMessage);
 
+    const now = Date.now();
+    this.lastWorldTickAt = now;
+    this.scheduleWorldTick(now);
+
     const connectedPlayers = this.countConnectedPlayers();
     this.observability.log("info", "round_started", {
       roundId: this.roundId,
@@ -2014,6 +2056,7 @@ export class RoomDO {
 
   private async endGame(reason: "timeout" | "completed"): Promise<void> {
     this.phase = "ended";
+    this.cancelWorldTick();
     this.roundEndsAt = Date.now();
     this.alarmSchedule.delete("round_end");
     this.alarmSchedule.set("reset", Date.now() + RESET_DELAY_MS);
@@ -2071,8 +2114,14 @@ export class RoomDO {
 
     await this.flushSnapshots({ force: true });
 
-    this.lastWorldTickAt = Date.now();
-    this.scheduleWorldTick(this.lastWorldTickAt);
+    const now = Date.now();
+    if (this.shouldRunWorldTickLoop()) {
+      this.lastWorldTickAt = now;
+      this.scheduleWorldTick(now);
+    } else {
+      this.lastWorldTickAt = null;
+      this.cancelWorldTick();
+    }
 
     const message: StateFullMessage = {
       type: "state",
@@ -2353,6 +2402,13 @@ export class RoomDO {
     if (typeof nextTimestamp === "number") {
       await this.state.storage.setAlarm(nextTimestamp);
     }
+  }
+
+  private shouldRunWorldTickLoop(): boolean {
+    if (this.phase === "ended") {
+      return false;
+    }
+    return this.countConnectedPlayers() > 0;
   }
 
   private countConnectedPlayers(): number {
