@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -52,6 +53,11 @@ const StartScreen = ({
 
   const [inputValue, setInputValue] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const focusInput = useCallback(() => {
+    inputRef.current?.focus({ preventScroll: true });
+  }, []);
 
   useEffect(() => {
     if (storedName) {
@@ -82,6 +88,7 @@ const StartScreen = ({
 
       if (validation) {
         setLocalError(validation);
+        focusInput();
         return;
       }
 
@@ -90,6 +97,7 @@ const StartScreen = ({
         setLocalError(
           `Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos (letras, incluindo acentos, números, espaços, hífens ou sublinhados).`
         );
+        focusInput();
         return;
       }
 
@@ -105,7 +113,7 @@ const StartScreen = ({
 
       onStart({ name: sanitized, settings });
     },
-    [inputValue, onStart, settings, storedName]
+    [focusInput, inputValue, onStart, settings, storedName]
   );
 
   const handleInputChange = useCallback(
@@ -178,6 +186,7 @@ const StartScreen = ({
               className={`${styles.input} ${errorMessage ? styles.inputError : ""}`.trim()}
               value={inputValue}
               onChange={handleInputChange}
+              ref={inputRef}
               disabled={isConnecting}
               maxLength={MAX_NAME_LENGTH}
               autoComplete="nickname"
