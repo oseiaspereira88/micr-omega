@@ -1,9 +1,26 @@
 import { backgroundRenderer } from './backgroundRenderer.js';
 import { organismRenderer } from './organismRenderer.js';
 import { effectsRenderer } from './effectsRenderer.js';
+import { enemyRenderer } from './enemyRenderer.js';
 import { withCameraTransform } from './utils/cameraHelpers.js';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const mapMicroorganismsToEnemies = (microorganisms = []) =>
+  microorganisms.map((entity) => ({
+    id: entity.id,
+    x: entity.x,
+    y: entity.y,
+    size: entity.size,
+    color: entity.color,
+    coreColor: entity.coreColor ?? entity.color,
+    outerColor: entity.outerColor ?? entity.color,
+    shadowColor: entity.shadowColor ?? entity.outerColor ?? entity.color,
+    health: entity.health ?? entity.maxHealth ?? 0,
+    maxHealth: entity.maxHealth ?? entity.health ?? 0,
+    boss: Boolean(entity.boss),
+    animPhase: entity.animPhase ?? 0,
+  }));
 
 const renderWorldEntities = (ctx, worldView, camera) => {
   if (!ctx || !worldView || !camera) return;
@@ -102,6 +119,11 @@ export const renderFrame = (ctx, state, camera, assets = {}) => {
 
   backgroundRenderer.render(ctx, state.background, extendedCamera);
   renderWorldEntities(ctx, state.worldView, extendedCamera);
+  enemyRenderer.render(
+    ctx,
+    { enemies: mapMicroorganismsToEnemies(state.worldView?.microorganisms) },
+    extendedCamera
+  );
   organismRenderer.render(
     ctx,
     {

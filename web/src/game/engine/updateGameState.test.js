@@ -225,10 +225,16 @@ describe('updateGameState', () => {
       actionBuffer: { attacks: [] },
     });
 
-    expect(renderState.worldView.microorganisms[0]).toMatchObject({
+    const microorganism = renderState.worldView.microorganisms[0];
+    expect(microorganism).toMatchObject({
       id: 'micro-1',
       color: '#88c0ff',
+      health: 4,
+      maxHealth: 8,
     });
+    expect(typeof microorganism.coreColor).toBe('string');
+    expect(typeof microorganism.outerColor).toBe('string');
+    expect(typeof microorganism.shadowColor).toBe('string');
     expect(renderState.worldView.obstacles[0]).toMatchObject({ id: 'obstacle-1', width: 30, height: 60 });
     expect(renderState.combatIndicators).not.toHaveLength(0);
   });

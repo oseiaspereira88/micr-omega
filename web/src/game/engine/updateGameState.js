@@ -21,6 +21,42 @@ const SPECIES_COLORS = {
 
 const DEFAULT_SPECIES_COLOR = '#8fb8ff';
 
+const clampColorChannel = (value) => Math.min(255, Math.max(0, Math.round(value ?? 0)));
+
+const normalizeHexColor = (value) => {
+  if (typeof value !== 'string' || !value) return DEFAULT_SPECIES_COLOR;
+  return value.startsWith('#') ? value : `#${value}`;
+};
+
+const adjustHexColor = (hex, delta) => {
+  const normalized = normalizeHexColor(hex);
+  const match = /^#([0-9a-fA-F]{6})$/.exec(normalized);
+  if (!match) return normalized;
+
+  const [r, g, b] = [
+    parseInt(match[1].slice(0, 2), 16),
+    parseInt(match[1].slice(2, 4), 16),
+    parseInt(match[1].slice(4, 6), 16),
+  ];
+
+  const next = [r, g, b]
+    .map((channel) => clampColorChannel(channel + delta))
+    .map((channel) => channel.toString(16).padStart(2, '0'))
+    .join('');
+
+  return `#${next}`;
+};
+
+const createMicroorganismPalette = (baseColor) => {
+  const color = normalizeHexColor(baseColor ?? DEFAULT_SPECIES_COLOR);
+  return {
+    color,
+    coreColor: adjustHexColor(color, 24),
+    outerColor: color,
+    shadowColor: adjustHexColor(color, -40),
+  };
+};
+
 export const XP_DISTRIBUTION = {
   perDamage: 0.45,
   perObjective: 120,
@@ -416,6 +452,11 @@ const toEntityMap = (entities = []) => {
 const mapMicroorganisms = (entities = [], previous = new Map()) =>
   entities.map((entity) => {
     const prior = previous.get(entity.id);
+    const baseColor = SPECIES_COLORS[entity.species] ?? entity.color ?? DEFAULT_SPECIES_COLOR;
+    const { color, coreColor, outerColor, shadowColor } = createMicroorganismPalette(baseColor);
+    const maxHealth = Math.max(1, entity.health?.max ?? entity.health?.current ?? 1);
+    const health = Math.max(0, Math.min(maxHealth, entity.health?.current ?? maxHealth));
+
     return {
       id: entity.id,
       x: entity.position?.x ?? 0,
@@ -423,7 +464,13 @@ const mapMicroorganisms = (entities = [], previous = new Map()) =>
       vx: entity.movementVector?.x ?? 0,
       vy: entity.movementVector?.y ?? 0,
       size: Math.max(4, Math.sqrt(Math.max(1, entity.health?.max ?? 1)) * 2),
-      color: SPECIES_COLORS[entity.species] ?? DEFAULT_SPECIES_COLOR,
+      color,
+      coreColor,
+      outerColor,
+      shadowColor,
+      health,
+      maxHealth,
+      boss: Boolean(entity?.boss || entity?.tier === 'boss' || entity?.classification === 'boss'),
       opacity: 0.6,
       animPhase: prior ? prior.animPhase ?? 0 : Math.random() * Math.PI * 2,
       depth: 0.5,
