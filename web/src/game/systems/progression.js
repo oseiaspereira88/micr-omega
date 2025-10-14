@@ -1,20 +1,13 @@
 import { createInitialState } from '../state/initialState';
+import { smallEvolutions as defaultSmallEvolutions } from '../config/smallEvolutions';
+import { mediumEvolutions as defaultMediumEvolutions } from '../config/mediumEvolutions';
+import { majorEvolutions as defaultMajorEvolutions } from '../config/majorEvolutions';
 
 const BASE_REROLL_COST = 25;
 const REROLL_GROWTH_FACTOR = 1.6;
-const SMALL_EVOLUTION_POINT_COST = 1;
 const MEDIUM_SLOT_INTERVAL = 2;
 const LARGE_SLOT_INTERVAL = 5;
-
-const MEDIUM_EVOLUTION_COST = {
-  mg: 45,
-  fragments: { major: 1 },
-};
-
-const LARGE_EVOLUTION_COST = {
-  mg: 120,
-  stableGenes: { apex: 1 },
-};
+const SMALL_EVOLUTION_POINT_COST = 1;
 
 const getXpRequirementForLevel = (xpState = {}, level = 1) => {
   const thresholds = Array.isArray(xpState.thresholds) ? xpState.thresholds : [];
@@ -64,6 +57,20 @@ const ensureResourceReferences = (state) => {
     fragments: 0,
     stableGenes: 0,
   };
+
+  if (state.organism) {
+    state.organism.evolutionHistory = state.organism.evolutionHistory || {
+      small: {},
+      medium: {},
+      large: {},
+    };
+    state.organism.persistentPassives = state.organism.persistentPassives || {};
+    state.organism.unlockedEvolutionSlots = state.organism.unlockedEvolutionSlots || {
+      small: 0,
+      medium: 0,
+      large: 0,
+    };
+  }
 };
 
 const recalcPointsAndSlots = (state) => {
@@ -102,6 +109,21 @@ const recalcPointsAndSlots = (state) => {
 
   state.characteristicPoints = points;
   state.evolutionSlots = slots;
+
+  if (state.organism?.unlockedEvolutionSlots) {
+    state.organism.unlockedEvolutionSlots.small = Math.max(
+      state.organism.unlockedEvolutionSlots.small ?? 0,
+      slots.small.max ?? 0
+    );
+    state.organism.unlockedEvolutionSlots.medium = Math.max(
+      state.organism.unlockedEvolutionSlots.medium ?? 0,
+      slots.medium.max ?? 0
+    );
+    state.organism.unlockedEvolutionSlots.large = Math.max(
+      state.organism.unlockedEvolutionSlots.large ?? 0,
+      slots.large.max ?? 0
+    );
+  }
 };
 
 const pushTier = (state, tier) => {
@@ -165,32 +187,148 @@ const applyCost = (state, cost = {}) => {
   }
 };
 
-const buildTraitOptions = (state, helpers = {}) => {
-  const { pickRandomUnique, evolutionaryTraits } = helpers;
-  const traitPool = Object.keys(evolutionaryTraits || {});
-  const owned = new Set(state.organism?.traits || []);
-  const unused = traitPool.filter((key) => !owned.has(key));
-  const sourcePool = unused.length > 0 ? unused : traitPool;
-  const count = Math.min(3, sourcePool.length);
-  if (count <= 0) return [];
-  if (typeof pickRandomUnique === 'function') {
-    return pickRandomUnique(sourcePool, count) || sourcePool.slice(0, count);
-  }
-  return sourcePool.slice(0, count);
+const getEvolutionPool = (helpers = {}, tier = 'small') => {
+  if (tier === 'medium') return helpers.mediumEvolutions || defaultMediumEvolutions || {};
+  if (tier === 'large') return helpers.majorEvolutions || defaultMajorEvolutions || {};
+  return helpers.smallEvolutions || defaultSmallEvolutions || {};
 };
 
-const buildFormOptions = (state, helpers = {}) => {
-  const { pickRandomUnique, forms } = helpers;
-  const allForms = Object.keys(forms || {});
-  const currentForm = state.organism?.form;
-  const available = allForms.filter((formKey) => formKey !== currentForm);
-  const pool = available.length > 0 ? available : allForms;
-  const count = Math.min(3, pool.length);
-  if (count <= 0) return [];
-  if (typeof pickRandomUnique === 'function') {
-    return pickRandomUnique(pool, count) || pool.slice(0, count);
+const computeNextMultiplier = (entry = {}, purchases = 0) => {
+  const diminishing = Number.isFinite(entry.diminishing) ? entry.diminishing : 0.6;
+  const minimum = Number.isFinite(entry.minimumBonus) ? entry.minimumBonus : 0.2;
+  if (purchases <= 0) return 1;
+  return Math.max(minimum, diminishing ** purchases);
+};
+
+const getHistoryCount = (state, tier, key) => {
+  return state.organism?.evolutionHistory?.[tier]?.[key] ?? 0;
+};
+
+const meetsRequirements = (state, requirements = {}) => {
+  if (!requirements) return { met: true };
+  if (
+    Number.isFinite(requirements.level) &&
+    (state.level ?? 0) < requirements.level
+  ) {
+    return { met: false, reason: `Requer nível ${requirements.level}` };
   }
-  return pool.slice(0, count);
+  if (
+    Number.isFinite(requirements.mg) &&
+    (state.geneticMaterial?.current ?? 0) < requirements.mg
+  ) {
+    return { met: false, reason: 'MG insuficiente' };
+  }
+  if (requirements.fragments) {
+    const missingFragment = Object.entries(requirements.fragments).find(
+      ([key, amount]) => (state.geneFragments?.[key] ?? 0) < amount
+    );
+    if (missingFragment) {
+      const [key, amount] = missingFragment;
+      return { met: false, reason: `Fragmentos ${key}: ${amount}` };
+    }
+  }
+  if (requirements.stableGenes) {
+    const missingGene = Object.entries(requirements.stableGenes).find(
+      ([key, amount]) => (state.stableGenes?.[key] ?? 0) < amount
+    );
+    if (missingGene) {
+      const [key, amount] = missingGene;
+      return { met: false, reason: `Genes ${key}: ${amount}` };
+    }
+  }
+  return { met: true };
+};
+
+const describeCost = (cost = {}) => ({ ...cost });
+
+const buildEvolutionOptions = (state, helpers = {}, tier = 'small') => {
+  const pool = getEvolutionPool(helpers, tier);
+  const entries = Object.entries(pool || {});
+  if (entries.length === 0) return [];
+
+  const availableEntries = entries.filter(([key, entry]) => {
+    const purchases = getHistoryCount(state, tier, key);
+    if (entry.unique && purchases > 0) {
+      return false;
+    }
+    if (Number.isFinite(entry.maxPurchases) && purchases >= entry.maxPurchases) {
+      return false;
+    }
+    return true;
+  });
+
+  const sourcePool = availableEntries.length > 0 ? availableEntries : entries;
+  const keys = sourcePool.map(([key]) => key);
+  const count = Math.min(3, keys.length);
+  const pick =
+    typeof helpers.pickRandomUnique === 'function'
+      ? helpers.pickRandomUnique(keys, count) || keys.slice(0, count)
+      : keys.slice(0, count);
+
+  return pick.map((key) => {
+    const entry = pool[key];
+    const purchases = getHistoryCount(state, tier, key);
+    const requirementCheck = meetsRequirements(state, entry?.requirements);
+    const affordable = hasCost(state, entry?.cost);
+    const available = requirementCheck.met && affordable;
+    const reason = requirementCheck.met
+      ? affordable
+        ? null
+        : 'Recursos insuficientes'
+      : requirementCheck.reason;
+
+    return {
+      key,
+      tier,
+      name: entry?.name ?? key,
+      icon: entry?.icon ?? '🧬',
+      color: entry?.color ?? '#00D9FF',
+      cost: describeCost(entry?.cost),
+      requirements: entry?.requirements || {},
+      purchases,
+      available,
+      reason,
+      unique: Boolean(entry?.unique),
+      nextBonusMultiplier: computeNextMultiplier(entry, purchases),
+    };
+  });
+};
+
+const getEvolutionEntry = (helpers = {}, tier = 'small', key) => {
+  const pool = getEvolutionPool(helpers, tier);
+  return pool?.[key];
+};
+
+const registerEvolutionPurchase = (state, tier, key) => {
+  if (!state.organism) return;
+  state.organism.evolutionHistory = state.organism.evolutionHistory || {
+    small: {},
+    medium: {},
+    large: {},
+  };
+  const bucket = state.organism.evolutionHistory[tier] || {};
+  bucket[key] = (bucket[key] ?? 0) + 1;
+  state.organism.evolutionHistory[tier] = bucket;
+};
+
+const incrementSlotUsage = (state, tier) => {
+  if (!state.evolutionSlots) return;
+  if (tier === 'small') {
+    state.evolutionSlots.small.used = Math.min(
+      (state.evolutionSlots.small.used ?? 0) + 1,
+      state.evolutionSlots.small.max ?? Infinity
+    );
+  } else if (tier === 'medium') {
+    state.evolutionSlots.medium.used = Math.min(
+      (state.evolutionSlots.medium.used ?? 0) + 1,
+      state.evolutionSlots.medium.max ?? Infinity
+    );
+  } else if (tier === 'large') {
+    state.evolutionSlots.large.used = Math.min(
+      (state.evolutionSlots.large.used ?? 0) + 1,
+      state.evolutionSlots.large.max ?? Infinity
+    );
+  }
 };
 
 export const checkEvolution = (state, helpers = {}) => {
@@ -261,34 +399,28 @@ export const openEvolutionMenu = (state, helpers = {}) => {
   }
 
   const tier = queue.shift();
-  const cost =
-    tier === 'large'
-      ? { ...LARGE_EVOLUTION_COST }
-      : tier === 'medium'
-        ? { ...MEDIUM_EVOLUTION_COST }
-        : { pc: SMALL_EVOLUTION_POINT_COST };
+  const options = {
+    small: buildEvolutionOptions(state, helpers, 'small'),
+    medium: buildEvolutionOptions(state, helpers, 'medium'),
+    large: buildEvolutionOptions(state, helpers, 'large'),
+  };
+  const activeOptions = options[tier] || [];
 
-  if (!hasCost(state, cost)) {
-    helpers.addNotification?.(state, 'Recursos insuficientes para evoluir.');
-    queue.unshift(tier);
+  if (activeOptions.length === 0) {
+    helpers.addNotification?.(state, 'Nenhuma evolução disponível no momento.');
     state.canEvolve = false;
     return state;
   }
 
-  state.evolutionContext = { tier, cost };
-  state.evolutionType = tier === 'large' ? 'form' : 'skill';
+  state.evolutionContext = { tier };
+  state.evolutionType = 'evolution';
   state.showEvolutionChoice = true;
   state.canEvolve = false;
-  state.availableTraits = [];
-  state.availableForms = [];
-
-  if (state.evolutionType === 'skill') {
-    state.availableTraits = buildTraitOptions(state, helpers);
-    state.formReapplyNotice = false;
-  } else {
-    state.availableForms = buildFormOptions(state, helpers);
-    state.formReapplyNotice = (state.availableForms || []).every((form) => form === state.organism?.form);
-  }
+  state.evolutionMenu = {
+    activeTier: tier,
+    options,
+  };
+  state.currentForm = state.organism?.form ?? null;
 
   state.uiSyncTimer = 0;
   helpers.playSound?.('skill');
@@ -296,118 +428,72 @@ export const openEvolutionMenu = (state, helpers = {}) => {
   return state;
 };
 
-export const chooseTrait = (state, helpers = {}, traitKey) => {
+export const chooseEvolution = (state, helpers = {}, evolutionKey, forcedTier) => {
   if (!state) return state;
   ensureResourceReferences(state);
 
-  const { evolutionaryTraits, addNotification, syncState } = helpers;
-  const tier = state.evolutionContext?.tier ?? 'small';
-  const cost = state.evolutionContext?.cost ?? (tier === 'medium' ? MEDIUM_EVOLUTION_COST : { pc: SMALL_EVOLUTION_POINT_COST });
-  const trait = evolutionaryTraits?.[traitKey];
+  const tier = forcedTier || state.evolutionContext?.tier || state.evolutionMenu?.activeTier;
+  if (!tier) return state;
 
-  if (!trait || state.organism?.traits?.includes(traitKey)) {
+  const entry = getEvolutionEntry(helpers, tier, evolutionKey);
+  if (!entry) return state;
+
+  const purchases = getHistoryCount(state, tier, evolutionKey);
+  if (entry.unique && purchases > 0) {
+    helpers.addNotification?.(state, 'Evolução já adquirida.');
     return state;
   }
 
-  if (!hasCost(state, cost)) {
-    addNotification?.(state, 'Recursos insuficientes.');
+  if (Number.isFinite(entry.maxPurchases) && purchases >= entry.maxPurchases) {
+    helpers.addNotification?.(state, 'Limite de evolução atingido.');
     return state;
   }
 
-  applyCost(state, cost);
-
-  state.organism.traits = Array.isArray(state.organism.traits)
-    ? [...state.organism.traits, traitKey]
-    : [traitKey];
-  trait.effect?.(state.organism);
-  state.organism.size += 4;
-  state.organism.color = trait.color;
-  state.maxHealth = (state.maxHealth ?? 100) + 30;
-  state.health = state.maxHealth;
-
-  if (trait.skill && state.organism.skillCooldowns) {
-    if (state.organism.skillCooldowns[trait.skill] === undefined) {
-      state.organism.skillCooldowns[trait.skill] = 0;
-    }
+  const requirementCheck = meetsRequirements(state, entry.requirements);
+  if (!requirementCheck.met) {
+    helpers.addNotification?.(state, requirementCheck.reason || 'Requisitos não atendidos.');
+    return state;
   }
 
-  if (tier === 'small') {
-    state.evolutionSlots.small.used = Math.min(
-      (state.evolutionSlots.small.used ?? 0) + 1,
-      state.evolutionSlots.small.max ?? Infinity
-    );
-  } else {
-    state.evolutionSlots.medium.used = Math.min(
-      (state.evolutionSlots.medium.used ?? 0) + 1,
-      state.evolutionSlots.medium.max ?? Infinity
-    );
+  if (!hasCost(state, entry.cost)) {
+    helpers.addNotification?.(state, 'Recursos insuficientes.');
+    return state;
   }
+
+  applyCost(state, entry.cost);
+
+  const multiplier = computeNextMultiplier(entry, purchases);
+  entry.effect?.(state, {
+    entry,
+    previousPurchases: purchases,
+    multiplier,
+    helpers,
+  });
+
+  registerEvolutionPurchase(state, tier, evolutionKey);
+  incrementSlotUsage(state, tier);
 
   state.showEvolutionChoice = false;
-  state.availableTraits = [];
   state.evolutionContext = null;
+  state.evolutionMenu = {
+    activeTier: tier,
+    options: { small: [], medium: [], large: [] },
+  };
+  state.currentForm = state.organism?.form ?? null;
   state.reroll.cost = state.reroll.baseCost ?? BASE_REROLL_COST;
-  addNotification?.(state, `✨ ${trait.name}`);
+  state.reroll.count = 0;
   state.uiSyncTimer = 0;
-  syncState?.(state);
+
+  const queue = ensureQueue(state);
+  state.canEvolve = queue.length > 0;
+
+  helpers.addNotification?.(state, `✨ ${entry.name}`);
+  helpers.syncState?.(state);
   return state;
 };
 
-export const chooseForm = (state, helpers = {}, formKey) => {
-  if (!state) return state;
-  ensureResourceReferences(state);
-
-  const { forms, addNotification, syncState } = helpers;
-  const form = forms?.[formKey];
-  if (!form) return state;
-
-  const tier = state.evolutionContext?.tier ?? 'large';
-  const cost = state.evolutionContext?.cost ?? LARGE_EVOLUTION_COST;
-  if (!hasCost(state, cost)) {
-    addNotification?.(state, 'Recursos insuficientes.');
-    return state;
-  }
-
-  applyCost(state, cost);
-
-  const currentDefenseMultiplier = Number.isFinite(state.organism?.formDefenseMultiplier)
-    ? state.organism.formDefenseMultiplier
-    : 1;
-  const currentSpeedMultiplier = Number.isFinite(state.organism?.formSpeedMultiplier)
-    ? state.organism.formSpeedMultiplier
-    : 1;
-
-  const safeDefenseMultiplier = form.defense > 0 ? form.defense : 1;
-  const safeSpeedMultiplier = form.speed > 0 ? form.speed : 1;
-
-  const baseDefense = currentDefenseMultiplier > 0
-    ? state.organism.defense / currentDefenseMultiplier
-    : state.organism.defense;
-  const baseSpeed = currentSpeedMultiplier > 0
-    ? state.organism.speed / currentSpeedMultiplier
-    : state.organism.speed;
-
-  state.organism.form = formKey;
-  state.organism.formDefenseMultiplier = safeDefenseMultiplier;
-  state.organism.formSpeedMultiplier = safeSpeedMultiplier;
-  state.organism.defense = baseDefense * safeDefenseMultiplier;
-  state.organism.speed = baseSpeed * safeSpeedMultiplier;
-
-  state.evolutionSlots.large.used = Math.min(
-    (state.evolutionSlots.large.used ?? 0) + 1,
-    state.evolutionSlots.large.max ?? Infinity
-  );
-
-  state.showEvolutionChoice = false;
-  state.formReapplyNotice = false;
-  state.availableForms = [];
-  state.evolutionContext = null;
-  state.reroll.cost = state.reroll.baseCost ?? BASE_REROLL_COST;
-  addNotification?.(state, `✨ Forma ${form.name}!`);
-  state.uiSyncTimer = 0;
-  syncState?.(state);
-  return state;
-};
+export const chooseTrait = (state, helpers = {}, key) => chooseEvolution(state, helpers, key);
+export const chooseForm = (state, helpers = {}, key) => chooseEvolution(state, helpers, key, 'large');
 
 export const requestEvolutionReroll = (state, helpers = {}) => {
   if (!state || !state.showEvolutionChoice) return state;
@@ -432,11 +518,13 @@ export const requestEvolutionReroll = (state, helpers = {}) => {
   rerollState.pity += 1;
   state.reroll = rerollState;
 
-  if (state.evolutionType === 'skill') {
-    state.availableTraits = buildTraitOptions(state, helpers);
-  } else {
-    state.availableForms = buildFormOptions(state, helpers);
-  }
+  const tier = state.evolutionMenu?.activeTier || state.evolutionContext?.tier || 'small';
+  const updatedOptions = buildEvolutionOptions(state, helpers, tier);
+  const previous = state.evolutionMenu?.options || { small: [], medium: [], large: [] };
+  state.evolutionMenu = {
+    activeTier: tier,
+    options: { ...previous, [tier]: updatedOptions },
+  };
 
   state.uiSyncTimer = 0;
   helpers.playSound?.('reroll');
@@ -480,9 +568,15 @@ export const restartGame = (state, helpers = {}) => {
     uiSyncTimer: 0,
     activePowerUps: [],
     powerUps: [],
-    availableTraits: [],
-    availableForms: [],
-    formReapplyNotice: false,
+    evolutionMenu: {
+      activeTier: 'small',
+      options: {
+        small: [],
+        medium: [],
+        large: [],
+      },
+    },
+    currentForm: baseState.organism?.form ?? null,
     organicMatter: [],
     enemies: [],
     projectiles: [],

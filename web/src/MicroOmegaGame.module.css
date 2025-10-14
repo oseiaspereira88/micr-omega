@@ -59,40 +59,103 @@
   margin-bottom: 10px;
 }
 
-.traitCard {
-  padding: 12px;
+.evolutionTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.evolutionTab {
   border-radius: 10px;
-  cursor: pointer;
-}
-
-.formCard {
-  background: rgba(100, 100, 255, 0.2);
-  padding: 12px;
-  border-radius: 10px;
-  border: 2px solid #7b2fff;
-  cursor: pointer;
-}
-
-.formCardCurrent {
-  border-color: #00d9ff;
-  background: rgba(0, 217, 255, 0.15);
-}
-
-.formNotice {
-  font-size: 0.85rem;
-  margin: 0 0 8px;
+  padding: 10px;
+  border: 2px solid rgba(0, 217, 255, 0.2);
+  background: rgba(0, 217, 255, 0.05);
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.evolutionTabActive {
+  border-color: #00d9ff;
+  background: rgba(0, 217, 255, 0.12);
+  box-shadow: 0 0 12px rgba(0, 217, 255, 0.2);
+}
+
+.evolutionTabDisabled {
+  opacity: 0.6;
+}
+
+.evolutionTabHeader {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  font-weight: bold;
+  font-size: 0.95rem;
+}
+
+.evolutionTabHint,
+.evolutionTabSlots {
+  font-size: 0.75rem;
   color: #9ec7ff;
 }
 
-.formHint {
-  margin-top: 6px;
+.evolutionOption {
+  background: rgba(15, 25, 60, 0.6);
+  border: 2px solid rgba(0, 217, 255, 0.3);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.evolutionOption:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: #00d9ff;
+}
+
+.evolutionOptionDisabled,
+.evolutionOption:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.evolutionOptionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.evolutionOptionTitle {
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.evolutionOptionRepeat {
   font-size: 0.8rem;
   color: #9ec7ff;
 }
 
-.formTitle,
-.traitTitle {
-  font-size: 1rem;
-  font-weight: bold;
+.evolutionOptionRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.evolutionOptionLabel {
+  color: #9ec7ff;
+}
+
+.evolutionOptionNotice {
+  font-size: 0.75rem;
+  color: #ff9a9a;
+  text-align: center;
+  background: rgba(255, 0, 102, 0.2);
+  border-radius: 6px;
+  padding: 4px 6px;
 }

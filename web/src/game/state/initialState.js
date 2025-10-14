@@ -74,11 +74,16 @@ export const createInitialState = () => {
     comboTimer: 0,
 
     showEvolutionChoice: false,
-    evolutionType: 'skill',
+    evolutionType: 'evolution',
     notifications: [],
-    availableTraits: [],
-    availableForms: [],
-    formReapplyNotice: false,
+    evolutionMenu: {
+      activeTier: 'small',
+      options: {
+        small: [],
+        medium: [],
+        large: [],
+      },
+    },
     fogIntensity: 0,
     boss: null,
     bossPending: false,

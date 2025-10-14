@@ -1,6 +1,4 @@
 import React, { useCallback, useMemo, useRef } from 'react';
-
-import { forms, evolutionaryTraits } from '../config';
 import GameHud from '../../ui/components/GameHud';
 import GameOverScreen from '../../ui/components/GameOverScreen';
 import styles from '../../MicroOmegaGame.module.css';
@@ -13,7 +11,7 @@ const GameCanvas = ({ settings, onQuit }) => {
   const gameState = useGameState();
   const dispatch = useGameDispatch();
 
-  const { joystick, inputActions, chooseTrait, chooseForm, restartGame, setCameraZoom } = useGameLoop({
+  const { joystick, inputActions, chooseEvolution, restartGame, setCameraZoom } = useGameLoop({
     canvasRef,
     dispatch,
     settings,
@@ -79,10 +77,66 @@ const GameCanvas = ({ settings, onQuit }) => {
     );
   }
 
-  const traitOptions = gameState.availableTraits || [];
-  const formOptions = gameState.availableForms || [];
+  const evolutionMenu = gameState.evolutionMenu || {
+    activeTier: 'small',
+    options: { small: [], medium: [], large: [] },
+  };
   const currentForm = gameState.currentForm;
-  const formReapplyNotice = gameState.formReapplyNotice;
+
+  const tierMetadata = useMemo(
+    () => ({
+      small: {
+        label: 'Pequenas',
+        icon: '🧬',
+        description: 'Custam PC e focam em ajustes rápidos.',
+      },
+      medium: {
+        label: 'Médias',
+        icon: '🧫',
+        description: 'Usam MG + fragmentos para reforços profundos.',
+      },
+      large: {
+        label: 'Grandes',
+        icon: '🌌',
+        description: 'Formas e mutações poderosas com Genes estáveis.',
+      },
+    }),
+    []
+  );
+
+  const formatCost = useCallback((cost = {}) => {
+    const parts = [];
+    if (Number.isFinite(cost.pc)) parts.push(`${cost.pc} PC`);
+    if (Number.isFinite(cost.mg)) parts.push(`${cost.mg} MG`);
+    if (cost.fragments) {
+      Object.entries(cost.fragments).forEach(([key, amount]) => {
+        parts.push(`${amount} Frag ${key}`);
+      });
+    }
+    if (cost.stableGenes) {
+      Object.entries(cost.stableGenes).forEach(([key, amount]) => {
+        parts.push(`${amount} Gene ${key}`);
+      });
+    }
+    return parts.length > 0 ? parts.join(' · ') : 'Sem custo';
+  }, []);
+
+  const formatRequirements = useCallback((requirements = {}) => {
+    const parts = [];
+    if (Number.isFinite(requirements.level)) parts.push(`Nível ${requirements.level}`);
+    if (requirements.fragments) {
+      Object.entries(requirements.fragments).forEach(([key, amount]) => {
+        parts.push(`${amount} Frag ${key}`);
+      });
+    }
+    if (requirements.stableGenes) {
+      Object.entries(requirements.stableGenes).forEach(([key, amount]) => {
+        parts.push(`${amount} Gene ${key}`);
+      });
+    }
+    if (Number.isFinite(requirements.mg)) parts.push(`${requirements.mg} MG mínimo`);
+    return parts.length > 0 ? parts.join(' · ') : 'Nenhum requisito adicional';
+  }, []);
 
   return (
     <div className={styles.container}>
@@ -136,66 +190,88 @@ const GameCanvas = ({ settings, onQuit }) => {
           <div className={styles.evolutionCard}>
             <h2 className={styles.evolutionTitle}>🧬 Evolução Nível {gameState.level}</h2>
 
-            {gameState.evolutionType === 'skill' ? (
-              <>
-                <h3 className={styles.optionHeading}>Escolha uma Habilidade:</h3>
-                <div className={styles.optionList}>
-                  {traitOptions.map((traitKey) => {
-                    const trait = evolutionaryTraits[traitKey];
-                    if (!trait) return null;
+            <div className={styles.evolutionTabs}>
+              {(['small', 'medium', 'large']).map((tierKey) => {
+                const metadata = tierMetadata[tierKey];
+                const isActive = evolutionMenu.activeTier === tierKey;
+                const slots = gameState.evolutionSlots?.[tierKey] || { used: 0, max: 0 };
+                return (
+                  <div
+                    key={tierKey}
+                    className={`${styles.evolutionTab} ${isActive ? styles.evolutionTabActive : styles.evolutionTabDisabled}`.trim()}
+                  >
+                    <div className={styles.evolutionTabHeader}>
+                      <span>{metadata.icon}</span>
+                      <span>{metadata.label}</span>
+                    </div>
+                    <small className={styles.evolutionTabHint}>{metadata.description}</small>
+                    <small className={styles.evolutionTabSlots}>
+                      Slots {slots.used}/{slots.max}
+                    </small>
+                  </div>
+                );
+              })}
+            </div>
 
-                    return (
-                      <div
-                        key={traitKey}
-                        className={styles.traitCard}
-                        style={{
-                          background: `linear-gradient(90deg, ${trait.color}33, ${trait.color}11)`,
-                          border: `2px solid ${trait.color}`,
-                        }}
-                        onClick={() => chooseTrait(traitKey)}
-                      >
-                        <div className={styles.traitTitle} style={{ color: trait.color }}>
-                          {trait.icon} {trait.name}
-                        </div>
+            <div className={styles.optionHeading}>
+              {tierMetadata[evolutionMenu.activeTier]?.label || 'Evoluções'} disponíveis
+            </div>
+            <div className={styles.optionList}>
+              {(evolutionMenu.options?.[evolutionMenu.activeTier] || []).map((option) => {
+                const disabled = !option.available;
+                const multiplierPercent = Math.round((option.nextBonusMultiplier ?? 0) * 100);
+                const className = [
+                  styles.evolutionOption,
+                  disabled ? styles.evolutionOptionDisabled : '',
+                ]
+                  .join(' ')
+                  .trim();
+
+                const handleSelect = () => {
+                  if (disabled) return;
+                  chooseEvolution(option.key, option.tier);
+                };
+
+                return (
+                  <button
+                    type="button"
+                    key={option.key}
+                    className={className}
+                    onClick={handleSelect}
+                    disabled={disabled}
+                  >
+                    <div className={styles.evolutionOptionHeader}>
+                      <span className={styles.evolutionOptionTitle} style={{ color: option.color }}>
+                        {option.icon} {option.name}
+                      </span>
+                      <span className={styles.evolutionOptionRepeat}>
+                        Aquisições: {option.purchases}
+                      </span>
+                    </div>
+                    <div className={styles.evolutionOptionRow}>
+                      <span className={styles.evolutionOptionLabel}>Custo</span>
+                      <span>{formatCost(option.cost)}</span>
+                    </div>
+                    <div className={styles.evolutionOptionRow}>
+                      <span className={styles.evolutionOptionLabel}>Requisitos</span>
+                      <span>{formatRequirements(option.requirements)}</span>
+                    </div>
+                    <div className={styles.evolutionOptionRow}>
+                      <span className={styles.evolutionOptionLabel}>Próximo bônus</span>
+                      <span>{multiplierPercent}%</span>
+                    </div>
+                    {!option.available && option.reason && (
+                      <div className={styles.evolutionOptionNotice}>{option.reason}</div>
+                    )}
+                    {option.tier === 'large' && option.key === currentForm && (
+                      <div className={styles.evolutionOptionNotice}>
+                        Forma atual — benefício reduzido
                       </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <>
-                <h3 className={styles.optionHeading}>Escolha uma Forma:</h3>
-                {formReapplyNotice && (
-                  <p className={styles.formNotice}>
-                    Reaplicar a forma atual não concede bônus adicional.
-                  </p>
-                )}
-                <div className={styles.optionList}>
-                  {formOptions.map((formKey) => {
-                    const form = forms[formKey];
-                    if (!form) return null;
-
-                    const isCurrentForm = formKey === currentForm;
-                    const cardClassName = `${styles.formCard} ${isCurrentForm ? styles.formCardCurrent : ''}`;
-
-                    return (
-                      <div
-                        key={formKey}
-                        className={cardClassName.trim()}
-                        onClick={() => chooseForm(formKey)}
-                      >
-                        <div className={styles.formTitle}>
-                          {form.icon} {form.name}
-                        </div>
-                        {isCurrentForm && (
-                          <div className={styles.formHint}>Forma atual — sem bônus adicional</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

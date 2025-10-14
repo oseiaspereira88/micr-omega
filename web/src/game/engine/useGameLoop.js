@@ -455,8 +455,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   return {
     joystick,
     inputActions,
-    chooseTrait: () => {},
-    chooseForm: () => {},
+    chooseEvolution: () => {},
     restartGame: () => {},
     setCameraZoom,
   };

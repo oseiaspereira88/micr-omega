@@ -4,6 +4,7 @@ export { useSkill, cycleSkill } from './skills';
 export {
   checkEvolution,
   openEvolutionMenu,
+  chooseEvolution,
   chooseTrait,
   chooseForm,
   restartGame,

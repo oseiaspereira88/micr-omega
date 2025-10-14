@@ -28,10 +28,15 @@ const initialState = {
   skillList: [],
   hasMultipleSkills: false,
   notifications: [],
-  availableTraits: [],
-  availableForms: [],
+  evolutionMenu: {
+    activeTier: 'small',
+    options: {
+      small: [],
+      medium: [],
+      large: [],
+    },
+  },
   currentForm: null,
-  formReapplyNotice: false,
   evolutionType: null,
   cameraZoom: 1,
   opponents: [],

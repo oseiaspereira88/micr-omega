@@ -7,6 +7,9 @@ export const createOrganism = (overrides = {}) => {
     skills = [],
     skillCooldowns = {},
     resources: resourceOverrides,
+    evolutionHistory = {},
+    persistentPassives = {},
+    unlockedEvolutionSlots = {},
     ...rest
   } = overrides;
 
@@ -85,6 +88,17 @@ export const createOrganism = (overrides = {}) => {
     traits: [...traits],
     trail: [...trail],
     skills: [...skills],
-    skillCooldowns: { ...skillCooldowns }
+    skillCooldowns: { ...skillCooldowns },
+    evolutionHistory: {
+      small: { ...(evolutionHistory.small || {}) },
+      medium: { ...(evolutionHistory.medium || {}) },
+      large: { ...(evolutionHistory.large || {}) },
+    },
+    persistentPassives: { ...persistentPassives },
+    unlockedEvolutionSlots: {
+      small: unlockedEvolutionSlots.small ?? 0,
+      medium: unlockedEvolutionSlots.medium ?? 0,
+      large: unlockedEvolutionSlots.large ?? 0,
+    },
   };
 };
