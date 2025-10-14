@@ -21,7 +21,8 @@ const DEFAULT_BOSS_CONFIG = {
   color: '#FF3A6B',
   behavior: 'boss',
   state: 'aggressive',
-  canLeave: false
+  canLeave: false,
+  dropTier: 'boss'
 };
 
 export const spawnEnemy = ({

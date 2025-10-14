@@ -1,3 +1,5 @@
+import { DROP_TABLES } from '../config/enemyTemplates';
+
 const getRandom = (rng = Math.random) => (typeof rng === 'function' ? rng : Math.random);
 
 const clamp01 = (value) => {
@@ -351,6 +353,9 @@ export const createEnemyFromTemplate = (
 
   enemy.tier = overrides.tier ?? template.tier ?? 'common';
   enemy.variantOf = overrides.variantOf ?? template.variantOf ?? templateKey;
+  enemy.dropTier = overrides.dropTier ?? template.dropTier ?? 'minion';
+  const dropProfile = DROP_TABLES[enemy.dropTier] ?? DROP_TABLES.minion;
+  enemy.dropProfile = { ...dropProfile };
   enemy.abilities = mergeArraysUnique(template.abilities || [], overrides.abilities || []);
   enemy.resistances = combineResistances(template.resistances || {}, overrides.resistances || {});
   enemy.behaviorTraits = mergeBehaviorTraits(template.behaviorTraits || {}, overrides.behaviorTraits || {});
@@ -503,6 +508,9 @@ export const createBossEnemy = (
   };
 
   boss.energyReward = resolveNumericValue(boss.energyReward, defaults.energyReward);
+  boss.dropTier = overrides.dropTier ?? config.dropTier ?? 'boss';
+  const bossDropProfile = DROP_TABLES[boss.dropTier] ?? DROP_TABLES.boss ?? DROP_TABLES.minion;
+  boss.dropProfile = { ...bossDropProfile };
 
   return boss;
 };

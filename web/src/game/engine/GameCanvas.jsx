@@ -98,6 +98,15 @@ const GameCanvas = ({ settings, onQuit }) => {
         combo={gameState.combo}
         maxCombo={gameState.maxCombo}
         activePowerUps={gameState.activePowerUps}
+        xp={gameState.xp}
+        geneticMaterial={gameState.geneticMaterial}
+        characteristicPoints={gameState.characteristicPoints}
+        geneFragments={gameState.geneFragments}
+        stableGenes={gameState.stableGenes}
+        evolutionSlots={gameState.evolutionSlots}
+        reroll={gameState.reroll}
+        dropPity={gameState.dropPity}
+        recentRewards={gameState.recentRewards}
         bossActive={gameState.bossActive}
         bossHealth={gameState.bossHealth}
         bossMaxHealth={gameState.bossMaxHealth}

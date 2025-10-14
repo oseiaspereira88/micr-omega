@@ -1,7 +1,14 @@
 export { performDash, updateOrganismPhysics } from './movement';
 export { performAttack, updateEnemy } from './combat';
 export { useSkill, cycleSkill } from './skills';
-export { checkEvolution, openEvolutionMenu, chooseTrait, chooseForm, restartGame } from './progression';
+export {
+  checkEvolution,
+  openEvolutionMenu,
+  chooseTrait,
+  chooseForm,
+  restartGame,
+  requestEvolutionReroll,
+} from './progression';
 
 import { updateOrganismPhysics } from './movement';
 import { updateEnemy } from './combat';

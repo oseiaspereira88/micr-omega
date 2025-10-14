@@ -1,3 +1,66 @@
+export const ELEMENTAL_ADVANTAGE_MULTIPLIER = 1.25;
+export const ELEMENTAL_DISADVANTAGE_MULTIPLIER = 0.75;
+
+export const DROP_TABLES = {
+  minion: {
+    xp: { base: 24, variance: 0.2 },
+    geneticMaterial: { min: 2, max: 4 },
+    fragment: {
+      chance: 0.1,
+      min: 1,
+      max: 1,
+      pityThreshold: 5,
+      pityIncrement: 0.1,
+    },
+    stableGene: {
+      chance: 0.02,
+      amount: 1,
+      pityThreshold: 12,
+      pityIncrement: 0.05,
+    },
+    fragmentKey: 'minor',
+    stableKey: 'minor',
+  },
+  elite: {
+    xp: { base: 80, variance: 0.15 },
+    geneticMaterial: { min: 6, max: 10 },
+    fragment: {
+      chance: 0.22,
+      min: 1,
+      max: 2,
+      pityThreshold: 4,
+      pityIncrement: 0.12,
+    },
+    stableGene: {
+      chance: 0.08,
+      amount: 1,
+      pityThreshold: 6,
+      pityIncrement: 0.1,
+    },
+    fragmentKey: 'major',
+    stableKey: 'major',
+  },
+  boss: {
+    xp: { base: 260, variance: 0.1 },
+    geneticMaterial: { min: 20, max: 32 },
+    fragment: {
+      chance: 0.55,
+      min: 3,
+      max: 5,
+      pityThreshold: 2,
+      pityIncrement: 0.2,
+    },
+    stableGene: {
+      chance: 0.35,
+      amount: 1,
+      pityThreshold: 3,
+      pityIncrement: 0.25,
+    },
+    fragmentKey: 'apex',
+    stableKey: 'apex',
+  },
+};
+
 const mergeBehaviorTraits = (base = {}, addition = {}) => {
   const merged = { ...base };
   Object.entries(addition || {}).forEach(([key, value]) => {
@@ -31,6 +94,7 @@ const baseTemplates = {
     behavior: 'aggressive',
     points: 100,
     tier: 'common',
+    dropTier: 'minion',
     abilities: ['viral_dash'],
     resistances: { bio: 0.1 },
     behaviorTraits: {
@@ -88,6 +152,7 @@ const baseTemplates = {
     behavior: 'territorial',
     points: 150,
     tier: 'common',
+    dropTier: 'minion',
     abilities: ['corrosive_aura'],
     resistances: { acid: 0.15 },
     behaviorTraits: {
@@ -149,6 +214,7 @@ const baseTemplates = {
     behavior: 'opportunist',
     points: 120,
     tier: 'common',
+    dropTier: 'minion',
     abilities: ['drain_bite'],
     resistances: { bio: 0.05, electric: -0.05 },
     behaviorTraits: {
@@ -204,6 +270,7 @@ const baseTemplates = {
     behavior: 'hunter',
     points: 300,
     tier: 'rare',
+    dropTier: 'elite',
     abilities: ['razor_charge'],
     resistances: { kinetic: 0.1 },
     behaviorTraits: {
@@ -277,6 +344,7 @@ const createVariant = (baseKey, overrides = {}) => {
     ...base,
     ...overrides,
     tier: overrides.tier ?? base.tier ?? 'variant',
+    dropTier: overrides.dropTier ?? base.dropTier ?? 'minion',
     variantOf: baseKey,
     abilities,
     resistances,
@@ -294,6 +362,7 @@ export const enemyTemplates = {
   virus_elite: createVariant('virus', {
     name: 'Vírus Élite',
     tier: 'elite',
+    dropTier: 'elite',
     baseAttack: 10,
     points: 180,
     abilities: ['acid_surge'],
@@ -320,6 +389,7 @@ export const enemyTemplates = {
   virus_prime: createVariant('virus', {
     name: 'Vírus Prime',
     tier: 'mythic',
+    dropTier: 'elite',
     baseAttack: 12,
     points: 260,
     abilities: ['neuroburst'],
@@ -346,6 +416,7 @@ export const enemyTemplates = {
   bacteria_elite: createVariant('bacteria', {
     name: 'Bactéria Guardiã',
     tier: 'elite',
+    dropTier: 'elite',
     baseDefense: 6,
     points: 220,
     abilities: ['fortified_shell'],
@@ -370,6 +441,7 @@ export const enemyTemplates = {
   bacteria_colossus: createVariant('bacteria', {
     name: 'Bactéria Colosso',
     tier: 'legendary',
+    dropTier: 'elite',
     baseSize: 32,
     points: 320,
     abilities: ['spore_wall'],
@@ -404,6 +476,7 @@ export const enemyTemplates = {
   parasite_stalker: createVariant('parasite', {
     name: 'Parasita Caçador',
     tier: 'elite',
+    dropTier: 'elite',
     baseSpeed: 3.2,
     points: 200,
     abilities: ['shadow_step'],
@@ -430,6 +503,7 @@ export const enemyTemplates = {
   parasite_symbiote: createVariant('parasite', {
     name: 'Parasita Simbionte',
     tier: 'legendary',
+    dropTier: 'elite',
     baseAttack: 8,
     points: 260,
     abilities: ['symbiotic_link'],
@@ -465,6 +539,7 @@ export const enemyTemplates = {
   predator_alpha: createVariant('predator', {
     name: 'Predador Alfa',
     tier: 'elite',
+    dropTier: 'elite',
     baseAttack: 24,
     points: 380,
     abilities: ['alpha_howl'],
@@ -492,6 +567,7 @@ export const enemyTemplates = {
   predator_matriarch: createVariant('predator', {
     name: 'Predadora Matriarca',
     tier: 'legendary',
+    dropTier: 'elite',
     baseDefense: 12,
     points: 460,
     abilities: ['matriarch_roar'],

@@ -1,11 +1,30 @@
+import { ensureResourceProfile } from '../state/resourceProfile';
+
 export const createOrganism = (overrides = {}) => {
   const {
     traits = [],
     trail = [],
     skills = [],
     skillCooldowns = {},
+    resources: resourceOverrides,
     ...rest
   } = overrides;
+
+  const resources = ensureResourceProfile(resourceOverrides);
+  const {
+    xp = { current: 0, next: 120, total: 0, level: 1 },
+    characteristicPoints = { total: 0, available: 0, spent: 0, perLevel: [] },
+    geneticMaterial = { current: 0, total: 0, bonus: 0 },
+    geneFragments = { minor: 0, major: 0, apex: 0 },
+    stableGenes = { minor: 0, major: 0, apex: 0 },
+    evolutionSlots = {
+      small: { used: 0, max: 0 },
+      medium: { used: 0, max: 0 },
+      large: { used: 0, max: 0 },
+    },
+    reroll = { baseCost: 25, cost: 25, count: 0, pity: 0 },
+    dropPity = { fragment: 0, stableGene: 0 },
+  } = resources;
 
   const defaults = {
     x: 2000,
@@ -48,7 +67,16 @@ export const createOrganism = (overrides = {}) => {
     dying: false,
     deathTimer: 0,
     hasShieldPowerUp: false,
-    invulnerableFromPowerUp: false
+    invulnerableFromPowerUp: false,
+    resources,
+    xp,
+    characteristicPoints,
+    geneticMaterial,
+    geneFragments,
+    stableGenes,
+    evolutionSlots,
+    reroll,
+    dropPity,
   };
 
   return {
