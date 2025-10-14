@@ -1714,8 +1714,15 @@ export class RoomDO {
   }
 
   private async handleDisconnect(socket: WebSocket, playerId: string): Promise<void> {
+    this.clientsBySocket.delete(socket);
+
     const player = this.players.get(playerId);
     if (!player) {
+      return;
+    }
+
+    const activeSocket = this.socketsByPlayer.get(playerId);
+    if (activeSocket && activeSocket !== socket) {
       return;
     }
 

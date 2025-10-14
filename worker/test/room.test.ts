@@ -90,4 +90,83 @@ describe("RoomDO", () => {
       await mf.dispose();
     }
   });
+
+  it("keeps the player connected when a stale socket closes", async () => {
+    const mf = await createMiniflare();
+    try {
+      const firstSocket = await openSocket(mf);
+      const joinedPromise = onceMessage<{
+        type: string;
+        playerId: string;
+      }>(firstSocket, "joined");
+
+      firstSocket.send(
+        JSON.stringify({
+          type: "join",
+          name: "Alice",
+        })
+      );
+
+      const joined = await joinedPromise;
+
+      const secondSocket = await openSocket(mf);
+      const secondJoinedPromise = onceMessage<{
+        type: string;
+        playerId: string;
+      }>(secondSocket, "joined");
+
+      secondSocket.send(
+        JSON.stringify({
+          type: "join",
+          name: "Alice",
+          playerId: joined.playerId,
+        })
+      );
+
+      await secondJoinedPromise;
+
+      const receivedMessages: MessagePayload[] = [];
+      const onMessage = (event: MessageEvent) => {
+        const data = typeof event.data === "string" ? event.data : String(event.data);
+        receivedMessages.push(JSON.parse(data) as MessagePayload);
+      };
+      secondSocket.addEventListener("message", onMessage as EventListener);
+
+      firstSocket.close();
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      secondSocket.removeEventListener("message", onMessage as EventListener);
+
+      const disconnectDiffReceived = receivedMessages.some((message) => {
+        if (message.type !== "state") {
+          return false;
+        }
+        const diff = message as {
+          mode?: string;
+          state?: { upsertPlayers?: { id: string; connected?: boolean }[] };
+        };
+        if (diff.mode !== "diff") {
+          return false;
+        }
+        const players = diff.state?.upsertPlayers ?? [];
+        return players.some((player) => player.id === joined.playerId && player.connected === false);
+      });
+
+      expect(disconnectDiffReceived).toBe(false);
+
+      const pongPromise = onceMessage<{ type: string }>(secondSocket, "pong");
+      secondSocket.send(
+        JSON.stringify({
+          type: "ping",
+          ts: Date.now(),
+        })
+      );
+      const pong = await pongPromise;
+      expect(pong.type).toBe("pong");
+
+      secondSocket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
 });
