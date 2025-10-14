@@ -1,0 +1,141 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(0, 40, 60, 0.9), rgba(0, 0, 0, 0.95));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1100;
+}
+
+.dialog {
+  width: min(960px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: rgba(12, 18, 40, 0.92);
+  border: 2px solid rgba(0, 217, 255, 0.4);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 0 80px rgba(0, 217, 255, 0.3);
+}
+
+.title {
+  font-size: 1.75rem;
+  margin: 0 0 8px 0;
+  text-align: center;
+  background: linear-gradient(90deg, #00d9ff, #8bea7c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  margin: 0 0 18px 0;
+  text-align: center;
+  color: rgba(210, 235, 255, 0.85);
+  font-size: 0.95rem;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.card {
+  background: rgba(10, 20, 45, 0.85);
+  border: 2px solid transparent;
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  color: #f8fbff;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(0, 217, 255, 0.5);
+  box-shadow: 0 12px 30px rgba(0, 217, 255, 0.18);
+}
+
+.cardSelected {
+  border-color: rgba(139, 234, 124, 0.8);
+  box-shadow: 0 0 24px rgba(139, 234, 124, 0.35);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cardIcon {
+  font-size: 2rem;
+}
+
+.cardTitleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardTitle {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.cardAffinity {
+  font-size: 0.85rem;
+  color: rgba(179, 215, 255, 0.85);
+}
+
+.description {
+  font-size: 0.9rem;
+  color: rgba(210, 235, 255, 0.8);
+  margin: 0;
+}
+
+.statLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 0.85rem;
+  color: rgba(240, 255, 255, 0.85);
+}
+
+.sectionLabel {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(0, 217, 255, 0.8);
+}
+
+.passiveList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: rgba(210, 235, 255, 0.85);
+}
+
+.skillList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.skillBadge {
+  background: rgba(0, 217, 255, 0.15);
+  border: 1px solid rgba(0, 217, 255, 0.35);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  color: rgba(210, 235, 255, 0.9);
+}

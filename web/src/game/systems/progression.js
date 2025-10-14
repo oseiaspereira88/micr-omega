@@ -1,3 +1,4 @@
+import { applyArchetypeToState, archetypes } from '../config/archetypes';
 import { createInitialState } from '../state/initialState';
 import { smallEvolutions as defaultSmallEvolutions } from '../config/smallEvolutions';
 import { mediumEvolutions as defaultMediumEvolutions } from '../config/mediumEvolutions';
@@ -57,6 +58,7 @@ const ensureResourceReferences = (state) => {
     fragments: 0,
     stableGenes: 0,
   };
+  state.macroEvolutionSlots = state.macroEvolutionSlots || { used: 0, max: 0 };
 
   if (state.organism) {
     state.organism.evolutionHistory = state.organism.evolutionHistory || {
@@ -109,6 +111,14 @@ const recalcPointsAndSlots = (state) => {
 
   state.characteristicPoints = points;
   state.evolutionSlots = slots;
+
+  const macroSlots = state.macroEvolutionSlots || { used: 0, max: 0 };
+  macroSlots.max = Math.max(
+    macroSlots.max ?? 0,
+    Math.floor(state.level / LARGE_SLOT_INTERVAL)
+  );
+  macroSlots.used = Math.min(macroSlots.used ?? 0, macroSlots.max ?? macroSlots.used ?? 0);
+  state.macroEvolutionSlots = macroSlots;
 
   if (state.organism?.unlockedEvolutionSlots) {
     state.organism.unlockedEvolutionSlots.small = Math.max(
@@ -204,6 +214,43 @@ const getHistoryCount = (state, tier, key) => {
   return state.organism?.evolutionHistory?.[tier]?.[key] ?? 0;
 };
 
+export const selectArchetype = (state, helpers = {}, archetypeKey) => {
+  if (!state) return state;
+
+  const normalizedKey = typeof archetypeKey === 'string' ? archetypeKey.trim() : '';
+  if (!normalizedKey) {
+    helpers.addNotification?.(state, 'Seleção de arquétipo inválida.');
+    return state;
+  }
+
+  const entry = archetypes[normalizedKey];
+  if (!entry) {
+    helpers.addNotification?.(state, 'Arquétipo indisponível.');
+    return state;
+  }
+
+  ensureResourceReferences(state);
+  applyArchetypeToState(state, entry.key);
+  state.health = state.maxHealth;
+  state.energy = Math.max(0, state.energy ?? 0);
+  state.archetypeSelection = {
+    pending: false,
+    options: Object.keys(archetypes),
+  };
+
+  if (state.organism) {
+    state.organism.evolutionHistory = state.organism.evolutionHistory || {
+      small: {},
+      medium: {},
+      large: {},
+    };
+  }
+
+  helpers.addNotification?.(state, `🌱 Arquétipo selecionado: ${entry.name}`);
+  helpers.syncState?.(state);
+  return state;
+};
+
 const meetsRequirements = (state, requirements = {}) => {
   if (!requirements) return { met: true };
   if (
@@ -290,6 +337,10 @@ const buildEvolutionOptions = (state, helpers = {}, tier = 'small') => {
       reason,
       unique: Boolean(entry?.unique),
       nextBonusMultiplier: computeNextMultiplier(entry, purchases),
+      macro: Boolean(entry?.macro),
+      macroRewardPc: entry?.macroProfile?.rewardPc ?? 0,
+      affinityOptions: entry?.macroProfile?.affinityOptions || [],
+      subforms: entry?.macroProfile?.subforms || [],
     };
   });
 };
@@ -473,6 +524,28 @@ export const chooseEvolution = (state, helpers = {}, evolutionKey, forcedTier) =
   registerEvolutionPurchase(state, tier, evolutionKey);
   incrementSlotUsage(state, tier);
 
+  if (entry.macro) {
+    state.macroEvolutionSlots = state.macroEvolutionSlots || { used: 0, max: 0 };
+    state.macroEvolutionSlots.used = Math.min(
+      (state.macroEvolutionSlots.used ?? 0) + 1,
+      state.macroEvolutionSlots.max ?? Infinity
+    );
+
+    if (!Array.isArray(state.organism?.macroEvolutions)) {
+      state.organism.macroEvolutions = [];
+    }
+    if (!state.organism.macroEvolutions.includes(evolutionKey)) {
+      state.organism.macroEvolutions.push(evolutionKey);
+    }
+
+    const rewardPc = entry.macroProfile?.rewardPc;
+    if (Number.isFinite(rewardPc) && state.characteristicPoints) {
+      state.characteristicPoints.total = (state.characteristicPoints.total ?? 0) + rewardPc;
+      state.characteristicPoints.available =
+        (state.characteristicPoints.available ?? 0) + rewardPc;
+    }
+  }
+
   state.showEvolutionChoice = false;
   state.evolutionContext = null;
   state.evolutionMenu = {
@@ -546,17 +619,19 @@ export const restartGame = (state, helpers = {}) => {
   } = helpers;
 
   const factory = overrideCreateInitialState || createInitialState;
-  const baseState = factory?.();
+  const baseState = factory?.({ archetypeKey: state.selectedArchetype });
   if (!baseState) return state;
 
   Object.assign(state, {
-    energy: 0,
-    health: 100,
-    maxHealth: 100,
+    energy: baseState.energy,
+    health: baseState.health,
+    maxHealth: baseState.maxHealth,
     level: 1,
     score: 0,
     canEvolve: false,
     showEvolutionChoice: false,
+    archetypeSelection: baseState.archetypeSelection,
+    selectedArchetype: baseState.selectedArchetype,
     gameOver: false,
     combo: 0,
     maxCombo: 0,
@@ -593,11 +668,13 @@ export const restartGame = (state, helpers = {}) => {
     geneFragments: baseState.geneFragments,
     stableGenes: baseState.stableGenes,
     evolutionSlots: baseState.evolutionSlots,
+    macroEvolutionSlots: baseState.macroEvolutionSlots,
     reroll: baseState.reroll,
     dropPity: baseState.dropPity,
     progressionQueue: [],
     recentRewards: baseState.recentRewards,
     evolutionContext: null,
+    traitLineage: baseState.traitLineage,
   });
 
   state.organism = { ...baseState.organism };

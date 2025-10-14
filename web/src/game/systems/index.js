@@ -7,6 +7,7 @@ export {
   chooseEvolution,
   chooseTrait,
   chooseForm,
+  selectArchetype,
   restartGame,
   requestEvolutionReroll,
 } from './progression';

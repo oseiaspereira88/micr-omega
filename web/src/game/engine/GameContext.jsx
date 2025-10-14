@@ -23,6 +23,8 @@ const initialState = {
   dashCharge: 100,
   canEvolve: false,
   showEvolutionChoice: false,
+  archetypeSelection: { pending: true, options: [] },
+  selectedArchetype: null,
   showMenu: false,
   gameOver: false,
   combo: 0,

@@ -1,18 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { AFFINITY_TYPES, ELEMENT_TYPES } from '../../shared/combat';
 import { createInitialState } from '../state/initialState';
 import {
   checkEvolution,
   openEvolutionMenu,
   chooseEvolution,
   requestEvolutionReroll,
+  selectArchetype,
 } from './progression';
 import { smallEvolutions } from '../config/smallEvolutions';
 import { mediumEvolutions } from '../config/mediumEvolutions';
 import { majorEvolutions } from '../config/majorEvolutions';
 
-const createState = () => {
-  const state = createInitialState();
+const createState = (archetypeKey = 'bacteria') => {
+  const state = createInitialState({ archetypeKey });
   state.organism.traits = [];
   state.organism.skills = [];
   state.organism.skillCooldowns = {};
@@ -29,6 +31,7 @@ const createState = () => {
   state.evolutionSlots.small.max = 5;
   state.evolutionSlots.medium.max = 2;
   state.evolutionSlots.large.max = 1;
+  state.macroEvolutionSlots = { used: 0, max: 1 };
   state.reroll.cost = state.reroll.baseCost;
   return state;
 };
@@ -54,6 +57,32 @@ describe('checkEvolution', () => {
     expect(state.xp.current).toBeGreaterThanOrEqual(0);
     expect(state.progressionQueue).toContain('medium');
     expect(state.characteristicPoints.available).toBeGreaterThan(0);
+  });
+});
+
+describe('selectArchetype', () => {
+  it('aplica afinidades e estatísticas base do arquétipo escolhido', () => {
+    const state = createInitialState();
+
+    selectArchetype(state, helpers, 'virus');
+
+    expect(state.selectedArchetype).toBe('virus');
+    expect(state.archetypeSelection.pending).toBe(false);
+    expect(state.element).toBe(ELEMENT_TYPES.CHEMICAL);
+    expect(state.affinity).toBe(AFFINITY_TYPES.DIVERGENT);
+    expect(state.organism.traits).toContain('virus');
+    expect(state.traitLineage).toContain('virus');
+    expect(state.maxHealth).toBeGreaterThan(0);
+    expect(state.organism.skills.length).toBeGreaterThan(0);
+  });
+
+  it('ignora seleções inválidas mantendo estado pendente', () => {
+    const state = createInitialState();
+
+    selectArchetype(state, helpers, '');
+
+    expect(state.selectedArchetype).toBeNull();
+    expect(state.archetypeSelection.pending).toBe(true);
   });
 });
 
@@ -118,20 +147,30 @@ describe('major evolutions', () => {
     const state = createState();
     state.progressionQueue.push('large');
     state.stableGenes.apex = 1;
+    state.stableGenes.major = 2;
     state.level = 10;
     state.xp.level = 10;
 
     openEvolutionMenu(state, helpers);
     const mgBefore = state.geneticMaterial.current;
-    const stableBefore = state.stableGenes.apex;
+    const stableBefore = { ...state.stableGenes };
 
     const option = state.evolutionMenu.options.large.find((entry) => entry.available);
     expect(option).toBeDefined();
+    const macroBefore = state.macroEvolutionSlots.used;
+    const pcBefore = state.characteristicPoints.available;
     chooseEvolution(state, helpers, option?.key ?? '', option?.tier);
 
     expect(state.geneticMaterial.current).toBeLessThan(mgBefore);
-    expect(state.stableGenes.apex).toBe(stableBefore - 1);
+    Object.entries(option?.cost?.stableGenes || {}).forEach(([key, amount]) => {
+      expect(state.stableGenes[key]).toBe((stableBefore[key] ?? 0) - amount);
+    });
     expect(Object.keys(state.organism.evolutionHistory.large || {})).toContain(option?.key ?? '');
+    expect(state.macroEvolutionSlots.used).toBe(macroBefore + 1);
+    expect(state.characteristicPoints.available).toBeGreaterThan(pcBefore);
+    expect(Array.isArray(state.organism.hybridForms)).toBe(true);
+    expect(state.organism.hybridForms.length).toBeGreaterThan(0);
+    expect(state.organism.macroEvolutions).toContain(option?.key ?? '');
   });
 
   it('applies diminishing returns on repeated purchases', () => {
