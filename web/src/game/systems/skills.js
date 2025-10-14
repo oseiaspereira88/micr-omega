@@ -15,12 +15,37 @@ export const useSkill = (state, helpers = {}) => {
     return state;
   }
 
-  if (state.energy < skill.cost) {
+  const cost = skill.cost ?? {};
+  const energyCost = Number.isFinite(cost.energy)
+    ? cost.energy
+    : Number.isFinite(skill.cost)
+    ? skill.cost
+    : 0;
+  const xpCost = Number.isFinite(cost.xp) ? cost.xp : 0;
+  const mgCost = Number.isFinite(cost.mg) ? cost.mg : 0;
+
+  if (state.energy < energyCost) {
     addNotification?.(state, 'Energia insuficiente!');
     return state;
   }
 
-  state.energy -= skill.cost;
+  if ((state.xp?.current ?? 0) < xpCost) {
+    addNotification?.(state, 'XP insuficiente!');
+    return state;
+  }
+
+  if ((state.geneticMaterial?.current ?? 0) < mgCost) {
+    addNotification?.(state, 'MG insuficiente!');
+    return state;
+  }
+
+  state.energy -= energyCost;
+  if (xpCost > 0 && state.xp) {
+    state.xp.current = Math.max(0, state.xp.current - xpCost);
+  }
+  if (mgCost > 0 && state.geneticMaterial) {
+    state.geneticMaterial.current = Math.max(0, state.geneticMaterial.current - mgCost);
+  }
   skill.effect(state);
   organism.skillCooldowns[currentSkillKey] = skill.cooldown / 1000;
   state.uiSyncTimer = 0;

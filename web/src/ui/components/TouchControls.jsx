@@ -107,7 +107,7 @@ const TouchControls = ({
           className={styles.skillLabel}
           style={{ color: skillDisabled ? '#fff' : '#001' }}
         >
-          {hasCurrentSkill ? (skillCoolingDown ? skillCooldownLabel : `${currentSkillCost}⚡`) : '--'}
+          {hasCurrentSkill ? (skillCoolingDown ? skillCooldownLabel : currentSkillCost) : '--'}
         </span>
         {hasCurrentSkill && skillCoolingDown && (
           <div

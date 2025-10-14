@@ -29,6 +29,19 @@ const GameCanvas = ({ settings, onQuit }) => {
 
   const skillData = useMemo(() => {
     const currentSkillInfo = gameState.currentSkill;
+    const resolveCost = (skill) => {
+      if (!skill) return { energy: 0, xp: 0, mg: 0 };
+      const cost = skill.cost ?? {};
+      if (typeof cost === 'number' && Number.isFinite(cost)) {
+        return { energy: cost, xp: 0, mg: 0 };
+      }
+      return {
+        energy: Number.isFinite(cost.energy) ? cost.energy : 0,
+        xp: Number.isFinite(cost.xp) ? cost.xp : 0,
+        mg: Number.isFinite(cost.mg) ? cost.mg : 0,
+      };
+    };
+    const currentCost = resolveCost(currentSkillInfo);
     const skillMaxCooldown = currentSkillInfo?.maxCooldown ?? 0;
     const skillCooldownRemaining = currentSkillInfo?.cooldown ?? 0;
     const skillReadyPercent = currentSkillInfo
@@ -43,7 +56,9 @@ const GameCanvas = ({ settings, onQuit }) => {
     const skillDisabled =
       !currentSkillInfo ||
       skillCoolingDown ||
-      (currentSkillInfo ? gameState.energy < currentSkillInfo.cost : true);
+      gameState.energy < currentCost.energy ||
+      (gameState.xp?.current ?? 0) < currentCost.xp ||
+      (gameState.geneticMaterial?.current ?? 0) < currentCost.mg;
     const skillCooldownLabel = currentSkillInfo
       ? skillCoolingDown
         ? `${skillCooldownRemaining.toFixed(1)}s`
@@ -52,6 +67,11 @@ const GameCanvas = ({ settings, onQuit }) => {
     const skillCooldownPercent = currentSkillInfo && skillMaxCooldown
       ? Math.max(0, Math.min(100, (skillCooldownRemaining / skillMaxCooldown) * 100))
       : 0;
+    const costParts = [];
+    if (currentCost.energy > 0) costParts.push(`${currentCost.energy}⚡`);
+    if (currentCost.xp > 0) costParts.push(`${currentCost.xp}XP`);
+    if (currentCost.mg > 0) costParts.push(`${currentCost.mg}MG`);
+    const costLabel = costParts.length > 0 ? costParts.join(' · ') : '0⚡';
 
     return {
       currentSkill: currentSkillInfo,
@@ -62,6 +82,8 @@ const GameCanvas = ({ settings, onQuit }) => {
       skillCooldownPercent,
       skillCoolingDown,
       skillDisabled,
+      costLabel,
+      costBreakdown: currentCost,
     };
   }, [gameState]);
 

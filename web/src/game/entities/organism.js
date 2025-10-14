@@ -1,5 +1,9 @@
 import { ensureResourceProfile } from '../state/resourceProfile';
 import {
+  createStatusResistanceProfile,
+  createStatusState,
+} from '../systems/statusEffects';
+import {
   AFFINITY_TYPES,
   ELEMENT_TYPES,
   convertWeaknessesToResistances,
@@ -76,7 +80,7 @@ export const createOrganism = (overrides = {}) => {
     speed: 1,
     formDefenseMultiplier: 1,
     formSpeedMultiplier: 1,
-    attackRange: 80,
+    attackRange: overrides.attackRange ?? overrides.range ?? 80,
     attackCooldown: 0,
     currentSkillIndex: 0,
     dying: false,
@@ -102,6 +106,38 @@ export const createOrganism = (overrides = {}) => {
       resistanceOverrides
     ),
     comboHooks: { ...comboHooks },
+    penetration: Number.isFinite(rest.penetration)
+      ? rest.penetration
+      : Number.isFinite(overrides.penetration)
+      ? overrides.penetration
+      : 0,
+    range:
+      Number.isFinite(rest.range)
+        ? rest.range
+        : Number.isFinite(overrides.range)
+        ? overrides.range
+        : overrides.attackRange ?? 80,
+    criticalChance: Number.isFinite(rest.criticalChance)
+      ? rest.criticalChance
+      : Number.isFinite(overrides.criticalChance)
+      ? overrides.criticalChance
+      : 0.05,
+    criticalMultiplier: Number.isFinite(rest.criticalMultiplier)
+      ? rest.criticalMultiplier
+      : Number.isFinite(overrides.criticalMultiplier)
+      ? overrides.criticalMultiplier
+      : 1.5,
+    mass: Number.isFinite(rest.mass)
+      ? rest.mass
+      : Number.isFinite(overrides.mass)
+      ? overrides.mass
+      : 1,
+    stability: Number.isFinite(rest.stability)
+      ? rest.stability
+      : Number.isFinite(overrides.stability)
+      ? overrides.stability
+      : 1,
+    statusResistances: createStatusResistanceProfile(overrides.statusResistances),
   };
 
   return {
@@ -122,5 +158,6 @@ export const createOrganism = (overrides = {}) => {
       medium: unlockedEvolutionSlots.medium ?? 0,
       large: unlockedEvolutionSlots.large ?? 0,
     },
+    status: createStatusState(rest.status || overrides.status),
   };
 };

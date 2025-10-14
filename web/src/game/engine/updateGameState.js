@@ -77,6 +77,10 @@ const sumModifiers = (modifiers = []) =>
 
 export const calculateDamageWithResistances = ({
   baseDamage = 0,
+  targetDefense = 0,
+  penetration = 0,
+  damageReductionCap = 0.7,
+  stability = 1,
   attackerElement,
   attackElement,
   attackerAffinity = AFFINITY_TYPES.NEUTRAL,
@@ -86,7 +90,17 @@ export const calculateDamageWithResistances = ({
   combo = {},
   hooks = {},
 } = {}) => {
-  const normalizedBase = Number.isFinite(baseDamage) ? Math.max(0, baseDamage) : 0;
+  const inputBase = Number.isFinite(baseDamage) ? Math.max(0, baseDamage) : 0;
+  const defenseValue = Number.isFinite(targetDefense) ? Math.max(0, targetDefense) : 0;
+  const penetrationValue = Number.isFinite(penetration) ? Math.max(0, penetration) : 0;
+  const cappedMitigation = Math.max(0, defenseValue - penetrationValue);
+  const stabilityFactor = Math.max(0.4, Number.isFinite(stability) ? stability : 1);
+  const reductionCap = Math.max(0.2, Math.min(0.9, Number.isFinite(damageReductionCap) ? damageReductionCap : 0.7));
+  const mitigatedBase = Math.max(
+    inputBase * (1 - reductionCap * stabilityFactor),
+    inputBase - cappedMitigation
+  );
+  const normalizedBase = Math.max(0, mitigatedBase);
   const effectiveAttackElement = attackElement ?? attackerElement;
   const { multiplier: rpsMultiplier, relation } = getElementalRpsMultiplier(
     effectiveAttackElement,
@@ -673,6 +687,9 @@ const buildHudSnapshot = (localPlayer, playerList, notifications, camera) => {
   const element = localPlayer?.element ?? ELEMENT_TYPES.BIO;
   const affinity = localPlayer?.affinity ?? AFFINITY_TYPES.NEUTRAL;
   const resistances = createResistanceSnapshot(localPlayer?.resistances);
+  const statusEffects = Array.isArray(localPlayer?.statusEffects)
+    ? localPlayer.statusEffects
+    : [];
 
   const opponents = playerList
     .filter((player) => !player.isLocal)
@@ -739,6 +756,7 @@ const buildHudSnapshot = (localPlayer, playerList, notifications, camera) => {
     element,
     affinity,
     resistances,
+    statusEffects,
     elementLabel: ELEMENT_LABELS[element] ?? element,
     affinityLabel: AFFINITY_LABELS[affinity] ?? affinity,
   };

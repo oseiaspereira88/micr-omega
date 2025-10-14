@@ -1,3 +1,11 @@
+import {
+  STATUS_METADATA,
+  getStatusEffectVisual,
+  getStatusHudSnapshot,
+  getStatusMovementMultiplier,
+  tickStatusEffects,
+} from './statusEffects';
+
 export const performDash = (state, helpers = {}) => {
   if (!state) return state;
 
@@ -82,6 +90,31 @@ export const updateOrganismPhysics = (state, helpers = {}, delta = 0) => {
 
   const { createParticle, addNotification, syncState, createEffect } = helpers;
 
+  const statusResult = tickStatusEffects(
+    organism,
+    delta,
+    {
+      onDamage: ({ damage, status }) => {
+        const normalizedDamage = Math.max(0, damage);
+        if (normalizedDamage <= 0) return;
+        state.health = Math.max(0, state.health - normalizedDamage);
+        state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+        const visualType = getStatusEffectVisual(status);
+        const color = STATUS_METADATA[status]?.color ?? '#ffffff';
+        createEffect?.(state, organism.x, organism.y, visualType, color);
+      },
+      onExpire: ({ status }) => {
+        const label = STATUS_METADATA[status]?.label ?? status;
+        addNotification?.(state, `${label} dissipou.`);
+      },
+    }
+  );
+
+  if (statusResult.totalDamage >= 1) {
+    addNotification?.(state, `-${Math.round(statusResult.totalDamage)} por estados`);
+  }
+  state.statusEffects = getStatusHudSnapshot(organism);
+
   const previousDashTimer = Math.max(0, organism.dashTimer || 0);
   const wasDashing = Boolean(organism.isDashing || previousDashTimer > 0);
   const updatedDashTimer = Math.max(0, previousDashTimer - delta);
@@ -137,14 +170,19 @@ export const updateOrganismPhysics = (state, helpers = {}, delta = 0) => {
     return false;
   });
 
-  organism.currentSpeedMultiplier = speedMultiplier;
+  const statusSpeedMultiplier = getStatusMovementMultiplier(organism);
+  const combinedSpeedMultiplier = speedMultiplier * statusSpeedMultiplier;
+
+  organism.currentSpeedMultiplier = combinedSpeedMultiplier;
   organism.currentAttackBonus = attackBonus;
   organism.currentRangeBonus = rangeBonus;
   organism.hasShieldPowerUp = invincibilityActive;
   organism.invulnerableFromPowerUp = invincibilityActive;
 
   const friction = dashActive ? 0.99 : 0.92;
-  const baseSpeed = dashActive ? 20 * speedMultiplier : 5 * organism.speed * speedMultiplier;
+  const baseSpeed = dashActive
+    ? 20 * combinedSpeedMultiplier
+    : 5 * organism.speed * combinedSpeedMultiplier;
   const maxSpeed = baseSpeed;
 
   const joystick = state.joystick;

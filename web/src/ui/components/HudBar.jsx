@@ -64,6 +64,16 @@ const HudBar = ({
     .filter(([, value]) => Math.abs(value) >= 0.05)
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
     .slice(0, 3);
+  const statusBadges = (statusEffects || [])
+    .map((entry) => ({
+      key: entry.key,
+      label: entry.label,
+      icon: entry.icon,
+      color: entry.color,
+      stacks: entry.stacks,
+      remaining: entry.remaining,
+    }))
+    .slice(0, 4);
 
   return (
     <>
@@ -128,6 +138,20 @@ const HudBar = ({
                 </span>
               );
             })}
+          </div>
+        )}
+        {statusBadges.length > 0 && (
+          <div className={styles.statusRow}>
+            {statusBadges.map((status) => (
+              <span
+                key={status.key}
+                className={styles.statusBadge}
+                style={{ background: `${status.color}22`, borderColor: `${status.color}55` }}
+                title={`x${status.stacks} • ${status.label}`}
+              >
+                {status.icon} {Math.ceil(status.remaining)}s
+              </span>
+            ))}
           </div>
         )}
         <div className={styles.progressRow}>

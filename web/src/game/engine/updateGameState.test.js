@@ -163,6 +163,24 @@ describe('calculateDamageWithResistances', () => {
     expect(result.damage).toBe(81);
     expect(result.multiplier).toBeCloseTo(1.0125, 3);
   });
+
+  it('applies penetration and DR caps before elemental multipliers', () => {
+    const result = calculateDamageWithResistances({
+      baseDamage: 200,
+      targetDefense: 150,
+      penetration: 50,
+      damageReductionCap: 0.5,
+      stability: 1.2,
+      attackerElement: ELEMENT_TYPES.ACID,
+      attackElement: ELEMENT_TYPES.ACID,
+      targetElement: ELEMENT_TYPES.KINETIC,
+      targetResistances: { [ELEMENT_TYPES.ACID]: 0.1 },
+    });
+
+    expect(result.damage).toBe(103);
+    expect(result.breakdown.resistance).toBeCloseTo(0.9, 2);
+    expect(result.breakdown.rps).toBeCloseTo(1.15, 2);
+  });
 });
 
 describe('updateGameState', () => {

@@ -33,13 +33,26 @@ const SkillWheel = ({
     }
   };
 
+  const resolveCostLabel = (skill) => {
+    if (!skill) return '0⚡';
+    const cost = skill.cost ?? {};
+    const energy = Number.isFinite(cost.energy) ? cost.energy : Number.isFinite(skill.cost) ? skill.cost : 0;
+    const xp = Number.isFinite(cost.xp) ? cost.xp : 0;
+    const mg = Number.isFinite(cost.mg) ? cost.mg : 0;
+    const parts = [];
+    if (energy > 0) parts.push(`${energy}⚡`);
+    if (xp > 0) parts.push(`${xp}XP`);
+    if (mg > 0) parts.push(`${mg}MG`);
+    return parts.length > 0 ? parts.join(' · ') : '0⚡';
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <span className={styles.title}>
           {currentSkill ? `${currentSkill.icon} ${currentSkill.name}` : 'Sem habilidade ativa'}
         </span>
-        {currentSkill && <span className={styles.cost}>{currentSkill.cost}⚡</span>}
+        {currentSkill && <span className={styles.cost}>{resolveCostLabel(currentSkill)}</span>}
       </div>
 
       <div className={styles.meta}>
@@ -54,7 +67,7 @@ const SkillWheel = ({
               }`
             : '--'}
         </span>
-        <span>Custo: {currentSkill ? currentSkill.cost : '--'}⚡</span>
+        <span>Custo: {currentSkill ? resolveCostLabel(currentSkill) : '--'}</span>
         <span>{skillCooldownLabel}</span>
       </div>
 
