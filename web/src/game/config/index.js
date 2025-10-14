@@ -1,6 +1,8 @@
 export { forms } from './forms';
 export { createSkills } from './skills';
-export { evolutionaryTraits } from './evolutionaryTraits';
+export { smallEvolutions } from './smallEvolutions';
+export { mediumEvolutions } from './mediumEvolutions';
+export { majorEvolutions } from './majorEvolutions';
 export { organicMatterTypes } from './organicMatterTypes';
 export { enemyTemplates } from './enemyTemplates';
 export { obstacleTypes } from './obstacleTypes';
