@@ -1,4 +1,11 @@
 import { DROP_TABLES } from '../config/enemyTemplates';
+import {
+  AFFINITY_TYPES,
+  ELEMENT_TYPES,
+  convertWeaknessesToResistances,
+  normalizeWeaknessProfile,
+  resolveResistanceProfile,
+} from '../../shared/combat';
 
 const getRandom = (rng = Math.random) => (typeof rng === 'function' ? rng : Math.random);
 
@@ -112,15 +119,25 @@ const mergeArraysUnique = (...collections) => {
   return Array.from(unique);
 };
 
-const combineResistances = (base = {}, additional = {}) => {
-  const result = { ...base };
-  Object.entries(additional || {}).forEach(([key, value]) => {
-    const numeric = toFiniteNumber(value);
-    if (numeric === null) return;
-    const current = toFiniteNumber(result[key]) ?? 0;
-    result[key] = clamp(current + numeric, -0.95, 0.95);
-  });
-  return result;
+const mergeWeaknessProfiles = (base = {}, extra = {}) => ({
+  ...normalizeWeaknessProfile(base),
+  ...normalizeWeaknessProfile(extra),
+});
+
+const recomputeResistances = (enemy) => {
+  if (!enemy) return {};
+
+  enemy.baseResistances = resolveResistanceProfile(enemy.baseResistances);
+  enemy.weaknesses = mergeWeaknessProfiles(enemy.weaknesses);
+  enemy.resistanceAdjustments = resolveResistanceProfile(enemy.resistanceAdjustments);
+
+  enemy.resistances = resolveResistanceProfile(
+    enemy.baseResistances,
+    convertWeaknessesToResistances(enemy.weaknesses),
+    enemy.resistanceAdjustments
+  );
+
+  return enemy.resistances;
 };
 
 const mergeBehaviorTraits = (base = {}, extra = {}) => {
@@ -212,6 +229,8 @@ const applyStatAdjustments = (enemy, stats = {}) => {
 const applyModifier = (enemy, modifier = {}, context = {}) => {
   if (!modifier || typeof modifier !== 'object') return;
 
+  let resistancesChanged = false;
+
   if (modifier.stats) {
     applyStatAdjustments(enemy, modifier.stats);
   }
@@ -220,12 +239,33 @@ const applyModifier = (enemy, modifier = {}, context = {}) => {
     enemy.abilities = mergeArraysUnique(enemy.abilities, modifier.abilities);
   }
 
+  if (modifier.baseResistances) {
+    enemy.baseResistances = resolveResistanceProfile(
+      enemy.baseResistances,
+      modifier.baseResistances
+    );
+    resistancesChanged = true;
+  }
+
+  if (modifier.weaknesses) {
+    enemy.weaknesses = mergeWeaknessProfiles(enemy.weaknesses, modifier.weaknesses);
+    resistancesChanged = true;
+  }
+
   if (modifier.resistances) {
-    enemy.resistances = combineResistances(enemy.resistances, modifier.resistances);
+    enemy.resistanceAdjustments = resolveResistanceProfile(
+      enemy.resistanceAdjustments,
+      modifier.resistances
+    );
+    resistancesChanged = true;
   }
 
   if (modifier.behaviorTraits) {
     enemy.behaviorTraits = mergeBehaviorTraits(enemy.behaviorTraits, modifier.behaviorTraits);
+  }
+
+  if (resistancesChanged) {
+    recomputeResistances(enemy);
   }
 
   if (typeof modifier.onApply === 'function') {
@@ -307,6 +347,8 @@ export const createEnemyFromTemplate = (
       overrides.energyReward ?? template.energyReward,
       0
     ),
+    element: overrides.element ?? template.element ?? ELEMENT_TYPES.BIO,
+    affinity: overrides.affinity ?? template.affinity ?? AFFINITY_TYPES.NEUTRAL,
     baseColor: baseColorInput,
     color,
     coreColor,
@@ -357,7 +399,19 @@ export const createEnemyFromTemplate = (
   const dropProfile = DROP_TABLES[enemy.dropTier] ?? DROP_TABLES.minion;
   enemy.dropProfile = { ...dropProfile };
   enemy.abilities = mergeArraysUnique(template.abilities || [], overrides.abilities || []);
-  enemy.resistances = combineResistances(template.resistances || {}, overrides.resistances || {});
+  const baseResistances = resolveResistanceProfile(
+    template.baseResistances,
+    overrides.baseResistances
+  );
+  const baseWeaknesses = mergeWeaknessProfiles(template.weaknesses, overrides.weaknesses);
+  const resistanceAdjustments = resolveResistanceProfile(
+    template.resistances,
+    overrides.resistances
+  );
+  enemy.baseResistances = baseResistances;
+  enemy.weaknesses = baseWeaknesses;
+  enemy.resistanceAdjustments = resistanceAdjustments;
+  recomputeResistances(enemy);
   enemy.behaviorTraits = mergeBehaviorTraits(template.behaviorTraits || {}, overrides.behaviorTraits || {});
   enemy.activeBuffs = Array.isArray(overrides.activeBuffs) ? [...overrides.activeBuffs] : [];
   enemy.dynamicModifiers = {
@@ -447,7 +501,7 @@ export const createEnemyFromTemplate = (
     maxHealth: enemy.maxHealth,
     health: enemy.health,
   };
-  enemy.baseResistances = { ...enemy.resistances };
+  recomputeResistances(enemy);
 
   return enemy;
 };

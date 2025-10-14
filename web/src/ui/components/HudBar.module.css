@@ -22,6 +22,28 @@
   -webkit-text-fill-color: transparent;
 }
 
+.combatProfile {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.65rem;
+  pointer-events: auto;
+}
+
+.combatTag {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #fff;
+}
+
+.affinityTag {
+  background: rgba(123, 47, 255, 0.28);
+}
+
 .stats {
   position: absolute;
   top: 45px;
@@ -29,7 +51,7 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 11;
 }
 
@@ -120,6 +142,31 @@
 .maxComboBadge {
   font-size: 0.65rem;
   color: rgba(255, 255, 255, 0.7);
+}
+
+.resistanceRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 4px;
+  pointer-events: auto;
+}
+
+.resistanceBadge {
+  font-size: 0.62rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
+  color: #fff;
+}
+
+.resistancePositive {
+  border-color: rgba(79, 255, 197, 0.6);
+}
+
+.resistanceNegative {
+  border-color: rgba(255, 136, 102, 0.6);
 }
 
 .powerUps {

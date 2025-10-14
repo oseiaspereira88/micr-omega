@@ -6,7 +6,9 @@ import {
   aggregateDrops,
   applyProgressionEvents,
   XP_DISTRIBUTION,
+  calculateDamageWithResistances,
 } from './updateGameState';
+import { AFFINITY_TYPES, ELEMENT_TYPES } from '../../shared/combat';
 
 const createRenderState = () => ({
   camera: {
@@ -125,6 +127,42 @@ const createSharedState = (overrides = {}) => ({
       },
     ],
   },
+});
+
+describe('calculateDamageWithResistances', () => {
+  it('applies RPS advantage, affinity and resistances', () => {
+    const result = calculateDamageWithResistances({
+      baseDamage: 100,
+      attackerElement: ELEMENT_TYPES.BIO,
+      attackElement: ELEMENT_TYPES.BIO,
+      attackerAffinity: AFFINITY_TYPES.ATTUNED,
+      targetElement: ELEMENT_TYPES.CHEMICAL,
+      targetResistances: { [ELEMENT_TYPES.BIO]: 0.2 },
+      combo: { value: 5, multiplier: 1.2 },
+    });
+
+    expect(result.relation).toBe('advantage');
+    expect(result.damage).toBe(127);
+    expect(result.multiplier).toBeCloseTo(1.2696, 3);
+    expect(result.comboApplied).toBe(true);
+  });
+
+  it('handles disadvantage, divergent affinity and negative resistances', () => {
+    const result = calculateDamageWithResistances({
+      baseDamage: 80,
+      attackerElement: ELEMENT_TYPES.ELECTRIC,
+      attackElement: ELEMENT_TYPES.ELECTRIC,
+      attackerAffinity: AFFINITY_TYPES.DIVERGENT,
+      targetElement: ELEMENT_TYPES.THERMAL,
+      targetResistances: { [ELEMENT_TYPES.ELECTRIC]: -0.25 },
+      combo: { multiplier: 1.5, apply: false },
+    });
+
+    expect(result.relation).toBe('disadvantage');
+    expect(result.comboApplied).toBe(false);
+    expect(result.damage).toBe(81);
+    expect(result.multiplier).toBeCloseTo(1.0125, 3);
+  });
 });
 
 describe('updateGameState', () => {

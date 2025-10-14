@@ -1,5 +1,4 @@
-export const ELEMENTAL_ADVANTAGE_MULTIPLIER = 1.25;
-export const ELEMENTAL_DISADVANTAGE_MULTIPLIER = 0.75;
+import { AFFINITY_TYPES, ELEMENT_TYPES } from '../../shared/combat';
 
 export const DROP_TABLES = {
   minion: {
@@ -96,7 +95,10 @@ const baseTemplates = {
     tier: 'common',
     dropTier: 'minion',
     abilities: ['viral_dash'],
-    resistances: { bio: 0.1 },
+    element: ELEMENT_TYPES.BIO,
+    affinity: AFFINITY_TYPES.ATTUNED,
+    baseResistances: { [ELEMENT_TYPES.BIO]: 0.1 },
+    weaknesses: {},
     behaviorTraits: {
       speedBurst: { interval: 6, duration: 0.8, speedMultiplier: 1.75 },
     },
@@ -154,7 +156,10 @@ const baseTemplates = {
     tier: 'common',
     dropTier: 'minion',
     abilities: ['corrosive_aura'],
-    resistances: { acid: 0.15 },
+    element: ELEMENT_TYPES.CHEMICAL,
+    affinity: AFFINITY_TYPES.ATTUNED,
+    baseResistances: { [ELEMENT_TYPES.ACID]: 0.15 },
+    weaknesses: { [ELEMENT_TYPES.THERMAL]: 0.1 },
     behaviorTraits: {
       supportAura: {
         interval: 9,
@@ -216,7 +221,10 @@ const baseTemplates = {
     tier: 'common',
     dropTier: 'minion',
     abilities: ['drain_bite'],
-    resistances: { bio: 0.05, electric: -0.05 },
+    element: ELEMENT_TYPES.BIO,
+    affinity: AFFINITY_TYPES.NEUTRAL,
+    baseResistances: { [ELEMENT_TYPES.BIO]: 0.05 },
+    weaknesses: { [ELEMENT_TYPES.ELECTRIC]: 0.05 },
     behaviorTraits: {
       speedBurst: { interval: 5, duration: 1.2, speedMultiplier: 1.6 },
     },
@@ -272,7 +280,10 @@ const baseTemplates = {
     tier: 'rare',
     dropTier: 'elite',
     abilities: ['razor_charge'],
-    resistances: { kinetic: 0.1 },
+    element: ELEMENT_TYPES.KINETIC,
+    affinity: AFFINITY_TYPES.ATTUNED,
+    baseResistances: { [ELEMENT_TYPES.KINETIC]: 0.1 },
+    weaknesses: { [ELEMENT_TYPES.PSIONIC]: 0.05 },
     behaviorTraits: {
       speedBurst: { interval: 7, duration: 1, speedMultiplier: 1.8 },
     },
@@ -333,6 +344,16 @@ const createVariant = (baseKey, overrides = {}) => {
     new Set([...(base.abilities || []), ...normalizeArray(overrides.abilities)])
   );
 
+  const baseResistances = {
+    ...(base.baseResistances || {}),
+    ...(overrides.baseResistances || {}),
+  };
+
+  const weaknesses = {
+    ...(base.weaknesses || {}),
+    ...(overrides.weaknesses || {}),
+  };
+
   const resistances = {
     ...(base.resistances || {}),
     ...(overrides.resistances || {}),
@@ -347,6 +368,10 @@ const createVariant = (baseKey, overrides = {}) => {
     dropTier: overrides.dropTier ?? base.dropTier ?? 'minion',
     variantOf: baseKey,
     abilities,
+    element: overrides.element ?? base.element ?? ELEMENT_TYPES.BIO,
+    affinity: overrides.affinity ?? base.affinity ?? AFFINITY_TYPES.NEUTRAL,
+    baseResistances,
+    weaknesses,
     resistances,
     behaviorTraits,
     modifiers: combineModifiers(base.modifiers, overrides.modifiers),

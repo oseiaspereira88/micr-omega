@@ -97,6 +97,6 @@ describe('createEnemyFromTemplate tier variants', () => {
     expect(early.abilities).not.toContain('spore_burst');
     expect(evolved.abilities).toContain('spore_burst');
     expect(evolved.behaviorTraits.projectileVolley).toBeDefined();
-    expect(evolved.resistances.thermal).toBeCloseTo(0.1, 2);
+    expect(evolved.resistances.thermal).toBeCloseTo(0, 2);
   });
 });
