@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const PROTOCOL_VERSION = "1.0.0" as const;
 
-export const NAME_PATTERN = /^[A-Za-z0-9 _-]+$/;
+export const NAME_PATTERN = /^[\p{L}\p{N} _-]+$/u;
 export const ABILITY_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export const MIN_NAME_LENGTH = 3;
@@ -163,6 +163,7 @@ export const errorMessageSchema = z.object({
     z.literal("invalid_payload"),
     z.literal("invalid_name"),
     z.literal("name_taken"),
+    z.literal("room_full"),
     z.literal("unknown_player"),
     z.literal("game_not_active"),
     z.literal("rate_limited")

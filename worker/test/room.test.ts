@@ -83,6 +83,31 @@ describe("RoomDO", () => {
     socket.close();
   });
 
+  it("allows joining with accented unicode characters", async () => {
+    const socket = await openSocket(mf);
+    const joinedPromise = onceMessage<{
+      type: string;
+      playerId: string;
+      state: { players: { id: string; name: string }[] };
+      ranking: { playerId: string; name: string; score: number }[];
+    }>(socket, "joined");
+
+    socket.send(JSON.stringify({ type: "join", name: "Álvaro" }));
+
+    const joined = await joinedPromise;
+    expect(joined.type).toBe("joined");
+    expect(joined.state.players.some((player) => player.name === "Álvaro")).toBe(true);
+    expect(joined.ranking).toEqual([
+      {
+        playerId: joined.playerId,
+        name: "Álvaro",
+        score: 0,
+      },
+    ]);
+
+    socket.close();
+  });
+
   it("rejects invalid player names", async () => {
     const socket = await openSocket(mf);
     const errorPromise = onceMessage<{ type: string; reason: string }>(socket, "error");

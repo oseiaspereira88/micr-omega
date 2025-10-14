@@ -23,7 +23,7 @@ export default {
         observability.log("warn", "ws_upgrade_missing", {
           category: "protocol_error",
           url: url.toString(),
-          path: url.pathname,
+          path: url.pathname
         });
         return new Response("Expected WebSocket", { status: 426 });
       }
@@ -32,7 +32,7 @@ export default {
       const stub = env.ROOM.get(id);
       observability.log("info", "ws_upgrade_forwarded", {
         roomId: ROOM_ID,
-        path: url.pathname,
+        path: url.pathname
       });
       return stub.fetch(request);
     }
@@ -40,7 +40,7 @@ export default {
     observability.log("warn", "unexpected_route", {
       category: "protocol_error",
       path: url.pathname,
-      expectedPaths: ["/", "/ws"],
+      expectedPaths: ["/", "/ws"]
     });
     return new Response("Not Found", { status: 404 });
   }

@@ -81,6 +81,32 @@ describe("gameStore", () => {
     expect(gameStore.getState().players.p1).toBeUndefined();
   });
 
+  it("clears round metadata when diffs reset values", () => {
+    const fullState: SharedGameState = {
+      phase: "active",
+      roundId: "round-42",
+      roundStartedAt: 10_000,
+      roundEndsAt: 20_000,
+      players: [],
+    };
+
+    gameStore.actions.applyFullState(fullState);
+
+    gameStore.actions.applyStateDiff({
+      phase: "waiting",
+      roundId: null,
+      roundStartedAt: null,
+      roundEndsAt: null,
+    });
+
+    expect(gameStore.getState().room).toEqual({
+      phase: "waiting",
+      roundId: null,
+      roundStartedAt: null,
+      roundEndsAt: null,
+    });
+  });
+
   it("tracks ranking payloads and connection lifecycle", () => {
     const ranking: RankingEntry[] = [
       { playerId: "p1", name: "Alice", score: 3200 },

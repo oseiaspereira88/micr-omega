@@ -1,17 +1,21 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import MicroOmegaGame from './MicroOmegaGame.jsx';
-import PlayerNameModal from './components/PlayerNameModal';
+import StartScreen from './components/StartScreen';
 import ToastStack from './components/ToastStack';
 import { useGameSocket } from './hooks/useGameSocket';
 import { useGameStore } from './store/gameStore';
+import { useGameSettings } from './store/gameSettings';
 
 const TOAST_DURATION = 5000;
 
 const App = () => {
   const { connect, disconnect } = useGameSocket();
   const joinError = useGameStore((state) => state.joinError);
+  const connectionStatus = useGameStore((state) => state.connectionStatus);
+  const { settings } = useGameSettings();
   const [toasts, setToasts] = useState([]);
   const timersRef = useRef(new Map());
+  const [isGameActive, setIsGameActive] = useState(false);
 
   const removeToast = useCallback((id) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
@@ -62,17 +66,31 @@ const App = () => {
     };
   }, []);
 
-  const handleNameSubmit = useCallback(
-    (name) => {
+  const handleStart = useCallback(
+    ({ name }) => {
       connect(name);
+      setIsGameActive(true);
     },
     [connect]
   );
 
+  const handleQuit = useCallback(() => {
+    setIsGameActive(false);
+    disconnect();
+  }, [disconnect]);
+
+  useEffect(() => {
+    if (connectionStatus === 'disconnected') {
+      setIsGameActive(false);
+    }
+  }, [connectionStatus]);
+
   return (
     <>
-      <MicroOmegaGame />
-      <PlayerNameModal onSubmit={handleNameSubmit} onLeave={disconnect} />
+      {isGameActive ? <MicroOmegaGame settings={settings} /> : null}
+      {!isGameActive ? (
+        <StartScreen onStart={handleStart} onQuit={handleQuit} />
+      ) : null}
       <ToastStack toasts={toasts} onDismiss={removeToast} />
     </>
   );

@@ -2,8 +2,41 @@ import {
   nebulaTypes,
 } from '../config';
 
-const ensureNumber = (value, fallback = 0) =>
-  typeof value === 'number' ? value : fallback;
+const toFiniteNumber = value => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
+
+const ensureNumber = (value, fallback = 0) => {
+  const fallbackNumber = toFiniteNumber(fallback);
+  const normalizedFallback = fallbackNumber ?? 0;
+  const finiteValue = toFiniteNumber(value);
+  return finiteValue ?? normalizedFallback;
+};
+
+const resolveEnemyDamage = enemy => {
+  if (!enemy) return 0;
+
+  const candidateKeys = ['attack', 'damage', 'baseDamage'];
+  for (const key of candidateKeys) {
+    const damage = toFiniteNumber(enemy[key]);
+    if (damage !== null) {
+      return damage;
+    }
+  }
+
+  return 0;
+};
 
 export const updateGameState = ({
   state,
@@ -336,7 +369,10 @@ export const updateGameState = ({
 
     if (dist < enemy.size + organism.size) {
       if (!organism.invulnerable && !organism.invulnerableFromPowerUp) {
-        state.health -= enemy.damage;
+        const fallbackHealth = toFiniteNumber(state.maxHealth) ?? 100;
+        const currentHealth = ensureNumber(state.health, fallbackHealth);
+        const damage = resolveEnemyDamage(enemy);
+        state.health = currentHealth - damage;
         organism.invulnerable = true;
         organism.invulnerableTimer = 1.5;
         createEffect(state, organism.x, organism.y, 'impact', enemy.color);
@@ -355,7 +391,8 @@ export const updateGameState = ({
     if (enemy.health <= 0) {
       state.combo += 1;
       state.maxCombo = Math.max(state.maxCombo, state.combo);
-      state.energy += enemy.energyReward;
+      const energyReward = ensureNumber(enemy.energyReward, 0);
+      state.energy += energyReward;
       state.score += enemy.points;
       createEffect(state, enemy.x, enemy.y, 'hit', enemy.color);
       playSound('enemyDie');
