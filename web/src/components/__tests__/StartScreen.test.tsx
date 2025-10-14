@@ -61,6 +61,17 @@ describe("StartScreen", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Use entre");
   });
 
+  it("mantém o foco no campo de nome quando a validação falha", () => {
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+    const input = screen.getByLabelText(/nome do jogador/i);
+    const startButton = screen.getByRole("button", { name: /iniciar partida/i });
+
+    fireEvent.click(startButton);
+
+    expect(input).toHaveFocus();
+  });
+
   it("persiste o nome sanitizado e envia as configurações", () => {
     const onStart = vi.fn();
     renderWithProviders(<StartScreen onStart={onStart} onQuit={() => {}} />);
