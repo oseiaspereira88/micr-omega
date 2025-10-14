@@ -192,9 +192,28 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
         availableTraits: state.availableTraits || [],
         availableForms: state.availableForms || [],
         evolutionType: state.evolutionType || null,
+        cameraZoom: state.camera?.zoom ?? 1,
       },
     });
   }, [skills]);
+
+  const setCameraZoom = useCallback((zoomValue) => {
+    const state = stateRef.current;
+    if (!state?.camera) return;
+
+    const minZoom = 0.6;
+    const maxZoom = 1.2;
+    const parsed = Number.parseFloat(zoomValue);
+    const safeValue = Number.isFinite(parsed) ? parsed : 1;
+    const clamped = Math.min(maxZoom, Math.max(minZoom, safeValue));
+
+    if (Math.abs((state.camera.zoom ?? 1) - clamped) < 0.0001) {
+      return;
+    }
+
+    state.camera.zoom = clamped;
+    state.uiSyncTimer = 0;
+  }, []);
 
   const resetControls = useCallback((state) => {
     inputResetRef.current(state);
@@ -850,6 +869,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     chooseTrait,
     chooseForm,
     restartGame,
+    setCameraZoom,
   };
 };
 

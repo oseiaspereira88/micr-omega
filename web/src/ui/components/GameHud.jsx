@@ -4,6 +4,7 @@ import BossHealthBar from './BossHealthBar';
 import SkillWheel from './SkillWheel';
 import Notifications from './Notifications';
 import TouchControls from './TouchControls';
+import CameraControls from './CameraControls';
 import styles from './GameHud.module.css';
 import RankingPanel from '../../components/RankingPanel';
 import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
@@ -36,6 +37,8 @@ const GameHud = ({
   onOpenEvolutionMenu,
   canEvolve,
   showTouchControls = false,
+  cameraZoom = 1,
+  onCameraZoomChange,
 }) => {
   const currentSkill = skillData?.currentSkill ?? null;
 
@@ -44,6 +47,7 @@ const GameHud = ({
       <div className={styles.sidebar}>
         <RankingPanel />
         <ConnectionStatusOverlay />
+        <CameraControls zoom={cameraZoom} onChange={onCameraZoomChange} />
       </div>
 
       <HudBar
