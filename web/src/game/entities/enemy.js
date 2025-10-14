@@ -94,6 +94,143 @@ const resolveNumericValue = (value, fallback = 0) => {
   return normalizedValue ?? fallbackNumber;
 };
 
+const clamp = (value, min, max) => {
+  if (!Number.isFinite(value)) return min;
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+};
+
+const mergeArraysUnique = (...collections) => {
+  const unique = new Set();
+  collections
+    .flat()
+    .filter((item) => typeof item === 'string' && item.trim().length > 0)
+    .forEach((item) => unique.add(item));
+  return Array.from(unique);
+};
+
+const combineResistances = (base = {}, additional = {}) => {
+  const result = { ...base };
+  Object.entries(additional || {}).forEach(([key, value]) => {
+    const numeric = toFiniteNumber(value);
+    if (numeric === null) return;
+    const current = toFiniteNumber(result[key]) ?? 0;
+    result[key] = clamp(current + numeric, -0.95, 0.95);
+  });
+  return result;
+};
+
+const mergeBehaviorTraits = (base = {}, extra = {}) => {
+  const merged = { ...base };
+  Object.entries(extra || {}).forEach(([key, value]) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      merged[key] = { ...(merged[key] || {}), ...value };
+    } else {
+      merged[key] = value;
+    }
+  });
+  return merged;
+};
+
+const applyStatAdjustments = (enemy, stats = {}) => {
+  if (!stats || typeof stats !== 'object') return;
+
+  const withMultiplier = (value, multiplier) => {
+    const numeric = toFiniteNumber(multiplier);
+    if (numeric === null) return value;
+    return value * numeric;
+  };
+
+  const withBonus = (value, bonus) => {
+    const numeric = toFiniteNumber(bonus);
+    if (numeric === null) return value;
+    return value + numeric;
+  };
+
+  if ('sizeMultiplier' in stats) {
+    enemy.size = withMultiplier(enemy.size, stats.sizeMultiplier);
+  }
+
+  if ('sizeBonus' in stats) {
+    enemy.size = withBonus(enemy.size, stats.sizeBonus);
+  }
+
+  if ('speedMultiplier' in stats) {
+    enemy.speed = withMultiplier(enemy.speed, stats.speedMultiplier);
+  }
+
+  if ('speedBonus' in stats) {
+    enemy.speed = withBonus(enemy.speed, stats.speedBonus);
+  }
+
+  if ('attackMultiplier' in stats) {
+    enemy.attack = withMultiplier(enemy.attack, stats.attackMultiplier);
+  }
+
+  if ('attackBonus' in stats) {
+    enemy.attack = withBonus(enemy.attack, stats.attackBonus);
+  }
+
+  if ('defenseMultiplier' in stats) {
+    enemy.defense = withMultiplier(enemy.defense, stats.defenseMultiplier);
+  }
+
+  if ('defenseBonus' in stats) {
+    enemy.defense = withBonus(enemy.defense, stats.defenseBonus);
+  }
+
+  if ('healthMultiplier' in stats) {
+    enemy.health = withMultiplier(enemy.health, stats.healthMultiplier);
+    enemy.maxHealth = withMultiplier(enemy.maxHealth, stats.healthMultiplier);
+  }
+
+  if ('healthBonus' in stats) {
+    enemy.health = withBonus(enemy.health, stats.healthBonus);
+    enemy.maxHealth = withBonus(enemy.maxHealth, stats.healthBonus);
+  }
+
+  if ('energyRewardMultiplier' in stats) {
+    enemy.energyReward = withMultiplier(enemy.energyReward, stats.energyRewardMultiplier);
+  }
+
+  if ('energyRewardBonus' in stats) {
+    enemy.energyReward = withBonus(enemy.energyReward, stats.energyRewardBonus);
+  }
+
+  if ('pointsMultiplier' in stats) {
+    enemy.points = withMultiplier(enemy.points, stats.pointsMultiplier);
+  }
+
+  if ('pointsBonus' in stats) {
+    enemy.points = withBonus(enemy.points, stats.pointsBonus);
+  }
+};
+
+const applyModifier = (enemy, modifier = {}, context = {}) => {
+  if (!modifier || typeof modifier !== 'object') return;
+
+  if (modifier.stats) {
+    applyStatAdjustments(enemy, modifier.stats);
+  }
+
+  if (Array.isArray(modifier.abilities)) {
+    enemy.abilities = mergeArraysUnique(enemy.abilities, modifier.abilities);
+  }
+
+  if (modifier.resistances) {
+    enemy.resistances = combineResistances(enemy.resistances, modifier.resistances);
+  }
+
+  if (modifier.behaviorTraits) {
+    enemy.behaviorTraits = mergeBehaviorTraits(enemy.behaviorTraits, modifier.behaviorTraits);
+  }
+
+  if (typeof modifier.onApply === 'function') {
+    modifier.onApply(enemy, context);
+  }
+};
+
 export const createEnemyFromTemplate = (
   templateKey,
   template,
@@ -211,6 +348,101 @@ export const createEnemyFromTemplate = (
   enemy.strokeColor = strokeColor;
   enemy.opacity = overrides.opacity ?? enemy.opacity ?? 1;
   enemy.energyReward = resolveNumericValue(enemy.energyReward, defaultEnemy.energyReward);
+
+  enemy.tier = overrides.tier ?? template.tier ?? 'common';
+  enemy.variantOf = overrides.variantOf ?? template.variantOf ?? templateKey;
+  enemy.abilities = mergeArraysUnique(template.abilities || [], overrides.abilities || []);
+  enemy.resistances = combineResistances(template.resistances || {}, overrides.resistances || {});
+  enemy.behaviorTraits = mergeBehaviorTraits(template.behaviorTraits || {}, overrides.behaviorTraits || {});
+  enemy.activeBuffs = Array.isArray(overrides.activeBuffs) ? [...overrides.activeBuffs] : [];
+  enemy.dynamicModifiers = {
+    attackMultiplier: 1,
+    defenseMultiplier: 1,
+    speedMultiplier: 1,
+    sizeMultiplier: 1,
+    attackBonus: 0,
+    defenseBonus: 0,
+    speedBonus: 0,
+    sizeBonus: 0,
+  };
+
+  const context = {
+    templateKey,
+    template,
+    level,
+    evolutionLevel: enemy.evolutionLevel,
+  };
+
+  const staticModifiers = [];
+  const enqueueModifiers = (value) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => enqueueModifiers(item));
+      return;
+    }
+    if (typeof value === 'object') {
+      staticModifiers.push(value);
+    }
+  };
+
+  enqueueModifiers(template.modifiers);
+  enqueueModifiers(overrides.modifiers);
+
+  staticModifiers.forEach((modifier) => applyModifier(enemy, modifier, context));
+
+  if (Array.isArray(template.evolutionModifiers)) {
+    template.evolutionModifiers.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+
+      const minLevel = toFiniteNumber(entry.minLevel) ?? 1;
+      const maxLevel = toFiniteNumber(entry.maxLevel) ?? Number.POSITIVE_INFINITY;
+      const minEvolutionLevel = toFiniteNumber(entry.minEvolutionLevel) ?? 1;
+      const maxEvolutionLevel =
+        toFiniteNumber(entry.maxEvolutionLevel) ?? Number.POSITIVE_INFINITY;
+
+      if (
+        level < minLevel ||
+        level > maxLevel ||
+        enemy.evolutionLevel < minEvolutionLevel ||
+        enemy.evolutionLevel > maxEvolutionLevel
+      ) {
+        return;
+      }
+
+      if (entry.modifiers && typeof entry.modifiers === 'object') {
+        applyModifier(enemy, entry.modifiers, context);
+      }
+    });
+  }
+
+  enemy.attack = Math.max(
+    1,
+    Math.round(resolveNumericValue(enemy.attack, defaultEnemy.attack))
+  );
+  enemy.defense = Math.max(
+    0,
+    Math.round(resolveNumericValue(enemy.defense, defaultEnemy.defense))
+  );
+  enemy.size = Math.max(1, resolveNumericValue(enemy.size, defaultEnemy.size));
+  enemy.speed = Math.max(0, resolveNumericValue(enemy.speed, defaultEnemy.speed));
+  enemy.points = Math.max(0, Math.round(resolveNumericValue(enemy.points, defaultEnemy.points)));
+  enemy.health = Math.max(1, Math.round(resolveNumericValue(enemy.health, defaultEnemy.health)));
+  enemy.maxHealth = Math.max(
+    enemy.health,
+    Math.round(resolveNumericValue(enemy.maxHealth, defaultEnemy.maxHealth))
+  );
+  enemy.energyReward = resolveNumericValue(enemy.energyReward, defaultEnemy.energyReward);
+  enemy.projectileCooldown = resolveNumericValue(enemy.projectileCooldown, 0);
+
+  enemy.baseStats = {
+    size: enemy.size,
+    speed: enemy.speed,
+    attack: enemy.attack,
+    defense: enemy.defense,
+    maxHealth: enemy.maxHealth,
+    health: enemy.health,
+  };
+  enemy.baseResistances = { ...enemy.resistances };
 
   return enemy;
 };
