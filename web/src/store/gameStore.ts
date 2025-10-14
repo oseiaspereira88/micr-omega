@@ -1,10 +1,19 @@
 import { useSyncExternalStore } from "react";
 import {
   GamePhase,
+  HealthState,
+  Microorganism,
+  OrganicMatter,
+  Obstacle,
+  OrientationState,
   RankingEntry,
+  RoomObject,
   SharedGameState,
   SharedGameStateDiff,
   SharedPlayerState,
+  SharedWorldState,
+  SharedWorldStateDiff,
+  Vector2,
 } from "../utils/messageTypes";
 import { reportRealtimeLatency } from "../utils/observability";
 
@@ -36,6 +45,7 @@ export interface GameStoreState {
   room: RoomStateSnapshot;
   players: PlayerMap;
   ranking: RankingEntry[];
+  world: SharedWorldState;
 }
 
 const defaultRoomState: RoomStateSnapshot = {
@@ -44,6 +54,13 @@ const defaultRoomState: RoomStateSnapshot = {
   roundStartedAt: null,
   roundEndsAt: null,
 };
+
+const createEmptyWorldState = (): SharedWorldState => ({
+  microorganisms: [],
+  organicMatter: [],
+  obstacles: [],
+  roomObjects: [],
+});
 
 const initialState: GameStoreState = {
   connectionStatus: "idle",
@@ -57,6 +74,7 @@ const initialState: GameStoreState = {
   room: defaultRoomState,
   players: {},
   ranking: [],
+  world: createEmptyWorldState(),
 };
 
 type GameStoreListener = () => void;
@@ -86,6 +104,173 @@ const playersArrayToMap = (players: SharedPlayerState[]): PlayerMap => {
     record[player.id] = player;
   }
   return record;
+};
+
+const cloneVector = (vector: Vector2): Vector2 => ({ x: vector.x, y: vector.y });
+
+const cloneOrientation = (orientation: OrientationState): OrientationState =>
+  orientation.tilt === undefined
+    ? { angle: orientation.angle }
+    : { angle: orientation.angle, tilt: orientation.tilt };
+
+const cloneHealth = (health: HealthState): HealthState => ({
+  current: health.current,
+  max: health.max,
+});
+
+const cloneMicroorganism = (entity: Microorganism): Microorganism => ({
+  ...entity,
+  position: cloneVector(entity.position),
+  movementVector: cloneVector(entity.movementVector),
+  orientation: cloneOrientation(entity.orientation),
+  health: cloneHealth(entity.health),
+  attributes: { ...entity.attributes },
+});
+
+const cloneOrganicMatter = (matter: OrganicMatter): OrganicMatter => ({
+  ...matter,
+  position: cloneVector(matter.position),
+  nutrients: { ...matter.nutrients },
+});
+
+const cloneObstacle = (obstacle: Obstacle): Obstacle => ({
+  ...obstacle,
+  position: cloneVector(obstacle.position),
+  size: cloneVector(obstacle.size),
+  orientation: obstacle.orientation ? cloneOrientation(obstacle.orientation) : undefined,
+});
+
+const cloneRoomObject = (object: RoomObject): RoomObject => ({
+  ...object,
+  position: cloneVector(object.position),
+  state: object.state ? { ...object.state } : undefined,
+});
+
+const cloneWorldState = (world: SharedWorldState): SharedWorldState => ({
+  microorganisms: world.microorganisms.map(cloneMicroorganism),
+  organicMatter: world.organicMatter.map(cloneOrganicMatter),
+  obstacles: world.obstacles.map(cloneObstacle),
+  roomObjects: world.roomObjects.map(cloneRoomObject),
+});
+
+const applyWorldCategoryDiff = <T extends { id: string }>(
+  list: T[],
+  upserts: readonly T[] | undefined,
+  removals: readonly string[] | undefined,
+  cloneItem: (item: T) => T,
+): { changed: boolean; next: T[] } => {
+  let changed = false;
+  let result = list;
+
+  if (upserts && upserts.length > 0) {
+    const updatesById = new Map<string, T>();
+    for (const item of upserts) {
+      updatesById.set(item.id, cloneItem(item));
+    }
+
+    const merged: T[] = [];
+    for (const item of list) {
+      const update = updatesById.get(item.id);
+      if (update) {
+        merged.push(update);
+        updatesById.delete(item.id);
+        changed = true;
+      } else {
+        merged.push(item);
+      }
+    }
+
+    if (updatesById.size > 0) {
+      changed = true;
+      for (const value of updatesById.values()) {
+        merged.push(value);
+      }
+    }
+
+    result = merged;
+  }
+
+  if (removals && removals.length > 0) {
+    const removalSet = new Set(removals);
+    const filtered = result.filter((item) => !removalSet.has(item.id));
+    if (filtered.length !== result.length) {
+      changed = true;
+      result = filtered;
+    }
+  }
+
+  return changed ? { changed: true, next: result } : { changed: false, next: list };
+};
+
+const applyWorldDiff = (
+  world: SharedWorldState,
+  diff: SharedWorldStateDiff | undefined,
+): SharedWorldState => {
+  if (!diff) {
+    return world;
+  }
+
+  let mutated = false;
+  let nextWorld = world;
+
+  const ensureNextWorld = () => {
+    if (!mutated) {
+      nextWorld = {
+        microorganisms: world.microorganisms,
+        organicMatter: world.organicMatter,
+        obstacles: world.obstacles,
+        roomObjects: world.roomObjects,
+      };
+      mutated = true;
+    }
+    return nextWorld;
+  };
+
+  const microorganismsResult = applyWorldCategoryDiff(
+    world.microorganisms,
+    diff.upsertMicroorganisms,
+    diff.removeMicroorganismIds,
+    cloneMicroorganism,
+  );
+  if (microorganismsResult.changed) {
+    const target = ensureNextWorld();
+    target.microorganisms = microorganismsResult.next;
+  }
+
+  const organicMatterResult = applyWorldCategoryDiff(
+    world.organicMatter,
+    diff.upsertOrganicMatter,
+    diff.removeOrganicMatterIds,
+    cloneOrganicMatter,
+  );
+  if (organicMatterResult.changed) {
+    const target = ensureNextWorld();
+    target.organicMatter = organicMatterResult.next;
+  }
+
+  const obstacleResult = applyWorldCategoryDiff(
+    world.obstacles,
+    diff.upsertObstacles,
+    diff.removeObstacleIds,
+    cloneObstacle,
+  );
+  if (obstacleResult.changed) {
+    const target = ensureNextWorld();
+    target.obstacles = obstacleResult.next;
+  }
+
+  const roomObjectResult = applyWorldCategoryDiff(
+    world.roomObjects,
+    diff.upsertRoomObjects,
+    diff.removeRoomObjectIds,
+    cloneRoomObject,
+  );
+  if (roomObjectResult.changed) {
+    const target = ensureNextWorld();
+    target.roomObjects = roomObjectResult.next;
+  }
+
+  return mutated ? nextWorld : world;
 };
 
 const mergeDiffIntoPlayers = (
@@ -257,6 +442,7 @@ const applyFullState = (state: SharedGameState) => {
       roundEndsAt: state.roundEndsAt,
     },
     players: playersArrayToMap(state.players),
+    world: cloneWorldState(state.world),
   }));
 };
 
@@ -265,6 +451,7 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
     ...prev,
     room: deriveRoomFromState(diff, prev.room),
     players: mergeDiffIntoPlayers(prev.players, diff),
+    world: applyWorldDiff(prev.world, diff.world),
   }));
 };
 
@@ -308,6 +495,7 @@ const resetGameState = () => {
     playerId: preservedId,
     connectionStatus: preservedStatus,
     reconnectUntil: preservedReconnectUntil,
+    world: createEmptyWorldState(),
   }));
 };
 

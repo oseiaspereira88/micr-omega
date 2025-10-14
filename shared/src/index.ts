@@ -10,6 +10,27 @@ export const MAX_NAME_LENGTH = 24;
 export const MAX_PLAYER_ID_LENGTH = 64;
 export const MAX_ABILITY_ID_LENGTH = 64;
 export const MAX_VERSION_LENGTH = 16;
+export const MAX_WORLD_OBJECT_ID_LENGTH = 64;
+
+export const vector2Schema = z.object({
+  x: z.number().finite(),
+  y: z.number().finite()
+});
+
+export const orientationSchema = z.object({
+  angle: z.number().finite(),
+  tilt: z.number().finite().optional()
+});
+
+export const healthSchema = z
+  .object({
+    current: z.number().finite().nonnegative(),
+    max: z.number().finite().positive()
+  })
+  .refine((value) => value.current <= value.max, {
+    message: "health_exceeds_max",
+    path: ["current"]
+  });
 
 const playerNameSchema = z
   .string()
@@ -27,13 +48,99 @@ const abilityIdSchema = z
   .max(MAX_ABILITY_ID_LENGTH)
   .regex(ABILITY_ID_PATTERN, "ability_invalid_chars");
 
+const worldObjectIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_WORLD_OBJECT_ID_LENGTH);
+
+export const combatStatusSchema = z.object({
+  state: z.union([z.literal("idle"), z.literal("engaged"), z.literal("cooldown")]),
+  targetPlayerId: playerIdSchema.nullable().default(null),
+  targetObjectId: worldObjectIdSchema.nullable().default(null),
+  lastAttackAt: z.number().finite().nullable().default(null)
+});
+
 export const sharedPlayerStateSchema = z.object({
   id: playerIdSchema,
   name: playerNameSchema,
   connected: z.boolean(),
   score: z.number().finite(),
   combo: z.number().finite(),
-  lastActiveAt: z.number().finite()
+  lastActiveAt: z.number().finite(),
+  position: vector2Schema,
+  movementVector: vector2Schema,
+  orientation: orientationSchema,
+  health: healthSchema,
+  combatStatus: combatStatusSchema
+});
+
+export const microorganismSchema = z.object({
+  id: worldObjectIdSchema,
+  kind: z.literal("microorganism"),
+  species: z.string().trim().min(1).max(64),
+  position: vector2Schema,
+  movementVector: vector2Schema,
+  orientation: orientationSchema,
+  health: healthSchema,
+  aggression: z.union([z.literal("passive"), z.literal("neutral"), z.literal("hostile")]),
+  attributes: z
+    .object({
+      speed: z.number().finite().nonnegative().optional(),
+      damage: z.number().finite().nonnegative().optional(),
+      resilience: z.number().finite().nonnegative().optional()
+    })
+    .default({})
+});
+
+export const organicMatterSchema = z.object({
+  id: worldObjectIdSchema,
+  kind: z.literal("organic_matter"),
+  position: vector2Schema,
+  quantity: z.number().finite().nonnegative(),
+  nutrients: z.record(z.string().trim().min(1), z.number().finite()).default({})
+});
+
+export const obstacleSchema = z.object({
+  id: worldObjectIdSchema,
+  kind: z.literal("obstacle"),
+  position: vector2Schema,
+  size: vector2Schema,
+  orientation: orientationSchema.optional(),
+  impassable: z.boolean().default(true)
+});
+
+export const roomObjectSchema = z.object({
+  id: worldObjectIdSchema,
+  kind: z.literal("room_object"),
+  type: z.string().trim().min(1).max(64),
+  position: vector2Schema,
+  state: z.record(z.string().trim().min(1), z.unknown()).optional()
+});
+
+export const worldEntitySchema = z.discriminatedUnion("kind", [
+  microorganismSchema,
+  organicMatterSchema,
+  obstacleSchema,
+  roomObjectSchema
+]);
+
+export const sharedWorldStateSchema = z.object({
+  microorganisms: z.array(microorganismSchema),
+  organicMatter: z.array(organicMatterSchema),
+  obstacles: z.array(obstacleSchema),
+  roomObjects: z.array(roomObjectSchema)
+});
+
+export const sharedWorldStateDiffSchema = z.object({
+  upsertMicroorganisms: z.array(microorganismSchema).optional(),
+  removeMicroorganismIds: z.array(worldObjectIdSchema).optional(),
+  upsertOrganicMatter: z.array(organicMatterSchema).optional(),
+  removeOrganicMatterIds: z.array(worldObjectIdSchema).optional(),
+  upsertObstacles: z.array(obstacleSchema).optional(),
+  removeObstacleIds: z.array(worldObjectIdSchema).optional(),
+  upsertRoomObjects: z.array(roomObjectSchema).optional(),
+  removeRoomObjectIds: z.array(worldObjectIdSchema).optional()
 });
 
 export const sharedGameStateSchema = z.object({
@@ -41,7 +148,8 @@ export const sharedGameStateSchema = z.object({
   roundId: z.string().trim().min(1).max(64).nullable(),
   roundStartedAt: z.number().finite().nullable(),
   roundEndsAt: z.number().finite().nullable(),
-  players: z.array(sharedPlayerStateSchema)
+  players: z.array(sharedPlayerStateSchema),
+  world: sharedWorldStateSchema
 });
 
 export const sharedGameStateDiffSchema = z.object({
@@ -50,7 +158,8 @@ export const sharedGameStateDiffSchema = z.object({
   roundStartedAt: sharedGameStateSchema.shape.roundStartedAt.optional(),
   roundEndsAt: sharedGameStateSchema.shape.roundEndsAt.optional(),
   upsertPlayers: z.array(sharedPlayerStateSchema).optional(),
-  removedPlayerIds: z.array(playerIdSchema).optional()
+  removedPlayerIds: z.array(playerIdSchema).optional(),
+  world: sharedWorldStateDiffSchema.optional()
 });
 
 export const rankingEntrySchema = z.object({
@@ -97,12 +206,54 @@ export const abilityActionSchema = z.object({
   value: z.number().finite().optional()
 });
 
-export const playerActionSchema = z.discriminatedUnion("type", [
-  scoreActionSchema,
-  comboActionSchema,
-  deathActionSchema,
-  abilityActionSchema
-]);
+export const movementActionSchema = z.object({
+  type: z.literal("movement"),
+  position: vector2Schema,
+  movementVector: vector2Schema,
+  orientation: orientationSchema
+});
+
+const attackActionBaseSchema = z.object({
+  type: z.literal("attack"),
+  targetPlayerId: playerIdSchema.optional(),
+  targetObjectId: worldObjectIdSchema.optional(),
+  damage: z.number().finite().nonnegative().optional(),
+  state: combatStatusSchema.shape.state.optional(),
+  resultingHealth: healthSchema.optional()
+});
+
+export const attackActionSchema = attackActionBaseSchema;
+
+export const collectActionSchema = z.object({
+  type: z.literal("collect"),
+  objectId: worldObjectIdSchema,
+  quantity: z.number().finite().nonnegative().optional(),
+  resourceType: z.string().trim().min(1).max(64).optional()
+});
+
+export const playerActionSchema = z
+  .discriminatedUnion("type", [
+    scoreActionSchema,
+    comboActionSchema,
+    deathActionSchema,
+    abilityActionSchema,
+    movementActionSchema,
+    attackActionBaseSchema,
+    collectActionSchema
+  ])
+  .superRefine((value, ctx) => {
+    if (
+      value.type === "attack" &&
+      value.targetPlayerId === undefined &&
+      value.targetObjectId === undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "attack_target_required",
+        path: ["targetPlayerId"]
+      });
+    }
+  });
 
 export const actionMessageSchema = z.object({
   type: z.literal("action"),
@@ -111,11 +262,43 @@ export const actionMessageSchema = z.object({
   action: playerActionSchema
 });
 
-export const clientMessageSchema = z.discriminatedUnion("type", [
-  joinMessageSchema,
-  actionMessageSchema,
-  pingMessageSchema
-]);
+export const movementMessageSchema = movementActionSchema.extend({
+  playerId: playerIdSchema,
+  clientTime: z.number().finite().optional()
+});
+
+export const attackMessageSchema = attackActionBaseSchema.extend({
+  playerId: playerIdSchema,
+  clientTime: z.number().finite().optional()
+});
+
+export const collectMessageSchema = collectActionSchema.extend({
+  playerId: playerIdSchema,
+  clientTime: z.number().finite().optional()
+});
+
+export const clientMessageSchema = z
+  .discriminatedUnion("type", [
+    joinMessageSchema,
+    actionMessageSchema,
+    pingMessageSchema,
+    movementMessageSchema,
+    attackMessageSchema,
+    collectMessageSchema
+  ])
+  .superRefine((value, ctx) => {
+    if (
+      value.type === "attack" &&
+      value.targetPlayerId === undefined &&
+      value.targetObjectId === undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "attack_target_required",
+        path: ["targetPlayerId"]
+      });
+    }
+  });
 
 export const joinedMessageSchema = z.object({
   type: z.literal("joined"),
@@ -198,9 +381,20 @@ export const serverMessageSchema = z.union([
 ]);
 
 export type GamePhase = z.infer<typeof sharedGameStateSchema.shape.phase>;
+export type Vector2 = z.infer<typeof vector2Schema>;
+export type OrientationState = z.infer<typeof orientationSchema>;
+export type HealthState = z.infer<typeof healthSchema>;
+export type CombatStatus = z.infer<typeof combatStatusSchema>;
 export type SharedPlayerState = z.infer<typeof sharedPlayerStateSchema>;
 export type SharedGameState = z.infer<typeof sharedGameStateSchema>;
 export type SharedGameStateDiff = z.infer<typeof sharedGameStateDiffSchema>;
+export type SharedWorldState = z.infer<typeof sharedWorldStateSchema>;
+export type SharedWorldStateDiff = z.infer<typeof sharedWorldStateDiffSchema>;
+export type Microorganism = z.infer<typeof microorganismSchema>;
+export type OrganicMatter = z.infer<typeof organicMatterSchema>;
+export type Obstacle = z.infer<typeof obstacleSchema>;
+export type RoomObject = z.infer<typeof roomObjectSchema>;
+export type WorldEntity = z.infer<typeof worldEntitySchema>;
 export type RankingEntry = z.infer<typeof rankingEntrySchema>;
 export type RankingMessage = z.infer<typeof rankingMessageSchema>;
 export type JoinMessage = z.infer<typeof joinMessageSchema>;
@@ -209,8 +403,14 @@ export type PlayerScoreAction = z.infer<typeof scoreActionSchema>;
 export type PlayerComboAction = z.infer<typeof comboActionSchema>;
 export type PlayerDeathAction = z.infer<typeof deathActionSchema>;
 export type PlayerAbilityAction = z.infer<typeof abilityActionSchema>;
+export type PlayerMovementAction = z.infer<typeof movementActionSchema>;
+export type PlayerAttackAction = z.infer<typeof attackActionSchema>;
+export type PlayerCollectAction = z.infer<typeof collectActionSchema>;
 export type PlayerAction = z.infer<typeof playerActionSchema>;
 export type ActionMessage = z.infer<typeof actionMessageSchema>;
+export type MovementMessage = z.infer<typeof movementMessageSchema>;
+export type AttackMessage = z.infer<typeof attackMessageSchema>;
+export type CollectMessage = z.infer<typeof collectMessageSchema>;
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 export type JoinedMessage = z.infer<typeof joinedMessageSchema>;
 export type StateFullMessage = z.infer<typeof stateFullMessageSchema>;

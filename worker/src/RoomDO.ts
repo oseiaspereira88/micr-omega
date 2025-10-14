@@ -12,8 +12,11 @@ import {
   type JoinedMessage,
   type JoinMessage,
   type PlayerAction,
+  type PlayerAttackAction,
+  type PlayerCollectAction,
   type PlayerLeftMessage,
   type PlayerJoinedMessage,
+  type PlayerMovementAction,
   type PongMessage,
   type RankingEntry,
   type RankingMessage,
@@ -22,8 +25,13 @@ import {
   type ServerMessage,
   type SharedGameState,
   type SharedGameStateDiff,
+  type SharedWorldState,
   type StateDiffMessage,
-  type StateFullMessage
+  type StateFullMessage,
+  type Vector2,
+  type OrientationState,
+  type HealthState,
+  type CombatStatus
 } from "./types";
 
 const MIN_PLAYERS_TO_START = 2;
@@ -85,9 +93,17 @@ type StoredPlayer = {
   name: string;
   score: number;
   combo: number;
+  position: Vector2;
+  movementVector: Vector2;
+  orientation: OrientationState;
+  health: HealthState;
+  combatStatus: CombatStatus;
   totalSessionDurationMs?: number;
   sessionCount?: number;
 };
+
+type StoredPlayerSnapshot = Omit<StoredPlayer, "position" | "movementVector" | "orientation" | "health" | "combatStatus"> &
+  Partial<Pick<StoredPlayer, "position" | "movementVector" | "orientation" | "health" | "combatStatus">>;
 
 type PlayerInternal = StoredPlayer & {
   connected: boolean;
@@ -99,6 +115,89 @@ type PlayerInternal = StoredPlayer & {
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
+
+const createVector = (vector?: Vector2): Vector2 => ({
+  x: vector?.x ?? 0,
+  y: vector?.y ?? 0,
+});
+
+const cloneVector = (vector: Vector2): Vector2 => ({ x: vector.x, y: vector.y });
+
+const createOrientation = (orientation?: OrientationState): OrientationState => {
+  if (!orientation) {
+    return { angle: 0 };
+  }
+  return orientation.tilt === undefined
+    ? { angle: orientation.angle }
+    : { angle: orientation.angle, tilt: orientation.tilt };
+};
+
+const cloneOrientation = (orientation: OrientationState): OrientationState =>
+  orientation.tilt === undefined
+    ? { angle: orientation.angle }
+    : { angle: orientation.angle, tilt: orientation.tilt };
+
+const createHealthState = (health?: HealthState): HealthState => {
+  const max = health?.max ?? 100;
+  const current = health?.current ?? max;
+  return {
+    current: Math.max(0, Math.min(max, current)),
+    max,
+  };
+};
+
+const cloneHealthState = (health: HealthState): HealthState => ({
+  current: health.current,
+  max: health.max,
+});
+
+const createCombatStatusState = (status?: CombatStatus): CombatStatus => ({
+  state: status?.state ?? "idle",
+  targetPlayerId: status?.targetPlayerId ?? null,
+  targetObjectId: status?.targetObjectId ?? null,
+  lastAttackAt: status?.lastAttackAt ?? null,
+});
+
+const cloneCombatStatusState = (status: CombatStatus): CombatStatus => ({
+  state: status.state,
+  targetPlayerId: status.targetPlayerId,
+  targetObjectId: status.targetObjectId,
+  lastAttackAt: status.lastAttackAt,
+});
+
+const createEmptyWorldState = (): SharedWorldState => ({
+  microorganisms: [],
+  organicMatter: [],
+  obstacles: [],
+  roomObjects: [],
+});
+
+const cloneWorldState = (world: SharedWorldState): SharedWorldState => ({
+  microorganisms: world.microorganisms.map((entity) => ({
+    ...entity,
+    position: cloneVector(entity.position),
+    movementVector: cloneVector(entity.movementVector),
+    orientation: cloneOrientation(entity.orientation),
+    health: cloneHealthState(entity.health),
+    attributes: { ...entity.attributes },
+  })),
+  organicMatter: world.organicMatter.map((matter) => ({
+    ...matter,
+    position: cloneVector(matter.position),
+    nutrients: { ...matter.nutrients },
+  })),
+  obstacles: world.obstacles.map((obstacle) => ({
+    ...obstacle,
+    position: cloneVector(obstacle.position),
+    size: cloneVector(obstacle.size),
+    orientation: obstacle.orientation ? cloneOrientation(obstacle.orientation) : undefined,
+  })),
+  roomObjects: world.roomObjects.map((object) => ({
+    ...object,
+    position: cloneVector(object.position),
+    state: object.state ? { ...object.state } : undefined,
+  })),
+});
 
 export class RoomDO {
   private readonly state: DurableObjectState;
@@ -119,6 +218,8 @@ export class RoomDO {
   private roundId: string | null = null;
   private roundStartedAt: number | null = null;
   private roundEndsAt: number | null = null;
+
+  private world: SharedWorldState = createEmptyWorldState();
 
   private alarmSchedule: Map<AlarmType, number> = new Map();
 
@@ -240,18 +341,29 @@ export class RoomDO {
   }
 
   private async initialize(): Promise<void> {
-    const storedPlayers = await this.state.storage.get<StoredPlayer[]>(PLAYERS_KEY);
+    const storedPlayers = await this.state.storage.get<StoredPlayerSnapshot[]>(PLAYERS_KEY);
     if (storedPlayers) {
       const now = Date.now();
       for (const stored of storedPlayers) {
+        const normalized: StoredPlayer = {
+          id: stored.id,
+          name: stored.name,
+          score: stored.score,
+          combo: stored.combo,
+          position: createVector(stored.position),
+          movementVector: createVector(stored.movementVector),
+          orientation: createOrientation(stored.orientation),
+          health: createHealthState(stored.health),
+          combatStatus: createCombatStatusState(stored.combatStatus),
+          totalSessionDurationMs: stored.totalSessionDurationMs ?? 0,
+          sessionCount: stored.sessionCount ?? 0
+        };
         const player: PlayerInternal = {
-          ...stored,
+          ...normalized,
           connected: false,
           lastActiveAt: now,
           lastSeenAt: now,
-          connectedAt: null,
-          totalSessionDurationMs: stored.totalSessionDurationMs ?? 0,
-          sessionCount: stored.sessionCount ?? 0
+          connectedAt: null
         };
         this.players.set(player.id, player);
         this.nameToPlayerId.set(player.name.toLowerCase(), player.id);
@@ -356,6 +468,54 @@ export class RoomDO {
           void this.handleActionMessage(parsed, socket);
           break;
         }
+        case "movement": {
+          const knownId = playerId ?? this.clientsBySocket.get(socket);
+          if (!knownId || knownId !== parsed.playerId) {
+            this.send(socket, { type: "error", reason: "unknown_player" });
+            return;
+          }
+          const { playerId: movementPlayerId, clientTime, ...movement } = parsed;
+          const normalized: ActionMessage = {
+            type: "action",
+            playerId: movementPlayerId,
+            ...(clientTime !== undefined ? { clientTime } : {}),
+            action: movement as PlayerMovementAction,
+          };
+          void this.handleActionMessage(normalized, socket);
+          break;
+        }
+        case "attack": {
+          const knownId = playerId ?? this.clientsBySocket.get(socket);
+          if (!knownId || knownId !== parsed.playerId) {
+            this.send(socket, { type: "error", reason: "unknown_player" });
+            return;
+          }
+          const { playerId: attackPlayerId, clientTime, ...attack } = parsed;
+          const normalized: ActionMessage = {
+            type: "action",
+            playerId: attackPlayerId,
+            ...(clientTime !== undefined ? { clientTime } : {}),
+            action: attack as PlayerAttackAction,
+          };
+          void this.handleActionMessage(normalized, socket);
+          break;
+        }
+        case "collect": {
+          const knownId = playerId ?? this.clientsBySocket.get(socket);
+          if (!knownId || knownId !== parsed.playerId) {
+            this.send(socket, { type: "error", reason: "unknown_player" });
+            return;
+          }
+          const { playerId: collectPlayerId, clientTime, ...collect } = parsed;
+          const normalized: ActionMessage = {
+            type: "action",
+            playerId: collectPlayerId,
+            ...(clientTime !== undefined ? { clientTime } : {}),
+            action: collect as PlayerCollectAction,
+          };
+          void this.handleActionMessage(normalized, socket);
+          break;
+        }
         case "ping":
           void this.handlePing(socket, parsed.ts);
           break;
@@ -436,6 +596,11 @@ export class RoomDO {
         name: normalizedName,
         score: 0,
         combo: 1,
+        position: createVector(),
+        movementVector: createVector(),
+        orientation: createOrientation(),
+        health: createHealthState(),
+        combatStatus: createCombatStatusState(),
         connected: true,
         lastActiveAt: now,
         lastSeenAt: now,
@@ -565,7 +730,7 @@ export class RoomDO {
       return;
     }
 
-    const result = this.applyPlayerAction(player, payload.action);
+    const result = this.applyPlayerAction(player, payload.action, payload.clientTime);
     if (!result) {
       this.send(socket, { type: "error", reason: "invalid_payload" });
       return;
@@ -593,7 +758,11 @@ export class RoomDO {
     this.broadcast(rankingMessage);
   }
 
-  private applyPlayerAction(player: PlayerInternal, action: PlayerAction): boolean {
+  private applyPlayerAction(
+    player: PlayerInternal,
+    action: PlayerAction,
+    clientTime?: number
+  ): boolean {
     switch (action.type) {
       case "score": {
         const amount = clamp(Math.round(action.amount), -MAX_SCORE_DELTA, MAX_SCORE_DELTA);
@@ -619,6 +788,41 @@ export class RoomDO {
         if (value !== 0) {
           player.score = Math.max(0, player.score + value);
         }
+        return true;
+      }
+      case "movement": {
+        player.position = cloneVector(action.position);
+        player.movementVector = cloneVector(action.movementVector);
+        player.orientation = cloneOrientation(action.orientation);
+        return true;
+      }
+      case "attack": {
+        const lastAttackAt = clientTime ?? Date.now();
+        player.combatStatus = createCombatStatusState({
+          state: action.state ?? "engaged",
+          targetPlayerId: action.targetPlayerId ?? null,
+          targetObjectId: action.targetObjectId ?? null,
+          lastAttackAt,
+        });
+
+        if (action.resultingHealth) {
+          player.health = createHealthState(action.resultingHealth);
+        } else if (typeof action.damage === "number") {
+          const next = Math.max(0, player.health.current - action.damage);
+          player.health = {
+            current: Math.max(0, Math.min(player.health.max, next)),
+            max: player.health.max,
+          };
+        }
+        return true;
+      }
+      case "collect": {
+        player.combatStatus = createCombatStatusState({
+          state: "idle",
+          targetPlayerId: null,
+          targetObjectId: action.objectId,
+          lastAttackAt: player.combatStatus.lastAttackAt,
+        });
         return true;
       }
       default:
@@ -864,6 +1068,7 @@ export class RoomDO {
     this.roundId = null;
     this.roundStartedAt = null;
     this.roundEndsAt = null;
+    this.world = createEmptyWorldState();
 
     for (const player of this.players.values()) {
       player.combo = 1;
@@ -894,7 +1099,12 @@ export class RoomDO {
       connected: player.connected,
       score: player.score,
       combo: player.combo,
-      lastActiveAt: player.lastActiveAt
+      lastActiveAt: player.lastActiveAt,
+      position: cloneVector(player.position),
+      movementVector: cloneVector(player.movementVector),
+      orientation: cloneOrientation(player.orientation),
+      health: cloneHealthState(player.health),
+      combatStatus: cloneCombatStatusState(player.combatStatus)
     };
   }
 
@@ -908,7 +1118,8 @@ export class RoomDO {
       roundId: this.roundId,
       roundStartedAt: this.roundStartedAt,
       roundEndsAt: this.roundEndsAt,
-      players
+      players,
+      world: cloneWorldState(this.world)
     };
   }
 
@@ -1094,6 +1305,11 @@ export class RoomDO {
       name: player.name,
       score: player.score,
       combo: player.combo,
+      position: cloneVector(player.position),
+      movementVector: cloneVector(player.movementVector),
+      orientation: cloneOrientation(player.orientation),
+      health: cloneHealthState(player.health),
+      combatStatus: cloneCombatStatusState(player.combatStatus),
       totalSessionDurationMs: player.totalSessionDurationMs ?? 0,
       sessionCount: player.sessionCount ?? 0
     }));
