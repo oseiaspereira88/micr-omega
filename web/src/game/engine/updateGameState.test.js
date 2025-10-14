@@ -190,6 +190,80 @@ describe('updateGameState', () => {
     expect(result.localPlayerId).toBe('p1');
   });
 
+  it('creates a renderer-ready playerList from synchronized players', () => {
+    const renderState = createRenderState();
+    const localPlayer = createPlayer({
+      id: 'pilot-local',
+      name: 'Pilot',
+      position: { x: 12, y: 6 },
+      movementVector: { x: 0.75, y: 0 },
+      orientation: { angle: Math.PI / 4 },
+      combatStatus: {
+        state: 'engaged',
+        targetPlayerId: 'raider-remote',
+        targetObjectId: null,
+        lastAttackAt: 4200,
+      },
+    });
+    const remotePlayer = createPlayer({
+      id: 'raider-remote',
+      name: 'Raider',
+      position: { x: -8, y: -20 },
+      movementVector: { x: 0, y: 1 },
+      orientation: { angle: Math.PI / 2 },
+      health: { current: 14, max: 20 },
+    });
+    const sharedState = createSharedState({
+      playerId: localPlayer.id,
+      players: [localPlayer, remotePlayer],
+    });
+
+    updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.1,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    // Snapshot mínimo: jogador local engajado e adversário remoto para alimentar o renderer.
+    expect(renderState.playerList.map((player) => player.id)).toEqual([
+      'raider-remote',
+      'pilot-local',
+    ]);
+    const localRenderPlayer = renderState.playerList.find((player) => player.id === localPlayer.id);
+    const remoteRenderPlayer = renderState.playerList.find((player) => player.id === remotePlayer.id);
+
+    expect(localRenderPlayer).toMatchObject({
+      id: 'pilot-local',
+      isLocal: true,
+      name: 'Pilot',
+      combatStatus: expect.objectContaining({
+        state: 'engaged',
+        targetPlayerId: 'raider-remote',
+      }),
+    });
+    expect(localRenderPlayer.palette).toEqual(
+      expect.objectContaining({ base: expect.any(String), accent: expect.any(String), label: expect.any(String) })
+    );
+    expect(localRenderPlayer.renderPosition).toEqual(
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) })
+    );
+
+    expect(remoteRenderPlayer).toMatchObject({
+      id: 'raider-remote',
+      isLocal: false,
+      name: 'Raider',
+    });
+    expect(remoteRenderPlayer.palette).toEqual(
+      expect.objectContaining({ base: expect.any(String), accent: expect.any(String), label: expect.any(String) })
+    );
+
+    expect(renderState.combatIndicators).toEqual([
+      expect.objectContaining({ id: 'pilot-local', targetPlayerId: 'raider-remote' }),
+    ]);
+  });
+
   it('builds HUD snapshot with opponents list', () => {
     const renderState = createRenderState();
     const sharedState = createSharedState();
@@ -213,9 +287,52 @@ describe('updateGameState', () => {
     );
   });
 
-  it('maps world entities into renderable state', () => {
+  it('maps microorganisms into renderer-friendly descriptors', () => {
     const renderState = createRenderState();
-    const sharedState = createSharedState();
+    const sharedState = createSharedState({
+      // Snapshot mínimo multiplayer: jogador local, rival remoto e um único microrganismo hostil.
+      world: {
+        microorganisms: [
+          {
+            id: 'hostile-micro-1',
+            species: 'rotifer',
+            position: { x: 64, y: -32 },
+            movementVector: { x: -0.2, y: 0.4 },
+            orientation: { angle: 0 },
+            health: { current: 3, max: 9 },
+            classification: 'boss',
+          },
+        ],
+        organicMatter: [
+          {
+            id: 'nutrient-1',
+            kind: 'organic_matter',
+            position: { x: 8, y: 12 },
+            quantity: 4,
+            nutrients: {},
+          },
+        ],
+        obstacles: [
+          {
+            id: 'wall-1',
+            kind: 'obstacle',
+            position: { x: 0, y: 0 },
+            size: { x: 24, y: 48 },
+            orientation: { angle: Math.PI / 6 },
+            impassable: true,
+          },
+        ],
+        roomObjects: [
+          {
+            id: 'console-1',
+            kind: 'room_object',
+            type: 'control',
+            position: { x: -12, y: 20 },
+            state: {},
+          },
+        ],
+      },
+    });
 
     updateGameState({
       renderState,
@@ -227,16 +344,53 @@ describe('updateGameState', () => {
 
     const microorganism = renderState.worldView.microorganisms[0];
     expect(microorganism).toMatchObject({
-      id: 'micro-1',
-      color: '#88c0ff',
-      health: 4,
-      maxHealth: 8,
+      id: 'hostile-micro-1',
+      x: 64,
+      y: -32,
+      vx: -0.2,
+      vy: 0.4,
+      color: '#ffa3d0',
+      outerColor: '#ffa3d0',
+      health: 3,
+      maxHealth: 9,
+      boss: true,
+      opacity: 0.6,
+      depth: 0.5,
     });
+    expect(microorganism.size).toBeCloseTo(Math.sqrt(9) * 2, 5);
     expect(typeof microorganism.coreColor).toBe('string');
-    expect(typeof microorganism.outerColor).toBe('string');
     expect(typeof microorganism.shadowColor).toBe('string');
-    expect(renderState.worldView.obstacles[0]).toMatchObject({ id: 'obstacle-1', width: 30, height: 60 });
-    expect(renderState.combatIndicators).not.toHaveLength(0);
+
+    const initialPhase = microorganism.animPhase;
+
+    sharedState.world.microorganisms[0] = {
+      ...sharedState.world.microorganisms[0],
+      movementVector: { x: 0.3, y: -0.1 },
+      health: { current: 1, max: 9 },
+    };
+
+    updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    const updatedMicroorganism = renderState.worldView.microorganisms[0];
+    expect(updatedMicroorganism.animPhase).toBeCloseTo(initialPhase, 5);
+    expect(updatedMicroorganism.vx).toBeCloseTo(0.3, 5);
+    expect(updatedMicroorganism.vy).toBeCloseTo(-0.1, 5);
+    expect(updatedMicroorganism.health).toBe(1);
+
+    expect(renderState.worldView.obstacles[0]).toMatchObject({
+      id: 'wall-1',
+      width: 24,
+      height: 48,
+      orientation: Math.PI / 6,
+    });
+    expect(renderState.worldView.organicMatter[0]).toMatchObject({ id: 'nutrient-1', quantity: 4 });
+    expect(renderState.worldView.roomObjects[0]).toMatchObject({ id: 'console-1', type: 'control' });
   });
 });
 
