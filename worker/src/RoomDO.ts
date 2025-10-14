@@ -57,8 +57,10 @@ const MAX_MESSAGES_GLOBAL = 600;
 const PLAYERS_KEY = "players";
 const WORLD_KEY = "world";
 const ALARM_KEY = "alarms";
+const SNAPSHOT_STATE_KEY = "snapshot_state";
 
 const WORLD_TICK_INTERVAL_MS = 250;
+const SNAPSHOT_FLUSH_INTERVAL_MS = 500;
 const PLAYER_ATTACK_COOLDOWN_MS = 800;
 const PLAYER_COLLECT_RADIUS = 60;
 const PLAYER_ATTACK_RANGE_BUFFER = 4;
@@ -104,9 +106,16 @@ class MessageRateLimiter {
   }
 }
 
-type AlarmType = "waiting_start" | "round_end" | "reset" | "cleanup" | "world_tick";
+type PersistentAlarmType = "waiting_start" | "round_end" | "reset" | "cleanup" | "world_tick";
+type AlarmType = PersistentAlarmType | "snapshot";
 
-type AlarmSnapshot = Record<AlarmType, number | null>;
+type AlarmSnapshot = Record<PersistentAlarmType, number | null>;
+
+type SnapshotState = {
+  playersDirty: boolean;
+  worldDirty: boolean;
+  pendingSnapshotAlarm: number | null;
+};
 
 type StoredPlayer = {
   id: string;
@@ -413,6 +422,9 @@ export class RoomDO {
   private lastWorldTickAt: number | null = null;
 
   private alarmSchedule: Map<AlarmType, number> = new Map();
+  private playersDirty = false;
+  private worldDirty = false;
+  private pendingSnapshotAlarm: number | null = null;
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
@@ -489,6 +501,9 @@ export class RoomDO {
           break;
         case "world_tick":
           await this.handleWorldTickAlarm(now);
+          break;
+        case "snapshot":
+          await this.flushSnapshots();
           break;
       }
     }
@@ -575,10 +590,21 @@ export class RoomDO {
     this.rebuildWorldCaches();
     this.lastWorldTickAt = Date.now();
 
+    const storedSnapshotState = await this.state.storage.get<SnapshotState>(SNAPSHOT_STATE_KEY);
+    if (storedSnapshotState) {
+      this.playersDirty = storedSnapshotState.playersDirty ?? false;
+      this.worldDirty = storedSnapshotState.worldDirty ?? false;
+      this.pendingSnapshotAlarm = storedSnapshotState.pendingSnapshotAlarm ?? null;
+    } else {
+      this.playersDirty = false;
+      this.worldDirty = false;
+      this.pendingSnapshotAlarm = null;
+    }
+
     const storedAlarms = await this.state.storage.get<AlarmSnapshot>(ALARM_KEY);
     if (storedAlarms) {
       this.alarmSchedule = new Map(
-        (Object.entries(storedAlarms) as [AlarmType, number | null][]).filter(([, ts]) => ts != null)
+        (Object.entries(storedAlarms) as [PersistentAlarmType, number | null][]).filter(([, ts]) => ts != null)
       );
     }
 
@@ -588,8 +614,28 @@ export class RoomDO {
       alarmsModified = true;
     }
 
+    let snapshotAlarmModified = false;
+    if (this.playersDirty || this.worldDirty) {
+      const now = Date.now();
+      const desired = this.pendingSnapshotAlarm ?? now + SNAPSHOT_FLUSH_INTERVAL_MS;
+      const normalized = Math.max(now, desired);
+      if (this.pendingSnapshotAlarm !== normalized) {
+        this.pendingSnapshotAlarm = normalized;
+        snapshotAlarmModified = true;
+      }
+      this.alarmSchedule.set("snapshot", this.pendingSnapshotAlarm);
+    } else {
+      this.pendingSnapshotAlarm = null;
+      this.alarmSchedule.delete("snapshot");
+      snapshotAlarmModified = storedSnapshotState?.pendingSnapshotAlarm != null;
+    }
+
     if (alarmsModified) {
       await this.persistAlarms();
+    }
+
+    if (snapshotAlarmModified) {
+      await this.persistSnapshotState();
     }
 
     await this.syncAlarms();
@@ -608,6 +654,91 @@ export class RoomDO {
 
   private scheduleWorldTick(reference: number = Date.now()): void {
     this.alarmSchedule.set("world_tick", reference + WORLD_TICK_INTERVAL_MS);
+  }
+
+  private queueSnapshotStatePersist(): void {
+    void this.persistSnapshotState().catch((error) => {
+      this.observability.logError("snapshot_state_persist_failed", error, {
+        category: "persistence"
+      });
+    });
+  }
+
+  private queueSyncAlarms(): void {
+    void this.syncAlarms().catch((error) => {
+      this.observability.logError("alarm_sync_failed", error, {
+        category: "persistence"
+      });
+    });
+  }
+
+  private scheduleSnapshotFlush(targetTimestamp?: number): boolean {
+    const now = Date.now();
+    const desired =
+      targetTimestamp !== undefined ? Math.max(targetTimestamp, now) : now + SNAPSHOT_FLUSH_INTERVAL_MS;
+
+    if (this.pendingSnapshotAlarm !== null && this.pendingSnapshotAlarm <= desired) {
+      this.alarmSchedule.set("snapshot", this.pendingSnapshotAlarm);
+      return false;
+    }
+
+    this.pendingSnapshotAlarm = desired;
+    this.alarmSchedule.set("snapshot", desired);
+    this.queueSyncAlarms();
+    return true;
+  }
+
+  private markPlayersDirty(): void {
+    const wasDirty = this.playersDirty;
+    this.playersDirty = true;
+    const pendingChanged = this.scheduleSnapshotFlush();
+    if (!wasDirty || pendingChanged) {
+      this.queueSnapshotStatePersist();
+    }
+  }
+
+  private markWorldDirty(): void {
+    const wasDirty = this.worldDirty;
+    this.worldDirty = true;
+    const pendingChanged = this.scheduleSnapshotFlush();
+    if (!wasDirty || pendingChanged) {
+      this.queueSnapshotStatePersist();
+    }
+  }
+
+  private async flushSnapshots(options: { force?: boolean } = {}): Promise<void> {
+    const { force = false } = options;
+    const shouldPersistPlayers = force || this.playersDirty;
+    const shouldPersistWorld = force || this.worldDirty;
+
+    if (!shouldPersistPlayers && !shouldPersistWorld) {
+      if (force && this.pendingSnapshotAlarm !== null) {
+        this.pendingSnapshotAlarm = null;
+        this.alarmSchedule.delete("snapshot");
+        await this.persistSnapshotState();
+        await this.syncAlarms();
+      }
+      return;
+    }
+
+    this.playersDirty = false;
+    this.worldDirty = false;
+    this.pendingSnapshotAlarm = null;
+    this.alarmSchedule.delete("snapshot");
+
+    if (shouldPersistPlayers) {
+      await this.persistPlayers();
+    }
+
+    if (shouldPersistWorld) {
+      await this.persistWorld();
+    }
+
+    await this.persistSnapshotState();
+
+    if (force) {
+      await this.syncAlarms();
+    }
   }
 
   private clampPosition(position: Vector2): Vector2 {
@@ -1241,7 +1372,7 @@ export class RoomDO {
     this.clientsBySocket.set(socket, player.id);
     this.socketsByPlayer.set(player.id, socket);
 
-    await this.persistPlayers();
+    this.markPlayersDirty();
 
     const connectedPlayers = this.countConnectedPlayers();
     const isReconnect = payload.playerId === player.id && !expiredPlayerRemoved;
@@ -1351,11 +1482,11 @@ export class RoomDO {
     }
 
     if (result.updatedPlayers.length > 0 || result.scoresChanged) {
-      await this.persistPlayers();
+      this.markPlayersDirty();
     }
 
     if (result.worldDiff) {
-      await this.persistWorld();
+      this.markWorldDirty();
     }
 
     const diff: SharedGameStateDiff = {};
@@ -1577,7 +1708,7 @@ export class RoomDO {
       });
     }
 
-    await this.persistPlayers();
+    this.markPlayersDirty();
 
     await this.scheduleCleanupAlarm();
 
@@ -1714,11 +1845,11 @@ export class RoomDO {
     const hasCombatLog = combatLog.length > 0;
 
     if (hasPlayerUpdates || scoresChanged) {
-      await this.persistPlayers();
+      this.markPlayersDirty();
     }
 
     if (hasWorldDiff || worldChanged) {
-      await this.persistWorld();
+      this.markWorldDirty();
     }
 
     const diff: SharedGameStateDiff = {};
@@ -1850,9 +1981,7 @@ export class RoomDO {
     this.broadcast(rankingMessage);
     this.broadcast(resetMessage);
 
-    if (reason === "completed") {
-      await this.persistPlayers();
-    }
+    await this.flushSnapshots({ force: true });
 
     const duration = this.roundStartedAt ? this.roundEndsAt - this.roundStartedAt : null;
     this.observability.log("info", "round_ended", {
@@ -1883,8 +2012,7 @@ export class RoomDO {
     await this.persistAlarms();
     await this.syncAlarms();
 
-    await this.persistPlayers();
-    await this.persistWorld();
+    await this.flushSnapshots({ force: true });
 
     this.lastWorldTickAt = Date.now();
     this.scheduleWorldTick(this.lastWorldTickAt);
@@ -2016,7 +2144,7 @@ export class RoomDO {
       return;
     }
 
-    await this.persistPlayers();
+    this.markPlayersDirty();
 
     const diff: SharedGameStateDiff = { removedPlayerIds: [removed.id] };
     const stateMessage: StateDiffMessage = { type: "state", mode: "diff", state: diff };
@@ -2055,7 +2183,7 @@ export class RoomDO {
       return;
     }
 
-    await this.persistPlayers();
+    this.markPlayersDirty();
 
     const leftMessage: PlayerLeftMessage = {
       type: "player_left",
@@ -2130,6 +2258,21 @@ export class RoomDO {
 
   private async persistWorld(): Promise<void> {
     await this.state.storage.put(WORLD_KEY, cloneWorldState(this.world));
+  }
+
+  private async persistSnapshotState(): Promise<void> {
+    if (!this.playersDirty && !this.worldDirty && this.pendingSnapshotAlarm === null) {
+      await this.state.storage.delete(SNAPSHOT_STATE_KEY);
+      return;
+    }
+
+    const snapshotState: SnapshotState = {
+      playersDirty: this.playersDirty,
+      worldDirty: this.worldDirty,
+      pendingSnapshotAlarm: this.pendingSnapshotAlarm,
+    };
+
+    await this.state.storage.put(SNAPSHOT_STATE_KEY, snapshotState);
   }
 
   private async persistAlarms(): Promise<void> {
