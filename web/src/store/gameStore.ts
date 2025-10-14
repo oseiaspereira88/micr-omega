@@ -12,7 +12,6 @@ import {
   SharedGameStateDiff,
   SharedPlayerState,
   SharedWorldState,
-  SharedWorldStateDiff,
   Vector2,
 } from "../utils/messageTypes";
 import { reportRealtimeLatency } from "../utils/observability";
@@ -25,6 +24,120 @@ export type ConnectionStatus =
   | "disconnected";
 
 export type PlayerMap = Record<string, SharedPlayerState>;
+
+export type EntityCollection<T extends { id: string }> = {
+  byId: Record<string, T>;
+  all: T[];
+};
+
+type WorldCollections = {
+  microorganisms: EntityCollection<Microorganism>;
+  organicMatter: EntityCollection<OrganicMatter>;
+  obstacles: EntityCollection<Obstacle>;
+  roomObjects: EntityCollection<RoomObject>;
+};
+
+const createEmptyEntityCollection = <T extends { id: string }>(): EntityCollection<T> => ({
+  byId: {},
+  all: [],
+});
+
+const createEntityCollectionFromArray = <T extends { id: string }>(
+  items: readonly T[],
+  cloneItem: (item: T) => T,
+): EntityCollection<T> => {
+  const all = items.map((item) => cloneItem(item));
+  const byId: Record<string, T> = {};
+  for (const item of all) {
+    byId[item.id] = item;
+  }
+  return { byId, all };
+};
+
+const applyEntityCollectionDiff = <T extends { id: string }>(
+  collection: EntityCollection<T>,
+  upserts: readonly T[] | undefined,
+  removals: readonly string[] | undefined,
+  cloneItem: (item: T) => T,
+): { next: EntityCollection<T>; changed: boolean } => {
+  let nextAll = collection.all;
+  let nextById = collection.byId;
+  let changed = false;
+
+  if (upserts && upserts.length > 0) {
+    nextAll = collection.all.slice();
+    nextById = { ...collection.byId };
+    const indexById = new Map<string, number>();
+    nextAll.forEach((item, index) => {
+      indexById.set(item.id, index);
+    });
+
+    for (const entry of upserts) {
+      const cloned = cloneItem(entry);
+      const existingIndex = indexById.get(cloned.id);
+      if (existingIndex !== undefined) {
+        nextAll[existingIndex] = cloned;
+      } else {
+        indexById.set(cloned.id, nextAll.push(cloned) - 1);
+      }
+      nextById[cloned.id] = cloned;
+    }
+
+    changed = true;
+  }
+
+  if (removals && removals.length > 0) {
+    const removalSet = new Set(removals);
+    if (removalSet.size > 0) {
+      if (!changed) {
+        nextAll = collection.all.slice();
+        nextById = { ...collection.byId };
+      }
+
+      const filtered: T[] = [];
+      let removedAny = false;
+      for (const item of nextAll) {
+        if (removalSet.has(item.id)) {
+          delete nextById[item.id];
+          removedAny = true;
+        } else {
+          filtered.push(item);
+        }
+      }
+
+      if (removedAny) {
+        nextAll = filtered;
+        changed = true;
+      }
+    }
+  }
+
+  if (!changed) {
+    return { next: collection, changed: false };
+  }
+
+  return {
+    next: {
+      byId: nextById,
+      all: nextAll,
+    },
+    changed: true,
+  };
+};
+
+const createEmptyWorldCollections = (): WorldCollections => ({
+  microorganisms: createEmptyEntityCollection<Microorganism>(),
+  organicMatter: createEmptyEntityCollection<OrganicMatter>(),
+  obstacles: createEmptyEntityCollection<Obstacle>(),
+  roomObjects: createEmptyEntityCollection<RoomObject>(),
+});
+
+const buildWorldFromCollections = (collections: WorldCollections): SharedWorldState => ({
+  microorganisms: collections.microorganisms.all,
+  organicMatter: collections.organicMatter.all,
+  obstacles: collections.obstacles.all,
+  roomObjects: collections.roomObjects.all,
+});
 
 export interface RoomStateSnapshot {
   phase: GamePhase;
@@ -44,7 +157,12 @@ export interface GameStoreState {
   lastPongAt: number | null;
   room: RoomStateSnapshot;
   players: PlayerMap;
+  remotePlayers: EntityCollection<SharedPlayerState>;
   ranking: RankingEntry[];
+  microorganisms: EntityCollection<Microorganism>;
+  organicMatter: EntityCollection<OrganicMatter>;
+  obstacles: EntityCollection<Obstacle>;
+  roomObjects: EntityCollection<RoomObject>;
   world: SharedWorldState;
 }
 
@@ -55,12 +173,20 @@ const defaultRoomState: RoomStateSnapshot = {
   roundEndsAt: null,
 };
 
-const createEmptyWorldState = (): SharedWorldState => ({
-  microorganisms: [],
-  organicMatter: [],
-  obstacles: [],
-  roomObjects: [],
-});
+const createEmptySynchronizedState = () => {
+  const remotePlayers = createEmptyEntityCollection<SharedPlayerState>();
+  const worldCollections = createEmptyWorldCollections();
+  return {
+    remotePlayers,
+    microorganisms: worldCollections.microorganisms,
+    organicMatter: worldCollections.organicMatter,
+    obstacles: worldCollections.obstacles,
+    roomObjects: worldCollections.roomObjects,
+    world: buildWorldFromCollections(worldCollections),
+  };
+};
+
+const emptySyncState = createEmptySynchronizedState();
 
 const initialState: GameStoreState = {
   connectionStatus: "idle",
@@ -72,9 +198,14 @@ const initialState: GameStoreState = {
   lastPingAt: null,
   lastPongAt: null,
   room: defaultRoomState,
-  players: {},
+  players: emptySyncState.remotePlayers.byId,
+  remotePlayers: emptySyncState.remotePlayers,
   ranking: [],
-  world: createEmptyWorldState(),
+  microorganisms: emptySyncState.microorganisms,
+  organicMatter: emptySyncState.organicMatter,
+  obstacles: emptySyncState.obstacles,
+  roomObjects: emptySyncState.roomObjects,
+  world: emptySyncState.world,
 };
 
 type GameStoreListener = () => void;
@@ -98,14 +229,6 @@ const applyState = (updater: StateUpdater) => {
   }
 };
 
-const playersArrayToMap = (players: SharedPlayerState[]): PlayerMap => {
-  const record: PlayerMap = {};
-  for (const player of players) {
-    record[player.id] = player;
-  }
-  return record;
-};
-
 const cloneVector = (vector: Vector2): Vector2 => ({ x: vector.x, y: vector.y });
 
 const cloneOrientation = (orientation: OrientationState): OrientationState =>
@@ -116,6 +239,34 @@ const cloneOrientation = (orientation: OrientationState): OrientationState =>
 const cloneHealth = (health: HealthState): HealthState => ({
   current: health.current,
   max: health.max,
+});
+
+const cloneCombatStatus = (
+  status: SharedPlayerState["combatStatus"],
+): SharedPlayerState["combatStatus"] => ({
+  state: status.state,
+  targetPlayerId: status.targetPlayerId,
+  targetObjectId: status.targetObjectId,
+  lastAttackAt: status.lastAttackAt,
+});
+
+const cloneCombatAttributes = (
+  attributes: SharedPlayerState["combatAttributes"],
+): SharedPlayerState["combatAttributes"] => ({
+  attack: attributes.attack,
+  defense: attributes.defense,
+  speed: attributes.speed,
+  range: attributes.range,
+});
+
+const clonePlayer = (player: SharedPlayerState): SharedPlayerState => ({
+  ...player,
+  position: cloneVector(player.position),
+  movementVector: cloneVector(player.movementVector),
+  orientation: cloneOrientation(player.orientation),
+  health: cloneHealth(player.health),
+  combatStatus: cloneCombatStatus(player.combatStatus),
+  combatAttributes: cloneCombatAttributes(player.combatAttributes),
 });
 
 const cloneMicroorganism = (entity: Microorganism): Microorganism => ({
@@ -145,167 +296,6 @@ const cloneRoomObject = (object: RoomObject): RoomObject => ({
   position: cloneVector(object.position),
   state: object.state ? { ...object.state } : undefined,
 });
-
-const cloneWorldState = (world: SharedWorldState): SharedWorldState => ({
-  microorganisms: world.microorganisms.map(cloneMicroorganism),
-  organicMatter: world.organicMatter.map(cloneOrganicMatter),
-  obstacles: world.obstacles.map(cloneObstacle),
-  roomObjects: world.roomObjects.map(cloneRoomObject),
-});
-
-const applyWorldCategoryDiff = <T extends { id: string }>(
-  list: T[],
-  upserts: readonly T[] | undefined,
-  removals: readonly string[] | undefined,
-  cloneItem: (item: T) => T,
-): { changed: boolean; next: T[] } => {
-  let changed = false;
-  let result = list;
-
-  if (upserts && upserts.length > 0) {
-    const updatesById = new Map<string, T>();
-    for (const item of upserts) {
-      updatesById.set(item.id, cloneItem(item));
-    }
-
-    const merged: T[] = [];
-    for (const item of list) {
-      const update = updatesById.get(item.id);
-      if (update) {
-        merged.push(update);
-        updatesById.delete(item.id);
-        changed = true;
-      } else {
-        merged.push(item);
-      }
-    }
-
-    if (updatesById.size > 0) {
-      changed = true;
-      for (const value of updatesById.values()) {
-        merged.push(value);
-      }
-    }
-
-    result = merged;
-  }
-
-  if (removals && removals.length > 0) {
-    const removalSet = new Set(removals);
-    const filtered = result.filter((item) => !removalSet.has(item.id));
-    if (filtered.length !== result.length) {
-      changed = true;
-      result = filtered;
-    }
-  }
-
-  return changed ? { changed: true, next: result } : { changed: false, next: list };
-};
-
-const applyWorldDiff = (
-  world: SharedWorldState,
-  diff: SharedWorldStateDiff | undefined,
-): SharedWorldState => {
-  if (!diff) {
-    return world;
-  }
-
-  let mutated = false;
-  let nextWorld = world;
-
-  const ensureNextWorld = () => {
-    if (!mutated) {
-      nextWorld = {
-        microorganisms: world.microorganisms,
-        organicMatter: world.organicMatter,
-        obstacles: world.obstacles,
-        roomObjects: world.roomObjects,
-      };
-      mutated = true;
-    }
-    return nextWorld;
-  };
-
-  const microorganismsResult = applyWorldCategoryDiff(
-    world.microorganisms,
-    diff.upsertMicroorganisms,
-    diff.removeMicroorganismIds,
-    cloneMicroorganism,
-  );
-  if (microorganismsResult.changed) {
-    const target = ensureNextWorld();
-    target.microorganisms = microorganismsResult.next;
-  }
-
-  const organicMatterResult = applyWorldCategoryDiff(
-    world.organicMatter,
-    diff.upsertOrganicMatter,
-    diff.removeOrganicMatterIds,
-    cloneOrganicMatter,
-  );
-  if (organicMatterResult.changed) {
-    const target = ensureNextWorld();
-    target.organicMatter = organicMatterResult.next;
-  }
-
-  const obstacleResult = applyWorldCategoryDiff(
-    world.obstacles,
-    diff.upsertObstacles,
-    diff.removeObstacleIds,
-    cloneObstacle,
-  );
-  if (obstacleResult.changed) {
-    const target = ensureNextWorld();
-    target.obstacles = obstacleResult.next;
-  }
-
-  const roomObjectResult = applyWorldCategoryDiff(
-    world.roomObjects,
-    diff.upsertRoomObjects,
-    diff.removeRoomObjectIds,
-    cloneRoomObject,
-  );
-  if (roomObjectResult.changed) {
-    const target = ensureNextWorld();
-    target.roomObjects = roomObjectResult.next;
-  }
-
-  return mutated ? nextWorld : world;
-};
-
-const mergeDiffIntoPlayers = (
-  existing: PlayerMap,
-  diff: SharedGameStateDiff
-): PlayerMap => {
-  let mutated = false;
-  let nextPlayers: PlayerMap = existing;
-
-  if (diff.upsertPlayers && diff.upsertPlayers.length > 0) {
-    if (!mutated) {
-      nextPlayers = { ...existing };
-      mutated = true;
-    }
-
-    for (const player of diff.upsertPlayers) {
-      nextPlayers[player.id] = player;
-    }
-  }
-
-  if (diff.removedPlayerIds && diff.removedPlayerIds.length > 0) {
-    if (!mutated) {
-      nextPlayers = { ...existing };
-      mutated = true;
-    }
-
-    for (const playerId of diff.removedPlayerIds) {
-      if (playerId in nextPlayers) {
-        delete nextPlayers[playerId];
-      }
-    }
-  }
-
-  return nextPlayers;
-};
 
 const isFullState = (
   state: SharedGameState | SharedGameStateDiff
@@ -433,26 +423,101 @@ const setReconnectUntil = (timestamp: number | null) => {
 };
 
 const applyFullState = (state: SharedGameState) => {
-  applyState((prev) => ({
-    ...prev,
-    room: {
-      phase: state.phase,
-      roundId: state.roundId,
-      roundStartedAt: state.roundStartedAt,
-      roundEndsAt: state.roundEndsAt,
-    },
-    players: playersArrayToMap(state.players),
-    world: cloneWorldState(state.world),
-  }));
+  applyState((prev) => {
+    const remotePlayers = createEntityCollectionFromArray(state.players, clonePlayer);
+    const worldCollections: WorldCollections = {
+      microorganisms: createEntityCollectionFromArray(
+        state.world.microorganisms,
+        cloneMicroorganism,
+      ),
+      organicMatter: createEntityCollectionFromArray(state.world.organicMatter, cloneOrganicMatter),
+      obstacles: createEntityCollectionFromArray(state.world.obstacles, cloneObstacle),
+      roomObjects: createEntityCollectionFromArray(state.world.roomObjects, cloneRoomObject),
+    };
+
+    return {
+      ...prev,
+      room: {
+        phase: state.phase,
+        roundId: state.roundId,
+        roundStartedAt: state.roundStartedAt,
+        roundEndsAt: state.roundEndsAt,
+      },
+      players: remotePlayers.byId,
+      remotePlayers,
+      microorganisms: worldCollections.microorganisms,
+      organicMatter: worldCollections.organicMatter,
+      obstacles: worldCollections.obstacles,
+      roomObjects: worldCollections.roomObjects,
+      world: buildWorldFromCollections(worldCollections),
+    };
+  });
 };
 
 const applyStateDiff = (diff: SharedGameStateDiff) => {
-  applyState((prev) => ({
-    ...prev,
-    room: deriveRoomFromState(diff, prev.room),
-    players: mergeDiffIntoPlayers(prev.players, diff),
-    world: applyWorldDiff(prev.world, diff.world),
-  }));
+  applyState((prev) => {
+    const nextRoom = deriveRoomFromState(diff, prev.room);
+
+    const playersResult = applyEntityCollectionDiff(
+      prev.remotePlayers,
+      diff.upsertPlayers,
+      diff.removedPlayerIds,
+      clonePlayer,
+    );
+
+    const worldDiff = diff.world;
+    const microorganismsResult = applyEntityCollectionDiff(
+      prev.microorganisms,
+      worldDiff?.upsertMicroorganisms,
+      worldDiff?.removeMicroorganismIds,
+      cloneMicroorganism,
+    );
+    const organicMatterResult = applyEntityCollectionDiff(
+      prev.organicMatter,
+      worldDiff?.upsertOrganicMatter,
+      worldDiff?.removeOrganicMatterIds,
+      cloneOrganicMatter,
+    );
+    const obstacleResult = applyEntityCollectionDiff(
+      prev.obstacles,
+      worldDiff?.upsertObstacles,
+      worldDiff?.removeObstacleIds,
+      cloneObstacle,
+    );
+    const roomObjectResult = applyEntityCollectionDiff(
+      prev.roomObjects,
+      worldDiff?.upsertRoomObjects,
+      worldDiff?.removeRoomObjectIds,
+      cloneRoomObject,
+    );
+
+    const worldChanged =
+      microorganismsResult.changed ||
+      organicMatterResult.changed ||
+      obstacleResult.changed ||
+      roomObjectResult.changed;
+
+    const nextWorld = worldChanged
+      ? buildWorldFromCollections({
+          microorganisms: microorganismsResult.next,
+          organicMatter: organicMatterResult.next,
+          obstacles: obstacleResult.next,
+          roomObjects: roomObjectResult.next,
+        })
+      : prev.world;
+
+    return {
+      ...prev,
+      room: nextRoom,
+      players: playersResult.next.byId,
+      remotePlayers: playersResult.next,
+      microorganisms: microorganismsResult.next,
+      organicMatter: organicMatterResult.next,
+      obstacles: obstacleResult.next,
+      roomObjects: roomObjectResult.next,
+      world: nextWorld,
+    };
+  });
 };
 
 const applyRanking = (ranking: RankingEntry[]) => {
@@ -489,14 +554,23 @@ const resetGameState = () => {
   const preservedId = currentState.playerId;
   const preservedStatus = currentState.connectionStatus;
   const preservedReconnectUntil = currentState.reconnectUntil;
-  applyState(() => ({
-    ...initialState,
-    playerName: preservedName,
-    playerId: preservedId,
-    connectionStatus: preservedStatus,
-    reconnectUntil: preservedReconnectUntil,
-    world: createEmptyWorldState(),
-  }));
+  applyState(() => {
+    const emptyState = createEmptySynchronizedState();
+    return {
+      ...initialState,
+      playerName: preservedName,
+      playerId: preservedId,
+      connectionStatus: preservedStatus,
+      reconnectUntil: preservedReconnectUntil,
+      players: emptyState.remotePlayers.byId,
+      remotePlayers: emptyState.remotePlayers,
+      microorganisms: emptyState.microorganisms,
+      organicMatter: emptyState.organicMatter,
+      obstacles: emptyState.obstacles,
+      roomObjects: emptyState.roomObjects,
+      world: emptyState.world,
+    };
+  });
 };
 
 export const gameStore = {

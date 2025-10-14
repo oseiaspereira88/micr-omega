@@ -2,19 +2,39 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import RankingPanel from "../RankingPanel";
 import { gameStore, type GameStoreState } from "../../store/gameStore";
+import type { SharedPlayerState } from "../../utils/messageTypes";
 
 const baseState = gameStore.getState();
 
-const snapshot = (): GameStoreState => ({
-  ...baseState,
-  room: { ...baseState.room },
-  players: {},
-  ranking: [],
-  connectionStatus: "idle",
-  playerId: null,
-  playerName: null,
-  joinError: null,
-});
+const snapshot = (): GameStoreState => {
+  const emptyPlayers = { byId: {}, all: [] };
+  const emptyMicroorganisms = { byId: {}, all: [] };
+  const emptyOrganic = { byId: {}, all: [] };
+  const emptyObstacles = { byId: {}, all: [] };
+  const emptyRoomObjects = { byId: {}, all: [] };
+
+  return {
+    ...baseState,
+    room: { ...baseState.room },
+    players: emptyPlayers.byId,
+    remotePlayers: emptyPlayers,
+    ranking: [],
+    microorganisms: emptyMicroorganisms,
+    organicMatter: emptyOrganic,
+    obstacles: emptyObstacles,
+    roomObjects: emptyRoomObjects,
+    connectionStatus: "idle",
+    playerId: null,
+    playerName: null,
+    joinError: null,
+    world: {
+      microorganisms: emptyMicroorganisms.all,
+      organicMatter: emptyOrganic.all,
+      obstacles: emptyObstacles.all,
+      roomObjects: emptyRoomObjects.all,
+    },
+  };
+};
 
 const resetStore = () => {
   act(() => {
@@ -62,22 +82,26 @@ describe("RankingPanel", () => {
 
     act(() => {
       const players: GameStoreState["players"] = {
-        alpha: {
+        alpha: createPlayer({
           id: "alpha",
           name: "Alice",
           connected: true,
           score: 4200,
           combo: 2,
           lastActiveAt: 10_000,
-        },
-        beta: {
+        }),
+        beta: createPlayer({
           id: "beta",
           name: "Bruno",
           connected: false,
           score: 3150,
           combo: 1,
           lastActiveAt: 9_000,
-        },
+        }),
+      };
+      const remotePlayers = {
+        byId: players,
+        all: Object.values(players),
       };
 
       gameStore.setState(() => ({
@@ -85,6 +109,7 @@ describe("RankingPanel", () => {
         connectionStatus: "connected",
         playerId: "beta",
         players,
+        remotePlayers,
         ranking: [
           { playerId: "alpha", name: "Alice", score: 4200 },
           { playerId: "beta", name: "Bruno", score: 3150 },
@@ -116,36 +141,41 @@ describe("RankingPanel", () => {
 
     act(() => {
       const players: GameStoreState["players"] = {
-        a: {
+        a: createPlayer({
           id: "a",
           name: "Ana",
           connected: true,
           score: 2_500,
           combo: 1,
           lastActiveAt: 1_000,
-        },
-        b: {
+        }),
+        b: createPlayer({
           id: "b",
           name: "Bruno",
           connected: true,
           score: 3_000,
           combo: 1,
           lastActiveAt: 2_000,
-        },
-        c: {
+        }),
+        c: createPlayer({
           id: "c",
           name: "Carla",
           connected: true,
           score: 3_000,
           combo: 1,
           lastActiveAt: 3_000,
-        },
+        }),
+      };
+      const remotePlayers = {
+        byId: players,
+        all: Object.values(players),
       };
 
       gameStore.setState(() => ({
         ...snapshot(),
         connectionStatus: "connected",
         players,
+        remotePlayers,
         ranking: [
           { playerId: "a", name: "Ana", score: 2_500 },
           { playerId: "c", name: "Carla", score: 3_000 },
@@ -162,4 +192,32 @@ describe("RankingPanel", () => {
     expect(within(second!).getByText("Carla")).toBeVisible();
     expect(within(third!).getByText("Ana")).toBeVisible();
   });
+});
+const createPlayer = (
+  overrides: Partial<SharedPlayerState> & Pick<SharedPlayerState, "id" | "name">
+): SharedPlayerState => ({
+  id: overrides.id,
+  name: overrides.name,
+  connected: overrides.connected ?? true,
+  score: overrides.score ?? 0,
+  combo: overrides.combo ?? 1,
+  lastActiveAt: overrides.lastActiveAt ?? 0,
+  position: overrides.position ?? { x: 0, y: 0 },
+  movementVector: overrides.movementVector ?? { x: 0, y: 0 },
+  orientation: overrides.orientation ?? { angle: 0 },
+  health: overrides.health ?? { current: 100, max: 100 },
+  combatStatus:
+    overrides.combatStatus ?? {
+      state: "idle",
+      targetPlayerId: null,
+      targetObjectId: null,
+      lastAttackAt: null,
+    },
+  combatAttributes:
+    overrides.combatAttributes ?? {
+      attack: 1,
+      defense: 1,
+      speed: 1,
+      range: 1,
+    },
 });

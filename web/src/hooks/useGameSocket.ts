@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
+  AttackMessage,
   ClientMessage,
   ErrorMessage,
   JoinMessage,
+  MovementMessage,
   ServerMessage,
   clientMessageSchema,
   serverMessageSchema,
@@ -112,8 +114,13 @@ type UseGameSocketOptions = {
   version?: string;
 };
 
+type MovementCommand = Omit<MovementMessage, "type" | "playerId"> & { playerId?: string | null };
+type AttackCommand = Omit<AttackMessage, "type" | "playerId"> & { playerId?: string | null };
+
 type UseGameSocketResult = {
   send: (message: ClientMessage) => boolean;
+  sendMovement: (command: MovementCommand) => boolean;
+  sendAttack: (command: AttackCommand) => boolean;
   connect: (overrideName?: string) => void;
   disconnect: () => void;
   socket: WebSocket | null;
@@ -196,6 +203,80 @@ export const useGameSocket = (
       return false;
     }
   }, []);
+
+  const resolveCommandPlayerId = useCallback(
+    (candidate?: string | null) => {
+      const explicit = candidate ?? playerIdRef.current;
+      if (!explicit) {
+        return null;
+      }
+
+      const sanitized = sanitizePlayerId(explicit);
+      if (!sanitized) {
+        console.warn("Identificador de jogador inválido descartado antes do envio");
+        return null;
+      }
+
+      return sanitized;
+    },
+    [playerIdRef],
+  );
+
+  const sendMovementCommand = useCallback(
+    (command: MovementCommand) => {
+      const playerId = resolveCommandPlayerId(command.playerId);
+      if (!playerId) {
+        return false;
+      }
+
+      const message: MovementMessage = {
+        type: "movement",
+        playerId,
+        position: command.position,
+        movementVector: command.movementVector,
+        orientation: command.orientation,
+      };
+
+      if (command.clientTime !== undefined) {
+        message.clientTime = command.clientTime;
+      }
+
+      return sendMessage(message);
+    },
+    [resolveCommandPlayerId, sendMessage],
+  );
+
+  const sendAttackCommand = useCallback(
+    (command: AttackCommand) => {
+      const playerId = resolveCommandPlayerId(command.playerId);
+      if (!playerId) {
+        return false;
+      }
+
+      const message: AttackMessage = {
+        type: "attack",
+        playerId,
+        targetPlayerId: command.targetPlayerId,
+        targetObjectId: command.targetObjectId,
+      };
+
+      if (command.damage !== undefined) {
+        message.damage = command.damage;
+      }
+      if (command.state !== undefined) {
+        message.state = command.state;
+      }
+      if (command.resultingHealth !== undefined) {
+        message.resultingHealth = command.resultingHealth;
+      }
+      if (command.clientTime !== undefined) {
+        message.clientTime = command.clientTime;
+      }
+
+      return sendMessage(message);
+    },
+    [resolveCommandPlayerId, sendMessage],
+  );
 
   const startHeartbeat = useCallback(() => {
     if (typeof window === "undefined") {
@@ -480,6 +561,8 @@ export const useGameSocket = (
 
   return {
     send: sendMessage,
+    sendMovement: sendMovementCommand,
+    sendAttack: sendAttackCommand,
     connect,
     disconnect,
     socket: socketRef.current,

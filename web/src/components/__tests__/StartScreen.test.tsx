@@ -8,16 +8,35 @@ import React, { useEffect } from "react";
 
 const baseState = gameStore.getState();
 
-const snapshot = (): GameStoreState => ({
-  ...baseState,
-  room: { ...baseState.room },
-  players: {},
-  ranking: [],
-  connectionStatus: "idle",
-  playerId: null,
-  playerName: null,
-  joinError: null,
-});
+const snapshot = (): GameStoreState => {
+  const emptyPlayers = { byId: {}, all: [] };
+  const emptyMicroorganisms = { byId: {}, all: [] };
+  const emptyOrganic = { byId: {}, all: [] };
+  const emptyObstacles = { byId: {}, all: [] };
+  const emptyRoomObjects = { byId: {}, all: [] };
+
+  return {
+    ...baseState,
+    room: { ...baseState.room },
+    players: emptyPlayers.byId,
+    remotePlayers: emptyPlayers,
+    ranking: [],
+    microorganisms: emptyMicroorganisms,
+    organicMatter: emptyOrganic,
+    obstacles: emptyObstacles,
+    roomObjects: emptyRoomObjects,
+    connectionStatus: "idle",
+    playerId: null,
+    playerName: null,
+    joinError: null,
+    world: {
+      microorganisms: emptyMicroorganisms.all,
+      organicMatter: emptyOrganic.all,
+      obstacles: emptyObstacles.all,
+      roomObjects: emptyRoomObjects.all,
+    },
+  };
+};
 
 const resetStore = () => {
   act(() => {
