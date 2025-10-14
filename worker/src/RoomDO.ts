@@ -560,6 +560,11 @@ export class RoomDO {
       return;
     }
 
+    if (payload.action.type === "death") {
+      await this.handlePlayerDeath(player, socket);
+      return;
+    }
+
     const result = this.applyPlayerAction(player, payload.action);
     if (!result) {
       this.send(socket, { type: "error", reason: "invalid_payload" });
@@ -604,10 +609,6 @@ export class RoomDO {
       case "combo": {
         const multiplier = clamp(action.multiplier, 1, MAX_COMBO_MULTIPLIER);
         player.combo = multiplier;
-        return true;
-      }
-      case "death": {
-        player.combo = 1;
         return true;
       }
       case "ability": {
@@ -926,6 +927,30 @@ export class RoomDO {
       });
   }
 
+  private detachPlayer(playerId: string): PlayerInternal | null {
+    const player = this.players.get(playerId);
+    if (!player) {
+      return null;
+    }
+
+    this.players.delete(playerId);
+
+    const nameKey = player.name.toLowerCase();
+    if (this.nameToPlayerId.get(nameKey) === playerId) {
+      this.nameToPlayerId.delete(nameKey);
+    }
+
+    this.socketsByPlayer.delete(playerId);
+
+    for (const [socket, id] of this.clientsBySocket.entries()) {
+      if (id === playerId) {
+        this.clientsBySocket.delete(socket);
+      }
+    }
+
+    return player;
+  }
+
   private async cleanupInactivePlayers(reference: number): Promise<void> {
     let removedSomeone = false;
     for (const player of Array.from(this.players.values())) {
@@ -953,44 +978,86 @@ export class RoomDO {
     await this.scheduleCleanupAlarm();
   }
 
-  private async removePlayer(playerId: string, reason: "expired" | "inactive"): Promise<void> {
-    const player = this.players.get(playerId);
-    if (!player) {
+  private async handlePlayerDeath(player: PlayerInternal, socket: WebSocket): Promise<void> {
+    const now = Date.now();
+    let sessionDurationMs: number | null = null;
+
+    if (player.connectedAt !== null) {
+      sessionDurationMs = Math.max(0, now - player.connectedAt);
+      player.totalSessionDurationMs = (player.totalSessionDurationMs ?? 0) + sessionDurationMs;
+      player.sessionCount = (player.sessionCount ?? 0) + 1;
+      player.connectedAt = null;
+    }
+
+    const removed = this.detachPlayer(player.id);
+    if (!removed) {
       return;
     }
 
-    this.players.delete(playerId);
-    const nameKey = player.name.toLowerCase();
-    if (this.nameToPlayerId.get(nameKey) === playerId) {
-      this.nameToPlayerId.delete(nameKey);
+    await this.persistPlayers();
+
+    const diff: SharedGameStateDiff = { removedPlayerIds: [removed.id] };
+    const stateMessage: StateDiffMessage = { type: "state", mode: "diff", state: diff };
+    this.broadcast(stateMessage);
+    this.send(socket, stateMessage);
+
+    const rankingMessage: RankingMessage = { type: "ranking", ranking: this.getRanking() };
+    this.broadcast(rankingMessage);
+    this.send(socket, rankingMessage);
+
+    const connectedPlayers = this.countConnectedPlayers();
+    this.observability.log("info", "player_removed", {
+      playerId: removed.id,
+      name: removed.name,
+      reason: "death",
+      sessionDurationMs,
+      totalSessionDurationMs: removed.totalSessionDurationMs ?? 0,
+      sessionCount: removed.sessionCount ?? 0,
+      connectedPlayers
+    });
+    this.observability.recordMetric("connected_players", connectedPlayers, {
+      phase: this.phase
+    });
+
+    if (this.phase === "active" && connectedPlayers === 0) {
+      await this.endGame("timeout");
     }
-    this.socketsByPlayer.delete(playerId);
-    for (const [socket, id] of this.clientsBySocket.entries()) {
-      if (id === playerId) {
-        this.clientsBySocket.delete(socket);
-      }
+  }
+
+  private async removePlayer(
+    playerId: string,
+    reason: "expired" | "inactive"
+  ): Promise<void> {
+    const removed = this.detachPlayer(playerId);
+    if (!removed) {
+      return;
     }
 
     await this.persistPlayers();
 
     const leftMessage: PlayerLeftMessage = {
       type: "player_left",
-      playerId: player.id,
-      name: player.name,
+      playerId: removed.id,
+      name: removed.name,
       state: this.serializeGameState()
     };
 
     this.broadcast(leftMessage);
 
     this.observability.log("info", "player_removed", {
-      playerId: player.id,
-      name: player.name,
+      playerId: removed.id,
+      name: removed.name,
       reason,
-      totalSessionDurationMs: player.totalSessionDurationMs ?? 0,
-      sessionCount: player.sessionCount ?? 0
+      totalSessionDurationMs: removed.totalSessionDurationMs ?? 0,
+      sessionCount: removed.sessionCount ?? 0
     });
 
-    if (this.phase === "active" && this.countConnectedPlayers() === 0) {
+    const connectedPlayers = this.countConnectedPlayers();
+    this.observability.recordMetric("connected_players", connectedPlayers, {
+      phase: this.phase
+    });
+
+    if (this.phase === "active" && connectedPlayers === 0) {
       await this.endGame("timeout");
     }
   }
