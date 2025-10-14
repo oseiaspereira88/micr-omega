@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useGameStore, type ConnectionStatus } from "../store/gameStore";
 import styles from "./RankingPanel.module.css";
 
@@ -41,33 +40,29 @@ const RankingPanel = () => {
   const localPlayerId = useGameStore((state) => state.playerId);
   const connectionStatus = useGameStore((state) => state.connectionStatus);
 
-  const rows = useMemo<RankingRow[]>(() => {
-    if (ranking.length === 0) {
-      return [];
-    }
-
-    const sortedEntries = [...ranking].sort((a, b) => {
-      if (a.score !== b.score) {
-        return b.score - a.score;
-      }
-      const nameComparison = a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" });
-      if (nameComparison !== 0) {
-        return nameComparison;
-      }
-      return a.playerId.localeCompare(b.playerId);
-    });
-
-    return sortedEntries.map((entry) => {
-      const player = players[entry.playerId];
-      return {
-        playerId: entry.playerId,
-        name: entry.name,
-        score: entry.score,
-        connected: player ? player.connected : false,
-        isLocal: entry.playerId === localPlayerId,
-      };
-    });
-  }, [localPlayerId, players, ranking]);
+  const rows: RankingRow[] = ranking.length
+    ? [...ranking]
+        .sort((a, b) => {
+          if (a.score !== b.score) {
+            return b.score - a.score;
+          }
+          const nameComparison = a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" });
+          if (nameComparison !== 0) {
+            return nameComparison;
+          }
+          return a.playerId.localeCompare(b.playerId);
+        })
+        .map((entry) => {
+          const player = players[entry.playerId];
+          return {
+            playerId: entry.playerId,
+            name: entry.name,
+            score: entry.score,
+            connected: player ? player.connected : false,
+            isLocal: entry.playerId === localPlayerId,
+          };
+        })
+    : [];
 
   const statusLabel = STATUS_LABEL[connectionStatus] ?? connectionStatus;
   const statusClass = STATUS_CLASS[connectionStatus] ?? "";
