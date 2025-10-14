@@ -62,6 +62,10 @@ export const chooseTrait = (state, helpers = {}, traitKey) => {
 
   if (!trait) return state;
 
+  if (state.organism.traits?.includes(traitKey)) {
+    return state;
+  }
+
   state.organism.traits.push(traitKey);
   trait.effect(state.organism);
 
