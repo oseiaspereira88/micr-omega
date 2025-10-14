@@ -35,6 +35,8 @@ export const createOrganism = (overrides = {}) => {
     isDashing: false,
     dashTimer: 0,
     dashCooldown: 0,
+    invulnerable: false,
+    invulnerableTimer: 0,
     attack: 10,
     defense: 5,
     speed: 1,

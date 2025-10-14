@@ -157,5 +157,34 @@ describe('updateGameState enemy collisions', () => {
     expect(state.energy).toBe(5);
     expect(Number.isFinite(state.energy)).toBe(true);
   });
+
+  it('counts down invulnerability timer and clears invulnerability when it expires', () => {
+    const state = createState({
+      organism: {
+        invulnerable: true,
+        invulnerableTimer: 0.5,
+      },
+    });
+
+    updateGameState({ state, delta: 1 });
+
+    expect(state.organism.invulnerableTimer).toBe(0);
+    expect(state.organism.invulnerable).toBe(false);
+  });
+
+  it('preserves invulnerability from power ups when timer expires', () => {
+    const state = createState({
+      organism: {
+        invulnerable: true,
+        invulnerableTimer: 0.2,
+        invulnerableFromPowerUp: true,
+      },
+    });
+
+    updateGameState({ state, delta: 0.5 });
+
+    expect(state.organism.invulnerableTimer).toBe(0);
+    expect(state.organism.invulnerable).toBe(true);
+  });
 });
 
