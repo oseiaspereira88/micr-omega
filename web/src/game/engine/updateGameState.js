@@ -206,6 +206,17 @@ export const updateGameState = ({
       }
     }
 
+    const currentInvulnerableTimer = Math.max(
+      0,
+      ensureNumber(organism.invulnerableTimer, 0)
+    );
+    const updatedInvulnerableTimer = Math.max(0, currentInvulnerableTimer - delta);
+    organism.invulnerableTimer = updatedInvulnerableTimer;
+
+    if (updatedInvulnerableTimer === 0 && !dashActive) {
+      organism.invulnerable = Boolean(organism.invulnerableFromPowerUp);
+    }
+
     state.gameTime += delta;
 
     if (state.gameTime - state.lastSpawnTime > state.spawnInterval / 1000) {

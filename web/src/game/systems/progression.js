@@ -181,6 +181,8 @@ export const restartGame = (state, helpers = {}) => {
     maxDashCharge: 100,
     isDashing: false,
     dashCooldown: 0,
+    invulnerable: false,
+    invulnerableTimer: 0,
     currentSpeedMultiplier: 1,
     currentAttackBonus: 0,
     currentRangeBonus: 0,
