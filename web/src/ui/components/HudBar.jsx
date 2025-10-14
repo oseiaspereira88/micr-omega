@@ -1,5 +1,13 @@
 import React from 'react';
 import styles from './HudBar.module.css';
+import {
+  AFFINITY_ICONS,
+  AFFINITY_LABELS,
+  AFFINITY_TYPES,
+  ELEMENT_ICONS,
+  ELEMENT_LABELS,
+  ELEMENT_TYPES,
+} from '../../shared/combat';
 
 const HudBar = ({
   level,
@@ -20,6 +28,11 @@ const HudBar = ({
   reroll,
   dropPity,
   recentRewards,
+  element,
+  affinity,
+  elementLabel,
+  affinityLabel,
+  resistances,
 }) => {
   const xpCurrent = Math.max(0, Math.floor(xp?.current ?? 0));
   const xpNext = Math.max(1, Math.floor(xp?.next ?? 1));
@@ -41,10 +54,32 @@ const HudBar = ({
   const fragmentCounters = geneFragments || {};
   const stableCounters = stableGenes || {};
 
+  const normalizedElement = element ?? ELEMENT_TYPES.BIO;
+  const normalizedAffinity = affinity ?? AFFINITY_TYPES.NEUTRAL;
+  const elementName = elementLabel ?? ELEMENT_LABELS[normalizedElement] ?? normalizedElement;
+  const affinityName = affinityLabel ?? AFFINITY_LABELS[normalizedAffinity] ?? normalizedAffinity;
+  const elementIcon = ELEMENT_ICONS[normalizedElement] ?? '🧬';
+  const affinityIcon = AFFINITY_ICONS[normalizedAffinity] ?? '✨';
+  const resistanceEntries = Object.entries(resistances || {})
+    .filter(([, value]) => Math.abs(value) >= 0.05)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    .slice(0, 3);
+
   return (
     <>
       <div className={styles.header}>
         <div className={styles.title}>MicrΩ • Nv.{level} • {score} pts</div>
+        <div className={styles.combatProfile}>
+          <span className={styles.combatTag} title={`Elemento ${elementName}`}>
+            {elementIcon} {elementName}
+          </span>
+          <span
+            className={`${styles.combatTag} ${styles.affinityTag}`}
+            title={`Afinidade ${affinityName}`}
+          >
+            {affinityIcon} {affinityName}
+          </span>
+        </div>
       </div>
 
       <div className={styles.stats}>
@@ -71,6 +106,28 @@ const HudBar = ({
         {maxCombo > 0 && (
           <div className={`${styles.badge} ${styles.maxComboBadge}`} style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
             🏅 Máx x{maxCombo}
+          </div>
+        )}
+        {resistanceEntries.length > 0 && (
+          <div className={styles.resistanceRow}>
+            {resistanceEntries.map(([key, value]) => {
+              const label = ELEMENT_LABELS[key] ?? key;
+              const percent = Math.round(value * 100);
+              const positive = value >= 0;
+              const formatted = `${percent > 0 ? '+' : ''}${percent}%`;
+              const title = `${positive ? 'Resistência' : 'Fraqueza'} ${label} ${formatted}`;
+              return (
+                <span
+                  key={key}
+                  className={`${styles.resistanceBadge} ${
+                    positive ? styles.resistancePositive : styles.resistanceNegative
+                  }`}
+                  title={title}
+                >
+                  {positive ? '🛡️' : '⚠️'} {label} {formatted}
+                </span>
+              );
+            })}
           </div>
         )}
         <div className={styles.progressRow}>

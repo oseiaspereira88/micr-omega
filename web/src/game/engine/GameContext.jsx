@@ -1,5 +1,12 @@
 import React, { createContext, useContext, useReducer } from 'react';
 
+import {
+  AFFINITY_LABELS,
+  AFFINITY_TYPES,
+  ELEMENT_LABELS,
+  ELEMENT_TYPES,
+  createResistanceSnapshot,
+} from '../../shared/combat';
 import { createResourceProfile } from '../state/resourceProfile';
 
 const GameStateContext = createContext(undefined);
@@ -52,6 +59,11 @@ const initialState = {
   progressionQueue: [],
   recentRewards: { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 },
   evolutionContext: null,
+  element: ELEMENT_TYPES.BIO,
+  affinity: AFFINITY_TYPES.NEUTRAL,
+  elementLabel: ELEMENT_LABELS[ELEMENT_TYPES.BIO],
+  affinityLabel: AFFINITY_LABELS[AFFINITY_TYPES.NEUTRAL],
+  resistances: createResistanceSnapshot(),
 };
 
 function gameReducer(state, action) {

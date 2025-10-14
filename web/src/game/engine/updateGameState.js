@@ -1,4 +1,17 @@
-import { DROP_TABLES, ELEMENTAL_ADVANTAGE_MULTIPLIER } from '../config/enemyTemplates';
+import { DROP_TABLES } from '../config/enemyTemplates';
+import {
+  AFFINITY_LABELS,
+  AFFINITY_TYPES,
+  ELEMENT_LABELS,
+  ELEMENT_TYPES,
+  ELEMENTAL_ADVANTAGE_MULTIPLIER,
+  clampDamageMultiplier,
+  createResistanceSnapshot,
+  getElementalRpsMultiplier,
+  resolveAffinityBonus,
+  resolveResistanceMultiplier,
+  resolveResistanceProfile,
+} from '../../shared/combat';
 
 const MOVEMENT_EPSILON = 0.05;
 const POSITION_SMOOTHING = 7.5;
@@ -54,6 +67,88 @@ const createMicroorganismPalette = (baseColor) => {
     coreColor: adjustHexColor(color, 24),
     outerColor: color,
     shadowColor: adjustHexColor(color, -40),
+  };
+};
+
+const sumModifiers = (modifiers = []) =>
+  (Array.isArray(modifiers) ? modifiers : [])
+    .map((value) => (Number.isFinite(value) ? value : 0))
+    .reduce((total, value) => total + value, 0);
+
+export const calculateDamageWithResistances = ({
+  baseDamage = 0,
+  attackerElement,
+  attackElement,
+  attackerAffinity = AFFINITY_TYPES.NEUTRAL,
+  targetElement,
+  targetResistances = {},
+  situationalModifiers = [],
+  combo = {},
+  hooks = {},
+} = {}) => {
+  const normalizedBase = Number.isFinite(baseDamage) ? Math.max(0, baseDamage) : 0;
+  const effectiveAttackElement = attackElement ?? attackerElement;
+  const { multiplier: rpsMultiplier, relation } = getElementalRpsMultiplier(
+    effectiveAttackElement,
+    targetElement
+  );
+
+  const affinityBonus = resolveAffinityBonus({
+    attackerElement,
+    attackElement: effectiveAttackElement,
+    affinity: attackerAffinity,
+    relation,
+  });
+  const affinityMultiplier = clampDamageMultiplier(1 + affinityBonus);
+  const resistanceMultiplier = resolveResistanceMultiplier(
+    targetResistances,
+    effectiveAttackElement
+  );
+  const situationalBonus = sumModifiers(situationalModifiers);
+  const situationalMultiplier = clampDamageMultiplier(1 + situationalBonus);
+
+  const comboSourceBonus = Number.isFinite(combo?.bonus)
+    ? combo.bonus
+    : Number.isFinite(combo?.multiplier)
+    ? combo.multiplier - 1
+    : 0;
+  const comboApplied = combo?.apply !== false;
+  const comboMultiplier = comboApplied
+    ? clampDamageMultiplier(1 + comboSourceBonus)
+    : 1;
+  const reportedComboMultiplier = clampDamageMultiplier(1 + comboSourceBonus);
+
+  if (typeof hooks.onComboApplied === 'function') {
+    hooks.onComboApplied({
+      value: combo?.value ?? 0,
+      bonus: comboSourceBonus,
+      multiplier: reportedComboMultiplier,
+      applied: comboApplied,
+    });
+  }
+
+  const totalMultiplier =
+    clampDamageMultiplier(rpsMultiplier) *
+    affinityMultiplier *
+    resistanceMultiplier *
+    situationalMultiplier *
+    comboMultiplier;
+
+  const damage = Math.max(0, Math.round(normalizedBase * totalMultiplier));
+
+  return {
+    damage,
+    baseDamage: normalizedBase,
+    multiplier: totalMultiplier,
+    relation,
+    breakdown: {
+      rps: rpsMultiplier,
+      affinity: affinityMultiplier,
+      resistance: resistanceMultiplier,
+      situational: situationalMultiplier,
+      combo: comboApplied ? comboMultiplier : 1,
+    },
+    comboApplied,
   };
 };
 
@@ -368,6 +463,17 @@ const createRenderPlayer = (sharedPlayer) => {
     lastAttackAt: sharedPlayer.combatStatus?.lastAttackAt ?? null,
     pulse: Math.random() * Math.PI * 2,
     isLocal: false,
+    element:
+      sharedPlayer.element ??
+      sharedPlayer.combatAttributes?.element ??
+      ELEMENT_TYPES.BIO,
+    affinity:
+      sharedPlayer.affinity ??
+      sharedPlayer.combatAttributes?.affinity ??
+      AFFINITY_TYPES.NEUTRAL,
+    resistances: createResistanceSnapshot(
+      sharedPlayer.combatAttributes?.resistances ?? sharedPlayer.resistances
+    ),
   };
 };
 
@@ -413,6 +519,23 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
     existing.name = player.name;
     existing.score = Number.isFinite(player.score) ? player.score : existing.score ?? 0;
     existing.combo = Number.isFinite(player.combo) ? player.combo : existing.combo ?? 0;
+    existing.element =
+      player.element ??
+      player.combatAttributes?.element ??
+      existing.element ??
+      ELEMENT_TYPES.BIO;
+    existing.affinity =
+      player.affinity ??
+      player.combatAttributes?.affinity ??
+      existing.affinity ??
+      AFFINITY_TYPES.NEUTRAL;
+    const resistanceProfile =
+      player.combatAttributes?.resistances ?? player.resistances ?? null;
+    if (resistanceProfile) {
+      existing.resistances = createResistanceSnapshot(resistanceProfile);
+    } else if (!existing.resistances) {
+      existing.resistances = createResistanceSnapshot();
+    }
     existing.pulse = (existing.pulse + delta * (1 + existing.speed * 0.2)) % (Math.PI * 2);
   });
 
@@ -547,16 +670,30 @@ const buildHudSnapshot = (localPlayer, playerList, notifications, camera) => {
     ...(resourceBag.stableGenes || localPlayer?.stableGenes || {}),
   };
 
+  const element = localPlayer?.element ?? ELEMENT_TYPES.BIO;
+  const affinity = localPlayer?.affinity ?? AFFINITY_TYPES.NEUTRAL;
+  const resistances = createResistanceSnapshot(localPlayer?.resistances);
+
   const opponents = playerList
     .filter((player) => !player.isLocal)
-    .map((player) => ({
-      id: player.id,
-      name: player.name,
-      health: player.health.current,
-      maxHealth: player.health.max,
-      palette: player.palette,
-      combatState: player.combatStatus?.state ?? 'idle',
-    }));
+    .map((player) => {
+      const opponentElement = player.element ?? ELEMENT_TYPES.BIO;
+      const opponentAffinity = player.affinity ?? AFFINITY_TYPES.NEUTRAL;
+
+      return {
+        id: player.id,
+        name: player.name,
+        health: player.health.current,
+        maxHealth: player.health.max,
+        palette: player.palette,
+        combatState: player.combatStatus?.state ?? 'idle',
+        element: opponentElement,
+        affinity: opponentAffinity,
+        resistances: createResistanceSnapshot(player.resistances),
+        elementLabel: ELEMENT_LABELS[opponentElement] ?? opponentElement,
+        affinityLabel: AFFINITY_LABELS[opponentAffinity] ?? opponentAffinity,
+      };
+    });
 
   return {
     energy: 0,
@@ -599,6 +736,11 @@ const buildHudSnapshot = (localPlayer, playerList, notifications, camera) => {
     reroll: { ...reroll },
     dropPity: { ...dropPity },
     recentRewards: { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 },
+    element,
+    affinity,
+    resistances,
+    elementLabel: ELEMENT_LABELS[element] ?? element,
+    affinityLabel: AFFINITY_LABELS[affinity] ?? affinity,
   };
 };
 

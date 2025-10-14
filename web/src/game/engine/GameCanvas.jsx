@@ -164,6 +164,11 @@ const GameCanvas = ({ settings, onQuit }) => {
         bossActive={gameState.bossActive}
         bossHealth={gameState.bossHealth}
         bossMaxHealth={gameState.bossMaxHealth}
+        element={gameState.element}
+        affinity={gameState.affinity}
+        elementLabel={gameState.elementLabel}
+        affinityLabel={gameState.affinityLabel}
+        resistances={gameState.resistances}
         skillData={skillData}
         notifications={gameState.notifications}
         joystick={joystick}

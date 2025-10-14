@@ -31,6 +31,11 @@ const GameHud = ({
   bossActive,
   bossHealth,
   bossMaxHealth,
+  element,
+  affinity,
+  elementLabel,
+  affinityLabel,
+  resistances,
   skillData,
   notifications,
   joystick,
@@ -95,6 +100,14 @@ const GameHud = ({
                   return (
                     <li key={opponent.id} className={styles.opponentItem}>
                       <div className={styles.opponentName}>{opponent.name}</div>
+                      <div className={styles.opponentMeta}>
+                        <span className={styles.opponentTag}>
+                          {opponent.elementLabel ?? opponent.element ?? '—'}
+                        </span>
+                        <span className={`${styles.opponentTag} ${styles.opponentAffinity}`}>
+                          {opponent.affinityLabel ?? opponent.affinity ?? '—'}
+                        </span>
+                      </div>
                       <div className={styles.opponentHealthBar}>
                         <div className={styles.opponentHealthFill} style={barStyle} />
                       </div>
@@ -133,6 +146,11 @@ const GameHud = ({
             reroll={reroll}
             dropPity={dropPity}
             recentRewards={recentRewards}
+            element={element}
+            affinity={affinity}
+            elementLabel={elementLabel}
+            affinityLabel={affinityLabel}
+            resistances={resistances}
           />
 
           <BossHealthBar active={bossActive} health={bossHealth} maxHealth={bossMaxHealth} />

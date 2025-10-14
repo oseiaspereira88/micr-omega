@@ -1,4 +1,10 @@
 import { ensureResourceProfile } from '../state/resourceProfile';
+import {
+  AFFINITY_TYPES,
+  ELEMENT_TYPES,
+  convertWeaknessesToResistances,
+  resolveResistanceProfile,
+} from '../../shared/combat';
 
 export const createOrganism = (overrides = {}) => {
   const {
@@ -10,6 +16,12 @@ export const createOrganism = (overrides = {}) => {
     evolutionHistory = {},
     persistentPassives = {},
     unlockedEvolutionSlots = {},
+    element: elementOverride,
+    affinity: affinityOverride,
+    baseResistances: baseResistanceOverrides,
+    weaknesses: weaknessOverrides,
+    resistances: resistanceOverrides,
+    comboHooks = {},
     ...rest
   } = overrides;
 
@@ -80,6 +92,16 @@ export const createOrganism = (overrides = {}) => {
     evolutionSlots,
     reroll,
     dropPity,
+    element: elementOverride ?? ELEMENT_TYPES.BIO,
+    affinity: affinityOverride ?? AFFINITY_TYPES.NEUTRAL,
+    baseResistances: resolveResistanceProfile(baseResistanceOverrides),
+    weaknesses: { ...(weaknessOverrides || {}) },
+    resistances: resolveResistanceProfile(
+      baseResistanceOverrides,
+      convertWeaknessesToResistances(weaknessOverrides),
+      resistanceOverrides
+    ),
+    comboHooks: { ...comboHooks },
   };
 
   return {

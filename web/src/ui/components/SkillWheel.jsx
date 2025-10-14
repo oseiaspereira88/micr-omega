@@ -1,5 +1,11 @@
 import React from 'react';
 import styles from './SkillWheel.module.css';
+import {
+  ELEMENT_ICONS,
+  ELEMENT_LABELS,
+  SKILL_TYPE_LABELS,
+  STATUS_LABELS,
+} from '../../shared/combat';
 
 const SkillWheel = ({
   currentSkill,
@@ -37,13 +43,40 @@ const SkillWheel = ({
       </div>
 
       <div className={styles.meta}>
+        <span>
+          Tipo: {currentSkill ? SKILL_TYPE_LABELS[currentSkill.type] ?? currentSkill.type ?? 'Ativa' : '--'}
+        </span>
+        <span>
+          Elemento:{' '}
+          {currentSkill
+            ? `${ELEMENT_ICONS[currentSkill.element] ?? '🧬'} ${
+                ELEMENT_LABELS[currentSkill.element] ?? currentSkill.element ?? 'Neutro'
+              }`
+            : '--'}
+        </span>
         <span>Custo: {currentSkill ? currentSkill.cost : '--'}⚡</span>
         <span>{skillCooldownLabel}</span>
       </div>
 
       <div className={styles.progress}>
-        <div style={{ width: `${skillReadyPercent}%`, height: '100%', background: 'linear-gradient(90deg, #00D9FF, #7B2FFF)' }} />
+        <div
+          style={{
+            width: `${skillReadyPercent}%`,
+            height: '100%',
+            background: 'linear-gradient(90deg, #00D9FF, #7B2FFF)',
+          }}
+        />
       </div>
+
+      {currentSkill?.applies?.length ? (
+        <div className={styles.statusList}>
+          {currentSkill.applies.map((status) => (
+            <span key={status} className={styles.statusBadge}>
+              {STATUS_LABELS[status] ?? status}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {skillList.length > 0 && (
         <div className={styles.skills}>
@@ -57,7 +90,11 @@ const SkillWheel = ({
               : styles.skillItem;
 
             return (
-              <div key={skill.key} className={itemClass} title={skill.name}>
+              <div
+                key={skill.key}
+                className={itemClass}
+                title={`${skill.name} • ${ELEMENT_LABELS[skill.element] ?? skill.element ?? '—'} (${SKILL_TYPE_LABELS[skill.type] ?? skill.type ?? 'Ativa'})`}
+              >
                 <span>{skill.icon}</span>
                 {skill.cooldown > 0 && (
                   <div

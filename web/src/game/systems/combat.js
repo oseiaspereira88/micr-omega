@@ -1,3 +1,6 @@
+import { calculateDamageWithResistances } from '../engine/updateGameState';
+import { AFFINITY_TYPES, ELEMENT_TYPES } from '../../shared/combat';
+
 export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   if (!state || !enemy) return false;
 
@@ -65,11 +68,31 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
       state.activePowerUps.some(p => p.type === 'invincibility');
 
     if (!organism.invulnerable && !organism.dying && !powerShieldActive) {
-      const damage = Math.max(1, enemy.attack - organism.defense);
+      const attackMultiplier = enemy.dynamicModifiers?.attackMultiplier ?? 1;
+      const attackBonus = enemy.dynamicModifiers?.attackBonus ?? 0;
+      const effectiveAttack = Math.max(0, (enemy.attack + attackBonus) * attackMultiplier);
+      const defenseValue = Math.max(0, organism.defense ?? 0);
+      const baseDamage = Math.max(0, effectiveAttack - defenseValue);
+      const damageResult = calculateDamageWithResistances({
+        baseDamage,
+        attackerElement: enemy.element ?? ELEMENT_TYPES.BIO,
+        attackElement: enemy.attackElement ?? enemy.element ?? ELEMENT_TYPES.BIO,
+        attackerAffinity: enemy.affinity ?? AFFINITY_TYPES.NEUTRAL,
+        targetElement: organism.element ?? ELEMENT_TYPES.BIO,
+        targetResistances: organism.resistances ?? {},
+        situationalModifiers: [],
+      });
+      const damage = Math.max(1, damageResult.damage);
       state.health -= damage;
       addNotification?.(state, `-${damage} HP`);
       playSound?.('damage');
       createEffect?.(state, organism.x, organism.y, 'hit', '#FF0000');
+
+      if (damageResult.relation === 'advantage') {
+        addNotification?.(state, '⚠️ Afinidade inimiga explorou sua fraqueza!');
+      } else if (damageResult.relation === 'disadvantage') {
+        addNotification?.(state, '🛡️ Resistência absorveu parte do dano.');
+      }
 
       organism.eyeExpression = 'hurt';
       setTimeout(() => { organism.eyeExpression = 'neutral'; }, 500);
@@ -131,7 +154,23 @@ export const performAttack = (state, helpers = {}) => {
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
 
     if (dist < attackRange) {
-      const damage = Math.max(1, (organism.attack + attackBonus) * comboMultiplier - enemy.defense * 0.5);
+      const defenseMultiplier = enemy.dynamicModifiers?.defenseMultiplier ?? 1;
+      const defenseBonus = enemy.dynamicModifiers?.defenseBonus ?? 0;
+      const effectiveDefense = Math.max(0, (enemy.defense + defenseBonus) * defenseMultiplier * 0.5);
+      const baseAttackValue = Math.max(0, organism.attack + attackBonus);
+      const baseDamage = Math.max(0, baseAttackValue - effectiveDefense);
+      const damageResult = calculateDamageWithResistances({
+        baseDamage,
+        attackerElement: organism.element ?? ELEMENT_TYPES.BIO,
+        attackElement: organism.attackElement ?? organism.element ?? ELEMENT_TYPES.BIO,
+        attackerAffinity: organism.affinity ?? AFFINITY_TYPES.NEUTRAL,
+        targetElement: enemy.element ?? ELEMENT_TYPES.BIO,
+        targetResistances: enemy.resistances ?? {},
+        situationalModifiers: [],
+        combo: { value: state.combo, multiplier: comboMultiplier },
+        hooks: organism.comboHooks ?? {},
+      });
+      const damage = Math.max(1, damageResult.damage);
       enemy.health -= damage;
 
       createEffect?.(state, enemy.x, enemy.y, 'hit', organism.color);
@@ -145,6 +184,16 @@ export const performAttack = (state, helpers = {}) => {
       state.comboTimer = 3;
       if (state.combo > state.maxCombo) state.maxCombo = state.combo;
       if (state.combo > 0 && state.combo % 6 === 0) comboSound = true;
+
+      if (damageResult.relation === 'advantage') {
+        addNotification?.(state, '⚡ Ataque explorou fraqueza elemental!');
+      } else if (damageResult.relation === 'disadvantage') {
+        addNotification?.(state, '🛡️ Resistência inimiga reduziu o golpe.');
+      }
+
+      if (typeof organism.comboHooks?.onDamageResolved === 'function') {
+        organism.comboHooks.onDamageResolved({ damageResult, enemy, state });
+      }
 
       if (enemy.health <= 0) {
         state.energy += 30;

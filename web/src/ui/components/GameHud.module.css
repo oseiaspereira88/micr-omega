@@ -113,6 +113,27 @@
   font-size: 0.95rem;
 }
 
+.opponentMeta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.opponentTag {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.opponentAffinity {
+  background: rgba(123, 47, 255, 0.2);
+}
+
 .opponentHealthBar {
   position: relative;
   width: 100%;
