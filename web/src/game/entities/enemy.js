@@ -123,6 +123,82 @@ const mergeArraysUnique = (...collections) => {
   return Array.from(unique);
 };
 
+const cloneCollection = (collection = []) =>
+  (Array.isArray(collection)
+    ? collection.map((entry) => (entry && typeof entry === 'object' ? { ...entry } : entry))
+    : []);
+
+const DEFAULT_NPC_XP_THRESHOLDS = { minor: 60, medium: 140 };
+const DEFAULT_NPC_MUTATION_LIMITS = { minor: 2, medium: 1 };
+
+const ensureEvolutionXpState = (input = {}) => {
+  const merged = {
+    current: input.current,
+    thresholds: { ...(input.thresholds || {}) },
+    rolls: { ...(input.rolls || {}) },
+  };
+  return {
+    current: resolveNumericValue(merged.current, 0),
+    thresholds: {
+      minor: resolveNumericValue(merged.thresholds.minor, DEFAULT_NPC_XP_THRESHOLDS.minor),
+      medium: resolveNumericValue(merged.thresholds.medium, DEFAULT_NPC_XP_THRESHOLDS.medium),
+    },
+    rolls: {
+      minor: resolveNumericValue(merged.rolls.minor, 0),
+      medium: resolveNumericValue(merged.rolls.medium, 0),
+    },
+  };
+};
+
+const resolveMutationLimits = (input = {}) => ({
+  minor: resolveNumericValue(input.minor, DEFAULT_NPC_MUTATION_LIMITS.minor),
+  medium: resolveNumericValue(input.medium, DEFAULT_NPC_MUTATION_LIMITS.medium),
+});
+
+const normalizeBiomeMutationLimits = (input = {}) => {
+  const normalized = {};
+  Object.entries(input || {}).forEach(([biome, limits]) => {
+    if (!limits || typeof limits !== 'object') return;
+    normalized[biome] = resolveMutationLimits(limits);
+  });
+  return normalized;
+};
+
+const applyEvolutionDropScaling = (enemy) => {
+  if (!enemy) return;
+  const base = enemy.baseDropProfile || enemy.dropProfile;
+  if (!base) return;
+  const evolution = Math.max(0, (enemy.evolutionLevel ?? 1) - 1);
+  const mutationCount = Array.isArray(enemy.mutationHistory) ? enemy.mutationHistory.length : 0;
+  const multiplier = 1 + evolution * 0.35 + mutationCount * 0.12;
+  const scaled = { ...base };
+
+  if (scaled.geneticMaterial) {
+    scaled.geneticMaterial = {
+      ...scaled.geneticMaterial,
+      min: Math.max(0, Math.round((scaled.geneticMaterial.min ?? 0) * multiplier)),
+      max: Math.max(0, Math.round((scaled.geneticMaterial.max ?? scaled.geneticMaterial.min ?? 0) * multiplier)),
+    };
+  }
+
+  if (scaled.fragment) {
+    scaled.fragment = {
+      ...scaled.fragment,
+      min: Math.max(0, Math.round((scaled.fragment.min ?? 0) * (1 + (multiplier - 1) * 0.8))),
+      max: Math.max(0, Math.round((scaled.fragment.max ?? scaled.fragment.min ?? 0) * (1 + (multiplier - 1) * 0.8))),
+    };
+  }
+
+  if (scaled.stableGene) {
+    scaled.stableGene = {
+      ...scaled.stableGene,
+      amount: Math.max(0, Math.round((scaled.stableGene.amount ?? 0) * (1 + (multiplier - 1) * 0.6))),
+    };
+  }
+
+  enemy.dropProfile = scaled;
+};
+
 const mergeWeaknessProfiles = (base = {}, extra = {}) => ({
   ...normalizeWeaknessProfile(base),
   ...normalizeWeaknessProfile(extra),
@@ -431,7 +507,8 @@ export const createEnemyFromTemplate = (
   enemy.variantOf = overrides.variantOf ?? template.variantOf ?? templateKey;
   enemy.dropTier = overrides.dropTier ?? template.dropTier ?? 'minion';
   const dropProfile = DROP_TABLES[enemy.dropTier] ?? DROP_TABLES.minion;
-  enemy.dropProfile = { ...dropProfile };
+  enemy.baseDropProfile = { ...dropProfile };
+  enemy.dropProfile = { ...enemy.baseDropProfile };
   enemy.abilities = mergeArraysUnique(template.abilities || [], overrides.abilities || []);
   const baseResistances = resolveResistanceProfile(
     template.baseResistances,
@@ -541,6 +618,48 @@ export const createEnemyFromTemplate = (
     ...(overrides.statusResistances || {}),
   });
   enemy.status = createStatusState(overrides.status);
+
+  const evolutionXpInput = {
+    ...(template.evolutionXp || {}),
+    ...(overrides.evolutionXp || {}),
+  };
+  enemy.evolutionXp = ensureEvolutionXpState(evolutionXpInput);
+
+  const mutationLimitInput = {
+    ...(template.mutationLimits || {}),
+    ...(overrides.mutationLimits || {}),
+  };
+  enemy.mutationLimits = resolveMutationLimits(mutationLimitInput);
+
+  const biomeLimits = {
+    ...normalizeBiomeMutationLimits(template.mutationLimitsByBiome || {}),
+    ...normalizeBiomeMutationLimits(overrides.mutationLimitsByBiome || {}),
+  };
+  enemy.mutationLimitsByBiome = {
+    default: { ...enemy.mutationLimits },
+    ...biomeLimits,
+  };
+
+  const historySeed = [
+    ...cloneCollection(template.mutationHistory),
+    ...cloneCollection(overrides.mutationHistory),
+  ];
+  enemy.mutationHistory = historySeed;
+
+  const templateScars = cloneCollection(template.scars);
+  const overrideScars = cloneCollection(overrides.scars);
+  enemy.scars = overrideScars.length > 0 ? overrideScars : templateScars;
+
+  if (enemy.scars.length === 0 && enemy.mutationHistory.length > 0) {
+    enemy.scars = enemy.mutationHistory.map((entry) => ({
+      type: entry?.type ?? 'minor',
+      color: enemy.coreColor ?? enemy.color,
+      intensity: entry?.type === 'medium' ? 1 : 0.6,
+      timestamp: entry?.timestamp ?? Date.now(),
+    }));
+  }
+
+  applyEvolutionDropScaling(enemy);
 
   return enemy;
 };
