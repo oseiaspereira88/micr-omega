@@ -1505,14 +1505,13 @@ export class RoomDO {
       player.connectedAt = now;
       const playerSocket = this.socketsByPlayer.get(player.id);
       if (playerSocket && playerSocket !== socket) {
-        try {
-          playerSocket.close(1008, "session_taken");
-        } catch (error) {
-          this.observability.log("warn", "close_stale_socket_failed", {
-            playerId: player.id,
-            error: serializeError(error)
-          });
-        }
+        this.closePlayerSocketIfCurrent(
+          player.id,
+          playerSocket,
+          1008,
+          "session_taken",
+          "close_stale_socket_failed"
+        );
       }
       this.socketsByPlayer.set(player.id, socket);
     }
@@ -1843,6 +1842,33 @@ export class RoomDO {
     const deltaMs = Math.max(1, now - lastTick);
     this.lastWorldTickAt = now;
 
+    const stalePlayerIds = new Set<string>();
+    const staleSockets: Array<{ playerId: string; socket: WebSocket }> = [];
+    for (const player of this.players.values()) {
+      if (!player.connected) {
+        continue;
+      }
+      if (now - player.lastSeenAt <= INACTIVE_TIMEOUT_MS) {
+        continue;
+      }
+      const socket = this.socketsByPlayer.get(player.id);
+      if (!socket) {
+        continue;
+      }
+      stalePlayerIds.add(player.id);
+      staleSockets.push({ playerId: player.id, socket });
+    }
+
+    for (const { playerId, socket } of staleSockets) {
+      this.closePlayerSocketIfCurrent(
+        playerId,
+        socket,
+        1001,
+        "inactive_timeout",
+        "close_inactive_socket_failed"
+      );
+    }
+
     const updatedPlayers = new Map<string, PlayerInternal>();
     const worldDiff: SharedWorldStateDiff = {};
     const combatLog: CombatLogEntry[] = [];
@@ -1850,6 +1876,9 @@ export class RoomDO {
     let scoresChanged = false;
 
     for (const player of this.players.values()) {
+      if (stalePlayerIds.has(player.id)) {
+        continue;
+      }
       if (this.movePlayerDuringTick(player, deltaMs)) {
         updatedPlayers.set(player.id, player);
       }
@@ -2370,6 +2399,34 @@ export class RoomDO {
       if (socket === except) continue;
       if (socket.readyState === WebSocket.OPEN) {
         this.send(socket, message);
+      }
+    }
+  }
+
+  private closePlayerSocketIfCurrent(
+    playerId: string,
+    socket: WebSocket,
+    code: number,
+    reason: string,
+    logEvent: string = "close_socket_failed"
+  ): void {
+    const current = this.socketsByPlayer.get(playerId);
+    if (current !== socket) {
+      return;
+    }
+    const mappedPlayerId = this.clientsBySocket.get(socket);
+    if (mappedPlayerId !== playerId) {
+      return;
+    }
+
+    if (socket.readyState !== WebSocket.CLOSING && socket.readyState !== WebSocket.CLOSED) {
+      try {
+        socket.close(code, reason);
+      } catch (error) {
+        this.observability.log("warn", logEvent, {
+          playerId,
+          error: serializeError(error),
+        });
       }
     }
   }
