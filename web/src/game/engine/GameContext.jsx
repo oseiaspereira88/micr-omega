@@ -30,6 +30,7 @@ const initialState = {
   formReapplyNotice: false,
   evolutionType: null,
   cameraZoom: 1,
+  opponents: [],
 };
 
 function gameReducer(state, action) {

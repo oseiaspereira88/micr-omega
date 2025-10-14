@@ -40,6 +40,7 @@ const GameHud = ({
   cameraZoom = 1,
   onCameraZoomChange,
   onQuit,
+  opponents = [],
 }) => {
   const currentSkill = skillData?.currentSkill ?? null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -47,6 +48,8 @@ const GameHud = ({
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
   }, []);
+
+  const hasOpponents = Array.isArray(opponents) && opponents.length > 0;
 
   return (
     <>
@@ -67,6 +70,32 @@ const GameHud = ({
         >
           <RankingPanel />
           <ConnectionStatusOverlay />
+          {hasOpponents ? (
+            <div className={styles.opponentPanel}>
+              <h3 className={styles.opponentHeading}>Oponentes</h3>
+              <ul className={styles.opponentList}>
+                {opponents.map((opponent) => {
+                  const ratio = opponent.maxHealth
+                    ? Math.max(0, Math.min(1, opponent.health / opponent.maxHealth))
+                    : 0;
+                  const barStyle = {
+                    width: `${ratio * 100}%`,
+                    background: opponent.palette?.base ?? '#47c2ff',
+                  };
+
+                  return (
+                    <li key={opponent.id} className={styles.opponentItem}>
+                      <div className={styles.opponentName}>{opponent.name}</div>
+                      <div className={styles.opponentHealthBar}>
+                        <div className={styles.opponentHealthFill} style={barStyle} />
+                      </div>
+                      <div className={styles.opponentStatus}>{opponent.combatState}</div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
           <CameraControls zoom={cameraZoom} onChange={onCameraZoomChange} />
           {onQuit ? (
             <button type="button" className={styles.leaveButton} onClick={onQuit}>
@@ -75,30 +104,32 @@ const GameHud = ({
           ) : null}
         </div>
 
-        <HudBar
-        level={level}
-        score={score}
-        energy={energy}
-        health={health}
-        maxHealth={maxHealth}
-        dashCharge={dashCharge}
-        combo={combo}
-        maxCombo={maxCombo}
-        activePowerUps={activePowerUps}
-      />
+        <div className={styles.mainHud}>
+          <HudBar
+            level={level}
+            score={score}
+            energy={energy}
+            health={health}
+            maxHealth={maxHealth}
+            dashCharge={dashCharge}
+            combo={combo}
+            maxCombo={maxCombo}
+            activePowerUps={activePowerUps}
+          />
 
-      <BossHealthBar active={bossActive} health={bossHealth} maxHealth={bossMaxHealth} />
+          <BossHealthBar active={bossActive} health={bossHealth} maxHealth={bossMaxHealth} />
 
-      <SkillWheel
-        currentSkill={currentSkill}
-        skillList={skillData?.skillList ?? []}
-        hasMultipleSkills={skillData?.hasMultipleSkills}
-        skillCooldownLabel={skillData?.skillCooldownLabel ?? 'Sem habilidade'}
-        skillReadyPercent={skillData?.skillReadyPercent ?? 0}
-        onCycleSkill={onCycleSkill}
-      />
+          <SkillWheel
+            currentSkill={currentSkill}
+            skillList={skillData?.skillList ?? []}
+            hasMultipleSkills={skillData?.hasMultipleSkills}
+            skillCooldownLabel={skillData?.skillCooldownLabel ?? 'Sem habilidade'}
+            skillReadyPercent={skillData?.skillReadyPercent ?? 0}
+            onCycleSkill={onCycleSkill}
+          />
 
-      <Notifications notifications={notifications} />
+          <Notifications notifications={notifications} />
+        </div>
 
         {showTouchControls ? (
           <TouchControls

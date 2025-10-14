@@ -119,6 +119,7 @@ const GameCanvas = ({ settings, onQuit }) => {
         cameraZoom={gameState.cameraZoom ?? gameState.camera?.zoom ?? 1}
         onCameraZoomChange={setCameraZoom}
         onQuit={onQuit}
+        opponents={gameState.opponents}
       />
 
       {gameState.showEvolutionChoice && (

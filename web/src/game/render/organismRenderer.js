@@ -1,172 +1,157 @@
 import { withCameraTransform } from './utils/cameraHelpers.js';
 
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const drawHealthRing = (ctx, radius, health, palette) => {
+  if (!health) return;
+  const { current, max } = health;
+  const ratio = max > 0 ? clamp(current / max, 0, 1) : 0;
+
+  ctx.save();
+  ctx.rotate(-Math.PI / 2);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = `${palette.accent}CC`;
+  ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = palette.base;
+  ctx.globalAlpha = 0.95;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2 * ratio);
+  ctx.stroke();
+  ctx.restore();
+};
+
+const drawPlayerBody = (ctx, player, pulsePhase) => {
+  const { palette, renderPosition, orientation, speed, isLocal } = player;
+  const baseSize = 22 + clamp(speed * 12, 0, 10);
+  const sizePulse = Math.sin((player.pulse ?? 0) + pulsePhase * 0.5) * 3;
+  const totalRadius = baseSize + sizePulse;
+
+  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, totalRadius);
+  gradient.addColorStop(0, `${palette.base}FF`);
+  gradient.addColorStop(0.6, `${palette.accent}CC`);
+  gradient.addColorStop(1, `${palette.base}33`);
+
+  if (isLocal) {
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = `${palette.base}22`;
+    ctx.beginPath();
+    ctx.arc(0, 0, totalRadius + 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.rotate(orientation ?? 0);
+  ctx.fillStyle = gradient;
+  ctx.shadowBlur = isLocal ? 25 : 10;
+  ctx.shadowColor = palette.base;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, totalRadius * (1.1 + speed * 0.05), totalRadius * 0.85, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  drawHealthRing(ctx, totalRadius + 6, player.health, palette);
+
+  ctx.save();
+  ctx.rotate(orientation ?? 0);
+  ctx.fillStyle = '#fff';
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.arc(totalRadius * 0.45, -totalRadius * 0.2, totalRadius * 0.25, 0, Math.PI * 2);
+  ctx.arc(totalRadius * 0.45, totalRadius * 0.2, totalRadius * 0.25, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#050505';
+  ctx.beginPath();
+  ctx.arc(totalRadius * 0.55, -totalRadius * 0.2, totalRadius * 0.13, 0, Math.PI * 2);
+  ctx.arc(totalRadius * 0.55, totalRadius * 0.2, totalRadius * 0.13, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.shadowBlur = 0;
+};
+
+const drawNameplate = (ctx, player, camera) => {
+  if (!player?.name) return;
+  const viewport = camera.viewport || {};
+  const width = viewport.width ?? 0;
+  const height = viewport.height ?? 0;
+  const offsetX = camera.offsetX ?? camera.x - width / 2;
+  const offsetY = camera.offsetY ?? camera.y - height / 2;
+
+  const screenX = player.renderPosition.x - offsetX;
+  const screenY = player.renderPosition.y - offsetY - 32;
+
+  ctx.save();
+  ctx.translate(screenX, screenY);
+  ctx.font = 'bold 14px "Nunito", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = `${player.palette.label}DD`;
+  ctx.strokeStyle = 'rgba(12, 15, 24, 0.6)';
+  ctx.lineWidth = 3;
+  ctx.strokeText(player.name, 0, 0);
+  ctx.fillText(player.name, 0, 0);
+  ctx.restore();
+};
+
+const drawCombatIndicators = (ctx, combatIndicators, camera) => {
+  if (!Array.isArray(combatIndicators) || combatIndicators.length === 0) return;
+  const viewport = camera.viewport || {};
+  const width = viewport.width ?? 0;
+  const height = viewport.height ?? 0;
+  const offsetX = camera.offsetX ?? camera.x - width / 2;
+  const offsetY = camera.offsetY ?? camera.y - height / 2;
+
+  combatIndicators.forEach((indicator) => {
+    const screenX = indicator.position.x - offsetX;
+    const screenY = indicator.position.y - offsetY;
+
+    ctx.save();
+    ctx.translate(screenX, screenY);
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = `${indicator.palette.base}AA`;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.arc(0, 0, 42, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  });
+};
+
 export const organismRenderer = {
   render(ctx, state, camera) {
-    const { organism: org, activePowerUps = [], pulsePhase = 0 } = state;
-    if (!ctx || !org) return;
+    if (!ctx || !state || !camera) return;
 
-    const baseSize = org.size * org.pulseIntensity;
+    const { players = [], combatIndicators = [], pulsePhase = 0 } = state;
+    if (!Array.isArray(players) || players.length === 0) return;
+
+    const viewport = camera.viewport || {};
+    const width = viewport.width ?? 0;
+    const height = viewport.height ?? 0;
+    const offsetX = camera.offsetX ?? camera.x - width / 2;
+    const offsetY = camera.offsetY ?? camera.y - height / 2;
 
     withCameraTransform(ctx, camera, () => {
-      ctx.save();
-      ctx.translate(org.x - camera.offsetX, org.y - camera.offsetY);
+      players.forEach((player) => {
+        const screenX = player.renderPosition.x - offsetX;
+        const screenY = player.renderPosition.y - offsetY;
 
-      const hasPowerShield =
-        org.invulnerableFromPowerUp || activePowerUps.some(p => p.type === 'invincibility');
-
-      org.trail.forEach((t, i) => {
-        const trailSize = t.size * (i / org.trail.length);
-        ctx.fillStyle = t.color;
-        ctx.globalAlpha = t.life * 0.2;
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = t.color;
-        ctx.beginPath();
-        ctx.arc(t.x - org.x, t.y - org.y, trailSize, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
-
-      ctx.rotate(org.angle);
-      ctx.transform(1 + org.tiltX, org.tiltY, org.tiltX, 1 + org.tiltY, 0, 0);
-
-      if (org.dying) {
-        ctx.rotate(org.rotation);
-        ctx.globalAlpha = org.deathTimer / 2;
-      }
-
-      if (org.invulnerable || hasPowerShield) {
-        ctx.strokeStyle = '#FFD700';
-        ctx.lineWidth = 4;
-        ctx.globalAlpha = 0.6 + Math.sin(pulsePhase * 10) * 0.3;
-        ctx.shadowBlur = 25;
-        ctx.shadowColor = '#FFD700';
-        ctx.beginPath();
-        ctx.arc(0, 0, baseSize + 15, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        ctx.shadowBlur = 0;
-      }
-
-      if (hasPowerShield) {
-        const shieldPower = activePowerUps.find(p => p.type === 'invincibility');
-        const shieldColor = shieldPower?.color || '#FFD700';
-        ctx.strokeStyle = shieldColor;
-        ctx.lineWidth = 3;
-        ctx.globalAlpha = 0.4 + Math.sin(pulsePhase * 6) * 0.2;
-        ctx.beginPath();
-        ctx.arc(0, 0, baseSize + 12 + Math.sin(pulsePhase) * 4, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-
-      ctx.strokeStyle = org.color;
-      ctx.lineWidth = 2;
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = org.color;
-
-      ctx.beginPath();
-      const segments = 64;
-      for (let i = 0; i <= segments; i++) {
-        const angle = (i / segments) * Math.PI * 2;
-        const wave = Math.sin(angle * 3 + org.swimPhase) * org.bodyWave * baseSize;
-        const r = baseSize + wave + 8;
-        const x = Math.cos(angle) * r;
-        const y = Math.sin(angle) * r;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.globalAlpha = 0.3;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
-
-      const gradient = ctx.createRadialGradient(
-        -baseSize * 0.3,
-        -baseSize * 0.3,
-        0,
-        0,
-        0,
-        baseSize * 1.4
-      );
-      gradient.addColorStop(0, org.tertiaryColor + 'FF');
-      gradient.addColorStop(0.4, org.color);
-      gradient.addColorStop(0.8, org.secondaryColor);
-      gradient.addColorStop(1, org.color + '22');
-
-      ctx.fillStyle = gradient;
-      ctx.shadowBlur = 40;
-      ctx.shadowColor = org.color;
-      ctx.beginPath();
-      for (let i = 0; i <= segments; i++) {
-        const angle = (i / segments) * Math.PI * 2;
-        const wave = Math.sin(angle * 3 + org.swimPhase) * org.bodyWave * baseSize;
-        const r = baseSize + wave;
-        const x = Math.cos(angle) * r;
-        const y = Math.sin(angle) * r;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.fill();
-
-      ctx.shadowBlur = 0;
-
-      ctx.fillStyle = org.secondaryColor + '66';
-      for (let i = 0; i < 3; i++) {
-        const angle = (i / 3) * Math.PI * 2 + org.swimPhase * 0.2;
-        const dist = baseSize * 0.3;
-        const size = baseSize * 0.1;
-        ctx.beginPath();
-        ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      const eyeSize = baseSize * 0.25;
-      const eyeDistance = baseSize * 0.4;
-      const eyeY = -eyeSize * 0.3;
-
-      const expressionOffset =
-        org.eyeExpression === 'hurt' ? 0.3 : org.eyeExpression === 'attacking' ? -0.2 : 0;
-
-      [-1, 1].forEach(side => {
         ctx.save();
-        ctx.translate(eyeDistance * side, eyeY + expressionOffset * eyeSize);
-
-        if (org.eyeBlinkState > 0.5) {
-          ctx.strokeStyle = org.secondaryColor;
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(-eyeSize, 0);
-          ctx.lineTo(eyeSize, 0);
-          ctx.stroke();
-        } else {
-          ctx.fillStyle = '#FFF';
-          ctx.strokeStyle = org.secondaryColor;
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(0, 0, eyeSize, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-
-          const pupilX = org.eyeLookX * eyeSize * 0.4;
-          const pupilY = org.eyeLookY * eyeSize * 0.4;
-
-          ctx.fillStyle = '#000';
-          ctx.beginPath();
-          ctx.arc(pupilX, pupilY, eyeSize * 0.5, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = '#FFF';
-          ctx.globalAlpha = 0.8;
-          ctx.beginPath();
-          ctx.arc(pupilX - eyeSize * 0.15, pupilY - eyeSize * 0.15, eyeSize * 0.2, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.globalAlpha = 1;
-        }
+        ctx.translate(screenX, screenY);
+        drawPlayerBody(ctx, player, pulsePhase);
         ctx.restore();
+
+        drawNameplate(ctx, player, camera);
       });
 
-      ctx.restore();
+      drawCombatIndicators(ctx, combatIndicators, camera);
     });
   },
 };
