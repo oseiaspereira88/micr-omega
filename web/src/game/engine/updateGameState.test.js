@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { updateGameState } from './updateGameState';
 
@@ -118,7 +118,6 @@ describe('updateGameState enemy collisions', () => {
     });
 
     updateGameState({ state, delta: 0.016 });
-
     expect(state.health).toBe(100);
     expect(Number.isFinite(state.health)).toBe(true);
   });
@@ -185,6 +184,89 @@ describe('updateGameState enemy collisions', () => {
 
     expect(state.organism.invulnerableTimer).toBe(0);
     expect(state.organism.invulnerable).toBe(true);
+  });
+});
+
+describe('updateGameState evolved enemy behaviours', () => {
+  it('fires hostile projectiles for enemies with projectile volley traits', () => {
+    const state = createState({
+      enemies: [
+        createEnemy({
+          id: 'volley',
+          attack: 12,
+          behaviorTraits: {
+            projectileVolley: {
+              interval: 0.1,
+              count: 2,
+              speed: 3,
+              spread: 0.2,
+              damageMultiplier: 0.5,
+              life: 1,
+              color: '#ff0000',
+            },
+          },
+          projectileCooldown: 0,
+        }),
+      ],
+    });
+
+    const helpers = {
+      createEffect: vi.fn(),
+      playSound: vi.fn(),
+    };
+
+    updateGameState({ state, delta: 0.2, helpers });
+
+    expect(state.projectiles.length).toBeGreaterThan(0);
+    expect(state.projectiles.every((proj) => proj.hostile)).toBe(true);
+  });
+
+  it('applies support aura buffs to nearby allies', () => {
+    const supportEnemy = createEnemy({
+      id: 'supporter',
+      x: 0,
+      y: 0,
+      attack: 8,
+      behaviorTraits: {
+        supportAura: {
+          interval: 0.1,
+          duration: 1,
+          radius: 150,
+          modifiers: { attackMultiplier: 1.5 },
+          includeSelf: true,
+        },
+      },
+    });
+
+    const ally = createEnemy({
+      id: 'ally',
+      x: 40,
+      y: 0,
+      attack: 10,
+    });
+
+    const state = createState({
+      enemies: [supportEnemy, ally],
+    });
+
+    const helpers = {
+      createEffect: vi.fn(),
+      playSound: vi.fn(),
+    };
+
+    updateGameState({ state, delta: 0.2, helpers });
+
+    const buffedAlly = state.enemies.find((enemy) => enemy.id === 'ally');
+    expect(buffedAlly).toBeDefined();
+    expect(buffedAlly.attack).toBeGreaterThan(10);
+    expect(helpers.createEffect).toHaveBeenCalledWith(
+      expect.anything(),
+      supportEnemy.x,
+      supportEnemy.y,
+      'buff',
+      supportEnemy.color
+    );
+    expect(helpers.playSound).toHaveBeenCalledWith('buff');
   });
 });
 

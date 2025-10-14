@@ -38,6 +38,79 @@ const resolveEnemyDamage = enemy => {
   return 0;
 };
 
+const applyBuffModifiersToDynamic = (dynamic, modifiers = {}) => {
+  if (!dynamic || typeof dynamic !== 'object') return;
+  if (!modifiers || typeof modifiers !== 'object') return;
+
+  if (typeof modifiers.attackMultiplier === 'number' && Number.isFinite(modifiers.attackMultiplier)) {
+    dynamic.attackMultiplier *= modifiers.attackMultiplier;
+  }
+
+  if (typeof modifiers.defenseMultiplier === 'number' && Number.isFinite(modifiers.defenseMultiplier)) {
+    dynamic.defenseMultiplier *= modifiers.defenseMultiplier;
+  }
+
+  if (typeof modifiers.speedMultiplier === 'number' && Number.isFinite(modifiers.speedMultiplier)) {
+    dynamic.speedMultiplier *= modifiers.speedMultiplier;
+  }
+
+  if (typeof modifiers.sizeMultiplier === 'number' && Number.isFinite(modifiers.sizeMultiplier)) {
+    dynamic.sizeMultiplier *= modifiers.sizeMultiplier;
+  }
+
+  if (typeof modifiers.attackBonus === 'number' && Number.isFinite(modifiers.attackBonus)) {
+    dynamic.attackBonus += modifiers.attackBonus;
+  }
+
+  if (typeof modifiers.defenseBonus === 'number' && Number.isFinite(modifiers.defenseBonus)) {
+    dynamic.defenseBonus += modifiers.defenseBonus;
+  }
+
+  if (typeof modifiers.speedBonus === 'number' && Number.isFinite(modifiers.speedBonus)) {
+    dynamic.speedBonus += modifiers.speedBonus;
+  }
+
+  if (typeof modifiers.sizeBonus === 'number' && Number.isFinite(modifiers.sizeBonus)) {
+    dynamic.sizeBonus += modifiers.sizeBonus;
+  }
+};
+
+const applyBuffToEnemy = (enemy, buff = {}, { immediate = false } = {}) => {
+  if (!enemy || !buff || typeof buff !== 'object') return;
+
+  const normalizedDuration = ensureNumber(buff.remaining ?? buff.duration, 0);
+  if (normalizedDuration <= 0) return;
+
+  const normalizedBuff = {
+    sourceId: buff.sourceId ?? enemy.id,
+    type: buff.type ?? 'generic',
+    remaining: normalizedDuration,
+    modifiers: { ...(buff.modifiers || {}) },
+  };
+
+  if (!Array.isArray(enemy.activeBuffs)) {
+    enemy.activeBuffs = [];
+  }
+
+  const existingBuff = enemy.activeBuffs.find(
+    (item) => item.sourceId === normalizedBuff.sourceId && item.type === normalizedBuff.type
+  );
+
+  if (existingBuff) {
+    existingBuff.remaining = Math.max(
+      ensureNumber(existingBuff.remaining, 0),
+      normalizedBuff.remaining
+    );
+    existingBuff.modifiers = { ...existingBuff.modifiers, ...normalizedBuff.modifiers };
+  } else {
+    enemy.activeBuffs.push({ ...normalizedBuff });
+  }
+
+  if (immediate && enemy.dynamicModifiers) {
+    applyBuffModifiersToDynamic(enemy.dynamicModifiers, normalizedBuff.modifiers);
+  }
+};
+
 export const updateGameState = ({
   state,
   delta = 0,
@@ -350,7 +423,214 @@ export const updateGameState = ({
     spawnOrganicMatter?.(state, 1);
   }
 
-  state.enemies = (state.enemies || []).filter(enemy => {
+  const enemies = Array.isArray(state.enemies) ? state.enemies : [];
+
+  enemies.forEach((enemy) => {
+    if (!enemy || typeof enemy !== 'object') {
+      return;
+    }
+
+    if (!enemy.dynamicModifiers || typeof enemy.dynamicModifiers !== 'object') {
+      enemy.dynamicModifiers = {
+        attackMultiplier: 1,
+        defenseMultiplier: 1,
+        speedMultiplier: 1,
+        sizeMultiplier: 1,
+        attackBonus: 0,
+        defenseBonus: 0,
+        speedBonus: 0,
+        sizeBonus: 0,
+      };
+    } else {
+      enemy.dynamicModifiers.attackMultiplier = 1;
+      enemy.dynamicModifiers.defenseMultiplier = 1;
+      enemy.dynamicModifiers.speedMultiplier = 1;
+      enemy.dynamicModifiers.sizeMultiplier = 1;
+      enemy.dynamicModifiers.attackBonus = 0;
+      enemy.dynamicModifiers.defenseBonus = 0;
+      enemy.dynamicModifiers.speedBonus = 0;
+      enemy.dynamicModifiers.sizeBonus = 0;
+    }
+
+    if (!enemy.baseStats || typeof enemy.baseStats !== 'object') {
+      enemy.baseStats = {
+        size: ensureNumber(enemy.size, 12),
+        speed: ensureNumber(enemy.speed, 1),
+        attack: ensureNumber(enemy.attack, 0),
+        defense: ensureNumber(enemy.defense, 0),
+        maxHealth: ensureNumber(enemy.maxHealth, ensureNumber(enemy.health, 10)),
+        health: ensureNumber(enemy.health, 10),
+      };
+    }
+
+    enemy.behaviorTraits =
+      enemy.behaviorTraits && typeof enemy.behaviorTraits === 'object'
+        ? enemy.behaviorTraits
+        : {};
+
+    if (Array.isArray(enemy.activeBuffs)) {
+      enemy.activeBuffs = enemy.activeBuffs.filter((buff) => {
+        if (!buff || typeof buff !== 'object') return false;
+        const remaining = ensureNumber(buff.remaining ?? buff.duration, 0) - delta;
+        if (remaining <= 0) return false;
+        buff.remaining = remaining;
+        applyBuffModifiersToDynamic(enemy.dynamicModifiers, buff.modifiers || {});
+        return true;
+      });
+    } else {
+      enemy.activeBuffs = [];
+    }
+  });
+
+  state.projectiles = state.projectiles || [];
+
+  const updatedEnemies = enemies.filter((enemy) => {
+    if (!enemy || typeof enemy !== 'object') {
+      return false;
+    }
+
+    const dynamic = enemy.dynamicModifiers || {
+      attackMultiplier: 1,
+      defenseMultiplier: 1,
+      speedMultiplier: 1,
+      sizeMultiplier: 1,
+      attackBonus: 0,
+      defenseBonus: 0,
+      speedBonus: 0,
+      sizeBonus: 0,
+    };
+    const baseStats = enemy.baseStats || {};
+    const behaviorTraits = enemy.behaviorTraits || {};
+
+    if (!enemy.boss && behaviorTraits.speedBurst) {
+      const burst = behaviorTraits.speedBurst;
+      const interval = Math.max(0.2, ensureNumber(burst.interval, 6));
+      enemy.speedBurstTimer = ensureNumber(enemy.speedBurstTimer, 0) + delta;
+      enemy.speedBurstActive = Boolean(enemy.speedBurstActive);
+      enemy.speedBurstRemaining = Math.max(0, ensureNumber(enemy.speedBurstRemaining, 0) - delta);
+      if (enemy.speedBurstRemaining <= 0) {
+        enemy.speedBurstActive = false;
+      }
+
+      if (enemy.speedBurstTimer >= interval) {
+        enemy.speedBurstTimer = 0;
+        enemy.speedBurstActive = true;
+        enemy.speedBurstRemaining = Math.max(0.2, ensureNumber(burst.duration, 0.8));
+        enemy.speedBurstMultiplier = Math.max(1, ensureNumber(burst.speedMultiplier, 1.6));
+        createEffect(state, enemy.x, enemy.y, 'dash', enemy.color);
+        playSound('dash');
+      }
+
+      if (enemy.speedBurstActive) {
+        const multiplier = Math.max(1, ensureNumber(enemy.speedBurstMultiplier, 1.6));
+        applyBuffModifiersToDynamic(dynamic, { speedMultiplier: multiplier });
+      }
+    }
+
+    const projectileVolley = behaviorTraits.projectileVolley;
+    if (projectileVolley) {
+      const interval = Math.max(0.2, ensureNumber(projectileVolley.interval, 6));
+      enemy.projectileCooldown = Math.max(
+        0,
+        ensureNumber(enemy.projectileCooldown, 0) - delta
+      );
+
+      if (enemy.projectileCooldown <= 0) {
+        const count = Math.max(1, Math.round(ensureNumber(projectileVolley.count, 3)));
+        const spread = ensureNumber(projectileVolley.spread, Math.PI / 4);
+        const projectileSpeed = ensureNumber(projectileVolley.speed, 5);
+        const projectileLife = Math.max(0.2, ensureNumber(projectileVolley.life, 2.5));
+        const damageMultiplier = ensureNumber(projectileVolley.damageMultiplier, 0.4);
+        const color = projectileVolley.color || enemy.glowColor || enemy.color;
+        const baseAngle = Math.atan2(organism.y - enemy.y, organism.x - enemy.x);
+        const baseAttack = ensureNumber(baseStats.attack, enemy.attack);
+        const damage = Math.max(1, Math.round(baseAttack * damageMultiplier));
+        const spreadStep = count > 1 ? spread / (count - 1) : 0;
+
+        for (let i = 0; i < count; i += 1) {
+          const offset = count > 1 ? -spread / 2 + spreadStep * i : 0;
+          const angle = baseAngle + offset;
+          state.projectiles.push({
+            x: enemy.x,
+            y: enemy.y,
+            vx: Math.cos(angle) * projectileSpeed,
+            vy: Math.sin(angle) * projectileSpeed,
+            damage,
+            life: projectileLife,
+            color,
+            type: 'enemy-projectile',
+            hostile: true,
+            sourceId: enemy.id,
+          });
+        }
+
+        enemy.projectileCooldown = interval;
+        playSound('shoot');
+      }
+    }
+
+    const supportAura = behaviorTraits.supportAura;
+    if (supportAura) {
+      enemy.supportAuraTimer = ensureNumber(enemy.supportAuraTimer, 0) + delta;
+      const interval = Math.max(0.1, ensureNumber(supportAura.interval, 8));
+      if (enemy.supportAuraTimer >= interval) {
+        enemy.supportAuraTimer = 0;
+        const duration = Math.max(0.2, ensureNumber(supportAura.duration, 3));
+        const radius = Math.max(0, ensureNumber(supportAura.radius, 240));
+        const includeSelf = supportAura.includeSelf !== false;
+        const modifiers = supportAura.modifiers || {};
+        const radiusSq = radius * radius;
+
+        enemies.forEach((ally) => {
+          if (!ally || ally === enemy && !includeSelf) return;
+          const dx = ally.x - enemy.x;
+          const dy = ally.y - enemy.y;
+          if (dx * dx + dy * dy <= radiusSq) {
+            applyBuffToEnemy(
+              ally,
+              {
+                sourceId: enemy.id,
+                type: supportAura.type || 'supportAura',
+                remaining: duration,
+                modifiers,
+              },
+              { immediate: true }
+            );
+          }
+        });
+
+        createEffect(state, enemy.x, enemy.y, 'buff', enemy.color);
+        playSound('buff');
+      }
+    }
+
+    const baseSize = ensureNumber(baseStats.size, enemy.size);
+    const baseSpeed = ensureNumber(baseStats.speed, enemy.speed);
+    const baseAttack = ensureNumber(baseStats.attack, enemy.attack);
+    const baseDefense = ensureNumber(baseStats.defense, enemy.defense);
+
+    const effectiveSize = Math.max(
+      1,
+      (baseSize + (dynamic.sizeBonus || 0)) * (dynamic.sizeMultiplier || 1)
+    );
+    const effectiveSpeed = Math.max(
+      0,
+      (baseSpeed + (dynamic.speedBonus || 0)) * (dynamic.speedMultiplier || 1)
+    );
+    const effectiveAttack = Math.max(
+      0,
+      Math.round((baseAttack + (dynamic.attackBonus || 0)) * (dynamic.attackMultiplier || 1))
+    );
+    const effectiveDefense = Math.max(
+      0,
+      Math.round((baseDefense + (dynamic.defenseBonus || 0)) * (dynamic.defenseMultiplier || 1))
+    );
+
+    enemy.size = effectiveSize;
+    enemy.currentSpeed = effectiveSpeed;
+    enemy.attack = effectiveAttack;
+    enemy.defense = effectiveDefense;
+
     if (!enemy.boss) {
       enemy.behaviorTimer += delta;
 
@@ -359,7 +639,7 @@ export const updateGameState = ({
         enemy.behaviorInterval = Math.random() * 2 + 0.5;
 
         const angle = Math.atan2(organism.y - enemy.y, organism.x - enemy.x);
-        const speed = enemy.speed * (0.8 + Math.random() * 0.4);
+        const speed = effectiveSpeed * (0.8 + Math.random() * 0.4);
         enemy.vx = Math.cos(angle) * speed;
         enemy.vy = Math.sin(angle) * speed;
       }
@@ -392,7 +672,7 @@ export const updateGameState = ({
         }
       } else {
         const angle = Math.atan2(organism.y - enemy.y, organism.x - enemy.x);
-        const speed = enemy.speed * (0.6 + Math.random() * 0.4);
+        const speed = effectiveSpeed * (0.6 + Math.random() * 0.4);
         enemy.vx = Math.cos(angle) * speed;
         enemy.vy = Math.sin(angle) * speed;
         enemy.x += enemy.vx * delta * 60;
@@ -451,6 +731,8 @@ export const updateGameState = ({
     return true;
   });
 
+  state.enemies = updatedEnemies;
+
   if (state.enemies.length < maxEnemiesAllowed && Math.random() < 0.005) {
     spawnEnemy?.();
   }
@@ -469,6 +751,38 @@ export const updateGameState = ({
       proj.y > worldSize + 50
     ) {
       return false;
+    }
+
+    if (proj.hostile) {
+      const dxOrg = proj.x - organism.x;
+      const dyOrg = proj.y - organism.y;
+      const distOrg = Math.sqrt(dxOrg * dxOrg + dyOrg * dyOrg);
+
+      if (distOrg < organism.size) {
+        if (!organism.invulnerable && !organism.invulnerableFromPowerUp) {
+          const damage = ensureNumber(proj.damage, 0);
+          const fallbackHealth = toFiniteNumber(state.maxHealth) ?? 100;
+          const currentHealth = ensureNumber(state.health, fallbackHealth);
+          state.health = currentHealth - damage;
+          organism.invulnerable = true;
+          organism.invulnerableTimer = Math.max(
+            ensureNumber(organism.invulnerableTimer, 0),
+            0.6
+          );
+          createEffect(state, organism.x, organism.y, 'impact', proj.color || '#FFFFFF');
+          playSound('hit');
+          state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+
+          if (state.health <= 0) {
+            state.gameOver = true;
+            state.showEvolutionChoice = false;
+          }
+        }
+
+        return false;
+      }
+
+      return true;
     }
 
     for (let i = 0; i < state.enemies.length; i += 1) {
