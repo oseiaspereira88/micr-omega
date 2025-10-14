@@ -177,6 +177,35 @@ export const updateGameState = ({
       ensureNumber(organism.dashCooldown, 0) - delta
     );
 
+    if (organism.skillCooldowns && typeof organism.skillCooldowns === 'object') {
+      let needsImmediateSync = false;
+
+      Object.keys(organism.skillCooldowns).forEach((skillKey) => {
+        const currentCooldown = ensureNumber(organism.skillCooldowns[skillKey], 0);
+
+        if (currentCooldown <= 0) {
+          if (currentCooldown < 0) {
+            organism.skillCooldowns[skillKey] = 0;
+          }
+          return;
+        }
+
+        const updatedCooldown = Math.max(0, currentCooldown - delta);
+
+        if (updatedCooldown !== currentCooldown) {
+          organism.skillCooldowns[skillKey] = updatedCooldown;
+
+          if (updatedCooldown === 0) {
+            needsImmediateSync = true;
+          }
+        }
+      });
+
+      if (needsImmediateSync) {
+        state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
+      }
+    }
+
     state.gameTime += delta;
 
     if (state.gameTime - state.lastSpawnTime > state.spawnInterval / 1000) {
