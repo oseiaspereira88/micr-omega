@@ -73,6 +73,24 @@
   cursor: pointer;
 }
 
+.formCardCurrent {
+  border-color: #00d9ff;
+  background: rgba(0, 217, 255, 0.15);
+}
+
+.formNotice {
+  font-size: 0.85rem;
+  margin: 0 0 8px;
+  text-align: center;
+  color: #9ec7ff;
+}
+
+.formHint {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #9ec7ff;
+}
+
 .formTitle,
 .traitTitle {
   font-size: 1rem;

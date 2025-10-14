@@ -62,6 +62,7 @@ export const createInitialState = () => {
     notifications: [],
     availableTraits: [],
     availableForms: [],
+    formReapplyNotice: false,
     fogIntensity: 0,
     boss: null,
     bossPending: false,

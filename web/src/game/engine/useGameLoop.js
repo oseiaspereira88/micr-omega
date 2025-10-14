@@ -191,6 +191,8 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
         })),
         availableTraits: state.availableTraits || [],
         availableForms: state.availableForms || [],
+        currentForm: organism.form,
+        formReapplyNotice: Boolean(state.formReapplyNotice),
         evolutionType: state.evolutionType || null,
         cameraZoom: state.camera?.zoom ?? 1,
       },

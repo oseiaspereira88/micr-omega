@@ -72,6 +72,8 @@ const GameCanvas = ({ settings, onQuit }) => {
 
   const traitOptions = gameState.availableTraits || [];
   const formOptions = gameState.availableForms || [];
+  const currentForm = gameState.currentForm;
+  const formReapplyNotice = gameState.formReapplyNotice;
 
   return (
     <div className={styles.container}>
@@ -144,20 +146,31 @@ const GameCanvas = ({ settings, onQuit }) => {
             ) : (
               <>
                 <h3 className={styles.optionHeading}>Escolha uma Forma:</h3>
+                {formReapplyNotice && (
+                  <p className={styles.formNotice}>
+                    Reaplicar a forma atual não concede bônus adicional.
+                  </p>
+                )}
                 <div className={styles.optionList}>
                   {formOptions.map((formKey) => {
                     const form = forms[formKey];
                     if (!form) return null;
 
+                    const isCurrentForm = formKey === currentForm;
+                    const cardClassName = `${styles.formCard} ${isCurrentForm ? styles.formCardCurrent : ''}`;
+
                     return (
                       <div
                         key={formKey}
-                        className={styles.formCard}
+                        className={cardClassName.trim()}
                         onClick={() => chooseForm(formKey)}
                       >
                         <div className={styles.formTitle}>
                           {form.icon} {form.name}
                         </div>
+                        {isCurrentForm && (
+                          <div className={styles.formHint}>Forma atual — sem bônus adicional</div>
+                        )}
                       </div>
                     );
                   })}
