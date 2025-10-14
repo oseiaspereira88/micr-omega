@@ -26,6 +26,8 @@ const initialState = {
   notifications: [],
   availableTraits: [],
   availableForms: [],
+  currentForm: null,
+  formReapplyNotice: false,
   evolutionType: null,
   cameraZoom: 1,
 };

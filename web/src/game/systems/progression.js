@@ -39,12 +39,15 @@ export const openEvolutionMenu = (state, helpers = {}) => {
     );
     const traitPool = unusedTraits.length > 0 ? unusedTraits : Object.keys(evolutionaryTraits);
     state.availableTraits = pickRandomUnique?.(traitPool, Math.min(3, traitPool.length)) ?? [];
+    state.formReapplyNotice = false;
   } else {
-    const unusedForms = Object.keys(forms).filter(
-      formKey => formKey !== state.organism.form
-    );
-    const formPool = unusedForms.length > 0 ? unusedForms : Object.keys(forms);
-    state.availableForms = pickRandomUnique?.(formPool, Math.min(3, formPool.length)) ?? [];
+    const allForms = Object.keys(forms ?? {});
+    const currentForm = state.organism.form;
+    const formPoolWithoutCurrent = allForms.filter((formKey) => formKey !== currentForm);
+    const selectionPool = formPoolWithoutCurrent.length > 0 ? formPoolWithoutCurrent : allForms;
+    const selectionCount = Math.min(3, selectionPool.length);
+    state.availableForms = pickRandomUnique?.(selectionPool, selectionCount) ?? [];
+    state.formReapplyNotice = formPoolWithoutCurrent.length === 0 && allForms.length > 0;
   }
 
   state.showEvolutionChoice = true;
@@ -96,10 +99,31 @@ export const chooseForm = (state, helpers = {}, formKey) => {
   if (!form) return state;
 
   state.organism.form = formKey;
-  state.organism.defense *= form.defense;
-  state.organism.speed *= form.speed;
+  const currentDefenseMultiplier = Number.isFinite(state.organism.formDefenseMultiplier)
+    ? state.organism.formDefenseMultiplier
+    : 1;
+  const currentSpeedMultiplier = Number.isFinite(state.organism.formSpeedMultiplier)
+    ? state.organism.formSpeedMultiplier
+    : 1;
+
+  const safeDefenseMultiplier = form.defense > 0 ? form.defense : 1;
+  const safeSpeedMultiplier = form.speed > 0 ? form.speed : 1;
+
+  const baseDefense = currentDefenseMultiplier > 0
+    ? state.organism.defense / currentDefenseMultiplier
+    : state.organism.defense;
+  const baseSpeed = currentSpeedMultiplier > 0
+    ? state.organism.speed / currentSpeedMultiplier
+    : state.organism.speed;
+
+  state.organism.formDefenseMultiplier = safeDefenseMultiplier;
+  state.organism.formSpeedMultiplier = safeSpeedMultiplier;
+
+  state.organism.defense = baseDefense * safeDefenseMultiplier;
+  state.organism.speed = baseSpeed * safeSpeedMultiplier;
 
   state.showEvolutionChoice = false;
+  state.formReapplyNotice = false;
   addNotification?.(state, `✨ Forma ${form.name}!`);
 
   state.uiSyncTimer = 0;
@@ -144,6 +168,7 @@ export const restartGame = (state, helpers = {}) => {
     powerUps: [],
     availableTraits: [],
     availableForms: [],
+    formReapplyNotice: false,
     organicMatter: [],
     enemies: [],
     projectiles: [],
@@ -195,6 +220,8 @@ export const restartGame = (state, helpers = {}) => {
     attack: 10,
     defense: 5,
     speed: 1,
+    formDefenseMultiplier: 1,
+    formSpeedMultiplier: 1,
     attackRange: 80,
     attackCooldown: 0,
     skills: [],

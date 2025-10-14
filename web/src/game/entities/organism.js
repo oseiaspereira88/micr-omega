@@ -40,6 +40,8 @@ export const createOrganism = (overrides = {}) => {
     attack: 10,
     defense: 5,
     speed: 1,
+    formDefenseMultiplier: 1,
+    formSpeedMultiplier: 1,
     attackRange: 80,
     attackCooldown: 0,
     currentSkillIndex: 0,
