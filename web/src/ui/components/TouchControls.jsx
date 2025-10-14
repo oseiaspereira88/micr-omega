@@ -75,6 +75,12 @@ const TouchControls = ({
           dashReady ? null : styles.disabled,
         )}
         onClick={onDash}
+        onTouchStart={event => {
+          event.preventDefault();
+          if (dashReady) {
+            onDash?.();
+          }
+        }}
         disabled={!dashReady}
       >
         💨

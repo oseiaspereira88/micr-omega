@@ -6,6 +6,7 @@ import GameOverScreen from '../../ui/components/GameOverScreen';
 import styles from '../../MicroOmegaGame.module.css';
 import { useGameDispatch, useGameState } from './GameContext';
 import useGameLoop from './useGameLoop';
+import useIsTouchDevice from '../../hooks/useIsTouchDevice';
 
 const GameCanvas = ({ settings }) => {
   const canvasRef = useRef(null);
@@ -17,6 +18,8 @@ const GameCanvas = ({ settings }) => {
     dispatch,
     settings,
   });
+
+  const isTouchDevice = useIsTouchDevice();
 
   const skillData = useMemo(() => {
     const currentSkillInfo = gameState.currentSkill;
@@ -101,7 +104,7 @@ const GameCanvas = ({ settings }) => {
         onCycleSkill={inputActions.cycleSkill}
         onOpenEvolutionMenu={inputActions.openEvolutionMenu}
         canEvolve={gameState.canEvolve}
-        showTouchControls={Boolean(settings?.showTouchControls)}
+        showTouchControls={Boolean(settings?.showTouchControls && isTouchDevice)}
       />
 
       {gameState.showEvolutionChoice && (
