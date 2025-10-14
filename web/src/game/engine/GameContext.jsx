@@ -27,6 +27,7 @@ const initialState = {
   availableTraits: [],
   availableForms: [],
   evolutionType: null,
+  cameraZoom: 1,
 };
 
 function gameReducer(state, action) {

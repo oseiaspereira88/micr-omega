@@ -13,7 +13,7 @@ const GameCanvas = ({ settings }) => {
   const gameState = useGameState();
   const dispatch = useGameDispatch();
 
-  const { joystick, inputActions, chooseTrait, chooseForm, restartGame } = useGameLoop({
+  const { joystick, inputActions, chooseTrait, chooseForm, restartGame, setCameraZoom } = useGameLoop({
     canvasRef,
     dispatch,
     settings,
@@ -105,6 +105,8 @@ const GameCanvas = ({ settings }) => {
         onOpenEvolutionMenu={inputActions.openEvolutionMenu}
         canEvolve={gameState.canEvolve}
         showTouchControls={Boolean(settings?.showTouchControls && isTouchDevice)}
+        cameraZoom={gameState.cameraZoom ?? gameState.camera?.zoom ?? 1}
+        onCameraZoomChange={setCameraZoom}
       />
 
       {gameState.showEvolutionChoice && (

@@ -1,0 +1,97 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(10, 20, 30, 0.78);
+  border: 1px solid rgba(120, 200, 255, 0.2);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.title {
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.value {
+  font-size: 0.95rem;
+  color: #76e4ff;
+}
+
+.sliderLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.slider {
+  width: 100%;
+  accent-color: #76e4ff;
+  cursor: pointer;
+}
+
+.sliderText {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.presets {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.presetButton {
+  flex: 1;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.presetButton:hover,
+.presetButton:focus-visible {
+  background: rgba(118, 228, 255, 0.2);
+  border-color: rgba(118, 228, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.presetButton:active {
+  transform: translateY(0);
+}
+
+.active {
+  background: rgba(118, 228, 255, 0.28);
+  border-color: rgba(118, 228, 255, 0.45);
+  color: #fff;
+}
+
+@media (max-width: 720px) {
+  .container {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .presetButton {
+    padding: 8px;
+    font-size: 0.8rem;
+  }
+}
