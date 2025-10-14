@@ -106,8 +106,9 @@ class MessageRateLimiter {
   }
 }
 
-type PersistentAlarmType = "waiting_start" | "round_end" | "reset" | "cleanup" | "world_tick";
-type AlarmType = PersistentAlarmType | "snapshot";
+type PersistentAlarmType = "waiting_start" | "round_end" | "reset" | "cleanup";
+type TransientAlarmType = "world_tick" | "snapshot";
+type AlarmType = PersistentAlarmType | TransientAlarmType;
 
 type AlarmSnapshot = Record<PersistentAlarmType, number | null>;
 
@@ -422,6 +423,8 @@ export class RoomDO {
   private lastWorldTickAt: number | null = null;
 
   private alarmSchedule: Map<AlarmType, number> = new Map();
+  private alarmsDirty = false;
+  private persistentAlarmsDirty = false;
   private playersDirty = false;
   private worldDirty = false;
   private pendingSnapshotAlarm: number | null = null;
@@ -475,7 +478,16 @@ export class RoomDO {
     }
 
     if (due.length === 0) {
-      await this.syncAlarms();
+      if (this.alarmsDirty) {
+        if (this.persistentAlarmsDirty) {
+          await this.persistAlarms();
+          this.persistentAlarmsDirty = false;
+        }
+        await this.syncAlarms();
+        this.alarmsDirty = false;
+      } else {
+        await this.syncAlarms();
+      }
       return;
     }
 
@@ -508,8 +520,16 @@ export class RoomDO {
       }
     }
 
-    await this.persistAlarms();
-    await this.syncAlarms();
+    if (this.alarmsDirty) {
+      if (this.persistentAlarmsDirty) {
+        await this.persistAlarms();
+        this.persistentAlarmsDirty = false;
+      }
+      await this.syncAlarms();
+      this.alarmsDirty = false;
+    } else {
+      await this.syncAlarms();
+    }
   }
 
   private getConnectionLimiter(socket: WebSocket): MessageRateLimiter {
@@ -588,7 +608,6 @@ export class RoomDO {
       await this.state.storage.put(WORLD_KEY, cloneWorldState(this.world));
     }
     this.rebuildWorldCaches();
-    this.lastWorldTickAt = Date.now();
 
     const storedSnapshotState = await this.state.storage.get<SnapshotState>(SNAPSHOT_STATE_KEY);
     if (storedSnapshotState) {
@@ -602,16 +621,28 @@ export class RoomDO {
     }
 
     const storedAlarms = await this.state.storage.get<AlarmSnapshot>(ALARM_KEY);
+    this.alarmSchedule = new Map();
     if (storedAlarms) {
-      this.alarmSchedule = new Map(
-        (Object.entries(storedAlarms) as [PersistentAlarmType, number | null][]).filter(([, ts]) => ts != null)
-      );
+      const persistentTypes: readonly PersistentAlarmType[] = [
+        "waiting_start",
+        "round_end",
+        "reset",
+        "cleanup",
+      ];
+      for (const type of persistentTypes) {
+        const timestamp = storedAlarms[type];
+        if (typeof timestamp === "number") {
+          this.alarmSchedule.set(type, timestamp);
+        }
+      }
     }
 
-    let alarmsModified = false;
+    const startupNow = Date.now();
+    this.lastWorldTickAt = startupNow;
     if (!this.alarmSchedule.has("world_tick")) {
-      this.scheduleWorldTick(this.lastWorldTickAt);
-      alarmsModified = true;
+      // World ticks are transient and are rescheduled relative to "now" so they recover
+      // immediately after a restart even though they are not persisted.
+      this.scheduleWorldTick(startupNow);
     }
 
     let snapshotAlarmModified = false;
@@ -628,10 +659,6 @@ export class RoomDO {
       this.pendingSnapshotAlarm = null;
       this.alarmSchedule.delete("snapshot");
       snapshotAlarmModified = storedSnapshotState?.pendingSnapshotAlarm != null;
-    }
-
-    if (alarmsModified) {
-      await this.persistAlarms();
     }
 
     if (snapshotAlarmModified) {
@@ -652,8 +679,33 @@ export class RoomDO {
     }
   }
 
+  private markAlarmsDirty(options: { persistent?: boolean } = {}): void {
+    const { persistent = false } = options;
+    this.alarmsDirty = true;
+    if (persistent) {
+      this.persistentAlarmsDirty = true;
+    }
+  }
+
+  private async persistAndSyncAlarms(): Promise<void> {
+    this.markAlarmsDirty({ persistent: true });
+    await this.persistAlarms();
+    await this.syncAlarms();
+    this.persistentAlarmsDirty = false;
+    this.alarmsDirty = false;
+  }
+
   private scheduleWorldTick(reference: number = Date.now()): void {
     this.alarmSchedule.set("world_tick", reference + WORLD_TICK_INTERVAL_MS);
+    this.markAlarmsDirty();
+    void this.syncAlarms().catch((error) => {
+      this.observability.logError("alarm_sync_failed", error, {
+        category: "persistence",
+      });
+    });
+    if (!this.persistentAlarmsDirty) {
+      this.alarmsDirty = false;
+    }
   }
 
   private queueSnapshotStatePersist(): void {
@@ -1728,6 +1780,7 @@ export class RoomDO {
     }
 
     this.alarmSchedule.delete("waiting_start");
+    this.markAlarmsDirty({ persistent: true });
 
     if (this.phase === "waiting") {
       await this.startGame();
@@ -1741,6 +1794,7 @@ export class RoomDO {
     }
 
     this.alarmSchedule.delete("round_end");
+    this.markAlarmsDirty({ persistent: true });
 
     if (this.phase === "active") {
       await this.endGame("timeout");
@@ -1754,6 +1808,7 @@ export class RoomDO {
     }
 
     this.alarmSchedule.delete("reset");
+    this.markAlarmsDirty({ persistent: true });
     await this.resetGame();
   }
 
@@ -1764,6 +1819,7 @@ export class RoomDO {
     }
 
     this.alarmSchedule.delete("cleanup");
+    this.markAlarmsDirty({ persistent: true });
     await this.cleanupInactivePlayers(Date.now());
   }
 
@@ -1893,8 +1949,7 @@ export class RoomDO {
     if (activePlayers.length === 0) {
       if (this.alarmSchedule.has("waiting_start")) {
         this.alarmSchedule.delete("waiting_start");
-        await this.persistAlarms();
-        await this.syncAlarms();
+        await this.persistAndSyncAlarms();
       }
       return;
     }
@@ -1907,8 +1962,7 @@ export class RoomDO {
     if (!this.alarmSchedule.has("waiting_start")) {
       const at = Date.now() + WAITING_START_DELAY_MS;
       this.alarmSchedule.set("waiting_start", at);
-      await this.persistAlarms();
-      await this.syncAlarms();
+      await this.persistAndSyncAlarms();
     }
   }
 
@@ -1920,8 +1974,7 @@ export class RoomDO {
       this.roundEndsAt = null;
       this.alarmSchedule.delete("waiting_start");
       this.alarmSchedule.delete("round_end");
-      await this.persistAlarms();
-      await this.syncAlarms();
+      await this.persistAndSyncAlarms();
       return;
     }
 
@@ -1931,8 +1984,7 @@ export class RoomDO {
     this.roundEndsAt = this.roundStartedAt + ROUND_DURATION_MS;
     this.alarmSchedule.delete("waiting_start");
     this.alarmSchedule.set("round_end", this.roundEndsAt);
-    await this.persistAlarms();
-    await this.syncAlarms();
+    await this.persistAndSyncAlarms();
 
     const stateMessage: StateFullMessage = {
       type: "state",
@@ -1958,8 +2010,7 @@ export class RoomDO {
     this.roundEndsAt = Date.now();
     this.alarmSchedule.delete("round_end");
     this.alarmSchedule.set("reset", Date.now() + RESET_DELAY_MS);
-    await this.persistAlarms();
-    await this.syncAlarms();
+    await this.persistAndSyncAlarms();
 
     const stateMessage: StateFullMessage = {
       type: "state",
@@ -2009,15 +2060,12 @@ export class RoomDO {
     }
 
     this.alarmSchedule.delete("reset");
-    await this.persistAlarms();
-    await this.syncAlarms();
+    await this.persistAndSyncAlarms();
 
     await this.flushSnapshots({ force: true });
 
     this.lastWorldTickAt = Date.now();
     this.scheduleWorldTick(this.lastWorldTickAt);
-    await this.persistAlarms();
-    await this.syncAlarms();
 
     const message: StateFullMessage = {
       type: "state",
@@ -2234,8 +2282,7 @@ export class RoomDO {
       this.alarmSchedule.set("cleanup", nextCleanup);
     }
 
-    await this.persistAlarms();
-    await this.syncAlarms();
+    await this.persistAndSyncAlarms();
   }
 
   private async persistPlayers(): Promise<void> {
@@ -2280,8 +2327,7 @@ export class RoomDO {
       waiting_start: this.alarmSchedule.get("waiting_start") ?? null,
       round_end: this.alarmSchedule.get("round_end") ?? null,
       reset: this.alarmSchedule.get("reset") ?? null,
-      cleanup: this.alarmSchedule.get("cleanup") ?? null,
-      world_tick: this.alarmSchedule.get("world_tick") ?? null
+      cleanup: this.alarmSchedule.get("cleanup") ?? null
     };
     await this.state.storage.put(ALARM_KEY, serialized);
   }
