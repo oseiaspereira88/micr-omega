@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import GameHud from '../../ui/components/GameHud';
 import GameOverScreen from '../../ui/components/GameOverScreen';
+import ArchetypeSelection from '../../ui/components/ArchetypeSelection';
 import styles from '../../MicroOmegaGame.module.css';
 import { useGameDispatch, useGameState } from './GameContext';
 import useGameLoop from './useGameLoop';
@@ -11,7 +12,14 @@ const GameCanvas = ({ settings, onQuit }) => {
   const gameState = useGameState();
   const dispatch = useGameDispatch();
 
-  const { joystick, inputActions, chooseEvolution, restartGame, setCameraZoom } = useGameLoop({
+  const {
+    joystick,
+    inputActions,
+    chooseEvolution,
+    restartGame,
+    selectArchetype,
+    setCameraZoom,
+  } = useGameLoop({
     canvasRef,
     dispatch,
     settings,
@@ -279,6 +287,14 @@ const GameCanvas = ({ settings, onQuit }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {gameState.archetypeSelection?.pending && (
+        <ArchetypeSelection
+          selection={gameState.archetypeSelection}
+          selected={gameState.selectedArchetype}
+          onSelect={selectArchetype}
+        />
       )}
     </div>
   );

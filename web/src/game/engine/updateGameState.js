@@ -822,6 +822,14 @@ export const updateGameState = ({
     renderState.notifications,
     renderState.camera
   );
+  if (renderState.localArchetypeSelection) {
+    hudSnapshot.archetypeSelection = {
+      ...renderState.localArchetypeSelection,
+    };
+    if (renderState.localSelectedArchetype) {
+      hudSnapshot.selectedArchetype = renderState.localSelectedArchetype;
+    }
+  }
 
   applyProgressionEvents(hudSnapshot, sharedState.progression, {
     dropTables: helpers.dropTables ?? DROP_TABLES,

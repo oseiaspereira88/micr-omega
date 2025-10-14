@@ -9,6 +9,7 @@ import { updateGameState } from './updateGameState';
 import useInputController from '../input/useInputController';
 import { DEFAULT_JOYSTICK_STATE } from '../input/utils';
 import { gameStore } from '../../store/gameStore';
+import { createInitialState } from '../state/initialState';
 
 const DEFAULT_SETTINGS = {
   audioEnabled: true,
@@ -149,6 +150,54 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
     camera.zoom = clamped;
   }, []);
+
+  const selectArchetype = useCallback(
+    (key) => {
+      if (!key) return;
+      const normalized = String(key).trim();
+      if (!normalized) return;
+
+      const baseState = createInitialState({ archetypeKey: normalized });
+      renderStateRef.current.localArchetypeSelection = baseState.archetypeSelection;
+      renderStateRef.current.localSelectedArchetype = baseState.selectedArchetype;
+      renderStateRef.current.hudSnapshot = {
+        ...(renderStateRef.current.hudSnapshot || {}),
+        energy: baseState.energy,
+        health: baseState.health,
+        maxHealth: baseState.maxHealth,
+        level: baseState.level,
+        element: baseState.element,
+        affinity: baseState.affinity,
+        resistances: baseState.resistances,
+        elementLabel: baseState.elementLabel,
+        affinityLabel: baseState.affinityLabel,
+        archetypeSelection: baseState.archetypeSelection,
+        selectedArchetype: baseState.selectedArchetype,
+      };
+
+      dispatchRef.current({
+        type: 'SYNC_STATE',
+        payload: {
+          energy: baseState.energy,
+          health: baseState.health,
+          maxHealth: baseState.maxHealth,
+          level: baseState.level,
+          element: baseState.element,
+          affinity: baseState.affinity,
+          resistances: baseState.resistances,
+          elementLabel: baseState.elementLabel,
+          affinityLabel: baseState.affinityLabel,
+          archetypeSelection: baseState.archetypeSelection,
+          selectedArchetype: baseState.selectedArchetype,
+        },
+      });
+
+      if (typeof resolvedSettings.onArchetypeSelect === 'function') {
+        resolvedSettings.onArchetypeSelect(normalized, baseState);
+      }
+    },
+    [resolvedSettings]
+  );
 
   const initializeBackground = useCallback(() => {
     const state = renderStateRef.current;
@@ -457,6 +506,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     inputActions,
     chooseEvolution: () => {},
     restartGame: () => {},
+    selectArchetype,
     setCameraZoom,
   };
 };

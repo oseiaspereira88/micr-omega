@@ -1,7 +1,13 @@
 import { createOrganism } from '../entities/organism';
+import { applyArchetypeToState, archetypeList } from '../config/archetypes';
 import { createResourceProfile } from './resourceProfile';
 
-export const createInitialState = () => {
+const buildArchetypeSelection = (selected) => ({
+  pending: !selected,
+  options: archetypeList.map((entry) => entry.key),
+});
+
+export const createInitialState = ({ archetypeKey } = {}) => {
   const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1280;
   const viewportHeight =
     typeof window !== 'undefined' ? Math.max(0, window.innerHeight - 40) : 720;
@@ -9,7 +15,7 @@ export const createInitialState = () => {
   const resources = createResourceProfile();
   const organism = createOrganism({ resources });
 
-  return {
+  const state = {
     energy: 0,
     health: 100,
     maxHealth: 100,
@@ -27,9 +33,11 @@ export const createInitialState = () => {
     evolutionSlots: resources.evolutionSlots,
     reroll: resources.reroll,
     dropPity: resources.dropPity,
+    macroEvolutionSlots: { used: 0, max: 0 },
     progressionQueue: [],
     recentRewards: { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 },
     evolutionContext: null,
+    traitLineage: [],
 
     particles: [],
     floatingParticles: [],
@@ -74,6 +82,8 @@ export const createInitialState = () => {
     comboTimer: 0,
 
     showEvolutionChoice: false,
+    archetypeSelection: buildArchetypeSelection(archetypeKey),
+    selectedArchetype: archetypeKey ?? null,
     evolutionType: 'evolution',
     notifications: [],
     evolutionMenu: {
@@ -94,4 +104,10 @@ export const createInitialState = () => {
     actionButton: false,
     gameOver: false,
   };
+
+  if (archetypeKey) {
+    applyArchetypeToState(state, archetypeKey);
+  }
+
+  return state;
 };

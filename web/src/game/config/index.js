@@ -1,4 +1,5 @@
 export { forms } from './forms';
+export { archetypes, archetypeList, applyArchetypeToState } from './archetypes';
 export { createSkills } from './skills';
 export { smallEvolutions } from './smallEvolutions';
 export { mediumEvolutions } from './mediumEvolutions';
