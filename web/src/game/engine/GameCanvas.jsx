@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 
 import { forms, evolutionaryTraits } from '../config';
 import GameHud from '../../ui/components/GameHud';
@@ -59,13 +59,22 @@ const GameCanvas = ({ settings, onQuit }) => {
     };
   }, [gameState]);
 
+  const handleRestart = useCallback(() => {
+    if (onQuit) {
+      onQuit();
+      return;
+    }
+
+    restartGame();
+  }, [onQuit, restartGame]);
+
   if (gameState.gameOver) {
     return (
       <GameOverScreen
         score={gameState.score}
         level={gameState.level}
         maxCombo={gameState.maxCombo}
-        onRestart={restartGame}
+        onRestart={handleRestart}
       />
     );
   }
