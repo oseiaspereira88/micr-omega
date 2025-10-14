@@ -20,12 +20,72 @@
   gap: 14px;
   align-items: stretch;
   width: clamp(240px, 26vw, 320px);
-  pointer-events: none;
   z-index: 20;
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
 .sidebar > * {
   pointer-events: auto;
+}
+
+.sidebarOpen {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.sidebarClosed {
+  opacity: 0;
+  transform: translateY(-12px);
+  pointer-events: none;
+}
+
+.sidebarToggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 30;
+  pointer-events: auto;
+  background: rgba(16, 16, 24, 0.85);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.sidebarToggle:hover,
+.sidebarToggle:focus-visible {
+  background: rgba(32, 32, 48, 0.95);
+  transform: translateY(-1px);
+}
+
+.leaveButton {
+  pointer-events: auto;
+  background: linear-gradient(90deg, rgba(255, 82, 82, 0.9), rgba(255, 23, 68, 0.8));
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(255, 23, 68, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.leaveButton:hover,
+.leaveButton:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(255, 23, 68, 0.35);
+}
+
+.leaveButton:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(255, 23, 68, 0.25);
 }
 
 @media (max-width: 900px) {
@@ -42,5 +102,13 @@
     right: 16px;
     width: min(320px, calc(100vw - 32px));
     gap: 10px;
+  }
+
+  .sidebarClosed {
+    transform: translateY(12px);
+  }
+
+  .sidebarToggle {
+    position: fixed;
   }
 }
