@@ -1,826 +1,382 @@
-import {
-  nebulaTypes,
-} from '../config';
+const MOVEMENT_EPSILON = 0.05;
+const POSITION_SMOOTHING = 7.5;
+const CAMERA_SMOOTHING = 4;
+const SPEED_SCALER = 60;
 
-const toFiniteNumber = value => {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
+const PLAYER_PALETTE = [
+  { base: '#47c2ff', accent: '#0b82c1', label: '#ffffff' },
+  { base: '#f7a072', accent: '#d96f34', label: '#1b1b1b' },
+  { base: '#9b6bff', accent: '#5a2d9f', label: '#f5f3ff' },
+  { base: '#4fd1c5', accent: '#2c7a7b', label: '#ffffff' },
+  { base: '#ff6fb7', accent: '#c52878', label: '#ffffff' },
+];
 
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-
-  return null;
+const SPECIES_COLORS = {
+  amoeba: '#88c0ff',
+  paramecium: '#a3ffa3',
+  rotifer: '#ffa3d0',
 };
 
-const ensureNumber = (value, fallback = 0) => {
-  const fallbackNumber = toFiniteNumber(fallback);
-  const normalizedFallback = fallbackNumber ?? 0;
-  const finiteValue = toFiniteNumber(value);
-  return finiteValue ?? normalizedFallback;
+const DEFAULT_SPECIES_COLOR = '#8fb8ff';
+
+const hashId = (id = '') => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash * 31 + id.charCodeAt(i)) & 0xffffffff;
+  }
+  return Math.abs(hash);
 };
 
-const resolveEnemyDamage = enemy => {
-  if (!enemy) return 0;
-
-  const candidateKeys = ['attack', 'damage', 'baseDamage'];
-  for (const key of candidateKeys) {
-    const damage = toFiniteNumber(enemy[key]);
-    if (damage !== null) {
-      return damage;
-    }
-  }
-
-  return 0;
+const getPaletteForPlayer = (playerId) => {
+  const index = hashId(playerId) % PLAYER_PALETTE.length;
+  return PLAYER_PALETTE[index];
 };
 
-const applyBuffModifiersToDynamic = (dynamic, modifiers = {}) => {
-  if (!dynamic || typeof dynamic !== 'object') return;
-  if (!modifiers || typeof modifiers !== 'object') return;
-
-  if (typeof modifiers.attackMultiplier === 'number' && Number.isFinite(modifiers.attackMultiplier)) {
-    dynamic.attackMultiplier *= modifiers.attackMultiplier;
-  }
-
-  if (typeof modifiers.defenseMultiplier === 'number' && Number.isFinite(modifiers.defenseMultiplier)) {
-    dynamic.defenseMultiplier *= modifiers.defenseMultiplier;
-  }
-
-  if (typeof modifiers.speedMultiplier === 'number' && Number.isFinite(modifiers.speedMultiplier)) {
-    dynamic.speedMultiplier *= modifiers.speedMultiplier;
-  }
-
-  if (typeof modifiers.sizeMultiplier === 'number' && Number.isFinite(modifiers.sizeMultiplier)) {
-    dynamic.sizeMultiplier *= modifiers.sizeMultiplier;
-  }
-
-  if (typeof modifiers.attackBonus === 'number' && Number.isFinite(modifiers.attackBonus)) {
-    dynamic.attackBonus += modifiers.attackBonus;
-  }
-
-  if (typeof modifiers.defenseBonus === 'number' && Number.isFinite(modifiers.defenseBonus)) {
-    dynamic.defenseBonus += modifiers.defenseBonus;
-  }
-
-  if (typeof modifiers.speedBonus === 'number' && Number.isFinite(modifiers.speedBonus)) {
-    dynamic.speedBonus += modifiers.speedBonus;
-  }
-
-  if (typeof modifiers.sizeBonus === 'number' && Number.isFinite(modifiers.sizeBonus)) {
-    dynamic.sizeBonus += modifiers.sizeBonus;
-  }
+const ensureVector = (value, fallback = { x: 0, y: 0 }) => {
+  if (!value || typeof value !== 'object') return { ...fallback };
+  const x = Number.isFinite(value.x) ? value.x : fallback.x;
+  const y = Number.isFinite(value.y) ? value.y : fallback.y;
+  return { x, y };
 };
 
-const applyBuffToEnemy = (enemy, buff = {}, { immediate = false } = {}) => {
-  if (!enemy || !buff || typeof buff !== 'object') return;
+const ensureHealth = (health) => {
+  if (!health || typeof health !== 'object') {
+    return { current: 0, max: 1 };
+  }
 
-  const normalizedDuration = ensureNumber(buff.remaining ?? buff.duration, 0);
-  if (normalizedDuration <= 0) return;
+  const current = Number.isFinite(health.current) ? health.current : 0;
+  const max = Number.isFinite(health.max) && health.max > 0 ? health.max : Math.max(1, current);
+  return { current, max };
+};
 
-  const normalizedBuff = {
-    sourceId: buff.sourceId ?? enemy.id,
-    type: buff.type ?? 'generic',
-    remaining: normalizedDuration,
-    modifiers: { ...(buff.modifiers || {}) },
+const normalizeMovementIntent = (intent = {}) => {
+  const rawX = Number.isFinite(intent.x) ? intent.x : 0;
+  const rawY = Number.isFinite(intent.y) ? intent.y : 0;
+  const magnitude = Math.sqrt(rawX * rawX + rawY * rawY);
+
+  if (magnitude < MOVEMENT_EPSILON) {
+    return { x: 0, y: 0, active: false };
+  }
+
+  return {
+    x: rawX / magnitude,
+    y: rawY / magnitude,
+    active: true,
   };
+};
 
-  if (!Array.isArray(enemy.activeBuffs)) {
-    enemy.activeBuffs = [];
+const interpolate = (start, end, factor) => start + (end - start) * factor;
+
+const updateCamera = (renderState, targetPlayer, delta) => {
+  const camera = renderState.camera;
+  if (!camera || !targetPlayer) return;
+
+  const smoothing = Math.min(1, delta * CAMERA_SMOOTHING);
+  const targetX = targetPlayer.renderPosition.x;
+  const targetY = targetPlayer.renderPosition.y;
+
+  camera.x = interpolate(camera.x, targetX, smoothing);
+  camera.y = interpolate(camera.y, targetY, smoothing);
+};
+
+const createRenderPlayer = (sharedPlayer) => {
+  const palette = getPaletteForPlayer(sharedPlayer.id);
+  const position = ensureVector(sharedPlayer.position);
+  const movementVector = ensureVector(sharedPlayer.movementVector);
+  const health = ensureHealth(sharedPlayer.health);
+
+  return {
+    id: sharedPlayer.id,
+    name: sharedPlayer.name,
+    score: Number.isFinite(sharedPlayer.score) ? sharedPlayer.score : 0,
+    combo: Number.isFinite(sharedPlayer.combo) ? sharedPlayer.combo : 0,
+    palette,
+    position,
+    renderPosition: { ...position },
+    movementVector,
+    orientation: Number.isFinite(sharedPlayer.orientation?.angle)
+      ? sharedPlayer.orientation.angle
+      : 0,
+    tilt: Number.isFinite(sharedPlayer.orientation?.tilt)
+      ? sharedPlayer.orientation.tilt
+      : 0,
+    speed: Math.sqrt(movementVector.x * movementVector.x + movementVector.y * movementVector.y),
+    health,
+    combatStatus: {
+      state: sharedPlayer.combatStatus?.state ?? 'idle',
+      targetPlayerId: sharedPlayer.combatStatus?.targetPlayerId ?? null,
+      targetObjectId: sharedPlayer.combatStatus?.targetObjectId ?? null,
+      lastAttackAt: sharedPlayer.combatStatus?.lastAttackAt ?? null,
+    },
+    lastAttackAt: sharedPlayer.combatStatus?.lastAttackAt ?? null,
+    pulse: Math.random() * Math.PI * 2,
+    isLocal: false,
+  };
+};
+
+const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) => {
+  const playersById = renderState.playersById;
+  const seenIds = new Set();
+
+  sharedPlayers.forEach((player) => {
+    const existing = playersById.get(player.id) ?? createRenderPlayer(player);
+    playersById.set(player.id, existing);
+    seenIds.add(player.id);
+
+    const palette = getPaletteForPlayer(player.id);
+    const position = ensureVector(player.position, existing.position);
+    const movementVector = ensureVector(player.movementVector, existing.movementVector);
+    const health = ensureHealth(player.health);
+
+    const smoothing = Math.min(1, delta * POSITION_SMOOTHING);
+
+    existing.position = position;
+    existing.renderPosition = {
+      x: interpolate(existing.renderPosition.x, position.x, smoothing),
+      y: interpolate(existing.renderPosition.y, position.y, smoothing),
+    };
+    existing.movementVector = movementVector;
+    existing.speed = Math.sqrt(movementVector.x * movementVector.x + movementVector.y * movementVector.y);
+    existing.orientation = Number.isFinite(player.orientation?.angle)
+      ? player.orientation.angle
+      : existing.orientation;
+    existing.tilt = Number.isFinite(player.orientation?.tilt)
+      ? player.orientation.tilt
+      : existing.tilt;
+    existing.health = health;
+    existing.combatStatus = {
+      state: player.combatStatus?.state ?? 'idle',
+      targetPlayerId: player.combatStatus?.targetPlayerId ?? null,
+      targetObjectId: player.combatStatus?.targetObjectId ?? null,
+      lastAttackAt: player.combatStatus?.lastAttackAt ?? existing.combatStatus?.lastAttackAt ?? null,
+    };
+    existing.lastAttackAt = existing.combatStatus.lastAttackAt;
+    existing.palette = palette;
+    existing.isLocal = player.id === localPlayerId;
+    existing.name = player.name;
+    existing.score = Number.isFinite(player.score) ? player.score : existing.score ?? 0;
+    existing.combo = Number.isFinite(player.combo) ? player.combo : existing.combo ?? 0;
+    existing.pulse = (existing.pulse + delta * (1 + existing.speed * 0.2)) % (Math.PI * 2);
+  });
+
+  Array.from(playersById.keys()).forEach((id) => {
+    if (!seenIds.has(id)) {
+      playersById.delete(id);
+    }
+  });
+
+  const playerList = Array.from(playersById.values());
+  playerList.sort((a, b) => a.renderPosition.y - b.renderPosition.y);
+
+  renderState.playerList = playerList;
+  renderState.combatIndicators = playerList
+    .filter((player) => player.combatStatus?.state === 'engaged' && player.combatStatus.targetPlayerId)
+    .map((player) => ({
+      id: player.id,
+      targetPlayerId: player.combatStatus.targetPlayerId,
+      lastAttackAt: player.combatStatus.lastAttackAt,
+      position: player.renderPosition,
+      palette: player.palette,
+    }));
+
+  return playerList.find((player) => player.isLocal) ?? null;
+};
+
+const toEntityMap = (entities = []) => {
+  const map = new Map();
+  entities.forEach((entity) => {
+    if (entity?.id) {
+      map.set(entity.id, entity);
+    }
+  });
+  return map;
+};
+
+const mapMicroorganisms = (entities = [], previous = new Map()) =>
+  entities.map((entity) => {
+    const prior = previous.get(entity.id);
+    return {
+      id: entity.id,
+      x: entity.position?.x ?? 0,
+      y: entity.position?.y ?? 0,
+      vx: entity.movementVector?.x ?? 0,
+      vy: entity.movementVector?.y ?? 0,
+      size: Math.max(4, Math.sqrt(Math.max(1, entity.health?.max ?? 1)) * 2),
+      color: SPECIES_COLORS[entity.species] ?? DEFAULT_SPECIES_COLOR,
+      opacity: 0.6,
+      animPhase: prior ? prior.animPhase ?? 0 : Math.random() * Math.PI * 2,
+      depth: 0.5,
+    };
+  });
+
+const mapOrganicMatter = (entities = []) =>
+  entities.map((entity) => ({
+    id: entity.id,
+    x: entity.position?.x ?? 0,
+    y: entity.position?.y ?? 0,
+    quantity: entity.quantity ?? 0,
+  }));
+
+const mapObstacles = (entities = []) =>
+  entities.map((entity) => ({
+    id: entity.id,
+    x: entity.position?.x ?? 0,
+    y: entity.position?.y ?? 0,
+    width: entity.size?.x ?? 40,
+    height: entity.size?.y ?? 40,
+    orientation: entity.orientation?.angle ?? 0,
+    impassable: Boolean(entity.impassable),
+  }));
+
+const mapRoomObjects = (entities = []) =>
+  entities.map((entity) => ({
+    id: entity.id,
+    x: entity.position?.x ?? 0,
+    y: entity.position?.y ?? 0,
+    type: entity.type,
+    state: entity.state || {},
+  }));
+
+const updateWorldView = (renderState, sharedWorld) => {
+  const previousWorld = renderState.worldView || {};
+  const previousMicro = toEntityMap(previousWorld.microorganisms || []);
+
+  renderState.worldView = {
+    microorganisms: mapMicroorganisms(sharedWorld?.microorganisms, previousMicro),
+    organicMatter: mapOrganicMatter(sharedWorld?.organicMatter),
+    obstacles: mapObstacles(sharedWorld?.obstacles),
+    roomObjects: mapRoomObjects(sharedWorld?.roomObjects),
+  };
+};
+
+const buildHudSnapshot = (localPlayer, playerList, notifications, camera) => {
+  const opponents = playerList
+    .filter((player) => !player.isLocal)
+    .map((player) => ({
+      id: player.id,
+      name: player.name,
+      health: player.health.current,
+      maxHealth: player.health.max,
+      palette: player.palette,
+      combatState: player.combatStatus?.state ?? 'idle',
+    }));
+
+  return {
+    energy: 0,
+    level: 1,
+    score: localPlayer?.score ?? 0,
+    health: localPlayer?.health?.current ?? 0,
+    maxHealth: localPlayer?.health?.max ?? 1,
+    dashCharge: 100,
+    combo: localPlayer?.combo ?? 0,
+    maxCombo: localPlayer?.combo ?? 0,
+    activePowerUps: [],
+    bossActive: false,
+    bossHealth: 0,
+    bossMaxHealth: 0,
+    skillList: [],
+    hasMultipleSkills: false,
+    currentSkill: null,
+    notifications,
+    availableTraits: [],
+    availableForms: [],
+    currentForm: null,
+    formReapplyNotice: false,
+    evolutionType: null,
+    showEvolutionChoice: false,
+    showMenu: false,
+    gameOver: false,
+    cameraZoom: camera?.zoom ?? 1,
+    opponents,
+  };
+};
+
+const collectCommands = (renderState, movementIntent, actionBuffer) => {
+  const normalized = normalizeMovementIntent(movementIntent);
+  const commands = { movement: null, attacks: [] };
+
+  const lastIntent = renderState.lastMovementIntent || { ...normalized };
+  const movementChanged =
+    Math.abs(lastIntent.x - normalized.x) > 0.01 || Math.abs(lastIntent.y - normalized.y) > 0.01;
+
+  if (normalized.active && movementChanged) {
+    commands.movement = {
+      vector: { x: normalized.x, y: normalized.y },
+      speed: SPEED_SCALER,
+      timestamp: Date.now(),
+    };
+    renderState.lastMovementIntent = { ...normalized };
+  } else if (!normalized.active && movementChanged) {
+    commands.movement = {
+      vector: { x: 0, y: 0 },
+      speed: 0,
+      timestamp: Date.now(),
+    };
+    renderState.lastMovementIntent = { ...normalized };
   }
 
-  const existingBuff = enemy.activeBuffs.find(
-    (item) => item.sourceId === normalizedBuff.sourceId && item.type === normalizedBuff.type
-  );
-
-  if (existingBuff) {
-    existingBuff.remaining = Math.max(
-      ensureNumber(existingBuff.remaining, 0),
-      normalizedBuff.remaining
-    );
-    existingBuff.modifiers = { ...existingBuff.modifiers, ...normalizedBuff.modifiers };
-  } else {
-    enemy.activeBuffs.push({ ...normalizedBuff });
+  if (Array.isArray(actionBuffer?.attacks) && actionBuffer.attacks.length > 0) {
+    commands.attacks = actionBuffer.attacks.map((attack) => ({
+      kind: attack.kind ?? 'basic',
+      timestamp: attack.timestamp ?? Date.now(),
+    }));
+    actionBuffer.attacks.length = 0;
   }
 
-  if (immediate && enemy.dynamicModifiers) {
-    applyBuffModifiersToDynamic(enemy.dynamicModifiers, normalizedBuff.modifiers);
-  }
+  return commands;
 };
 
 export const updateGameState = ({
-  state,
+  renderState,
+  sharedState,
   delta = 0,
-  movementIntent = {},
+  movementIntent,
+  actionBuffer,
   helpers = {},
-  spawnEnemy,
-  spawnBoss,
-  spawnOrganicMatter,
-  applyPowerUp,
 }) => {
-  if (!state) return;
-
-  const {
-    createEffect = () => {},
-    createParticle = () => {},
-    addNotification = () => {},
-    dropPowerUps = () => [],
-    playSound = () => {},
-    getAveragePlayerLevel = () => 1,
-  } = helpers;
-
-  const organism = state.organism;
-  if (!organism) {
-    return;
+  if (!renderState || !sharedState) {
+    return { commands: { movement: null, attacks: [] }, hudSnapshot: null, localPlayerId: null };
   }
 
-  const camera = state.camera;
-  const worldSize = ensureNumber(state.worldSize, 4000);
+  const sharedPlayersCollection = sharedState.remotePlayers?.all;
+  const sharedPlayers = Array.isArray(sharedPlayersCollection)
+    ? sharedPlayersCollection
+    : Object.values(sharedState.players || {});
+  const localPlayerId = sharedState.playerId ?? null;
 
-  const averageLevelRaw = Number(getAveragePlayerLevel?.() ?? 1);
-  const normalizedAverageLevel = Number.isFinite(averageLevelRaw) ? averageLevelRaw : 1;
-  const clampedAverageLevel = Math.max(1, normalizedAverageLevel);
-  const baseEnemyCap = 10;
-  const enemyCapGrowth = 2;
-  const maxEnemiesAllowed = Math.max(
-    4,
-    Math.round(baseEnemyCap + (clampedAverageLevel - 1) * enemyCapGrowth)
+  const localRenderPlayer = updateRenderPlayers(renderState, sharedPlayers, delta, localPlayerId);
+  updateCamera(renderState, localRenderPlayer, delta);
+  updateWorldView(renderState, sharedState.world);
+
+  if (typeof helpers.createEffect === 'function' && localRenderPlayer?.combatStatus?.state === 'engaged') {
+    const now = Date.now();
+    if (!localRenderPlayer.lastAttackVisual || now - localRenderPlayer.lastAttackVisual > 450) {
+      helpers.createEffect(
+        localRenderPlayer.renderPosition.x,
+        localRenderPlayer.renderPosition.y,
+        'pulse',
+        localRenderPlayer.palette.base
+      );
+      localRenderPlayer.lastAttackVisual = now;
+    }
+  }
+
+  const commands = collectCommands(renderState, movementIntent, actionBuffer);
+
+  const hudSnapshot = buildHudSnapshot(
+    localRenderPlayer,
+    renderState.playerList,
+    renderState.notifications,
+    renderState.camera
   );
 
-  state.joystick = movementIntent || state.joystick || {};
-
-  if (!state.gameOver) {
-    const frameFactor = Math.min(delta * 60, 3);
-    const previousDashTimer = Math.max(0, ensureNumber(organism.dashTimer, 0));
-    const wasDashing = Boolean(organism.isDashing || previousDashTimer > 0);
-    const updatedDashTimer = Math.max(0, previousDashTimer - delta);
-    organism.dashTimer = updatedDashTimer;
-    const dashActive = updatedDashTimer > 0;
-    organism.isDashing = dashActive;
-
-    if (dashActive) {
-      organism.invulnerable = true;
-    }
-
-    if (wasDashing && !dashActive) {
-      organism.invulnerable = Boolean(organism.invulnerableFromPowerUp);
-      organism.dashCooldown = Math.max(1, ensureNumber(organism.dashCooldown, 0));
-      createEffect(state, organism.x, organism.y, 'dashend', organism.color);
-    }
-
-    const moving = Boolean(movementIntent?.x || movementIntent?.y);
-
-    if (!dashActive && moving && frameFactor > 0) {
-      const length = Math.sqrt(
-        movementIntent.x * movementIntent.x +
-          movementIntent.y * movementIntent.y
-      );
-      const normX = movementIntent.x / (length || 1);
-      const normY = movementIntent.y / (length || 1);
-
-      const acceleration = organism.speed * frameFactor * 0.9;
-      organism.vx += normX * acceleration;
-      organism.vy += normY * acceleration;
-
-      const maxSpeed = organism.speed * 12;
-      const currentSpeed = Math.sqrt(organism.vx * organism.vx + organism.vy * organism.vy);
-      if (currentSpeed > maxSpeed) {
-        const scale = maxSpeed / currentSpeed;
-        organism.vx *= scale;
-        organism.vy *= scale;
-      }
-
-      organism.rotation = Math.atan2(normY, normX);
-    } else if (dashActive && (organism.vx !== 0 || organism.vy !== 0)) {
-      organism.rotation = Math.atan2(organism.vy, organism.vx);
-    }
-
-    const frictionBase = dashActive ? 0.99 : moving ? 0.92 : 0.78;
-    const friction = frameFactor > 0 ? Math.pow(frictionBase, frameFactor) : frictionBase;
-    organism.vx *= friction;
-    organism.vy *= friction;
-
-    if (!dashActive) {
-      const maxSpeed = organism.speed * 12;
-      const currentSpeed = Math.sqrt(organism.vx * organism.vx + organism.vy * organism.vy);
-      if (currentSpeed > maxSpeed) {
-        const scale = maxSpeed / currentSpeed;
-        organism.vx *= scale;
-        organism.vy *= scale;
-      }
-    }
-
-    organism.x += organism.vx;
-    organism.y += organism.vy;
-
-    organism.x = Math.max(organism.size, Math.min(worldSize - organism.size, organism.x));
-    organism.y = Math.max(organism.size, Math.min(worldSize - organism.size, organism.y));
-
-    if (camera) {
-      camera.x += ((organism.x - camera.x) * 0.08) * delta * 60;
-      camera.y += ((organism.y - camera.y) * 0.08) * delta * 60;
-    }
-
-    const currentDashCharge = Math.max(0, ensureNumber(organism.dashCharge, 0));
-    const maxDashCharge = Math.max(
-      0,
-      ensureNumber(organism.maxDashCharge, Math.max(currentDashCharge, 100))
-    );
-    if (maxDashCharge > 0) {
-      const dashCharge = Math.min(maxDashCharge, currentDashCharge);
-      const dashRegenRate = Math.max(
-        0,
-        ensureNumber(organism.dashChargeRegenRate, 20)
-      );
-      const regeneratedCharge = dashCharge + dashRegenRate * delta;
-      organism.dashCharge = Math.min(maxDashCharge, regeneratedCharge);
-    } else {
-      organism.dashCharge = currentDashCharge;
-    }
-
-    organism.attackCooldown = Math.max(
-      0,
-      ensureNumber(organism.attackCooldown, 0) - delta
-    );
-    organism.dashCooldown = Math.max(
-      0,
-      ensureNumber(organism.dashCooldown, 0) - delta
-    );
-
-    if (organism.skillCooldowns && typeof organism.skillCooldowns === 'object') {
-      let needsImmediateSync = false;
-
-      Object.keys(organism.skillCooldowns).forEach((skillKey) => {
-        const currentCooldown = ensureNumber(organism.skillCooldowns[skillKey], 0);
-
-        if (currentCooldown <= 0) {
-          if (currentCooldown < 0) {
-            organism.skillCooldowns[skillKey] = 0;
-          }
-          return;
-        }
-
-        const updatedCooldown = Math.max(0, currentCooldown - delta);
-
-        if (updatedCooldown !== currentCooldown) {
-          organism.skillCooldowns[skillKey] = updatedCooldown;
-
-          if (updatedCooldown === 0) {
-            needsImmediateSync = true;
-          }
-        }
-      });
-
-      if (needsImmediateSync) {
-        state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-      }
-    }
-
-    const currentInvulnerableTimer = Math.max(
-      0,
-      ensureNumber(organism.invulnerableTimer, 0)
-    );
-    const updatedInvulnerableTimer = Math.max(0, currentInvulnerableTimer - delta);
-    organism.invulnerableTimer = updatedInvulnerableTimer;
-
-    if (updatedInvulnerableTimer === 0 && !dashActive) {
-      organism.invulnerable = Boolean(organism.invulnerableFromPowerUp);
-    }
-
-    state.gameTime += delta;
-
-    if (state.gameTime - state.lastSpawnTime > state.spawnInterval / 1000) {
-      if (state.enemies.length < maxEnemiesAllowed) {
-        spawnEnemy?.();
-      }
-      state.lastSpawnTime = state.gameTime;
-      state.spawnInterval = Math.max(800, state.spawnInterval - 20);
-
-      if (state.level % 5 === 0 && !state.bossPending) {
-        state.bossPending = true;
-        spawnBoss?.();
-      }
-    }
-
-    const effects = state.effects || [];
-    state.effects = effects.filter(effect => {
-      effect.life -= delta;
-      return effect.life > 0;
-    });
+  if (typeof helpers.playSound === 'function' && commands.attacks.length > 0) {
+    helpers.playSound('attack');
   }
 
-  const updatedNebulas = [];
-  (state.nebulas || []).forEach(nebula => {
-    const dx = nebula.x - organism.x;
-    const dy = nebula.y - organism.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < nebula.radius + organism.size && !nebula.dispelled) {
-      nebula.dispelled = true;
-      nebula.dispelProgress = nebula.dispelProgress || 0;
-      nebula.rotationSpeed *= 3;
-      nebula.turbulence *= 2;
-      const nebulaColorBase =
-        nebula.color ?? nebulaTypes[nebula.type]?.color ?? 'rgba(20, 56, 81, ';
-      const nebulaEffectColor =
-        nebula.glow ?? nebulaTypes[nebula.type]?.glow ?? `${nebulaColorBase}0.6)`;
-      addNotification(state, '🌫️ Nebulosa bioenergética dispersa!');
-      createEffect(state, nebula.x, nebula.y, 'nebula', nebulaEffectColor);
-      state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-    }
-
-    nebula.rotation += nebula.rotationSpeed * delta;
-    nebula.pulsePhase += delta;
-
-    if (nebula.dispelled) {
-      nebula.dispelProgress = (nebula.dispelProgress || 0) + delta * 0.5;
-      if (nebula.dispelProgress >= 1) {
-        return;
-      }
-    }
-
-    updatedNebulas.push(nebula);
-  });
-  state.nebulas = updatedNebulas;
-
-  state.obstacles = (state.obstacles || []).filter(obs => {
-    obs.x += obs.vx;
-    obs.y += obs.vy;
-    obs.rotation += obs.rotationSpeed * delta;
-
-    if (obs.x < -200 || obs.x > worldSize + 200) return false;
-    if (obs.y < -200 || obs.y > worldSize + 200) return false;
-
-    const dx = obs.x - organism.x;
-    const dy = obs.y - organism.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < obs.size + organism.size) {
-      const divisor = dist || 1;
-      organism.vx -= (dx / divisor) * 10;
-      organism.vy -= (dy / divisor) * 10;
-      createEffect(state, obs.x, obs.y, 'impact', obs.color);
-      obs.color = obs.hitColor;
-      obs.hitPulse = 1;
-      obs.rotationSpeed *= -1;
-      playSound('impact');
-    }
-
-    if (obs.hitPulse > 0) {
-      obs.hitPulse *= 0.85;
-      if (obs.hitPulse < 0.01) {
-        obs.hitPulse = 0;
-      }
-    }
-
-    return true;
-  });
-
-  state.powerUps = (state.powerUps || []).filter(power => {
-    power.pulse += delta * 3;
-
-    const dx = power.x - organism.x;
-    const dy = power.y - organism.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < organism.size + 24) {
-      applyPowerUp?.(power.type);
-      return false;
-    }
-
-    return true;
-  });
-
-  state.organicMatter = (state.organicMatter || []).filter(matter => {
-    matter.x += matter.vx;
-    matter.y += matter.vy;
-    matter.rotation += matter.rotationSpeed * delta;
-    matter.pulsePhase += delta * 2;
-
-    const dx = matter.x - organism.x;
-    const dy = matter.y - organism.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < matter.size + organism.size) {
-      state.energy += matter.energy;
-      state.health = Math.min(state.maxHealth, state.health + matter.health);
-      state.score += matter.energy;
-      playSound('collect');
-      addNotification(state, `+${matter.energy} ⚡`);
-      for (let i = 0; i < 5; i += 1) {
-        createParticle(state, matter.x, matter.y, matter.color, 3);
-      }
-      return false;
-    }
-
-    return true;
-  });
-
-  if (state.organicMatter.length < 30 && Math.random() < 0.05) {
-    spawnOrganicMatter?.(state, 1);
-  }
-
-  const enemies = Array.isArray(state.enemies) ? state.enemies : [];
-
-  enemies.forEach((enemy) => {
-    if (!enemy || typeof enemy !== 'object') {
-      return;
-    }
-
-    if (!enemy.dynamicModifiers || typeof enemy.dynamicModifiers !== 'object') {
-      enemy.dynamicModifiers = {
-        attackMultiplier: 1,
-        defenseMultiplier: 1,
-        speedMultiplier: 1,
-        sizeMultiplier: 1,
-        attackBonus: 0,
-        defenseBonus: 0,
-        speedBonus: 0,
-        sizeBonus: 0,
-      };
-    } else {
-      enemy.dynamicModifiers.attackMultiplier = 1;
-      enemy.dynamicModifiers.defenseMultiplier = 1;
-      enemy.dynamicModifiers.speedMultiplier = 1;
-      enemy.dynamicModifiers.sizeMultiplier = 1;
-      enemy.dynamicModifiers.attackBonus = 0;
-      enemy.dynamicModifiers.defenseBonus = 0;
-      enemy.dynamicModifiers.speedBonus = 0;
-      enemy.dynamicModifiers.sizeBonus = 0;
-    }
-
-    if (!enemy.baseStats || typeof enemy.baseStats !== 'object') {
-      enemy.baseStats = {
-        size: ensureNumber(enemy.size, 12),
-        speed: ensureNumber(enemy.speed, 1),
-        attack: ensureNumber(enemy.attack, 0),
-        defense: ensureNumber(enemy.defense, 0),
-        maxHealth: ensureNumber(enemy.maxHealth, ensureNumber(enemy.health, 10)),
-        health: ensureNumber(enemy.health, 10),
-      };
-    }
-
-    enemy.behaviorTraits =
-      enemy.behaviorTraits && typeof enemy.behaviorTraits === 'object'
-        ? enemy.behaviorTraits
-        : {};
-
-    if (Array.isArray(enemy.activeBuffs)) {
-      enemy.activeBuffs = enemy.activeBuffs.filter((buff) => {
-        if (!buff || typeof buff !== 'object') return false;
-        const remaining = ensureNumber(buff.remaining ?? buff.duration, 0) - delta;
-        if (remaining <= 0) return false;
-        buff.remaining = remaining;
-        applyBuffModifiersToDynamic(enemy.dynamicModifiers, buff.modifiers || {});
-        return true;
-      });
-    } else {
-      enemy.activeBuffs = [];
-    }
-  });
-
-  state.projectiles = state.projectiles || [];
-
-  const updatedEnemies = enemies.filter((enemy) => {
-    if (!enemy || typeof enemy !== 'object') {
-      return false;
-    }
-
-    const dynamic = enemy.dynamicModifiers || {
-      attackMultiplier: 1,
-      defenseMultiplier: 1,
-      speedMultiplier: 1,
-      sizeMultiplier: 1,
-      attackBonus: 0,
-      defenseBonus: 0,
-      speedBonus: 0,
-      sizeBonus: 0,
-    };
-    const baseStats = enemy.baseStats || {};
-    const behaviorTraits = enemy.behaviorTraits || {};
-
-    if (!enemy.boss && behaviorTraits.speedBurst) {
-      const burst = behaviorTraits.speedBurst;
-      const interval = Math.max(0.2, ensureNumber(burst.interval, 6));
-      enemy.speedBurstTimer = ensureNumber(enemy.speedBurstTimer, 0) + delta;
-      enemy.speedBurstActive = Boolean(enemy.speedBurstActive);
-      enemy.speedBurstRemaining = Math.max(0, ensureNumber(enemy.speedBurstRemaining, 0) - delta);
-      if (enemy.speedBurstRemaining <= 0) {
-        enemy.speedBurstActive = false;
-      }
-
-      if (enemy.speedBurstTimer >= interval) {
-        enemy.speedBurstTimer = 0;
-        enemy.speedBurstActive = true;
-        enemy.speedBurstRemaining = Math.max(0.2, ensureNumber(burst.duration, 0.8));
-        enemy.speedBurstMultiplier = Math.max(1, ensureNumber(burst.speedMultiplier, 1.6));
-        createEffect(state, enemy.x, enemy.y, 'dash', enemy.color);
-        playSound('dash');
-      }
-
-      if (enemy.speedBurstActive) {
-        const multiplier = Math.max(1, ensureNumber(enemy.speedBurstMultiplier, 1.6));
-        applyBuffModifiersToDynamic(dynamic, { speedMultiplier: multiplier });
-      }
-    }
-
-    const projectileVolley = behaviorTraits.projectileVolley;
-    if (projectileVolley) {
-      const interval = Math.max(0.2, ensureNumber(projectileVolley.interval, 6));
-      enemy.projectileCooldown = Math.max(
-        0,
-        ensureNumber(enemy.projectileCooldown, 0) - delta
-      );
-
-      if (enemy.projectileCooldown <= 0) {
-        const count = Math.max(1, Math.round(ensureNumber(projectileVolley.count, 3)));
-        const spread = ensureNumber(projectileVolley.spread, Math.PI / 4);
-        const projectileSpeed = ensureNumber(projectileVolley.speed, 5);
-        const projectileLife = Math.max(0.2, ensureNumber(projectileVolley.life, 2.5));
-        const damageMultiplier = ensureNumber(projectileVolley.damageMultiplier, 0.4);
-        const color = projectileVolley.color || enemy.glowColor || enemy.color;
-        const baseAngle = Math.atan2(organism.y - enemy.y, organism.x - enemy.x);
-        const baseAttack = ensureNumber(baseStats.attack, enemy.attack);
-        const damage = Math.max(1, Math.round(baseAttack * damageMultiplier));
-        const spreadStep = count > 1 ? spread / (count - 1) : 0;
-
-        for (let i = 0; i < count; i += 1) {
-          const offset = count > 1 ? -spread / 2 + spreadStep * i : 0;
-          const angle = baseAngle + offset;
-          state.projectiles.push({
-            x: enemy.x,
-            y: enemy.y,
-            vx: Math.cos(angle) * projectileSpeed,
-            vy: Math.sin(angle) * projectileSpeed,
-            damage,
-            life: projectileLife,
-            color,
-            type: 'enemy-projectile',
-            hostile: true,
-            sourceId: enemy.id,
-          });
-        }
-
-        enemy.projectileCooldown = interval;
-        playSound('shoot');
-      }
-    }
-
-    const supportAura = behaviorTraits.supportAura;
-    if (supportAura) {
-      enemy.supportAuraTimer = ensureNumber(enemy.supportAuraTimer, 0) + delta;
-      const interval = Math.max(0.1, ensureNumber(supportAura.interval, 8));
-      if (enemy.supportAuraTimer >= interval) {
-        enemy.supportAuraTimer = 0;
-        const duration = Math.max(0.2, ensureNumber(supportAura.duration, 3));
-        const radius = Math.max(0, ensureNumber(supportAura.radius, 240));
-        const includeSelf = supportAura.includeSelf !== false;
-        const modifiers = supportAura.modifiers || {};
-        const radiusSq = radius * radius;
-
-        enemies.forEach((ally) => {
-          if (!ally || ally === enemy && !includeSelf) return;
-          const dx = ally.x - enemy.x;
-          const dy = ally.y - enemy.y;
-          if (dx * dx + dy * dy <= radiusSq) {
-            applyBuffToEnemy(
-              ally,
-              {
-                sourceId: enemy.id,
-                type: supportAura.type || 'supportAura',
-                remaining: duration,
-                modifiers,
-              },
-              { immediate: true }
-            );
-          }
-        });
-
-        createEffect(state, enemy.x, enemy.y, 'buff', enemy.color);
-        playSound('buff');
-      }
-    }
-
-    const baseSize = ensureNumber(baseStats.size, enemy.size);
-    const baseSpeed = ensureNumber(baseStats.speed, enemy.speed);
-    const baseAttack = ensureNumber(baseStats.attack, enemy.attack);
-    const baseDefense = ensureNumber(baseStats.defense, enemy.defense);
-
-    const effectiveSize = Math.max(
-      1,
-      (baseSize + (dynamic.sizeBonus || 0)) * (dynamic.sizeMultiplier || 1)
-    );
-    const effectiveSpeed = Math.max(
-      0,
-      (baseSpeed + (dynamic.speedBonus || 0)) * (dynamic.speedMultiplier || 1)
-    );
-    const effectiveAttack = Math.max(
-      0,
-      Math.round((baseAttack + (dynamic.attackBonus || 0)) * (dynamic.attackMultiplier || 1))
-    );
-    const effectiveDefense = Math.max(
-      0,
-      Math.round((baseDefense + (dynamic.defenseBonus || 0)) * (dynamic.defenseMultiplier || 1))
-    );
-
-    enemy.size = effectiveSize;
-    enemy.currentSpeed = effectiveSpeed;
-    enemy.attack = effectiveAttack;
-    enemy.defense = effectiveDefense;
-
-    if (!enemy.boss) {
-      enemy.behaviorTimer += delta;
-
-      if (enemy.behaviorTimer > enemy.behaviorInterval) {
-        enemy.behaviorTimer = 0;
-        enemy.behaviorInterval = Math.random() * 2 + 0.5;
-
-        const angle = Math.atan2(organism.y - enemy.y, organism.x - enemy.x);
-        const speed = effectiveSpeed * (0.8 + Math.random() * 0.4);
-        enemy.vx = Math.cos(angle) * speed;
-        enemy.vy = Math.sin(angle) * speed;
-      }
-
-      enemy.x += enemy.vx * delta * 60;
-      enemy.y += enemy.vy * delta * 60;
-    } else {
-      enemy.attackTimer += delta;
-      enemy.phaseTimer += delta;
-
-      if (enemy.phase === 'charge' && enemy.attackTimer > enemy.attackCooldown) {
-        enemy.phase = 'dash';
-        enemy.attackTimer = 0;
-        const angle = Math.atan2(organism.y - enemy.y, organism.x - enemy.x);
-        enemy.vx = Math.cos(angle) * enemy.dashSpeed;
-        enemy.vy = Math.sin(angle) * enemy.dashSpeed;
-        createEffect(state, enemy.x, enemy.y, 'dash', enemy.color);
-        playSound('dash');
-      }
-
-      if (enemy.phase === 'dash') {
-        enemy.x += enemy.vx * delta * 60;
-        enemy.y += enemy.vy * delta * 60;
-        enemy.dashDuration -= delta;
-        if (enemy.dashDuration <= 0) {
-          enemy.phase = 'charge';
-          enemy.dashDuration = enemy.dashDurationMax;
-          enemy.vx *= 0.2;
-          enemy.vy *= 0.2;
-        }
-      } else {
-        const angle = Math.atan2(organism.y - enemy.y, organism.x - enemy.x);
-        const speed = effectiveSpeed * (0.6 + Math.random() * 0.4);
-        enemy.vx = Math.cos(angle) * speed;
-        enemy.vy = Math.sin(angle) * speed;
-        enemy.x += enemy.vx * delta * 60;
-        enemy.y += enemy.vy * delta * 60;
-      }
-    }
-
-    enemy.x = Math.max(0, Math.min(worldSize, enemy.x));
-    enemy.y = Math.max(0, Math.min(worldSize, enemy.y));
-
-    const dx = enemy.x - organism.x;
-    const dy = enemy.y - organism.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < enemy.size + organism.size) {
-      if (!organism.invulnerable && !organism.invulnerableFromPowerUp) {
-        const fallbackHealth = toFiniteNumber(state.maxHealth) ?? 100;
-        const currentHealth = ensureNumber(state.health, fallbackHealth);
-        const damage = resolveEnemyDamage(enemy);
-        state.health = currentHealth - damage;
-        organism.invulnerable = true;
-        organism.invulnerableTimer = 1.5;
-        createEffect(state, organism.x, organism.y, 'impact', enemy.color);
-        playSound('hit');
-        state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-
-        if (state.health <= 0) {
-          state.gameOver = true;
-          state.showEvolutionChoice = false;
-        }
-      }
-      enemy.vx *= -0.5;
-      enemy.vy *= -0.5;
-    }
-
-    if (enemy.health <= 0) {
-      state.combo += 1;
-      state.maxCombo = Math.max(state.maxCombo, state.combo);
-      const energyReward = ensureNumber(enemy.energyReward, 0);
-      state.energy += energyReward;
-      state.score += enemy.points;
-      createEffect(state, enemy.x, enemy.y, 'hit', enemy.color);
-      playSound('enemyDie');
-      dropPowerUps(state, enemy);
-      state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-
-      if (enemy.boss) {
-        state.boss = null;
-        state.bossPending = false;
-        addNotification(state, '✨ Mega-organismo neutralizado!');
-      }
-
-      return false;
-    }
-
-    return true;
-  });
-
-  state.enemies = updatedEnemies;
-
-  if (state.enemies.length < maxEnemiesAllowed && Math.random() < 0.005) {
-    spawnEnemy?.();
-  }
-
-  state.projectiles = (state.projectiles || []).filter(proj => {
-    proj.x += proj.vx;
-    proj.y += proj.vy;
-    proj.life -= delta;
-
-    if (proj.life <= 0) return false;
-
-    if (
-      proj.x < -50 ||
-      proj.x > worldSize + 50 ||
-      proj.y < -50 ||
-      proj.y > worldSize + 50
-    ) {
-      return false;
-    }
-
-    if (proj.hostile) {
-      const dxOrg = proj.x - organism.x;
-      const dyOrg = proj.y - organism.y;
-      const distOrg = Math.sqrt(dxOrg * dxOrg + dyOrg * dyOrg);
-
-      if (distOrg < organism.size) {
-        if (!organism.invulnerable && !organism.invulnerableFromPowerUp) {
-          const damage = ensureNumber(proj.damage, 0);
-          const fallbackHealth = toFiniteNumber(state.maxHealth) ?? 100;
-          const currentHealth = ensureNumber(state.health, fallbackHealth);
-          state.health = currentHealth - damage;
-          organism.invulnerable = true;
-          organism.invulnerableTimer = Math.max(
-            ensureNumber(organism.invulnerableTimer, 0),
-            0.6
-          );
-          createEffect(state, organism.x, organism.y, 'impact', proj.color || '#FFFFFF');
-          playSound('hit');
-          state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-
-          if (state.health <= 0) {
-            state.gameOver = true;
-            state.showEvolutionChoice = false;
-          }
-        }
-
-        return false;
-      }
-
-      return true;
-    }
-
-    for (let i = 0; i < state.enemies.length; i += 1) {
-      const enemy = state.enemies[i];
-      const dx = proj.x - enemy.x;
-      const dy = proj.y - enemy.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist < enemy.size) {
-        enemy.health -= proj.damage;
-        createEffect(state, enemy.x, enemy.y, 'hit', proj.color);
-
-        if (enemy.health <= 0) {
-          state.energy += 25;
-          state.score += enemy.points;
-          dropPowerUps(state, enemy);
-          if (enemy.boss) {
-            state.boss = null;
-            state.bossPending = false;
-            addNotification(state, '✨ Mega-organismo neutralizado!');
-          }
-          state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-        } else if (enemy.boss) {
-          state.boss = {
-            active: true,
-            health: enemy.health,
-            maxHealth: enemy.maxHealth,
-            color: enemy.color,
-          };
-          state.uiSyncTimer = Math.min(state.uiSyncTimer, 0.05);
-        }
-
-        return false;
-      }
-    }
-
-    return true;
-  });
+  return {
+    commands,
+    hudSnapshot,
+    localPlayerId,
+  };
 };
-
-export default updateGameState;
