@@ -82,6 +82,15 @@ const isIpAddress = (hostname: string) => {
   return isIpv4Address(hostname);
 };
 
+const formatHostnameForWebSocket = (hostname: string) => {
+  if (!hostname.includes(":")) {
+    return hostname;
+  }
+
+  const unwrappedHostname = hostname.replace(/^\[/, "").replace(/\]$/, "");
+  return `[${unwrappedHostname}]`;
+};
+
 export const resolveWebSocketUrl = (explicitUrl?: string) => {
   if (explicitUrl) {
     return normalizeRealtimeUrl(explicitUrl);
@@ -107,12 +116,12 @@ export const resolveWebSocketUrl = (explicitUrl?: string) => {
 
   if (isLoopbackHost) {
     const portSuffix = port ? `:${port}` : "";
-    return `${websocketProtocol}//${hostname}${portSuffix}`;
+    return `${websocketProtocol}//${formatHostnameForWebSocket(hostname)}${portSuffix}`;
   }
 
   if (isIpAddress(hostname)) {
     const portSuffix = port ? `:${port}` : "";
-    return `${websocketProtocol}//${hostname}${portSuffix}`;
+    return `${websocketProtocol}//${formatHostnameForWebSocket(hostname)}${portSuffix}`;
   }
 
   const hostnameParts = hostname.split(".").filter(Boolean);
