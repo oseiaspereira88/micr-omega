@@ -10,7 +10,7 @@ import useInputController from '../input/useInputController';
 import { DEFAULT_JOYSTICK_STATE } from '../input/utils';
 import { gameStore } from '../../store/gameStore';
 import { createInitialState } from '../state/initialState';
-import { restartGame as restartGameSystem } from '../systems';
+import { chooseEvolution as chooseEvolutionSystem, restartGame as restartGameSystem } from '../systems';
 import { spawnObstacle as createObstacleSpawn } from '../factories/obstacleFactory';
 import { spawnNebula as createNebulaSpawn } from '../factories/nebulaFactory';
 import { spawnPowerUp as createPowerUpSpawn } from '../factories/powerUpFactory';
@@ -152,6 +152,84 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     const state = renderStateRef.current;
     state.notifications = appendNotification(state.notifications, text);
   }, []);
+
+  const syncHudState = useCallback((state) => {
+    if (!state) return;
+
+    const safeArray = (value) => (Array.isArray(value) ? value : []);
+
+    const boss = state.boss ?? null;
+    const bossHealth = boss?.health?.current ?? boss?.health ?? state.bossHealth ?? 0;
+    const bossMaxHealth = boss?.health?.max ?? boss?.maxHealth ?? state.bossMaxHealth ?? 0;
+
+    const skillList = safeArray(state.skillList);
+    const notifications = safeArray(state.notifications);
+    const activePowerUps = safeArray(state.activePowerUps);
+    const opponents = safeArray(state.enemies ?? state.opponents);
+    const progressionQueue = safeArray(state.progressionQueue);
+
+    const evolutionMenu =
+      state.evolutionMenu ?? {
+        activeTier: 'small',
+        options: { small: [], medium: [], large: [] },
+      };
+
+    dispatchRef.current?.({
+      type: 'SYNC_STATE',
+      payload: {
+        energy: state.energy ?? 0,
+        health: state.health ?? 0,
+        maxHealth: state.maxHealth ?? state.health ?? 0,
+        level: state.level ?? 1,
+        score: state.score ?? 0,
+        dashCharge: state.dashCharge ?? 100,
+        canEvolve: Boolean(state.canEvolve),
+        showEvolutionChoice: Boolean(state.showEvolutionChoice),
+        archetypeSelection: state.archetypeSelection ?? {
+          pending: true,
+          options: [],
+        },
+        selectedArchetype: state.selectedArchetype ?? null,
+        showMenu: Boolean(state.showMenu),
+        gameOver: Boolean(state.gameOver),
+        combo: state.combo ?? 0,
+        maxCombo: state.maxCombo ?? 0,
+        activePowerUps,
+        bossActive: Boolean(boss),
+        bossHealth,
+        bossMaxHealth,
+        currentSkill: state.currentSkill ?? null,
+        skillList,
+        hasMultipleSkills:
+          typeof state.hasMultipleSkills === 'boolean'
+            ? state.hasMultipleSkills
+            : skillList.length > 1,
+        notifications,
+        evolutionMenu,
+        currentForm: state.currentForm ?? null,
+        evolutionType: state.evolutionType ?? null,
+        cameraZoom: state.camera?.zoom ?? state.cameraZoom ?? 1,
+        opponents,
+        resources: state.resources ?? null,
+        xp: state.xp ?? null,
+        characteristicPoints: state.characteristicPoints ?? null,
+        geneticMaterial: state.geneticMaterial ?? null,
+        geneFragments: state.geneFragments ?? null,
+        stableGenes: state.stableGenes ?? null,
+        evolutionSlots: state.evolutionSlots ?? null,
+        reroll: state.reroll ?? null,
+        dropPity: state.dropPity ?? null,
+        progressionQueue,
+        recentRewards: state.recentRewards ?? null,
+        evolutionContext: state.evolutionContext ?? null,
+        element: state.element ?? null,
+        affinity: state.affinity ?? null,
+        elementLabel: state.elementLabel ?? null,
+        affinityLabel: state.affinityLabel ?? null,
+        resistances: state.resistances ?? null,
+      },
+    });
+  }, [dispatchRef]);
 
   const setCameraZoom = useCallback((zoomValue) => {
     const state = renderStateRef.current;
@@ -344,84 +422,6 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
     const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
-    const syncState = (state) => {
-      if (!state) return;
-
-      const boss = state.boss ?? null;
-      const bossHealth =
-        boss?.health?.current ?? boss?.health ?? state.bossHealth ?? 0;
-      const bossMaxHealth =
-        boss?.health?.max ?? boss?.maxHealth ?? state.bossMaxHealth ?? 0;
-
-      const safeArray = (value) => (Array.isArray(value) ? value : []);
-      const skillList = safeArray(state.skillList);
-      const notifications = safeArray(state.notifications);
-      const activePowerUps = safeArray(state.activePowerUps);
-      const opponents = safeArray(state.enemies ?? state.opponents);
-      const progressionQueue = safeArray(state.progressionQueue);
-      const evolutionMenu =
-        state.evolutionMenu ?? {
-          activeTier: 'small',
-          options: { small: [], medium: [], large: [] },
-        };
-
-      dispatchRef.current?.({
-        type: 'SYNC_STATE',
-        payload: {
-          energy: state.energy ?? 0,
-          health: state.health ?? 0,
-          maxHealth: state.maxHealth ?? state.health ?? 0,
-          level: state.level ?? 1,
-          score: state.score ?? 0,
-          dashCharge: state.dashCharge ?? 100,
-          canEvolve: Boolean(state.canEvolve),
-          showEvolutionChoice: Boolean(state.showEvolutionChoice),
-          archetypeSelection: state.archetypeSelection ?? {
-            pending: true,
-            options: [],
-          },
-          selectedArchetype: state.selectedArchetype ?? null,
-          showMenu: Boolean(state.showMenu),
-          gameOver: Boolean(state.gameOver),
-          combo: state.combo ?? 0,
-          maxCombo: state.maxCombo ?? 0,
-          activePowerUps,
-          bossActive: Boolean(boss),
-          bossHealth,
-          bossMaxHealth,
-          currentSkill: state.currentSkill ?? null,
-          skillList,
-          hasMultipleSkills:
-            typeof state.hasMultipleSkills === 'boolean'
-              ? state.hasMultipleSkills
-              : skillList.length > 1,
-          notifications,
-          evolutionMenu,
-          currentForm: state.currentForm ?? null,
-          evolutionType: state.evolutionType ?? null,
-          cameraZoom: state.camera?.zoom ?? state.cameraZoom ?? 1,
-          opponents,
-          resources: state.resources ?? null,
-          xp: state.xp ?? null,
-          characteristicPoints: state.characteristicPoints ?? null,
-          geneticMaterial: state.geneticMaterial ?? null,
-          geneFragments: state.geneFragments ?? null,
-          stableGenes: state.stableGenes ?? null,
-          evolutionSlots: state.evolutionSlots ?? null,
-          reroll: state.reroll ?? null,
-          dropPity: state.dropPity ?? null,
-          progressionQueue,
-          recentRewards: state.recentRewards ?? null,
-          evolutionContext: state.evolutionContext ?? null,
-          element: state.element ?? null,
-          affinity: state.affinity ?? null,
-          elementLabel: state.elementLabel ?? null,
-          affinityLabel: state.affinityLabel ?? null,
-          resistances: state.resistances ?? null,
-        },
-      });
-    };
-
     const resetControls = () => {
       movementIntentRef.current = { ...DEFAULT_JOYSTICK_STATE };
       actionBufferRef.current = { attacks: [] };
@@ -509,7 +509,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     restartGameSystem(renderStateRef.current, {
       createEffect,
       createParticle,
-      syncState,
+      syncState: syncHudState,
       resetControls,
       spawnObstacle,
       spawnNebula,
@@ -519,7 +519,35 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     });
 
     renderStateRef.current.hudSnapshot = null;
-  }, [createEffect, createParticle, densityScale, initializeBackground]);
+    syncHudState(renderStateRef.current);
+  }, [createEffect, createParticle, densityScale, initializeBackground, syncHudState]);
+
+  const chooseEvolutionHandler = useCallback(
+    (evolutionKey, tier) => {
+      if (!evolutionKey) return;
+
+      const state = renderStateRef.current;
+      if (!state) return;
+
+      const helpers = {
+        createEffect,
+        createParticle,
+        addNotification: (targetState, text) => {
+          if (!text) return;
+          if (targetState && targetState !== renderStateRef.current) {
+            targetState.notifications = appendNotification(targetState.notifications, text);
+          }
+          pushNotification(text);
+        },
+        playSound,
+        syncState: syncHudState,
+      };
+
+      chooseEvolutionSystem(state, helpers, evolutionKey, tier);
+      syncHudState(state);
+    },
+    [createEffect, createParticle, playSound, pushNotification, syncHudState]
+  );
 
   useEffect(() => {
     if (!resolvedSettings.audioEnabled) {
@@ -722,7 +750,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   return {
     joystick,
     inputActions,
-    chooseEvolution: () => {},
+    chooseEvolution: chooseEvolutionHandler,
     restartGame: restartGameHandler,
     selectArchetype,
     setCameraZoom,
