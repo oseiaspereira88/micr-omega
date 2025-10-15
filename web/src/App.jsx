@@ -87,10 +87,67 @@ const App = () => {
       }
 
       if (Array.isArray(commands.attacks) && commands.attacks.length > 0) {
-        if (typeof sendAttack === 'function') {
-          // Integração de ataque ainda não suportada. Apenas limpamos a fila.
+        const attackQueue = commands.attacks;
+
+        if (typeof sendAttack === 'function' && playerId && player && isGamePhaseActive) {
+          const combatStatus = player.combatStatus ?? {};
+
+          attackQueue.forEach((attackCommand) => {
+            if (!attackCommand || typeof attackCommand !== 'object') {
+              return;
+            }
+
+            const payload = {
+              playerId,
+              kind: typeof attackCommand.kind === 'string' ? attackCommand.kind : 'basic',
+            };
+
+            const timestamp = Number.isFinite(attackCommand.timestamp)
+              ? attackCommand.timestamp
+              : Date.now();
+            payload.clientTime = timestamp;
+
+            const targetPlayerId =
+              typeof attackCommand.targetPlayerId === 'string'
+                ? attackCommand.targetPlayerId
+                : combatStatus?.targetPlayerId;
+            const targetObjectId =
+              typeof attackCommand.targetObjectId === 'string'
+                ? attackCommand.targetObjectId
+                : combatStatus?.targetObjectId;
+
+            if (targetPlayerId) {
+              payload.targetPlayerId = targetPlayerId;
+            }
+            if (targetObjectId) {
+              payload.targetObjectId = targetObjectId;
+            }
+
+            if (Number.isFinite(attackCommand.damage)) {
+              payload.damage = attackCommand.damage;
+            }
+            if (typeof attackCommand.state === 'string' && attackCommand.state) {
+              payload.state = attackCommand.state;
+            }
+            if (
+              attackCommand.resultingHealth &&
+              typeof attackCommand.resultingHealth === 'object'
+            ) {
+              payload.resultingHealth = attackCommand.resultingHealth;
+            }
+
+            try {
+              const sent = sendAttack(payload);
+              if (!sent) {
+                console.warn('Falha ao enviar comando de ataque', payload);
+              }
+            } catch (error) {
+              console.error('Erro ao enviar comando de ataque', error);
+            }
+          });
         }
-        commands.attacks.length = 0;
+
+        attackQueue.length = 0;
       }
     },
     [sendMovement, sendAttack]
