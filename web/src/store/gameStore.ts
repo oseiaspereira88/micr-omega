@@ -303,9 +303,18 @@ const isFullState = (
 
 const deriveRoomFromState = (
   state: SharedGameState | SharedGameStateDiff,
-  previousRoom: RoomStateSnapshot
+  previousRoom: RoomStateSnapshot,
 ): RoomStateSnapshot => {
   if (isFullState(state)) {
+    if (
+      previousRoom.phase === state.phase &&
+      previousRoom.roundId === state.roundId &&
+      previousRoom.roundStartedAt === state.roundStartedAt &&
+      previousRoom.roundEndsAt === state.roundEndsAt
+    ) {
+      return previousRoom;
+    }
+
     return {
       phase: state.phase,
       roundId: state.roundId,
@@ -314,25 +323,32 @@ const deriveRoomFromState = (
     };
   }
 
-  const nextRoom: RoomStateSnapshot = { ...previousRoom };
+  let nextRoom: RoomStateSnapshot | null = null;
 
-  if (state.phase !== undefined) {
+  if (state.phase !== undefined && state.phase !== previousRoom.phase) {
+    nextRoom = nextRoom ?? { ...previousRoom };
     nextRoom.phase = state.phase;
   }
 
-  if (state.roundId !== undefined) {
+  if (state.roundId !== undefined && state.roundId !== previousRoom.roundId) {
+    nextRoom = nextRoom ?? { ...previousRoom };
     nextRoom.roundId = state.roundId;
   }
 
-  if (state.roundStartedAt !== undefined) {
+  if (
+    state.roundStartedAt !== undefined &&
+    state.roundStartedAt !== previousRoom.roundStartedAt
+  ) {
+    nextRoom = nextRoom ?? { ...previousRoom };
     nextRoom.roundStartedAt = state.roundStartedAt;
   }
 
-  if (state.roundEndsAt !== undefined) {
+  if (state.roundEndsAt !== undefined && state.roundEndsAt !== previousRoom.roundEndsAt) {
+    nextRoom = nextRoom ?? { ...previousRoom };
     nextRoom.roundEndsAt = state.roundEndsAt;
   }
 
-  return nextRoom;
+  return nextRoom ?? previousRoom;
 };
 
 const setConnectionStatus = (status: ConnectionStatus) => {
@@ -497,6 +513,15 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       obstacleResult.changed ||
       roomObjectResult.changed;
 
+    const stateChanged =
+      nextRoom !== prev.room ||
+      playersResult.changed ||
+      worldChanged;
+
+    if (!stateChanged) {
+      return prev;
+    }
+
     const nextWorld = worldChanged
       ? buildWorldFromCollections({
           microorganisms: microorganismsResult.next,
@@ -509,8 +534,8 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
     return {
       ...prev,
       room: nextRoom,
-      players: playersResult.next.byId,
-      remotePlayers: playersResult.next,
+      players: playersResult.changed ? playersResult.next.byId : prev.players,
+      remotePlayers: playersResult.changed ? playersResult.next : prev.remotePlayers,
       microorganisms: microorganismsResult.next,
       organicMatter: organicMatterResult.next,
       obstacles: obstacleResult.next,
@@ -520,11 +545,41 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
   });
 };
 
+const areRankingsEqual = (a: RankingEntry[], b: RankingEntry[]) => {
+  if (a === b) {
+    return true;
+  }
+
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  for (let index = 0; index < a.length; index += 1) {
+    const left = a[index];
+    const right = b[index];
+    if (
+      left.playerId !== right.playerId ||
+      left.name !== right.name ||
+      left.score !== right.score
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 const applyRanking = (ranking: RankingEntry[]) => {
-  applyState((prev) => ({
-    ...prev,
-    ranking,
-  }));
+  applyState((prev) => {
+    if (areRankingsEqual(prev.ranking, ranking)) {
+      return prev;
+    }
+
+    return {
+      ...prev,
+      ranking,
+    };
+  });
 };
 
 const markPing = (timestamp: number) => {
