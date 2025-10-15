@@ -46,12 +46,18 @@ const createPlayerState = (
     },
 });
 
+const createEmptyCollection = <T extends { id: string }>(): {
+  byId: Record<string, T>;
+  all: T[];
+  indexById: Map<string, number>;
+} => ({ byId: {}, all: [], indexById: new Map() });
+
 const createFreshState = (): GameStoreState => {
-  const emptyPlayers = { byId: {}, all: [] };
-  const emptyMicroorganisms = { byId: {}, all: [] };
-  const emptyOrganic = { byId: {}, all: [] };
-  const emptyObstacles = { byId: {}, all: [] };
-  const emptyRoomObjects = { byId: {}, all: [] };
+  const emptyPlayers = createEmptyCollection<SharedPlayerState>();
+  const emptyMicroorganisms = createEmptyCollection<SharedWorldState["microorganisms"][number]>();
+  const emptyOrganic = createEmptyCollection<SharedWorldState["organicMatter"][number]>();
+  const emptyObstacles = createEmptyCollection<SharedWorldState["obstacles"][number]>();
+  const emptyRoomObjects = createEmptyCollection<SharedWorldState["roomObjects"][number]>();
 
   return {
     ...baseState,
@@ -251,5 +257,55 @@ describe("gameStore", () => {
     gameStore.actions.markPong(1200);
     expect(gameStore.getState().lastPingAt).toBe(1000);
     expect(gameStore.getState().lastPongAt).toBe(1200);
+  });
+
+  it("maintains index maps across partial entity updates", () => {
+    const players = [
+      createPlayerState({ id: "p1", name: "Alpha" }),
+      createPlayerState({ id: "p2", name: "Beta" }),
+      createPlayerState({ id: "p3", name: "Gamma" }),
+    ];
+
+    const world = createWorld();
+    const fullState: SharedGameState = {
+      phase: "active",
+      roundId: "round-idx",
+      roundStartedAt: 0,
+      roundEndsAt: 10,
+      players,
+      world,
+    };
+
+    gameStore.actions.applyFullState(fullState);
+
+    const snapshot = gameStore.getState();
+    const initialPlayers = snapshot.remotePlayers;
+    const originalIndexMap = initialPlayers.indexById;
+    expect(originalIndexMap.get("p1")).toBe(0);
+    expect(originalIndexMap.get("p2")).toBe(1);
+    expect(originalIndexMap.get("p3")).toBe(2);
+
+    gameStore.actions.applyStateDiff({
+      upsertPlayers: [
+        createPlayerState({ id: "p2", name: "Beta", score: 42 }),
+      ],
+    });
+
+    const afterUpdate = gameStore.getState().remotePlayers;
+    expect(afterUpdate.byId.p2?.score).toBe(42);
+    expect(afterUpdate.indexById).toBe(originalIndexMap);
+    expect(afterUpdate.indexById.get("p1")).toBe(0);
+    expect(afterUpdate.indexById.get("p2")).toBe(1);
+    expect(afterUpdate.indexById.get("p3")).toBe(2);
+    expect(afterUpdate.all).toHaveLength(3);
+
+    gameStore.actions.applyStateDiff({ removedPlayerIds: ["p2"] });
+
+    const afterRemoval = gameStore.getState().remotePlayers;
+    expect(afterRemoval.byId.p2).toBeUndefined();
+    expect(afterRemoval.indexById).not.toBe(originalIndexMap);
+    expect(afterRemoval.all).toHaveLength(2);
+    expect(afterRemoval.indexById.get("p1")).toBe(0);
+    expect(afterRemoval.indexById.get("p3")).toBe(1);
   });
 });

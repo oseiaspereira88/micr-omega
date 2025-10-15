@@ -28,6 +28,7 @@ export type PlayerMap = Record<string, SharedPlayerState>;
 export type EntityCollection<T extends { id: string }> = {
   byId: Record<string, T>;
   all: T[];
+  indexById: Map<string, number>;
 };
 
 type WorldCollections = {
@@ -40,6 +41,7 @@ type WorldCollections = {
 const createEmptyEntityCollection = <T extends { id: string }>(): EntityCollection<T> => ({
   byId: {},
   all: [],
+  indexById: new Map(),
 });
 
 const createEntityCollectionFromArray = <T extends { id: string }>(
@@ -48,10 +50,13 @@ const createEntityCollectionFromArray = <T extends { id: string }>(
 ): EntityCollection<T> => {
   const all = items.map((item) => cloneItem(item));
   const byId: Record<string, T> = {};
-  for (const item of all) {
+  const indexById = new Map<string, number>();
+  for (let index = 0; index < all.length; index += 1) {
+    const item = all[index]!;
     byId[item.id] = item;
+    indexById.set(item.id, index);
   }
-  return { byId, all };
+  return { byId, all, indexById };
 };
 
 const applyEntityCollectionDiff = <T extends { id: string }>(
@@ -62,51 +67,85 @@ const applyEntityCollectionDiff = <T extends { id: string }>(
 ): { next: EntityCollection<T>; changed: boolean } => {
   let nextAll = collection.all;
   let nextById = collection.byId;
+  let nextIndexById = collection.indexById;
   let changed = false;
 
-  if (upserts && upserts.length > 0) {
-    nextAll = collection.all.slice();
-    nextById = { ...collection.byId };
-    const indexById = new Map<string, number>();
-    nextAll.forEach((item, index) => {
-      indexById.set(item.id, index);
-    });
+  let arrayCloned = false;
+  let byIdCloned = false;
+  let indexCloned = false;
 
+  const ensureArray = () => {
+    if (!arrayCloned) {
+      nextAll = collection.all.slice();
+      arrayCloned = true;
+    }
+  };
+
+  const ensureById = () => {
+    if (!byIdCloned) {
+      nextById = { ...collection.byId };
+      byIdCloned = true;
+    }
+  };
+
+  const ensureIndex = () => {
+    if (!indexCloned) {
+      nextIndexById = new Map(collection.indexById);
+      indexCloned = true;
+    }
+  };
+
+  if (upserts && upserts.length > 0) {
     for (const entry of upserts) {
       const cloned = cloneItem(entry);
-      const existingIndex = indexById.get(cloned.id);
+      const existingIndex = nextIndexById.get(cloned.id);
       if (existingIndex !== undefined) {
+        ensureArray();
+        ensureById();
         nextAll[existingIndex] = cloned;
+        nextById[cloned.id] = cloned;
       } else {
-        indexById.set(cloned.id, nextAll.push(cloned) - 1);
+        ensureArray();
+        ensureById();
+        ensureIndex();
+        const newIndex = nextAll.length;
+        nextAll.push(cloned);
+        nextById[cloned.id] = cloned;
+        nextIndexById.set(cloned.id, newIndex);
       }
-      nextById[cloned.id] = cloned;
+      changed = true;
     }
-
-    changed = true;
   }
 
   if (removals && removals.length > 0) {
     const removalSet = new Set(removals);
     if (removalSet.size > 0) {
-      if (!changed) {
-        nextAll = collection.all.slice();
-        nextById = { ...collection.byId };
-      }
-
-      const filtered: T[] = [];
-      let removedAny = false;
-      for (const item of nextAll) {
-        if (removalSet.has(item.id)) {
-          delete nextById[item.id];
-          removedAny = true;
-        } else {
-          filtered.push(item);
+      const indicesToRemove: number[] = [];
+      for (const id of removalSet) {
+        const index = nextIndexById.get(id);
+        if (index !== undefined) {
+          ensureById();
+          ensureIndex();
+          delete nextById[id];
+          nextIndexById.delete(id);
+          indicesToRemove.push(index);
         }
       }
 
-      if (removedAny) {
-        nextAll = filtered;
+      if (indicesToRemove.length > 0) {
+        ensureArray();
+        indicesToRemove.sort((a, b) => a - b);
+        for (let i = indicesToRemove.length - 1; i >= 0; i -= 1) {
+          const index = indicesToRemove[i]!;
+          nextAll.splice(index, 1);
+        }
+
+        const minIndex = indicesToRemove[0]!;
+        for (let i = minIndex; i < nextAll.length; i += 1) {
+          const item = nextAll[i]!;
+          nextIndexById.set(item.id, i);
+        }
+
         changed = true;
       }
     }
@@ -120,6 +159,7 @@ const applyEntityCollectionDiff = <T extends { id: string }>(
     next: {
       byId: nextById,
       all: nextAll,
+      indexById: nextIndexById,
     },
     changed: true,
   };
