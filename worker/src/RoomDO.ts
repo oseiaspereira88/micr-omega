@@ -446,6 +446,8 @@ export class RoomDO {
   private playersDirty = false;
   private worldDirty = false;
   private pendingSnapshotAlarm: number | null = null;
+  private gameStateSnapshot: SharedGameState | null = null;
+  private gameStateSnapshotDirty = true;
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
@@ -626,6 +628,7 @@ export class RoomDO {
       await this.state.storage.put(WORLD_KEY, cloneWorldState(this.world));
     }
     this.rebuildWorldCaches();
+    this.invalidateGameStateSnapshot();
 
     const storedSnapshotState = await this.state.storage.get<SnapshotState>(SNAPSHOT_STATE_KEY);
     if (storedSnapshotState) {
@@ -882,9 +885,15 @@ export class RoomDO {
     return true;
   }
 
+  private invalidateGameStateSnapshot(): void {
+    this.gameStateSnapshot = null;
+    this.gameStateSnapshotDirty = true;
+  }
+
   private markPlayersDirty(): void {
     const wasDirty = this.playersDirty;
     this.playersDirty = true;
+    this.invalidateGameStateSnapshot();
     const pendingChanged = this.scheduleSnapshotFlush();
     if (!wasDirty || pendingChanged) {
       this.queueSnapshotStatePersist();
@@ -898,6 +907,7 @@ export class RoomDO {
   private markWorldDirty(): void {
     const wasDirty = this.worldDirty;
     this.worldDirty = true;
+    this.invalidateGameStateSnapshot();
     const pendingChanged = this.scheduleSnapshotFlush();
     if (!wasDirty || pendingChanged) {
       this.queueSnapshotStatePersist();
@@ -2219,6 +2229,7 @@ export class RoomDO {
       this.alarmSchedule.delete("waiting_start");
       this.alarmSchedule.delete("round_end");
       await this.persistAndSyncAlarms();
+      this.invalidateGameStateSnapshot();
       return;
     }
 
@@ -2229,6 +2240,7 @@ export class RoomDO {
     this.alarmSchedule.delete("waiting_start");
     this.alarmSchedule.set("round_end", this.roundEndsAt);
     await this.persistAndSyncAlarms();
+    this.invalidateGameStateSnapshot();
 
     const stateMessage: StateFullMessage = {
       type: "state",
@@ -2260,6 +2272,7 @@ export class RoomDO {
     this.alarmSchedule.delete("round_end");
     this.alarmSchedule.set("reset", Date.now() + RESET_DELAY_MS);
     await this.persistAndSyncAlarms();
+    this.invalidateGameStateSnapshot();
 
     const stateMessage: StateFullMessage = {
       type: "state",
@@ -2308,6 +2321,8 @@ export class RoomDO {
       player.lastActiveAt = Date.now();
     }
 
+    this.invalidateGameStateSnapshot();
+
     this.alarmSchedule.delete("reset");
     await this.persistAndSyncAlarms();
 
@@ -2351,11 +2366,15 @@ export class RoomDO {
   }
 
   private serializeGameState(): SharedGameState {
+    if (this.gameStateSnapshot !== null && !this.gameStateSnapshotDirty) {
+      return this.gameStateSnapshot;
+    }
+
     const players = Array.from(this.players.values())
       .map((player) => this.serializePlayer(player))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return {
+    const snapshot: SharedGameState = {
       phase: this.phase,
       roundId: this.roundId,
       roundStartedAt: this.roundStartedAt,
@@ -2363,6 +2382,11 @@ export class RoomDO {
       players,
       world: cloneWorldState(this.world)
     };
+
+    this.gameStateSnapshot = snapshot;
+    this.gameStateSnapshotDirty = false;
+
+    return snapshot;
   }
 
   private getRanking(): RankingEntry[] {
