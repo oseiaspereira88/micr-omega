@@ -260,10 +260,8 @@ export const collectActionSchema = z.object({
 
 export const playerActionSchema = z
   .discriminatedUnion("type", [
-    scoreActionSchema,
     comboActionSchema,
     deathActionSchema,
-    abilityActionSchema,
     movementActionSchema,
     attackActionBaseSchema,
     collectActionSchema

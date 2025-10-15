@@ -2,46 +2,60 @@ import { describe, expect, it } from "vitest";
 import { createMiniflare, onceMessage, openSocket, waitForRanking } from "./utils/miniflare";
 
 describe("RoomDO integration", () => {
-  it("synchronizes state and ranking across multiple clients", { timeout: 15000 }, async () => {
+  it("rejects unauthorized score actions and keeps ranking unchanged", { timeout: 20000 }, async () => {
     const mf = await createMiniflare();
 
     try {
       const socketA = await openSocket(mf);
       const socketB = await openSocket(mf);
 
-      const stateSyncA = onceMessage<{ type: string; mode: string }>(socketA, "state");
-      const stateSyncB = onceMessage<{ type: string; mode: string }>(socketB, "state");
+      const stateSyncA = onceMessage<{ type: string }>(socketA, "state", 5000);
+      const stateSyncB = onceMessage<{ type: string }>(socketB, "state", 5000);
 
       const joinedPromiseA = onceMessage<{
         type: string;
         playerId: string;
+        state: {
+          players: {
+            id: string;
+            score: number;
+            movementVector: { x: number; y: number };
+            position: { x: number; y: number };
+            orientation: { angle: number; tilt?: number };
+          }[];
+        };
         ranking: { playerId: string; score: number }[];
-      }>(socketA, "joined");
+      }>(socketA, "joined", 5000);
       socketA.send(JSON.stringify({ type: "join", name: "Alice" }));
       const joinedA = await joinedPromiseA;
 
-      const joinedPromiseB = onceMessage<{
-        type: string;
-        playerId: string;
-        ranking: { playerId: string; score: number }[];
-        state: { players: { id: string }[] };
-      }>(socketB, "joined");
+      const joinedPromiseB = onceMessage<{ type: string; playerId: string }>(socketB, "joined", 5000);
       socketB.send(JSON.stringify({ type: "join", name: "Bob" }));
-      const joinedB = await joinedPromiseB;
-
-      expect(joinedA.playerId).not.toBe(joinedB.playerId);
-      expect(joinedB.state.players.length).toBeGreaterThanOrEqual(2);
-      expect(joinedB.ranking.length).toBeGreaterThanOrEqual(2);
+      await joinedPromiseB;
 
       await Promise.all([stateSyncA, stateSyncB]);
 
-      const updatedRankingA = waitForRanking(
+      const initialPlayer = joinedA.state.players.find((player) => player.id === joinedA.playerId);
+      if (!initialPlayer) {
+        throw new Error("Player state not found in joined payload");
+      }
+
+      const errorPromise = onceMessage<{ type: string; reason: string }>(socketA, "error", 5000);
+      const rankingAttemptA = waitForRanking(
         socketA,
-        (ranking) => ranking[0]?.playerId === joinedA.playerId && ranking[0]?.score >= 1000,
+        (ranking) =>
+          ranking.some(
+            (entry) => entry.playerId === joinedA.playerId && entry.score !== initialPlayer.score,
+          ),
+        500,
       );
-      const updatedRankingB = waitForRanking(
+      const rankingAttemptB = waitForRanking(
         socketB,
-        (ranking) => ranking[0]?.playerId === joinedA.playerId && ranking[0]?.score >= 1000,
+        (ranking) =>
+          ranking.some(
+            (entry) => entry.playerId === joinedA.playerId && entry.score !== initialPlayer.score,
+          ),
+        500,
       );
 
       socketA.send(
@@ -52,10 +66,13 @@ describe("RoomDO integration", () => {
         }),
       );
 
-      const [rankingA, rankingB] = await Promise.all([updatedRankingA, updatedRankingB]);
+      const error = await errorPromise;
+      expect(error).toMatchObject({ type: "error", reason: "invalid_payload" });
 
-      expect(rankingA[0]).toMatchObject({ playerId: joinedA.playerId, score: 1000 });
-      expect(rankingB[0]).toMatchObject({ playerId: joinedA.playerId, score: 1000 });
+      await Promise.all([
+        expect(rankingAttemptA).rejects.toThrow("Timed out waiting for ranking update"),
+        expect(rankingAttemptB).rejects.toThrow("Timed out waiting for ranking update"),
+      ]);
 
       socketA.close();
       socketB.close();
@@ -71,18 +88,20 @@ describe("RoomDO integration", () => {
       const socketA = await openSocket(mf);
       const socketB = await openSocket(mf);
 
-      const stateSyncA = onceMessage<{ type: string }>(socketA, "state");
-      const stateSyncB = onceMessage<{ type: string }>(socketB, "state");
+      const stateSyncA = onceMessage<{ type: string }>(socketA, "state", 5000);
+      const stateSyncB = onceMessage<{ type: string }>(socketB, "state", 5000);
 
-      const joinedPromiseA = onceMessage<{
-        type: string;
-        playerId: string;
-      }>(socketA, "joined");
+      const joinedPromiseA = onceMessage<{ type: string; playerId: string }>(
+        socketA,
+        "joined",
+        5000,
+      );
 
-      const joinedPromiseB = onceMessage<{
-        type: string;
-        playerId: string;
-      }>(socketB, "joined");
+      const joinedPromiseB = onceMessage<{ type: string; playerId: string }>(
+        socketB,
+        "joined",
+        5000,
+      );
 
       socketA.send(JSON.stringify({ type: "join", name: "Charlie" }));
       const joinedA = await joinedPromiseA;
@@ -92,32 +111,103 @@ describe("RoomDO integration", () => {
 
       await Promise.all([stateSyncA, stateSyncB]);
 
+      const stateDiffPromise = onceMessage<{
+        type: string;
+        state: { upsertPlayers?: { id: string; combo: number }[] };
+      }>(socketA, "state", 5000);
+
       socketA.send(
         JSON.stringify({
           type: "action",
           playerId: joinedA.playerId,
-          action: { type: "combo", multiplier: 10 },
+          action: { type: "combo", multiplier: 0 },
         }),
       );
 
-      await onceMessage(socketA, "state");
+      const stateDiff = await stateDiffPromise;
+      const updatedPlayer = stateDiff.state.upsertPlayers?.find(
+        (entry) => entry.id === joinedA.playerId,
+      );
+      expect(updatedPlayer?.combo).toBe(1);
 
-      const rankingUpdate = waitForRanking(
+      socketA.close();
+      socketB.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("rejects unauthorized ability actions", { timeout: 20000 }, async () => {
+    const mf = await createMiniflare();
+
+    try {
+      const socketA = await openSocket(mf);
+      const socketB = await openSocket(mf);
+
+      const stateSyncA = onceMessage<{ type: string }>(socketA, "state", 5000);
+      const stateSyncB = onceMessage<{ type: string }>(socketB, "state", 5000);
+
+      const joinedPromiseA = onceMessage<{
+        type: string;
+        playerId: string;
+        state: {
+          players: {
+            id: string;
+            score: number;
+            movementVector: { x: number; y: number };
+            position: { x: number; y: number };
+            orientation: { angle: number; tilt?: number };
+          }[];
+        };
+        ranking: { playerId: string; score: number }[];
+      }>(socketA, "joined", 5000);
+      socketA.send(JSON.stringify({ type: "join", name: "Eve" }));
+      const joinedA = await joinedPromiseA;
+
+      const joinedPromiseB = onceMessage<{ type: string; playerId: string }>(socketB, "joined", 5000);
+      socketB.send(JSON.stringify({ type: "join", name: "Frank" }));
+      await joinedPromiseB;
+
+      await Promise.all([stateSyncA, stateSyncB]);
+
+      const initialPlayer = joinedA.state.players.find((player) => player.id === joinedA.playerId);
+      if (!initialPlayer) {
+        throw new Error("Player state not found in joined payload");
+      }
+
+      const errorPromise = onceMessage<{ type: string; reason: string }>(socketA, "error", 5000);
+      const rankingAttemptA = waitForRanking(
         socketA,
-        (ranking) => ranking[0]?.playerId === joinedA.playerId && ranking[0]?.score >= 50,
+        (ranking) =>
+          ranking.some(
+            (entry) => entry.playerId === joinedA.playerId && entry.score !== initialPlayer.score,
+          ),
+        500,
+      );
+      const rankingAttemptB = waitForRanking(
+        socketB,
+        (ranking) =>
+          ranking.some(
+            (entry) => entry.playerId === joinedA.playerId && entry.score !== initialPlayer.score,
+          ),
+        500,
       );
 
       socketA.send(
         JSON.stringify({
           type: "action",
           playerId: joinedA.playerId,
-          action: { type: "score", amount: 50, comboMultiplier: 0 },
+          action: { type: "ability", abilityId: "dash", value: 100 },
         }),
       );
 
-      const ranking = await rankingUpdate;
+      const error = await errorPromise;
+      expect(error).toMatchObject({ type: "error", reason: "invalid_payload" });
 
-      expect(ranking[0]).toMatchObject({ playerId: joinedA.playerId, score: 50 });
+      await Promise.all([
+        expect(rankingAttemptA).rejects.toThrow("Timed out waiting for ranking update"),
+        expect(rankingAttemptB).rejects.toThrow("Timed out waiting for ranking update"),
+      ]);
 
       socketA.close();
       socketB.close();
