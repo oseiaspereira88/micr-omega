@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { MessageRateLimiter } from "../src/RoomDO";
+import {
+  MAX_MESSAGES_PER_CONNECTION,
+  MessageRateLimiter,
+  RATE_LIMIT_WINDOW_MS
+} from "../src/RoomDO";
 
 describe("MessageRateLimiter", () => {
   it("enforces limits within a rolling window and allows consumption once entries expire", () => {
@@ -30,5 +34,21 @@ describe("MessageRateLimiter", () => {
     expect(limiter.consume(601)).toBe(true);
     expect(limiter.getRetryAfterMs(700)).toBe(401);
     expect(limiter.getRetryAfterMs(1_101)).toBe(0);
+  });
+
+  it("allows sustained bursts of at least 20 messages per second", () => {
+    const limiter = new MessageRateLimiter(
+      MAX_MESSAGES_PER_CONNECTION,
+      RATE_LIMIT_WINDOW_MS
+    );
+
+    const allowedMessagesPerSecond = (MAX_MESSAGES_PER_CONNECTION * 1_000) / RATE_LIMIT_WINDOW_MS;
+    expect(allowedMessagesPerSecond).toBeGreaterThanOrEqual(20);
+
+    for (let i = 0; i < MAX_MESSAGES_PER_CONNECTION; i += 1) {
+      expect(limiter.consume(i * (RATE_LIMIT_WINDOW_MS / MAX_MESSAGES_PER_CONNECTION))).toBe(true);
+    }
+
+    expect(limiter.consume(RATE_LIMIT_WINDOW_MS - 1)).toBe(false);
   });
 });
