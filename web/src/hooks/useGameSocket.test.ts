@@ -49,6 +49,14 @@ describe("resolveWebSocketUrl", () => {
     expect(resolveWebSocketUrl()).toBe("ws://192.168.0.10:5173");
   });
 
+  it("wraps IPv6 hosts with brackets when building the URL", () => {
+    vi.stubGlobal("window", {
+      location: { hostname: "::1", protocol: "http:", port: "8787" }
+    } as Window);
+
+    expect(resolveWebSocketUrl()).toBe("ws://[::1]:8787");
+  });
+
   it("falls back to host when window is unavailable", () => {
     vi.stubGlobal("window", undefined as unknown as Window);
     expect(resolveWebSocketUrl()).toBe("");
