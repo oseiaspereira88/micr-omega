@@ -47,7 +47,6 @@ const RESET_DELAY_MS = 10_000;
 const RECONNECT_WINDOW_MS = 30_000;
 const INACTIVE_TIMEOUT_MS = 45_000;
 
-const MAX_SCORE_DELTA = 5_000;
 const MAX_COMBO_MULTIPLIER = 50;
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -1635,36 +1634,11 @@ export class RoomDO {
     const updatedPlayers: PlayerInternal[] = [];
 
     switch (action.type) {
-      case "score": {
-        const amount = clamp(Math.round(action.amount), -MAX_SCORE_DELTA, MAX_SCORE_DELTA);
-        const combo =
-          action.comboMultiplier !== undefined
-            ? clamp(action.comboMultiplier, 1, MAX_COMBO_MULTIPLIER)
-            : player.combo;
-        const delta = amount * combo;
-        if (delta !== 0) {
-          player.score = Math.max(0, player.score + delta);
-        }
-        player.combo = combo;
-        updatedPlayers.push(player);
-        return { updatedPlayers, scoresChanged: delta !== 0 };
-      }
       case "combo": {
         const multiplier = clamp(action.multiplier, 1, MAX_COMBO_MULTIPLIER);
         player.combo = multiplier;
         updatedPlayers.push(player);
         return { updatedPlayers };
-      }
-      case "ability": {
-        const value =
-          action.value !== undefined
-            ? clamp(Math.round(action.value), -MAX_SCORE_DELTA, MAX_SCORE_DELTA)
-            : 0;
-        if (value !== 0) {
-          player.score = Math.max(0, player.score + value);
-        }
-        updatedPlayers.push(player);
-        return { updatedPlayers, scoresChanged: value !== 0 };
       }
       case "movement": {
         const targetPosition = this.clampPosition(cloneVector(action.position));

@@ -13,6 +13,7 @@ test.beforeEach(async ({ page }) => {
     hook.instances = [];
     hook.lastJoin = null;
     hook.lastRanking = null;
+    hook.lastError = null;
     class TestWebSocket extends OriginalWebSocket {
       constructor(url: string | URL, protocols?: string | string[]) {
         super(url, protocols);
@@ -27,6 +28,9 @@ test.beforeEach(async ({ page }) => {
               }
               if (payload.type === "ranking") {
                 hook.lastRanking = payload;
+              }
+              if (payload.type === "error") {
+                hook.lastError = payload;
               }
             }
           } catch (err) {
@@ -56,7 +60,7 @@ test("permite entrar na sala pública e exibe o jogador local no ranking", async
   await expect(page.getByText(playerName)).toBeVisible({ timeout: 15_000 });
 });
 
-test("recebe atualizações de ranking após enviar uma ação de pontuação", async ({ page }) => {
+test("ignora ações de pontuação não autorizadas do cliente", async ({ page }) => {
   await page.goto("/");
 
   const playerName = `E2E-${Date.now()}-score`;
@@ -90,25 +94,21 @@ test("recebe atualizações de ranking após enviar uma ação de pontuação", 
 
   await page.waitForFunction(() => {
     const hook = (window as any).__MICR_OMEGA_E2E__;
-    const join = hook?.lastJoin;
-    const ranking = hook?.lastRanking?.ranking as { playerId: string; score: number }[] | undefined;
-    if (!join?.playerId || !ranking) {
-      return false;
-    }
-    const entry = ranking.find((item) => item.playerId === join.playerId);
-    return Boolean(entry && entry.score >= 360);
+    return hook?.lastError?.reason === "invalid_payload";
   }, null, { timeout: 15_000 });
 
   await expect.poll(async () => {
-    const text = await page.evaluate(() => {
-      const panel = document.querySelector('[aria-label="Ranking da partida"]');
-      if (!panel) {
-        return "";
+    return await page.evaluate(() => {
+      const hook = (window as any).__MICR_OMEGA_E2E__;
+      const join = hook?.lastJoin;
+      const ranking = (hook?.lastRanking?.ranking ?? join?.ranking) as
+        | { playerId: string; score: number }[]
+        | undefined;
+      if (!join?.playerId || !ranking) {
+        return null;
       }
-      const rows = Array.from(panel.querySelectorAll("li"));
-      const localRow = rows.find((row) => row.textContent?.includes("Você"));
-      return localRow?.textContent ?? "";
+      const entry = ranking.find((item) => item.playerId === join.playerId);
+      return entry?.score ?? null;
     });
-    return text;
-  }, { timeout: 15_000 }).toContain("360");
+  }, { timeout: 15_000 }).toBe(0);
 });
