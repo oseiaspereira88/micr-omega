@@ -65,6 +65,21 @@ const createInitialRenderState = () => ({
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
+const MAX_FRAME_DELTA_SECONDS = 0.1;
+const MAX_FRAME_DELTA_MS = MAX_FRAME_DELTA_SECONDS * 1000;
+
+const resolveTimestamp = (timestamp) => {
+  if (typeof timestamp === 'number') {
+    return timestamp;
+  }
+
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    return performance.now();
+  }
+
+  return Date.now();
+};
+
 const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   const audioCtxRef = useRef(null);
   const audioWarningLoggedRef = useRef(false);
@@ -405,11 +420,25 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
 
-    let lastTime = Date.now();
+    let lastTime = null;
 
-    const animate = () => {
-      const now = Date.now();
-      const delta = (now - lastTime) / 1000;
+    const animate = (timestamp) => {
+      const now = resolveTimestamp(timestamp);
+
+      if (lastTime === null) {
+        lastTime = now;
+      }
+
+      let deltaMs = now - lastTime;
+      if (!Number.isFinite(deltaMs) || deltaMs < 0) {
+        deltaMs = 0;
+      }
+
+      const clampedDeltaMs = Math.min(deltaMs, MAX_FRAME_DELTA_MS);
+      const delta = clampedDeltaMs / 1000;
+
+      // Always reset to the current RAF timestamp so we don't accumulate large catch-up steps
+      // when the tab resumes after being paused or throttled.
       lastTime = now;
 
       const canvasWidth = canvas.clientWidth || canvas.width / (window.devicePixelRatio || 1);
@@ -490,7 +519,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
       animationFrameRef.current = requestAnimationFrame(animate);
     };
 
-    animate();
+    animate(resolveTimestamp());
 
     return () => {
       window.removeEventListener('resize', updateCanvasSize);
