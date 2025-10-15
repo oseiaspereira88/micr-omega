@@ -89,4 +89,29 @@ describe("RoomDO player attacks", () => {
     expect(combatLog).toHaveLength(0);
     expect(defender.health.current).toBe(defender.health.max);
   });
+
+  it("ignores resultingHealth values above the recorded max", async () => {
+    const { roomAny } = await createRoom();
+
+    const attacker = createTestPlayer("attacker");
+    const defender = createTestPlayer("defender");
+    roomAny.players.set(attacker.id, attacker);
+    roomAny.players.set(defender.id, defender);
+
+    const result = roomAny.applyPlayerAction(attacker, {
+      type: "attack",
+      targetPlayerId: defender.id,
+      targetObjectId: null,
+      state: "engaged",
+      damage: 10,
+      resultingHealth: {
+        current: attacker.health.max + 25,
+        max: attacker.health.max + 25,
+      },
+    });
+
+    expect(result).not.toBeNull();
+    expect(attacker.health.max).toBe(100);
+    expect(attacker.health.current).toBe(90);
+  });
 });

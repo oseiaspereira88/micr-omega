@@ -1704,9 +1704,26 @@ export class RoomDO {
           lastAttackAt,
         });
 
+        let updatedHealth = false;
         if (action.resultingHealth) {
-          player.health = createHealthState(action.resultingHealth);
-        } else if (typeof action.damage === "number") {
+          const { current, max } = action.resultingHealth;
+          const currentHealthMax = player.health.max;
+          const isCurrentFinite = typeof current === "number" && Number.isFinite(current);
+          const maxMatches = max === undefined || max === currentHealthMax;
+
+          if (isCurrentFinite && maxMatches) {
+            const normalizedCurrent = clamp(current, 0, currentHealthMax);
+            if (normalizedCurrent === current && current <= currentHealthMax) {
+              player.health = {
+                current: normalizedCurrent,
+                max: currentHealthMax,
+              };
+              updatedHealth = true;
+            }
+          }
+        }
+
+        if (!updatedHealth && typeof action.damage === "number") {
           const next = Math.max(0, player.health.current - Math.max(0, action.damage));
           player.health = {
             current: Math.max(0, Math.min(player.health.max, next)),
