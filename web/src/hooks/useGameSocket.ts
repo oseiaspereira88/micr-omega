@@ -165,6 +165,14 @@ export const resolveWebSocketUrl = (explicitUrl?: string) => {
   }
 
   const hostnameParts = hostname.split(".").filter(Boolean);
+  const hasRealtimeLabel = hostnameParts.some(
+    (part) => part.toLowerCase() === "realtime"
+  );
+
+  if (hasRealtimeLabel) {
+    return `${websocketProtocol}//${formatHostnameForWebSocket(hostname)}`;
+  }
+
   let apexDomain = hostname;
 
   if (hostnameParts.length >= 2) {

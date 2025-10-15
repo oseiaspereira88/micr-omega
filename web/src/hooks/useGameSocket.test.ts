@@ -37,6 +37,26 @@ describe("resolveWebSocketUrl", () => {
     expect(resolveWebSocketUrl()).toBe("wss://realtime.example.com");
   });
 
+  it("preserves hosts that already include realtime label", () => {
+    vi.stubGlobal("window", {
+      location: { hostname: "realtime.example.com", protocol: "https:", port: "" }
+    } as Window);
+
+    expect(resolveWebSocketUrl()).toBe("wss://realtime.example.com");
+  });
+
+  it("preserves nested hosts that include realtime label", () => {
+    vi.stubGlobal("window", {
+      location: {
+        hostname: "beta.realtime.example.com",
+        protocol: "https:",
+        port: ""
+      }
+    } as Window);
+
+    expect(resolveWebSocketUrl()).toBe("wss://beta.realtime.example.com");
+  });
+
   it("keeps loopback-style localhost subdomains without realtime prefix", () => {
     vi.stubGlobal("window", {
       location: { hostname: "dev.localhost", protocol: "https:", port: "" }
