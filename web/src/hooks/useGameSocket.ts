@@ -16,6 +16,31 @@ import { gameStore, useGameStore } from "../store/gameStore";
 const DEFAULT_PING_INTERVAL = 15000;
 const DEFAULT_RECONNECT_BASE = 1500;
 const DEFAULT_RECONNECT_MAX = 12000;
+const RECONNECT_JITTER_MIN = 0.5;
+const RECONNECT_JITTER_MAX = 1.5;
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const computeJitterFactor = (randomFn: () => number) => {
+  const raw = clamp(randomFn(), 0, 1);
+  const jitterRange = RECONNECT_JITTER_MAX - RECONNECT_JITTER_MIN;
+  return RECONNECT_JITTER_MIN + raw * jitterRange;
+};
+
+export const computeReconnectDelay = (
+  attempts: number,
+  reconnectBaseDelay: number,
+  reconnectMaxDelay: number,
+  randomFn: () => number = Math.random
+) => {
+  const exponentialDelay = reconnectBaseDelay * Math.pow(2, Math.max(0, attempts - 1));
+  const cappedDelay = Math.min(exponentialDelay, reconnectMaxDelay);
+  const jitterFactor = computeJitterFactor(randomFn);
+  const jitteredDelay = cappedDelay * jitterFactor;
+
+  return Math.min(jitteredDelay, reconnectMaxDelay);
+};
 
 const normalizeRealtimeUrl = (url: string) => url.trim().replace(/\/+$/, "");
 
@@ -508,8 +533,9 @@ export const useGameSocket = (
           if (shouldReconnectRef.current && lastRequestedNameRef.current) {
             const scheduledName = lastRequestedNameRef.current;
             const attempts = gameStore.actions.incrementReconnectAttempts();
-            const delay = Math.min(
-              reconnectBaseDelay * Math.pow(2, Math.max(0, attempts - 1)),
+            const delay = computeReconnectDelay(
+              attempts,
+              reconnectBaseDelay,
               reconnectMaxDelay
             );
 
@@ -534,8 +560,9 @@ export const useGameSocket = (
         console.error("Não foi possível abrir WebSocket", err);
         if (shouldReconnectRef.current) {
           const attempts = gameStore.actions.incrementReconnectAttempts();
-          const delay = Math.min(
-            reconnectBaseDelay * Math.pow(2, Math.max(0, attempts - 1)),
+          const delay = computeReconnectDelay(
+            attempts,
+            reconnectBaseDelay,
             reconnectMaxDelay
           );
 

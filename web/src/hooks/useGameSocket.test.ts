@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ClientMessage } from "../utils/messageTypes";
-import { prepareClientMessagePayload, resolveWebSocketUrl } from "./useGameSocket";
+import {
+  computeReconnectDelay,
+  prepareClientMessagePayload,
+  resolveWebSocketUrl
+} from "./useGameSocket";
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -88,5 +92,26 @@ describe("prepareClientMessagePayload", () => {
 
     expect(payload).toBe(invalidMessage);
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe("computeReconnectDelay", () => {
+  const baseDelay = 1500;
+  const maxDelay = 12000;
+
+  it("applies the minimum jitter factor", () => {
+    const delay = computeReconnectDelay(1, baseDelay, maxDelay, () => 0);
+    expect(delay).toBe(baseDelay * 0.5);
+  });
+
+  it("respects the maximum cap when jitter increases the delay", () => {
+    const delay = computeReconnectDelay(6, baseDelay, maxDelay, () => 1);
+    expect(delay).toBe(maxDelay);
+  });
+
+  it("applies intermediate jitter values deterministically", () => {
+    const delay = computeReconnectDelay(3, baseDelay, maxDelay, () => 0.25);
+    const baseForAttempt = baseDelay * Math.pow(2, 2);
+    expect(delay).toBe(baseForAttempt * 0.75);
   });
 });
