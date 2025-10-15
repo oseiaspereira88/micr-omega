@@ -2455,10 +2455,11 @@ export class RoomDO {
   }
 
   private broadcast(message: ServerMessage, except?: WebSocket): void {
+    const payload = JSON.stringify(message);
     for (const socket of this.clientsBySocket.keys()) {
       if (socket === except) continue;
       if (socket.readyState === WebSocket.OPEN) {
-        this.send(socket, message);
+        this.send(socket, message, payload);
       }
     }
   }
@@ -2491,9 +2492,9 @@ export class RoomDO {
     }
   }
 
-  private send(socket: WebSocket, message: ServerMessage): void {
+  private send(socket: WebSocket, message: ServerMessage, payload?: string): void {
     if (socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(message));
+      socket.send(payload ?? JSON.stringify(message));
     }
   }
 }
