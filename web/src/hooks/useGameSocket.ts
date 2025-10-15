@@ -424,13 +424,13 @@ export const useGameSocket = (
           "";
 
         lastRequestedNameRef.current = normalizedName;
-        gameStore.actions.setConnectionStatus("connected");
-        gameStore.actions.setPlayerId(message.playerId);
-        gameStore.actions.setJoinError(null);
-        gameStore.actions.setReconnectUntil(message.reconnectUntil);
-        gameStore.actions.setPlayerName(normalizedName);
-        gameStore.actions.applyFullState(message.state);
-        gameStore.actions.applyRanking(message.ranking);
+        gameStore.actions.applyJoinedSnapshot({
+          playerId: message.playerId,
+          playerName: normalizedName,
+          reconnectUntil: message.reconnectUntil,
+          state: message.state,
+          ranking: message.ranking,
+        });
         break;
       }
       case "state": {
@@ -499,7 +499,9 @@ export const useGameSocket = (
           isReconnect ? "reconnecting" : "connecting"
         );
         gameStore.actions.setJoinError(null);
-        gameStore.actions.resetGameState();
+        if (!isReconnect) {
+          gameStore.actions.resetGameState();
+        }
         gameStore.actions.setPlayerName(sanitizedName);
 
         socket.onopen = () => {

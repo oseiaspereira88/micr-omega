@@ -203,6 +203,98 @@ describe("gameStore", () => {
     expect(gameStore.getState().remotePlayers.all).toHaveLength(0);
   });
 
+  it("retains previous world data during reconnection until the new joined snapshot arrives", () => {
+    const oldPlayer = createPlayerState({ id: "p-old", name: "Veteran" });
+    const oldWorld = createWorld();
+    oldWorld.microorganisms.push({
+      id: "micro-old",
+      kind: "microorganism" as const,
+      species: "amoeba",
+      position: { x: 2, y: 2 },
+      movementVector: { x: 0, y: 0 },
+      orientation: { angle: 0 },
+      health: { current: 8, max: 10 },
+      aggression: "neutral" as const,
+      attributes: {},
+    });
+
+    const oldState: SharedGameState = {
+      phase: "active",
+      roundId: "round-old",
+      roundStartedAt: 100,
+      roundEndsAt: 200,
+      players: [oldPlayer],
+      world: oldWorld,
+    };
+
+    const oldRanking: RankingEntry[] = [
+      { playerId: "p-old", name: "Veteran", score: 15, combo: 2 },
+    ];
+
+    gameStore.actions.applyFullState(oldState);
+    gameStore.actions.applyRanking(oldRanking);
+    gameStore.actions.setPlayerId("p-old");
+    gameStore.actions.setPlayerName("Veteran");
+    gameStore.actions.setConnectionStatus("connected");
+
+    const beforeReconnect = gameStore.getState();
+    expect(beforeReconnect.connectionStatus).toBe("connected");
+    expect(beforeReconnect.players).toHaveProperty("p-old");
+    expect(beforeReconnect.world.microorganisms).toHaveLength(1);
+
+    gameStore.actions.setConnectionStatus("reconnecting");
+
+    const whileReconnecting = gameStore.getState();
+    expect(whileReconnecting.connectionStatus).toBe("reconnecting");
+    expect(whileReconnecting.players).toHaveProperty("p-old");
+    expect(whileReconnecting.world.microorganisms[0]?.id).toBe("micro-old");
+    expect(whileReconnecting.ranking).toEqual(oldRanking);
+
+    const newPlayer = createPlayerState({ id: "p-new", name: "Rookie", score: 30 });
+    const newWorld = createWorld();
+    newWorld.microorganisms.push({
+      id: "micro-new",
+      kind: "microorganism" as const,
+      species: "paramecium",
+      position: { x: 5, y: 5 },
+      movementVector: { x: 1, y: 1 },
+      orientation: { angle: Math.PI / 2 },
+      health: { current: 6, max: 12 },
+      aggression: "passive" as const,
+      attributes: { speed: 2 },
+    });
+
+    const newState: SharedGameState = {
+      phase: "active",
+      roundId: "round-new",
+      roundStartedAt: 300,
+      roundEndsAt: 600,
+      players: [newPlayer],
+      world: newWorld,
+    };
+
+    const newRanking: RankingEntry[] = [
+      { playerId: "p-new", name: "Rookie", score: 30, combo: 1 },
+    ];
+
+    gameStore.actions.applyJoinedSnapshot({
+      playerId: "p-new",
+      playerName: "Rookie",
+      reconnectUntil: 9999,
+      state: newState,
+      ranking: newRanking,
+    });
+
+    const afterJoined = gameStore.getState();
+    expect(afterJoined.connectionStatus).toBe("connected");
+    expect(afterJoined.players).not.toHaveProperty("p-old");
+    expect(afterJoined.players).toHaveProperty("p-new");
+    expect(afterJoined.world.microorganisms[0]?.id).toBe("micro-new");
+    expect(afterJoined.ranking).toEqual(newRanking);
+    expect(afterJoined.joinError).toBeNull();
+    expect(afterJoined.reconnectAttempts).toBe(0);
+  });
+
   it("clears round metadata when diffs reset values", () => {
     const fullState: SharedGameState = {
       phase: "active",
