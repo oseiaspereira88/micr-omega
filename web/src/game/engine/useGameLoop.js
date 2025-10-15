@@ -10,6 +10,11 @@ import useInputController from '../input/useInputController';
 import { DEFAULT_JOYSTICK_STATE } from '../input/utils';
 import { gameStore } from '../../store/gameStore';
 import { createInitialState } from '../state/initialState';
+import { restartGame as restartGameSystem } from '../systems';
+import { spawnObstacle as createObstacleSpawn } from '../factories/obstacleFactory';
+import { spawnNebula as createNebulaSpawn } from '../factories/nebulaFactory';
+import { spawnPowerUp as createPowerUpSpawn } from '../factories/powerUpFactory';
+import { spawnOrganicMatter as createOrganicMatterBatch } from '../factories/organicMatterFactory';
 
 const DEFAULT_SETTINGS = {
   audioEnabled: true,
@@ -332,6 +337,190 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     initializeBackground();
   }, [initializeBackground]);
 
+  const restartGameHandler = useCallback(() => {
+    const createEntityId = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+
+    const ensureArray = (value) => (Array.isArray(value) ? value : []);
+
+    const syncState = (state) => {
+      if (!state) return;
+
+      const boss = state.boss ?? null;
+      const bossHealth =
+        boss?.health?.current ?? boss?.health ?? state.bossHealth ?? 0;
+      const bossMaxHealth =
+        boss?.health?.max ?? boss?.maxHealth ?? state.bossMaxHealth ?? 0;
+
+      const safeArray = (value) => (Array.isArray(value) ? value : []);
+      const skillList = safeArray(state.skillList);
+      const notifications = safeArray(state.notifications);
+      const activePowerUps = safeArray(state.activePowerUps);
+      const opponents = safeArray(state.enemies ?? state.opponents);
+      const progressionQueue = safeArray(state.progressionQueue);
+      const evolutionMenu =
+        state.evolutionMenu ?? {
+          activeTier: 'small',
+          options: { small: [], medium: [], large: [] },
+        };
+
+      dispatchRef.current?.({
+        type: 'SYNC_STATE',
+        payload: {
+          energy: state.energy ?? 0,
+          health: state.health ?? 0,
+          maxHealth: state.maxHealth ?? state.health ?? 0,
+          level: state.level ?? 1,
+          score: state.score ?? 0,
+          dashCharge: state.dashCharge ?? 100,
+          canEvolve: Boolean(state.canEvolve),
+          showEvolutionChoice: Boolean(state.showEvolutionChoice),
+          archetypeSelection: state.archetypeSelection ?? {
+            pending: true,
+            options: [],
+          },
+          selectedArchetype: state.selectedArchetype ?? null,
+          showMenu: Boolean(state.showMenu),
+          gameOver: Boolean(state.gameOver),
+          combo: state.combo ?? 0,
+          maxCombo: state.maxCombo ?? 0,
+          activePowerUps,
+          bossActive: Boolean(boss),
+          bossHealth,
+          bossMaxHealth,
+          currentSkill: state.currentSkill ?? null,
+          skillList,
+          hasMultipleSkills:
+            typeof state.hasMultipleSkills === 'boolean'
+              ? state.hasMultipleSkills
+              : skillList.length > 1,
+          notifications,
+          evolutionMenu,
+          currentForm: state.currentForm ?? null,
+          evolutionType: state.evolutionType ?? null,
+          cameraZoom: state.camera?.zoom ?? state.cameraZoom ?? 1,
+          opponents,
+          resources: state.resources ?? null,
+          xp: state.xp ?? null,
+          characteristicPoints: state.characteristicPoints ?? null,
+          geneticMaterial: state.geneticMaterial ?? null,
+          geneFragments: state.geneFragments ?? null,
+          stableGenes: state.stableGenes ?? null,
+          evolutionSlots: state.evolutionSlots ?? null,
+          reroll: state.reroll ?? null,
+          dropPity: state.dropPity ?? null,
+          progressionQueue,
+          recentRewards: state.recentRewards ?? null,
+          evolutionContext: state.evolutionContext ?? null,
+          element: state.element ?? null,
+          affinity: state.affinity ?? null,
+          elementLabel: state.elementLabel ?? null,
+          affinityLabel: state.affinityLabel ?? null,
+          resistances: state.resistances ?? null,
+        },
+      });
+    };
+
+    const resetControls = () => {
+      movementIntentRef.current = { ...DEFAULT_JOYSTICK_STATE };
+      actionBufferRef.current = { attacks: [] };
+      renderStateRef.current.pendingInputs = { movement: null, attacks: [] };
+      renderStateRef.current.lastMovementIntent = { ...DEFAULT_JOYSTICK_STATE };
+    };
+
+    const spawnObstacle = (state) => {
+      if (!state) return;
+      const obstacle = createObstacleSpawn({ worldSize: state.worldSize ?? 4000 });
+      if (!obstacle) return;
+
+      const normalized = {
+        ...obstacle,
+        id: obstacle.id ?? createEntityId('obstacle'),
+        position: {
+          x: obstacle.x ?? obstacle.position?.x ?? 0,
+          y: obstacle.y ?? obstacle.position?.y ?? 0,
+        },
+        size: {
+          x: obstacle.size ?? obstacle.size?.x ?? 60,
+          y: obstacle.size ?? obstacle.size?.y ?? 60,
+        },
+        orientation: {
+          angle: obstacle.rotation ?? obstacle.orientation?.angle ?? 0,
+        },
+        impassable: obstacle.impassable ?? true,
+      };
+
+      state.obstacles = [...ensureArray(state.obstacles), normalized];
+    };
+
+    const spawnNebula = (state) => {
+      if (!state) return;
+      const nebula = createNebulaSpawn({ worldSize: state.worldSize ?? 4000 });
+      if (!nebula) return;
+
+      state.nebulas = [...ensureArray(state.nebulas), nebula];
+    };
+
+    const spawnPowerUp = (state) => {
+      if (!state) return;
+      const powerUp = createPowerUpSpawn({ worldSize: state.worldSize ?? 4000 });
+      if (!powerUp) return;
+
+      const normalized = {
+        ...powerUp,
+        position: {
+          x: powerUp.x ?? powerUp.position?.x ?? 0,
+          y: powerUp.y ?? powerUp.position?.y ?? 0,
+        },
+      };
+
+      state.powerUps = [...ensureArray(state.powerUps), normalized];
+    };
+
+    const spawnOrganicMatter = (state) => {
+      if (!state) return;
+      const batch = createOrganicMatterBatch({
+        count: Math.max(6, Math.round(10 * densityScale)),
+        worldSize: state.worldSize ?? 4000,
+      });
+      if (!batch?.length) return;
+
+      const normalized = batch.map((item) => ({
+        ...item,
+        id: item.id ?? createEntityId('organic'),
+        position: {
+          x: item.x ?? item.position?.x ?? 0,
+          y: item.y ?? item.position?.y ?? 0,
+        },
+        quantity:
+          Number.isFinite(item.quantity)
+            ? item.quantity
+            : Math.max(1, Math.round(item.energy ?? item.health ?? 0)),
+      }));
+
+      state.organicMatter = [...ensureArray(state.organicMatter), ...normalized];
+    };
+
+    renderStateRef.current = createInitialRenderState();
+    initializeBackground();
+    resetControls();
+
+    restartGameSystem(renderStateRef.current, {
+      createEffect,
+      createParticle,
+      syncState,
+      resetControls,
+      spawnObstacle,
+      spawnNebula,
+      spawnPowerUp,
+      spawnOrganicMatter,
+      createInitialState,
+    });
+
+    renderStateRef.current.hudSnapshot = null;
+  }, [createEffect, createParticle, densityScale, initializeBackground]);
+
   useEffect(() => {
     if (!resolvedSettings.audioEnabled) {
       if (audioCtxRef.current && typeof audioCtxRef.current.close === 'function') {
@@ -534,7 +723,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     joystick,
     inputActions,
     chooseEvolution: () => {},
-    restartGame: () => {},
+    restartGame: restartGameHandler,
     selectArchetype,
     setCameraZoom,
   };

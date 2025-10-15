@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
     })),
     renderFrame: vi.fn(() => null),
     soundEffectsFactory: vi.fn(() => ({ playSound: vi.fn() })),
+    restartGame: vi.fn(),
     gameStoreState: {},
     gameStoreListeners: listeners,
   };
@@ -30,6 +31,10 @@ vi.mock('../render/renderFrame', () => ({
 
 vi.mock('../audio/soundEffects', () => ({
   createSoundEffects: (...args) => mocks.soundEffectsFactory(...args),
+}));
+
+vi.mock('../systems', () => ({
+  restartGame: (...args) => mocks.restartGame(...args),
 }));
 
 vi.mock('../../store/gameStore', () => ({
