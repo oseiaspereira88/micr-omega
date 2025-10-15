@@ -19,6 +19,7 @@ const HudBar = ({
   combo,
   maxCombo,
   activePowerUps = [],
+  statusEffects = [],
   xp,
   geneticMaterial,
   characteristicPoints,
