@@ -8,6 +8,7 @@ import CameraControls from './CameraControls';
 import styles from './GameHud.module.css';
 import RankingPanel from '../../components/RankingPanel';
 import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
+import { useGameStore } from '../../store/gameStore';
 
 const GameHud = ({
   level,
@@ -57,6 +58,9 @@ const GameHud = ({
   onQuit,
   opponents = [],
 }) => {
+  const connectionStatus = useGameStore((state) => state.connectionStatus);
+  const joinError = useGameStore((state) => state.joinError);
+
   const currentSkill = skillData?.currentSkill ?? null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -90,6 +94,29 @@ const GameHud = ({
 
   const hasOpponents = opponentSummaries.length > 0;
 
+  const statusMessages = useMemo(
+    () => ({
+      idle: 'Preparando conexão ao servidor…',
+      connecting: 'Conectando ao servidor…',
+      reconnecting: 'Reconectando ao servidor…',
+      disconnected: 'Conexão perdida. Tentando reconectar…',
+    }),
+    [],
+  );
+
+  const statusHints = useMemo(
+    () => ({
+      connecting: 'Isso pode levar alguns instantes.',
+      reconnecting: 'Segure firme enquanto restabelecemos a conexão.',
+      disconnected: 'Verifique sua rede ou tente novamente em instantes.',
+    }),
+    [],
+  );
+
+  const showStatusOverlay = connectionStatus !== 'connected';
+  const statusTitle = statusMessages[connectionStatus] ?? 'Problemas de conexão';
+  const statusHint = statusHints[connectionStatus];
+
   return (
     <>
       <button
@@ -102,6 +129,28 @@ const GameHud = ({
       </button>
 
       <div className={styles.hud}>
+        <div
+          className={`${styles.canvasOverlay} ${
+            showStatusOverlay ? styles.canvasOverlayVisible : ''
+          }`}
+          role="status"
+          aria-live="polite"
+          aria-label="Estado da conexão do jogo"
+          aria-hidden={showStatusOverlay ? undefined : true}
+        >
+          {showStatusOverlay ? (
+            <div className={styles.canvasOverlayContent}>
+              <h2 className={styles.canvasOverlayTitle}>{statusTitle}</h2>
+              {joinError ? (
+                <p className={styles.canvasOverlayMessage}>{joinError}</p>
+              ) : null}
+              {statusHint ? (
+                <p className={styles.canvasOverlayHint}>{statusHint}</p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
         <div
           className={`${styles.sidebar} ${
             isSidebarOpen ? styles.sidebarOpen : styles.sidebarClosed
