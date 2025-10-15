@@ -723,11 +723,12 @@ const buildHudSnapshot = (
   camera,
   previousHud = {}
 ) => {
+  const safePreviousHud = previousHud ?? {};
   const resourceBag = localPlayer?.resources || {};
 
   const xp = mergeNumericRecord(
     DEFAULT_RESOURCE_STUB,
-    previousHud?.xp,
+    safePreviousHud?.xp,
     resourceBag.xp,
     localPlayer?.xp
   );
@@ -738,68 +739,68 @@ const buildHudSnapshot = (
 
   const geneticMaterial = mergeNumericRecord(
     { current: 0, total: 0, bonus: 0 },
-    previousHud?.geneticMaterial,
+    safePreviousHud?.geneticMaterial,
     resourceBag.geneticMaterial
   );
 
   const characteristicPointsSource =
-    resourceBag.characteristicPoints ?? previousHud.characteristicPoints ?? {};
+    resourceBag.characteristicPoints ?? safePreviousHud?.characteristicPoints ?? {};
   const characteristicPoints = {
     total: safeNumber(characteristicPointsSource.total, 0),
     available: safeNumber(characteristicPointsSource.available, 0),
     spent: safeNumber(characteristicPointsSource.spent, 0),
     perLevel: Array.isArray(resourceBag.characteristicPoints?.perLevel)
       ? [...resourceBag.characteristicPoints.perLevel]
-      : Array.isArray(previousHud.characteristicPoints?.perLevel)
-      ? [...previousHud.characteristicPoints.perLevel]
+      : Array.isArray(safePreviousHud?.characteristicPoints?.perLevel)
+      ? [...safePreviousHud.characteristicPoints.perLevel]
       : [],
   };
 
   const evolutionSlots = mergeEvolutionSlots(
-    previousHud.evolutionSlots,
+    safePreviousHud.evolutionSlots,
     resourceBag.evolutionSlots,
     localPlayer?.evolutionSlots
   );
 
   const reroll = mergeNumericRecord(
     { baseCost: 25, cost: 25, count: 0, pity: 0 },
-    previousHud.reroll,
+    safePreviousHud.reroll,
     resourceBag.reroll
   );
 
   const dropPity = mergeNumericRecord(
     { fragment: 0, stableGene: 0 },
-    previousHud.dropPity,
+    safePreviousHud.dropPity,
     resourceBag.dropPity
   );
 
   const geneFragments = mergeNumericRecord(
     { minor: 0, major: 0, apex: 0 },
-    previousHud.geneFragments,
+    safePreviousHud.geneFragments,
     resourceBag.geneFragments,
     localPlayer?.geneFragments
   );
 
   const stableGenes = mergeNumericRecord(
     { minor: 0, major: 0, apex: 0 },
-    previousHud.stableGenes,
+    safePreviousHud.stableGenes,
     resourceBag.stableGenes,
     localPlayer?.stableGenes
   );
 
   const element =
-    localPlayer?.element ?? previousHud.element ?? ELEMENT_TYPES.BIO;
+    localPlayer?.element ?? safePreviousHud.element ?? ELEMENT_TYPES.BIO;
   const affinity =
-    localPlayer?.affinity ?? previousHud.affinity ?? AFFINITY_TYPES.NEUTRAL;
+    localPlayer?.affinity ?? safePreviousHud.affinity ?? AFFINITY_TYPES.NEUTRAL;
   const resistances = createResistanceSnapshot(
-    localPlayer?.resistances ?? previousHud.resistances ?? {}
+    localPlayer?.resistances ?? safePreviousHud.resistances ?? {}
   );
   const statusEffects = Array.isArray(localPlayer?.statusEffects)
     ? localPlayer.statusEffects.map((effect) =>
         typeof effect === 'object' ? { ...effect } : effect
       )
-    : Array.isArray(previousHud.statusEffects)
-    ? previousHud.statusEffects.map((effect) =>
+    : Array.isArray(safePreviousHud.statusEffects)
+    ? safePreviousHud.statusEffects.map((effect) =>
         typeof effect === 'object' ? { ...effect } : effect
       )
     : [];
@@ -829,28 +830,28 @@ const buildHudSnapshot = (
 
   const energy = safeNumber(
     resourceBag.energy ?? localPlayer?.energy,
-    safeNumber(previousHud.energy, 0)
+    safeNumber(safePreviousHud.energy, 0)
   );
   const dashCharge = safeNumber(
     resourceBag.dashCharge ?? localPlayer?.dashCharge,
-    safeNumber(previousHud.dashCharge, 100)
+    safeNumber(safePreviousHud.dashCharge, 100)
   );
   const score = safeNumber(
     localPlayer?.score,
-    safeNumber(previousHud.score, 0)
+    safeNumber(safePreviousHud.score, 0)
   );
   const currentCombo = Number.isFinite(localPlayer?.combo)
     ? Math.max(0, localPlayer.combo)
-    : Math.max(0, previousHud.combo ?? 0);
+    : Math.max(0, safePreviousHud.combo ?? 0);
   const maxCombo = Math.max(
-    Number.isFinite(previousHud.maxCombo) ? previousHud.maxCombo : currentCombo,
+    Number.isFinite(safePreviousHud.maxCombo) ? safePreviousHud.maxCombo : currentCombo,
     currentCombo
   );
 
   const activePowerUpsSource = Array.isArray(localPlayer?.activePowerUps)
     ? localPlayer.activePowerUps
-    : Array.isArray(previousHud.activePowerUps)
-    ? previousHud.activePowerUps
+    : Array.isArray(safePreviousHud.activePowerUps)
+    ? safePreviousHud.activePowerUps
     : [];
   const activePowerUps = activePowerUpsSource.map((powerUp) =>
     typeof powerUp === 'object' ? { ...powerUp } : powerUp
@@ -858,8 +859,8 @@ const buildHudSnapshot = (
 
   const skillListSource = Array.isArray(localPlayer?.skillList)
     ? localPlayer.skillList
-    : Array.isArray(previousHud.skillList)
-    ? previousHud.skillList
+    : Array.isArray(safePreviousHud.skillList)
+    ? safePreviousHud.skillList
     : [];
   const skillList = skillListSource.map((skill) =>
     typeof skill === 'object' ? { ...skill } : skill
@@ -868,34 +869,34 @@ const buildHudSnapshot = (
   const hasMultipleSkills =
     typeof localPlayer?.hasMultipleSkills === 'boolean'
       ? localPlayer.hasMultipleSkills
-      : Boolean(previousHud.hasMultipleSkills);
+      : Boolean(safePreviousHud.hasMultipleSkills);
   const currentSkill =
-    localPlayer?.currentSkill ?? previousHud.currentSkill ?? null;
+    localPlayer?.currentSkill ?? safePreviousHud.currentSkill ?? null;
 
   const bossActive =
     typeof localPlayer?.bossActive === 'boolean'
       ? localPlayer.bossActive
-      : typeof previousHud.bossActive === 'boolean'
-      ? previousHud.bossActive
+      : typeof safePreviousHud.bossActive === 'boolean'
+      ? safePreviousHud.bossActive
       : false;
   const bossHealth = safeNumber(
     localPlayer?.bossHealth,
-    safeNumber(previousHud.bossHealth, 0)
+    safeNumber(safePreviousHud.bossHealth, 0)
   );
   const bossMaxHealth = safeNumber(
     localPlayer?.bossMaxHealth,
-    safeNumber(previousHud.bossMaxHealth, bossHealth || 0)
+    safeNumber(safePreviousHud.bossMaxHealth, bossHealth || 0)
   );
 
   const evolutionMenuSource =
     localPlayer?.evolutionMenu ??
     resourceBag.evolutionMenu ??
-    previousHud.evolutionMenu ?? {
+    safePreviousHud.evolutionMenu ?? {
       activeTier: 'small',
       options: { small: [], medium: [], large: [] },
     };
   const previousEvolutionMenu =
-    previousHud.evolutionMenu ?? evolutionMenuSource ?? {};
+    safePreviousHud.evolutionMenu ?? evolutionMenuSource ?? {};
   const evolutionMenu = {
     activeTier:
       evolutionMenuSource.activeTier ?? previousEvolutionMenu.activeTier ?? 'small',
@@ -919,49 +920,49 @@ const buildHudSnapshot = (
   };
 
   const currentForm =
-    localPlayer?.currentForm ?? previousHud.currentForm ?? null;
+    localPlayer?.currentForm ?? safePreviousHud.currentForm ?? null;
   const evolutionType =
-    localPlayer?.evolutionType ?? previousHud.evolutionType ?? null;
+    localPlayer?.evolutionType ?? safePreviousHud.evolutionType ?? null;
   const showEvolutionChoice =
     typeof localPlayer?.showEvolutionChoice === 'boolean'
       ? localPlayer.showEvolutionChoice
-      : typeof previousHud.showEvolutionChoice === 'boolean'
-      ? previousHud.showEvolutionChoice
+      : typeof safePreviousHud.showEvolutionChoice === 'boolean'
+      ? safePreviousHud.showEvolutionChoice
       : false;
   const showMenu =
     typeof localPlayer?.showMenu === 'boolean'
       ? localPlayer.showMenu
-      : typeof previousHud.showMenu === 'boolean'
-      ? previousHud.showMenu
+      : typeof safePreviousHud.showMenu === 'boolean'
+      ? safePreviousHud.showMenu
       : false;
   const gameOver =
     typeof localPlayer?.gameOver === 'boolean'
       ? localPlayer.gameOver
-      : typeof previousHud.gameOver === 'boolean'
-      ? previousHud.gameOver
+      : typeof safePreviousHud.gameOver === 'boolean'
+      ? safePreviousHud.gameOver
       : false;
 
   const cameraZoom = safeNumber(
     camera?.zoom,
-    safeNumber(previousHud.cameraZoom, 1)
+    safeNumber(safePreviousHud.cameraZoom, 1)
   );
 
-  const recentRewards = previousHud.recentRewards
-    ? { ...previousHud.recentRewards }
+  const recentRewards = safePreviousHud.recentRewards
+    ? { ...safePreviousHud.recentRewards }
     : { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 };
 
   const healthCurrent = safeNumber(
     localPlayer?.health?.current,
-    safeNumber(previousHud.health, 0)
+    safeNumber(safePreviousHud.health, 0)
   );
   const healthMax = safeNumber(
     localPlayer?.health?.max,
-    safeNumber(previousHud.maxHealth, 1)
+    safeNumber(safePreviousHud.maxHealth, 1)
   );
 
   const level = safeNumber(
     resourceBag.level ?? localPlayer?.level ?? xp.level,
-    safeNumber(previousHud.level, xp.level)
+    safeNumber(safePreviousHud.level, xp.level)
   );
 
   const snapshot = {
@@ -1006,17 +1007,17 @@ const buildHudSnapshot = (
     affinityLabel: AFFINITY_LABELS[affinity] ?? affinity,
   };
 
-  if (previousHud.archetypeSelection) {
+  if (safePreviousHud.archetypeSelection) {
     snapshot.archetypeSelection = {
-      ...previousHud.archetypeSelection,
-      options: previousHud.archetypeSelection.options
-        ? { ...previousHud.archetypeSelection.options }
-        : previousHud.archetypeSelection.options,
+      ...safePreviousHud.archetypeSelection,
+      options: safePreviousHud.archetypeSelection.options
+        ? { ...safePreviousHud.archetypeSelection.options }
+        : safePreviousHud.archetypeSelection.options,
     };
   }
 
-  if (previousHud.selectedArchetype) {
-    snapshot.selectedArchetype = previousHud.selectedArchetype;
+  if (safePreviousHud.selectedArchetype) {
+    snapshot.selectedArchetype = safePreviousHud.selectedArchetype;
   }
 
   return snapshot;
