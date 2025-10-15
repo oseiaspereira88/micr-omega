@@ -1648,12 +1648,15 @@ export class RoomDO {
       this.markRankingDirty();
     }
 
+    const sharedState = this.serializeGameState();
+    const ranking = this.getRanking();
+
     const joinedMessage: JoinedMessage = {
       type: "joined",
       playerId: player.id,
       reconnectUntil,
-      state: this.serializeGameState(),
-      ranking: this.getRanking()
+      state: sharedState,
+      ranking
     };
 
     this.send(socket, joinedMessage);
@@ -1662,14 +1665,14 @@ export class RoomDO {
       type: "player_joined",
       playerId: player.id,
       name: player.name,
-      state: this.serializeGameState()
+      state: sharedState
     };
 
     this.broadcast(joinBroadcast, socket);
 
     const rankingMessage: RankingMessage = {
       type: "ranking",
-      ranking: this.getRanking()
+      ranking
     };
 
     this.broadcast(rankingMessage, socket);
@@ -2274,20 +2277,23 @@ export class RoomDO {
     await this.persistAndSyncAlarms();
     this.invalidateGameStateSnapshot();
 
+    const serializedState = this.serializeGameState();
+    const ranking = this.getRanking();
+
     const stateMessage: StateFullMessage = {
       type: "state",
       mode: "full",
-      state: this.serializeGameState()
+      state: serializedState
     };
 
     const rankingMessage: RankingMessage = {
       type: "ranking",
-      ranking: this.getRanking()
+      ranking
     };
 
     const resetMessage: ResetMessage = {
       type: "reset",
-      state: this.serializeGameState()
+      state: serializedState
     };
 
     this.broadcast(stateMessage);
