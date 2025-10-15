@@ -38,6 +38,18 @@ type WorldCollections = {
   roomObjects: EntityCollection<RoomObject>;
 };
 
+type DerivedSynchronizedState = Pick<
+  GameStoreState,
+  | "room"
+  | "players"
+  | "remotePlayers"
+  | "microorganisms"
+  | "organicMatter"
+  | "obstacles"
+  | "roomObjects"
+  | "world"
+>;
+
 const createEmptyEntityCollection = <T extends { id: string }>(): EntityCollection<T> => ({
   byId: {},
   all: [],
@@ -178,6 +190,37 @@ const buildWorldFromCollections = (collections: WorldCollections): SharedWorldSt
   obstacles: collections.obstacles.all,
   roomObjects: collections.roomObjects.all,
 });
+
+const deriveSynchronizedStateFromFullSnapshot = (
+  state: SharedGameState,
+): DerivedSynchronizedState => {
+  const remotePlayers = createEntityCollectionFromArray(state.players, clonePlayer);
+  const worldCollections: WorldCollections = {
+    microorganisms: createEntityCollectionFromArray(
+      state.world.microorganisms,
+      cloneMicroorganism,
+    ),
+    organicMatter: createEntityCollectionFromArray(state.world.organicMatter, cloneOrganicMatter),
+    obstacles: createEntityCollectionFromArray(state.world.obstacles, cloneObstacle),
+    roomObjects: createEntityCollectionFromArray(state.world.roomObjects, cloneRoomObject),
+  };
+
+  return {
+    room: {
+      phase: state.phase,
+      roundId: state.roundId,
+      roundStartedAt: state.roundStartedAt,
+      roundEndsAt: state.roundEndsAt,
+    },
+    players: remotePlayers.byId,
+    remotePlayers,
+    microorganisms: worldCollections.microorganisms,
+    organicMatter: worldCollections.organicMatter,
+    obstacles: worldCollections.obstacles,
+    roomObjects: worldCollections.roomObjects,
+    world: buildWorldFromCollections(worldCollections),
+  };
+};
 
 export interface RoomStateSnapshot {
   phase: GamePhase;
@@ -479,35 +522,11 @@ const setReconnectUntil = (timestamp: number | null) => {
 };
 
 const applyFullState = (state: SharedGameState) => {
-  applyState((prev) => {
-    const remotePlayers = createEntityCollectionFromArray(state.players, clonePlayer);
-    const worldCollections: WorldCollections = {
-      microorganisms: createEntityCollectionFromArray(
-        state.world.microorganisms,
-        cloneMicroorganism,
-      ),
-      organicMatter: createEntityCollectionFromArray(state.world.organicMatter, cloneOrganicMatter),
-      obstacles: createEntityCollectionFromArray(state.world.obstacles, cloneObstacle),
-      roomObjects: createEntityCollectionFromArray(state.world.roomObjects, cloneRoomObject),
-    };
-
-    return {
-      ...prev,
-      room: {
-        phase: state.phase,
-        roundId: state.roundId,
-        roundStartedAt: state.roundStartedAt,
-        roundEndsAt: state.roundEndsAt,
-      },
-      players: remotePlayers.byId,
-      remotePlayers,
-      microorganisms: worldCollections.microorganisms,
-      organicMatter: worldCollections.organicMatter,
-      obstacles: worldCollections.obstacles,
-      roomObjects: worldCollections.roomObjects,
-      world: buildWorldFromCollections(worldCollections),
-    };
-  });
+  const derived = deriveSynchronizedStateFromFullSnapshot(state);
+  applyState((prev) => ({
+    ...prev,
+    ...derived,
+  }));
 };
 
 const applyStateDiff = (diff: SharedGameStateDiff) => {
@@ -668,6 +687,34 @@ const resetGameState = () => {
   });
 };
 
+const applyJoinedSnapshot = ({
+  playerId,
+  playerName,
+  reconnectUntil,
+  state,
+  ranking,
+}: {
+  playerId: string;
+  playerName: string;
+  reconnectUntil: number | null;
+  state: SharedGameState;
+  ranking: RankingEntry[];
+}) => {
+  const derived = deriveSynchronizedStateFromFullSnapshot(state);
+  applyState(() => ({
+    connectionStatus: "connected",
+    reconnectAttempts: 0,
+    reconnectUntil,
+    playerId,
+    playerName,
+    joinError: null,
+    lastPingAt: null,
+    lastPongAt: null,
+    ranking,
+    ...derived,
+  }));
+};
+
 export const gameStore = {
   getState: () => currentState,
   subscribe: (listener: GameStoreListener) => {
@@ -696,6 +743,7 @@ export const gameStore = {
     markPing,
     markPong,
     resetGameState,
+    applyJoinedSnapshot,
   },
 };
 
