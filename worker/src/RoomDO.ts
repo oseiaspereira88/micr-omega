@@ -65,6 +65,8 @@ const PLAYER_COLLECT_RADIUS = 60;
 const PLAYER_ATTACK_RANGE_BUFFER = 4;
 const OBSTACLE_PADDING = 12;
 
+const ORGANIC_MATTER_CELL_SIZE = PLAYER_COLLECT_RADIUS;
+
 const CLIENT_TIME_MAX_FUTURE_DRIFT_MS = 2_000;
 
 const WORLD_BOUNDS = {
@@ -431,6 +433,9 @@ export class RoomDO {
   private world: SharedWorldState = createInitialWorldState();
   private microorganisms = new Map<string, Microorganism>();
   private organicMatter = new Map<string, OrganicMatter>();
+  private organicMatterCells = new Map<string, Set<string>>();
+  private organicMatterCellById = new Map<string, string>();
+  private organicMatterOrder = new Map<string, number>();
   private obstacles = new Map<string, Obstacle>();
   private microorganismBehavior = new Map<string, { lastAttackAt: number }>();
   private lastWorldTickAt: number | null = null;
@@ -684,13 +689,110 @@ export class RoomDO {
 
   private rebuildWorldCaches(): void {
     this.microorganisms = new Map(this.world.microorganisms.map((entity) => [entity.id, entity]));
-    this.organicMatter = new Map(this.world.organicMatter.map((matter) => [matter.id, matter]));
+    this.organicMatter = new Map();
+    this.organicMatterCells = new Map();
+    this.organicMatterCellById = new Map();
+    this.organicMatterOrder = new Map();
     this.obstacles = new Map(this.world.obstacles.map((obstacle) => [obstacle.id, obstacle]));
+
+    this.world.organicMatter.forEach((matter, index) => {
+      this.organicMatter.set(matter.id, matter);
+      this.organicMatterOrder.set(matter.id, index);
+      this.addOrganicMatterToIndex(matter);
+    });
     const now = Date.now();
     this.microorganismBehavior.clear();
     for (const microorganism of this.microorganisms.values()) {
       this.microorganismBehavior.set(microorganism.id, { lastAttackAt: now });
     }
+  }
+
+  private getOrganicMatterCellKeyFromCoordinates(cellX: number, cellY: number): string {
+    return `${cellX}:${cellY}`;
+  }
+
+  private getOrganicMatterCellKey(position: Vector2): string {
+    const cellSize = Math.max(1, ORGANIC_MATTER_CELL_SIZE);
+    const cellX = Math.floor(position.x / cellSize);
+    const cellY = Math.floor(position.y / cellSize);
+    return this.getOrganicMatterCellKeyFromCoordinates(cellX, cellY);
+  }
+
+  private getOrganicMatterCellKeysForRadius(position: Vector2, radius: number): string[] {
+    const cellSize = Math.max(1, ORGANIC_MATTER_CELL_SIZE);
+    const minCellX = Math.floor((position.x - radius) / cellSize);
+    const maxCellX = Math.floor((position.x + radius) / cellSize);
+    const minCellY = Math.floor((position.y - radius) / cellSize);
+    const maxCellY = Math.floor((position.y + radius) / cellSize);
+
+    const keys: string[] = [];
+    for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+      for (let cellY = minCellY; cellY <= maxCellY; cellY++) {
+        keys.push(this.getOrganicMatterCellKeyFromCoordinates(cellX, cellY));
+      }
+    }
+    return keys;
+  }
+
+  private addOrganicMatterToIndex(matter: OrganicMatter): void {
+    const key = this.getOrganicMatterCellKey(matter.position);
+    let bucket = this.organicMatterCells.get(key);
+    if (!bucket) {
+      bucket = new Set<string>();
+      this.organicMatterCells.set(key, bucket);
+    }
+    bucket.add(matter.id);
+    this.organicMatterCellById.set(matter.id, key);
+  }
+
+  private removeOrganicMatterFromIndex(id: string): void {
+    const key = this.organicMatterCellById.get(id);
+    if (!key) {
+      return;
+    }
+    const bucket = this.organicMatterCells.get(key);
+    if (bucket) {
+      bucket.delete(id);
+      if (bucket.size === 0) {
+        this.organicMatterCells.delete(key);
+      }
+    }
+    this.organicMatterCellById.delete(id);
+  }
+
+  private addOrganicMatterEntity(matter: OrganicMatter): void {
+    const index = this.world.organicMatter.length;
+    this.world.organicMatter.push(matter);
+    this.organicMatter.set(matter.id, matter);
+    this.organicMatterOrder.set(matter.id, index);
+    this.addOrganicMatterToIndex(matter);
+  }
+
+  private removeOrganicMatterEntity(id: string): OrganicMatter | undefined {
+    const matter = this.organicMatter.get(id);
+    if (!matter) {
+      return undefined;
+    }
+    this.organicMatter.delete(id);
+    this.removeOrganicMatterFromIndex(id);
+
+    const index = this.organicMatterOrder.get(id);
+    this.organicMatterOrder.delete(id);
+    if (index !== undefined) {
+      const lastIndex = this.world.organicMatter.length - 1;
+      if (lastIndex >= 0) {
+        const lastMatter = this.world.organicMatter[lastIndex];
+        if (lastMatter) {
+          if (index !== lastIndex) {
+            this.world.organicMatter[index] = lastMatter;
+            this.organicMatterOrder.set(lastMatter.id, index);
+          }
+          this.world.organicMatter.pop();
+        }
+      }
+    }
+
+    return matter;
   }
 
   private markAlarmsDirty(options: { persistent?: boolean } = {}): void {
@@ -913,10 +1015,28 @@ export class RoomDO {
   ): { playerUpdated: boolean; worldChanged: boolean; scoresChanged: boolean } {
     const collectedEntries: { id: string; matter: OrganicMatter }[] = [];
     const collectRadiusSquared = PLAYER_COLLECT_RADIUS ** 2;
-    for (const [id, matter] of this.organicMatter.entries()) {
-      const distanceSquared = this.distanceSquared(player.position, matter.position);
-      if (distanceSquared <= collectRadiusSquared) {
-        collectedEntries.push({ id, matter });
+    const neighborCells = this.getOrganicMatterCellKeysForRadius(
+      player.position,
+      PLAYER_COLLECT_RADIUS,
+    );
+    const seenIds = new Set<string>();
+    for (const cellKey of neighborCells) {
+      const bucket = this.organicMatterCells.get(cellKey);
+      if (!bucket) {
+        continue;
+      }
+      for (const id of bucket) {
+        if (!seenIds.add(id)) {
+          continue;
+        }
+        const matter = this.organicMatter.get(id);
+        if (!matter) {
+          continue;
+        }
+        const distanceSquared = this.distanceSquared(player.position, matter.position);
+        if (distanceSquared <= collectRadiusSquared) {
+          collectedEntries.push({ id, matter });
+        }
       }
     }
 
@@ -924,11 +1044,9 @@ export class RoomDO {
       return { playerUpdated: false, worldChanged: false, scoresChanged: false };
     }
 
-    const idSet = new Set(collectedEntries.map((entry) => entry.id));
     for (const { id } of collectedEntries) {
-      this.organicMatter.delete(id);
+      this.removeOrganicMatterEntity(id);
     }
-    this.world.organicMatter = this.world.organicMatter.filter((matter) => !idSet.has(matter.id));
 
     const removedIds = collectedEntries.map((entry) => entry.id);
     worldDiff.removeOrganicMatterIds = [
@@ -1094,8 +1212,7 @@ export class RoomDO {
           quantity: Math.max(5, Math.round(microorganism.health.max / 2)),
           nutrients: { residue: microorganism.health.max },
         };
-        this.organicMatter.set(remains.id, remains);
-        this.world.organicMatter.push(remains);
+        this.addOrganicMatterEntity(remains);
         worldDiff.upsertOrganicMatter = [
           ...(worldDiff.upsertOrganicMatter ?? []),
           cloneOrganicMatter(remains),
