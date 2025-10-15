@@ -199,6 +199,7 @@ const GameCanvas = ({ settings, onQuit }) => {
         elementLabel={gameState.elementLabel}
         affinityLabel={gameState.affinityLabel}
         resistances={gameState.resistances}
+        statusEffects={gameState.statusEffects ?? []}
         skillData={skillData}
         notifications={gameState.notifications}
         joystick={joystick}

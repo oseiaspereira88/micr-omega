@@ -36,6 +36,7 @@ const GameHud = ({
   elementLabel,
   affinityLabel,
   resistances,
+  statusEffects = [],
   skillData,
   notifications,
   joystick,
@@ -151,7 +152,7 @@ const GameHud = ({
             elementLabel={elementLabel}
             affinityLabel={affinityLabel}
             resistances={resistances}
-            statusEffects={gameState.statusEffects}
+            statusEffects={statusEffects}
           />
 
           <BossHealthBar active={bossActive} health={bossHealth} maxHealth={bossMaxHealth} />
