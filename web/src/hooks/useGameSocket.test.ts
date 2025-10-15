@@ -36,6 +36,14 @@ describe("resolveWebSocketUrl", () => {
     expect(resolveWebSocketUrl()).toBe("wss://realtime.service.co.uk");
   });
 
+  it("preserves numeric hosts when running on private networks", () => {
+    vi.stubGlobal("window", {
+      location: { hostname: "192.168.0.10", protocol: "http:", port: "5173" }
+    } as Window);
+
+    expect(resolveWebSocketUrl()).toBe("ws://192.168.0.10:5173");
+  });
+
   it("falls back to host when window is unavailable", () => {
     vi.stubGlobal("window", undefined as unknown as Window);
     expect(resolveWebSocketUrl()).toBe("");

@@ -33,6 +33,30 @@ const SECOND_LEVEL_DOMAINS = new Set([
   "org"
 ]);
 
+const IPV4_SEGMENT = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+
+const isIpv4Address = (hostname: string) => {
+  const segments = hostname.split(".");
+  if (segments.length !== 4) {
+    return false;
+  }
+
+  return segments.every((segment) => IPV4_SEGMENT.test(segment));
+};
+
+const isIpAddress = (hostname: string) => {
+  if (!hostname) {
+    return false;
+  }
+
+  if (hostname.includes(":")) {
+    // Covers IPv6 literals (with or without square brackets) and mixed formats.
+    return true;
+  }
+
+  return isIpv4Address(hostname);
+};
+
 export const resolveWebSocketUrl = (explicitUrl?: string) => {
   if (explicitUrl) {
     return normalizeRealtimeUrl(explicitUrl);
@@ -57,6 +81,11 @@ export const resolveWebSocketUrl = (explicitUrl?: string) => {
   );
 
   if (isLoopbackHost) {
+    const portSuffix = port ? `:${port}` : "";
+    return `${websocketProtocol}//${hostname}${portSuffix}`;
+  }
+
+  if (isIpAddress(hostname)) {
     const portSuffix = port ? `:${port}` : "";
     return `${websocketProtocol}//${hostname}${portSuffix}`;
   }
