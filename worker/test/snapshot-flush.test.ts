@@ -41,4 +41,22 @@ describe("RoomDO snapshot batching", () => {
     expect(mockState.storageImpl.getPutCount("players")).toBe(1);
     expect(mockState.storageImpl.getPutCount("world")).toBe(1);
   });
+
+  it("reuses cached game state snapshots when no changes occur", async () => {
+    const { room } = await createRoom();
+    const roomAny = room as any;
+
+    const first = roomAny.serializeGameState();
+    const second = roomAny.serializeGameState();
+
+    expect(second).toBe(first);
+
+    roomAny.markPlayersDirty();
+
+    const third = roomAny.serializeGameState();
+    expect(third).not.toBe(second);
+
+    const fourth = roomAny.serializeGameState();
+    expect(fourth).toBe(third);
+  });
 });
