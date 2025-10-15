@@ -7,6 +7,67 @@ import { useGameDispatch, useGameState } from './GameContext';
 import useGameLoop from './useGameLoop';
 import useIsTouchDevice from '../../hooks/useIsTouchDevice';
 
+const DEFAULT_EVOLUTION_MENU = Object.freeze({
+  activeTier: 'small',
+  options: Object.freeze({
+    small: Object.freeze([]),
+    medium: Object.freeze([]),
+    large: Object.freeze([]),
+  }),
+});
+
+const TIER_METADATA = Object.freeze({
+  small: {
+    label: 'Pequenas',
+    icon: '🧬',
+    description: 'Custam PC e focam em ajustes rápidos.',
+  },
+  medium: {
+    label: 'Médias',
+    icon: '🧫',
+    description: 'Usam MG + fragmentos para reforços profundos.',
+  },
+  large: {
+    label: 'Grandes',
+    icon: '🌌',
+    description: 'Formas e mutações poderosas com Genes estáveis.',
+  },
+});
+
+const formatEvolutionCost = (cost = {}) => {
+  const parts = [];
+  if (Number.isFinite(cost.pc)) parts.push(`${cost.pc} PC`);
+  if (Number.isFinite(cost.mg)) parts.push(`${cost.mg} MG`);
+  if (cost.fragments) {
+    Object.entries(cost.fragments).forEach(([key, amount]) => {
+      parts.push(`${amount} Frag ${key}`);
+    });
+  }
+  if (cost.stableGenes) {
+    Object.entries(cost.stableGenes).forEach(([key, amount]) => {
+      parts.push(`${amount} Gene ${key}`);
+    });
+  }
+  return parts.length > 0 ? parts.join(' · ') : 'Sem custo';
+};
+
+const formatEvolutionRequirements = (requirements = {}) => {
+  const parts = [];
+  if (Number.isFinite(requirements.level)) parts.push(`Nível ${requirements.level}`);
+  if (requirements.fragments) {
+    Object.entries(requirements.fragments).forEach(([key, amount]) => {
+      parts.push(`${amount} Frag ${key}`);
+    });
+  }
+  if (requirements.stableGenes) {
+    Object.entries(requirements.stableGenes).forEach(([key, amount]) => {
+      parts.push(`${amount} Gene ${key}`);
+    });
+  }
+  if (Number.isFinite(requirements.mg)) parts.push(`${requirements.mg} MG mínimo`);
+  return parts.length > 0 ? parts.join(' · ') : 'Nenhum requisito adicional';
+};
+
 const GameCanvas = ({ settings, onQuit }) => {
   const canvasRef = useRef(null);
   const gameState = useGameState();
@@ -27,8 +88,52 @@ const GameCanvas = ({ settings, onQuit }) => {
 
   const isTouchDevice = useIsTouchDevice();
 
+  const {
+    currentSkill: currentSkillInfo,
+    skillList,
+    hasMultipleSkills,
+    energy,
+    xp,
+    geneticMaterial,
+    characteristicPoints,
+    geneFragments,
+    stableGenes,
+    evolutionSlots,
+    reroll,
+    dropPity,
+    recentRewards,
+    bossActive,
+    bossHealth,
+    bossMaxHealth,
+    element,
+    affinity,
+    elementLabel,
+    affinityLabel,
+    resistances,
+    statusEffects,
+    notifications,
+    canEvolve,
+    cameraZoom,
+    opponents,
+    evolutionMenu: evolutionMenuState,
+    currentForm,
+    showEvolutionChoice,
+    archetypeSelection,
+    selectedArchetype,
+    level,
+    score,
+    health,
+    maxHealth,
+    dashCharge,
+    combo,
+    maxCombo,
+    activePowerUps,
+  } = gameState;
+
+  const xpCurrent = xp?.current ?? 0;
+  const mgCurrent = geneticMaterial?.current ?? 0;
+
   const skillData = useMemo(() => {
-    const currentSkillInfo = gameState.currentSkill;
     const resolveCost = (skill) => {
       if (!skill) return { energy: 0, xp: 0, mg: 0 };
       const cost = skill.cost ?? {};
@@ -56,9 +161,9 @@ const GameCanvas = ({ settings, onQuit }) => {
     const skillDisabled =
       !currentSkillInfo ||
       skillCoolingDown ||
-      gameState.energy < currentCost.energy ||
-      (gameState.xp?.current ?? 0) < currentCost.xp ||
-      (gameState.geneticMaterial?.current ?? 0) < currentCost.mg;
+      energy < currentCost.energy ||
+      xpCurrent < currentCost.xp ||
+      mgCurrent < currentCost.mg;
     const skillCooldownLabel = currentSkillInfo
       ? skillCoolingDown
         ? `${skillCooldownRemaining.toFixed(1)}s`
@@ -75,8 +180,8 @@ const GameCanvas = ({ settings, onQuit }) => {
 
     return {
       currentSkill: currentSkillInfo,
-      skillList: gameState.skillList,
-      hasMultipleSkills: gameState.hasMultipleSkills,
+      skillList,
+      hasMultipleSkills,
       skillCooldownLabel,
       skillReadyPercent,
       skillCooldownPercent,
@@ -85,7 +190,7 @@ const GameCanvas = ({ settings, onQuit }) => {
       costLabel,
       costBreakdown: currentCost,
     };
-  }, [gameState]);
+  }, [currentSkillInfo, energy, hasMultipleSkills, mgCurrent, skillList, xpCurrent]);
 
   const handleRestart = useCallback(() => {
     if (onQuit) {
@@ -107,101 +212,42 @@ const GameCanvas = ({ settings, onQuit }) => {
     );
   }
 
-  const evolutionMenu = gameState.evolutionMenu || {
-    activeTier: 'small',
-    options: { small: [], medium: [], large: [] },
-  };
-  const currentForm = gameState.currentForm;
-
-  const tierMetadata = useMemo(
-    () => ({
-      small: {
-        label: 'Pequenas',
-        icon: '🧬',
-        description: 'Custam PC e focam em ajustes rápidos.',
-      },
-      medium: {
-        label: 'Médias',
-        icon: '🧫',
-        description: 'Usam MG + fragmentos para reforços profundos.',
-      },
-      large: {
-        label: 'Grandes',
-        icon: '🌌',
-        description: 'Formas e mutações poderosas com Genes estáveis.',
-      },
-    }),
-    []
-  );
-
-  const formatCost = useCallback((cost = {}) => {
-    const parts = [];
-    if (Number.isFinite(cost.pc)) parts.push(`${cost.pc} PC`);
-    if (Number.isFinite(cost.mg)) parts.push(`${cost.mg} MG`);
-    if (cost.fragments) {
-      Object.entries(cost.fragments).forEach(([key, amount]) => {
-        parts.push(`${amount} Frag ${key}`);
-      });
-    }
-    if (cost.stableGenes) {
-      Object.entries(cost.stableGenes).forEach(([key, amount]) => {
-        parts.push(`${amount} Gene ${key}`);
-      });
-    }
-    return parts.length > 0 ? parts.join(' · ') : 'Sem custo';
-  }, []);
-
-  const formatRequirements = useCallback((requirements = {}) => {
-    const parts = [];
-    if (Number.isFinite(requirements.level)) parts.push(`Nível ${requirements.level}`);
-    if (requirements.fragments) {
-      Object.entries(requirements.fragments).forEach(([key, amount]) => {
-        parts.push(`${amount} Frag ${key}`);
-      });
-    }
-    if (requirements.stableGenes) {
-      Object.entries(requirements.stableGenes).forEach(([key, amount]) => {
-        parts.push(`${amount} Gene ${key}`);
-      });
-    }
-    if (Number.isFinite(requirements.mg)) parts.push(`${requirements.mg} MG mínimo`);
-    return parts.length > 0 ? parts.join(' · ') : 'Nenhum requisito adicional';
-  }, []);
+  const evolutionMenu = evolutionMenuState || DEFAULT_EVOLUTION_MENU;
 
   return (
     <div className={styles.container}>
       <canvas ref={canvasRef} className={styles.canvas} />
 
       <GameHud
-        level={gameState.level}
-        score={gameState.score}
-        energy={gameState.energy}
-        health={gameState.health}
-        maxHealth={gameState.maxHealth}
-        dashCharge={gameState.dashCharge}
-        combo={gameState.combo}
-        maxCombo={gameState.maxCombo}
-        activePowerUps={gameState.activePowerUps}
-        xp={gameState.xp}
-        geneticMaterial={gameState.geneticMaterial}
-        characteristicPoints={gameState.characteristicPoints}
-        geneFragments={gameState.geneFragments}
-        stableGenes={gameState.stableGenes}
-        evolutionSlots={gameState.evolutionSlots}
-        reroll={gameState.reroll}
-        dropPity={gameState.dropPity}
-        recentRewards={gameState.recentRewards}
-        bossActive={gameState.bossActive}
-        bossHealth={gameState.bossHealth}
-        bossMaxHealth={gameState.bossMaxHealth}
-        element={gameState.element}
-        affinity={gameState.affinity}
-        elementLabel={gameState.elementLabel}
-        affinityLabel={gameState.affinityLabel}
-        resistances={gameState.resistances}
-        statusEffects={gameState.statusEffects ?? []}
+        level={level}
+        score={score}
+        energy={energy}
+        health={health}
+        maxHealth={maxHealth}
+        dashCharge={dashCharge}
+        combo={combo}
+        maxCombo={maxCombo}
+        activePowerUps={activePowerUps}
+        xp={xp}
+        geneticMaterial={geneticMaterial}
+        characteristicPoints={characteristicPoints}
+        geneFragments={geneFragments}
+        stableGenes={stableGenes}
+        evolutionSlots={evolutionSlots}
+        reroll={reroll}
+        dropPity={dropPity}
+        recentRewards={recentRewards}
+        bossActive={bossActive}
+        bossHealth={bossHealth}
+        bossMaxHealth={bossMaxHealth}
+        element={element}
+        affinity={affinity}
+        elementLabel={elementLabel}
+        affinityLabel={affinityLabel}
+        resistances={resistances}
+        statusEffects={statusEffects ?? []}
         skillData={skillData}
-        notifications={gameState.notifications}
+        notifications={notifications}
         joystick={joystick}
         onJoystickStart={inputActions.joystickStart}
         onJoystickMove={inputActions.joystickMove}
@@ -213,24 +259,24 @@ const GameCanvas = ({ settings, onQuit }) => {
         onUseSkill={inputActions.useSkill}
         onCycleSkill={inputActions.cycleSkill}
         onOpenEvolutionMenu={inputActions.openEvolutionMenu}
-        canEvolve={gameState.canEvolve}
+        canEvolve={canEvolve}
         showTouchControls={Boolean(settings?.showTouchControls && isTouchDevice)}
-        cameraZoom={gameState.cameraZoom ?? gameState.camera?.zoom ?? 1}
+        cameraZoom={cameraZoom ?? gameState.camera?.zoom ?? 1}
         onCameraZoomChange={setCameraZoom}
         onQuit={onQuit}
-        opponents={gameState.opponents}
+        opponents={opponents}
       />
 
-      {gameState.showEvolutionChoice && (
+      {showEvolutionChoice && (
         <div className={styles.evolutionOverlay}>
           <div className={styles.evolutionCard}>
-            <h2 className={styles.evolutionTitle}>🧬 Evolução Nível {gameState.level}</h2>
+            <h2 className={styles.evolutionTitle}>🧬 Evolução Nível {level}</h2>
 
             <div className={styles.evolutionTabs}>
               {(['small', 'medium', 'large']).map((tierKey) => {
-                const metadata = tierMetadata[tierKey];
+                const metadata = TIER_METADATA[tierKey];
                 const isActive = evolutionMenu.activeTier === tierKey;
-                const slots = gameState.evolutionSlots?.[tierKey] || { used: 0, max: 0 };
+                const slots = evolutionSlots?.[tierKey] || { used: 0, max: 0 };
                 return (
                   <div
                     key={tierKey}
@@ -250,7 +296,7 @@ const GameCanvas = ({ settings, onQuit }) => {
             </div>
 
             <div className={styles.optionHeading}>
-              {tierMetadata[evolutionMenu.activeTier]?.label || 'Evoluções'} disponíveis
+              {TIER_METADATA[evolutionMenu.activeTier]?.label || 'Evoluções'} disponíveis
             </div>
             <div className={styles.optionList}>
               {(evolutionMenu.options?.[evolutionMenu.activeTier] || []).map((option) => {
@@ -286,11 +332,11 @@ const GameCanvas = ({ settings, onQuit }) => {
                     </div>
                     <div className={styles.evolutionOptionRow}>
                       <span className={styles.evolutionOptionLabel}>Custo</span>
-                      <span>{formatCost(option.cost)}</span>
+                      <span>{formatEvolutionCost(option.cost)}</span>
                     </div>
                     <div className={styles.evolutionOptionRow}>
                       <span className={styles.evolutionOptionLabel}>Requisitos</span>
-                      <span>{formatRequirements(option.requirements)}</span>
+                      <span>{formatEvolutionRequirements(option.requirements)}</span>
                     </div>
                     <div className={styles.evolutionOptionRow}>
                       <span className={styles.evolutionOptionLabel}>Próximo bônus</span>
@@ -312,10 +358,10 @@ const GameCanvas = ({ settings, onQuit }) => {
         </div>
       )}
 
-      {gameState.archetypeSelection?.pending && (
+      {archetypeSelection?.pending && (
         <ArchetypeSelection
-          selection={gameState.archetypeSelection}
-          selected={gameState.selectedArchetype}
+          selection={archetypeSelection}
+          selected={selectedArchetype}
           onSelect={selectArchetype}
         />
       )}

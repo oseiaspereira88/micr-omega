@@ -1,6 +1,8 @@
 import React from 'react';
 import styles from './TouchControls.module.css';
 
+const joinClassNames = (...classes) => classes.filter(Boolean).join(' ');
+
 const TouchControls = ({
   joystick,
   onJoystickStart,
@@ -24,8 +26,6 @@ const TouchControls = ({
 }) => {
   const dashReady = dashCharge >= 30;
 
-  const classNames = (...classes) => classes.filter(Boolean).join(' ');
-
   return (
     <div className={styles.touchLayer}>
       <div
@@ -47,7 +47,7 @@ const TouchControls = ({
 
       <button
         type="button"
-        className={classNames(styles.button, styles.attackButton)}
+        className={joinClassNames(styles.button, styles.attackButton)}
         onTouchStart={event => {
           event.preventDefault();
           onAttackPress?.();
@@ -68,7 +68,7 @@ const TouchControls = ({
 
       <button
         type="button"
-        className={classNames(
+        className={joinClassNames(
           styles.button,
           styles.dashButton,
           dashReady ? styles.chargeReady : styles.chargeEmpty,
@@ -88,7 +88,7 @@ const TouchControls = ({
 
       <button
         type="button"
-        className={classNames(
+        className={joinClassNames(
           styles.button,
           styles.skillButton,
           skillDisabled ? styles.skillDisabled : styles.skillReady,
@@ -127,7 +127,7 @@ const TouchControls = ({
 
       <button
         type="button"
-        className={classNames(
+        className={joinClassNames(
           styles.button,
           styles.evolveButton,
           canEvolve ? styles.evolveReady : styles.evolveLocked,

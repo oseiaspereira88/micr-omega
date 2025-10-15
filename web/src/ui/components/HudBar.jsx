@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import styles from './HudBar.module.css';
 import {
   AFFINITY_ICONS,
@@ -8,6 +8,12 @@ import {
   ELEMENT_LABELS,
   ELEMENT_TYPES,
 } from '../../shared/combat';
+
+const summarizeSlot = (slot) => {
+  const used = Math.floor(slot?.used ?? 0);
+  const max = Math.floor(slot?.max ?? 0);
+  return `${used}/${max}`;
+};
 
 const HudBar = ({
   level,
@@ -43,12 +49,6 @@ const HudBar = ({
   const pcAvailable = Math.floor(characteristicPoints?.available ?? 0);
   const pcTotal = Math.floor(characteristicPoints?.total ?? pcAvailable);
 
-  const slotSummary = (slot) => {
-    const used = Math.floor(slot?.used ?? 0);
-    const max = Math.floor(slot?.max ?? 0);
-    return `${used}/${max}`;
-  };
-
   const rerollCost = Math.floor(reroll?.cost ?? reroll?.baseCost ?? 25);
   const rerollCount = Math.floor(reroll?.count ?? 0);
 
@@ -61,20 +61,45 @@ const HudBar = ({
   const affinityName = affinityLabel ?? AFFINITY_LABELS[normalizedAffinity] ?? normalizedAffinity;
   const elementIcon = ELEMENT_ICONS[normalizedElement] ?? '🧬';
   const affinityIcon = AFFINITY_ICONS[normalizedAffinity] ?? '✨';
-  const resistanceEntries = Object.entries(resistances || {})
-    .filter(([, value]) => Math.abs(value) >= 0.05)
-    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-    .slice(0, 3);
-  const statusBadges = (statusEffects || [])
-    .map((entry) => ({
-      key: entry.key,
-      label: entry.label,
-      icon: entry.icon,
-      color: entry.color,
-      stacks: entry.stacks,
-      remaining: entry.remaining,
-    }))
-    .slice(0, 4);
+  const resistanceEntries = useMemo(
+    () =>
+      Object.entries(resistances || {})
+        .filter(([, value]) => Math.abs(value) >= 0.05)
+        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+        .slice(0, 3),
+    [resistances]
+  );
+  const statusBadges = useMemo(
+    () =>
+      (statusEffects || [])
+        .map((entry) => ({
+          key: entry.key,
+          label: entry.label,
+          icon: entry.icon,
+          color: entry.color,
+          stacks: entry.stacks,
+          remaining: entry.remaining,
+        }))
+        .slice(0, 4),
+    [statusEffects]
+  );
+  const powerUpSummaries = useMemo(
+    () =>
+      (activePowerUps || []).map((power) => {
+        const percent = power.duration
+          ? Math.max(0, Math.min(100, (power.remaining / power.duration) * 100))
+          : 0;
+
+        return {
+          key: power.type,
+          color: power.color,
+          icon: power.icon,
+          name: power.name,
+          percent,
+        };
+      }),
+    [activePowerUps]
+  );
 
   return (
     <>
@@ -163,9 +188,9 @@ const HudBar = ({
             </div>
           </div>
           <div className={styles.slotSummary}>
-            <span>Pequena: {slotSummary(evolutionSlots?.small)}</span>
-            <span>Média: {slotSummary(evolutionSlots?.medium)}</span>
-            <span>Grande: {slotSummary(evolutionSlots?.large)}</span>
+            <span>Pequena: {summarizeSlot(evolutionSlots?.small)}</span>
+            <span>Média: {summarizeSlot(evolutionSlots?.medium)}</span>
+            <span>Grande: {summarizeSlot(evolutionSlots?.large)}</span>
           </div>
         </div>
         <div className={styles.resourceGrid}>
@@ -203,28 +228,22 @@ const HudBar = ({
             </div>
           </div>
         </div>
-        {activePowerUps.length > 0 && (
+        {powerUpSummaries.length > 0 && (
           <div className={styles.powerUps}>
-            {activePowerUps.map(power => {
-              const percent = power.duration
-                ? Math.max(0, Math.min(100, (power.remaining / power.duration) * 100))
-                : 0;
-
-              return (
-                <div
-                  key={power.type}
-                  className={styles.powerUpCard}
-                  style={{ background: `${power.color}22`, border: `1px solid ${power.color}` }}
-                >
-                  <div className={styles.powerUpTitle} style={{ color: power.color }}>
-                    {power.icon} {power.name}
-                  </div>
-                  <div className={styles.powerUpBar}>
-                    <div style={{ width: `${percent}%`, height: '100%', background: power.color }} />
-                  </div>
+            {powerUpSummaries.map((power) => (
+              <div
+                key={power.key}
+                className={styles.powerUpCard}
+                style={{ background: `${power.color}22`, border: `1px solid ${power.color}` }}
+              >
+                <div className={styles.powerUpTitle} style={{ color: power.color }}>
+                  {power.icon} {power.name}
                 </div>
-              );
-            })}
+                <div className={styles.powerUpBar}>
+                  <div style={{ width: `${power.percent}%`, height: '100%', background: power.color }} />
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

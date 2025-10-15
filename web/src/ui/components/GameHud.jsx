@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import HudBar from './HudBar';
 import BossHealthBar from './BossHealthBar';
 import SkillWheel from './SkillWheel';
@@ -64,7 +64,31 @@ const GameHud = ({
     setIsSidebarOpen((prev) => !prev);
   }, []);
 
-  const hasOpponents = Array.isArray(opponents) && opponents.length > 0;
+  const opponentSummaries = useMemo(() => {
+    if (!Array.isArray(opponents) || opponents.length === 0) {
+      return [];
+    }
+
+    return opponents.map((opponent) => {
+      const ratio = opponent.maxHealth
+        ? Math.max(0, Math.min(1, opponent.health / opponent.maxHealth))
+        : 0;
+
+      return {
+        id: opponent.id,
+        name: opponent.name,
+        elementLabel: opponent.elementLabel ?? opponent.element ?? '—',
+        affinityLabel: opponent.affinityLabel ?? opponent.affinity ?? '—',
+        combatState: opponent.combatState,
+        barStyle: {
+          width: `${ratio * 100}%`,
+          background: opponent.palette?.base ?? '#47c2ff',
+        },
+      };
+    });
+  }, [opponents]);
+
+  const hasOpponents = opponentSummaries.length > 0;
 
   return (
     <>
@@ -89,33 +113,21 @@ const GameHud = ({
             <div className={styles.opponentPanel}>
               <h3 className={styles.opponentHeading}>Oponentes</h3>
               <ul className={styles.opponentList}>
-                {opponents.map((opponent) => {
-                  const ratio = opponent.maxHealth
-                    ? Math.max(0, Math.min(1, opponent.health / opponent.maxHealth))
-                    : 0;
-                  const barStyle = {
-                    width: `${ratio * 100}%`,
-                    background: opponent.palette?.base ?? '#47c2ff',
-                  };
-
-                  return (
-                    <li key={opponent.id} className={styles.opponentItem}>
-                      <div className={styles.opponentName}>{opponent.name}</div>
-                      <div className={styles.opponentMeta}>
-                        <span className={styles.opponentTag}>
-                          {opponent.elementLabel ?? opponent.element ?? '—'}
-                        </span>
-                        <span className={`${styles.opponentTag} ${styles.opponentAffinity}`}>
-                          {opponent.affinityLabel ?? opponent.affinity ?? '—'}
-                        </span>
-                      </div>
-                      <div className={styles.opponentHealthBar}>
-                        <div className={styles.opponentHealthFill} style={barStyle} />
-                      </div>
-                      <div className={styles.opponentStatus}>{opponent.combatState}</div>
-                    </li>
-                  );
-                })}
+                {opponentSummaries.map((opponent) => (
+                  <li key={opponent.id} className={styles.opponentItem}>
+                    <div className={styles.opponentName}>{opponent.name}</div>
+                    <div className={styles.opponentMeta}>
+                      <span className={styles.opponentTag}>{opponent.elementLabel}</span>
+                      <span className={`${styles.opponentTag} ${styles.opponentAffinity}`}>
+                        {opponent.affinityLabel}
+                      </span>
+                    </div>
+                    <div className={styles.opponentHealthBar}>
+                      <div className={styles.opponentHealthFill} style={opponent.barStyle} />
+                    </div>
+                    <div className={styles.opponentStatus}>{opponent.combatState}</div>
+                  </li>
+                ))}
               </ul>
             </div>
           ) : null}
