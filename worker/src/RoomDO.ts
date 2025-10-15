@@ -65,6 +65,8 @@ const PLAYER_COLLECT_RADIUS = 60;
 const PLAYER_ATTACK_RANGE_BUFFER = 4;
 const OBSTACLE_PADDING = 12;
 
+const CLIENT_TIME_MAX_FUTURE_DRIFT_MS = 2_000;
+
 const WORLD_BOUNDS = {
   minX: -500,
   maxX: 500,
@@ -1690,7 +1692,11 @@ export class RoomDO {
           }
         }
 
-        const lastAttackAt = clientTime !== undefined ? Math.min(clientTime, Date.now()) : Date.now();
+        const now = Date.now();
+        const lastAttackAt =
+          clientTime !== undefined
+            ? Math.min(Math.max(clientTime, now), now + CLIENT_TIME_MAX_FUTURE_DRIFT_MS)
+            : now;
         player.combatStatus = createCombatStatusState({
           state: action.state ?? "engaged",
           targetPlayerId: action.targetPlayerId ?? null,
