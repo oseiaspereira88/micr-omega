@@ -1424,6 +1424,8 @@ export class RoomDO {
       }
     }
 
+    const previousSocket = player ? this.socketsByPlayer.get(player.id) : undefined;
+
     if (!player) {
       const id = crypto.randomUUID();
       const spawnPosition = this.clampPosition(getSpawnPositionForPlayer(id));
@@ -1460,6 +1462,18 @@ export class RoomDO {
       player.combatAttributes = createCombatAttributes(player.combatAttributes);
       this.players.set(player.id, player);
       this.nameToPlayerId.set(nameKey, player.id);
+    }
+
+    if (previousSocket && previousSocket !== socket) {
+      this.closePlayerSocketIfCurrent(
+        player.id,
+        previousSocket,
+        1008,
+        "session_taken",
+        "close_stale_socket_failed",
+      );
+      this.clientsBySocket.delete(previousSocket);
+      this.socketsByPlayer.delete(player.id);
     }
 
     this.clientsBySocket.set(socket, player.id);
