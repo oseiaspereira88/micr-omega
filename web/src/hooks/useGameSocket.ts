@@ -141,6 +141,7 @@ type UseGameSocketOptions = {
   reconnectBaseDelay?: number;
   reconnectMaxDelay?: number;
   version?: string;
+  validateMessages?: boolean;
 };
 
 type MovementCommand = Omit<MovementMessage, "type" | "playerId"> & { playerId?: string | null };
@@ -161,6 +162,23 @@ const useStableLatest = <T,>(value: T) => {
   return ref;
 };
 
+export const prepareClientMessagePayload = (
+  message: ClientMessage,
+  shouldValidate: boolean,
+): ClientMessage | null => {
+  if (!shouldValidate) {
+    return message;
+  }
+
+  const validation = clientMessageSchema.safeParse(message);
+  if (!validation.success) {
+    console.error("Mensagem de cliente inválida antes do envio", validation.error);
+    return null;
+  }
+
+  return validation.data;
+};
+
 export const useGameSocket = (
   options: UseGameSocketOptions = {}
 ): UseGameSocketResult => {
@@ -171,6 +189,7 @@ export const useGameSocket = (
     reconnectMaxDelay = DEFAULT_RECONNECT_MAX,
     url,
     version,
+    validateMessages = import.meta.env.DEV,
   } = options;
 
   const playerName = useGameStore((state) => state.playerName);
@@ -212,26 +231,28 @@ export const useGameSocket = (
     }
   }, []);
 
-  const sendMessage = useCallback((message: ClientMessage) => {
-    const socket = socketRef.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      return false;
-    }
+  const sendMessage = useCallback(
+    (message: ClientMessage) => {
+      const socket = socketRef.current;
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        return false;
+      }
 
-    const validation = clientMessageSchema.safeParse(message);
-    if (!validation.success) {
-      console.error("Mensagem de cliente inválida antes do envio", validation.error);
-      return false;
-    }
+      const payload = prepareClientMessagePayload(message, validateMessages);
+      if (!payload) {
+        return false;
+      }
 
-    try {
-      socket.send(JSON.stringify(validation.data));
-      return true;
-    } catch (err) {
-      console.error("Não foi possível enviar mensagem ao servidor", err);
-      return false;
-    }
-  }, []);
+      try {
+        socket.send(JSON.stringify(payload));
+        return true;
+      } catch (err) {
+        console.error("Não foi possível enviar mensagem ao servidor", err);
+        return false;
+      }
+    },
+    [validateMessages],
+  );
 
   const resolveCommandPlayerId = useCallback(
     (candidate?: string | null) => {
