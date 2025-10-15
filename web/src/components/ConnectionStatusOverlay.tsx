@@ -18,7 +18,7 @@ const ConnectionStatusOverlay = () => {
   const joinError = useGameStore((state) => state.joinError);
 
   const latency = useMemo(() => {
-    if (!lastPingAt || !lastPongAt) {
+    if (lastPingAt == null || lastPongAt == null) {
       return null;
     }
 
