@@ -17,6 +17,18 @@ describe("resolveWebSocketUrl", () => {
     );
   });
 
+  it("converts https schemes to wss", () => {
+    expect(resolveWebSocketUrl("https://api.example.com/ws")).toBe(
+      "wss://api.example.com/ws"
+    );
+  });
+
+  it("converts http schemes to ws", () => {
+    expect(resolveWebSocketUrl("http://api.example.com/ws")).toBe(
+      "ws://api.example.com/ws"
+    );
+  });
+
   it("derives realtime subdomain for standard domains", () => {
     vi.stubGlobal("window", {
       location: { hostname: "game.example.com", protocol: "https:", port: "" }

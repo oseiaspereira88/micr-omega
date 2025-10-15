@@ -44,6 +44,21 @@ export const computeReconnectDelay = (
 
 const normalizeRealtimeUrl = (url: string) => url.trim().replace(/\/+$/, "");
 
+const convertHttpUrlToWebSocket = (url: string) => {
+  const trimmedUrl = url.trim();
+  const lowerCaseUrl = trimmedUrl.toLowerCase();
+
+  if (lowerCaseUrl.startsWith("https://")) {
+    return `wss://${trimmedUrl.slice("https://".length)}`;
+  }
+
+  if (lowerCaseUrl.startsWith("http://")) {
+    return `ws://${trimmedUrl.slice("http://".length)}`;
+  }
+
+  return trimmedUrl;
+};
+
 const SECOND_LEVEL_DOMAINS = new Set([
   "ac",
   "co",
@@ -93,7 +108,7 @@ const formatHostnameForWebSocket = (hostname: string) => {
 
 export const resolveWebSocketUrl = (explicitUrl?: string) => {
   if (explicitUrl) {
-    return normalizeRealtimeUrl(explicitUrl);
+    return normalizeRealtimeUrl(convertHttpUrlToWebSocket(explicitUrl));
   }
 
   if (typeof window === "undefined") {
@@ -104,7 +119,7 @@ export const resolveWebSocketUrl = (explicitUrl?: string) => {
     import.meta.env.VITE_REALTIME_URL ?? import.meta.env.VITE_WS_URL ?? "";
 
   if (envUrl) {
-    return normalizeRealtimeUrl(envUrl);
+    return normalizeRealtimeUrl(convertHttpUrlToWebSocket(envUrl));
   }
 
   const { hostname, protocol, port } = window.location;
