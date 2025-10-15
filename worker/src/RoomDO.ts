@@ -75,14 +75,15 @@ const WORLD_BOUNDS = {
 
 const SUPPORTED_CLIENT_VERSIONS = new Set([PROTOCOL_VERSION]);
 
-class MessageRateLimiter {
+export class MessageRateLimiter {
   private timestamps: number[] = [];
+  private startIndex = 0;
 
   constructor(private readonly limit: number, private readonly windowMs: number) {}
 
   consume(now: number): boolean {
     this.prune(now);
-    if (this.timestamps.length >= this.limit) {
+    if (this.getActiveCount() >= this.limit) {
       return false;
     }
     this.timestamps.push(now);
@@ -91,7 +92,7 @@ class MessageRateLimiter {
 
   getRetryAfterMs(now: number): number {
     this.prune(now);
-    const earliest = this.timestamps[0];
+    const earliest = this.timestamps[this.startIndex];
     if (earliest === undefined) {
       return 0;
     }
@@ -100,9 +101,18 @@ class MessageRateLimiter {
 
   private prune(now: number): void {
     const cutoff = now - this.windowMs;
-    while (this.timestamps.length > 0 && this.timestamps[0]! <= cutoff) {
-      this.timestamps.shift();
+    while (this.startIndex < this.timestamps.length && this.timestamps[this.startIndex]! <= cutoff) {
+      this.startIndex++;
     }
+
+    if (this.startIndex > 0 && this.startIndex * 2 >= this.timestamps.length) {
+      this.timestamps = this.timestamps.slice(this.startIndex);
+      this.startIndex = 0;
+    }
+  }
+
+  private getActiveCount(): number {
+    return this.timestamps.length - this.startIndex;
   }
 }
 
