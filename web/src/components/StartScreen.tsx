@@ -21,6 +21,7 @@ import {
   getValidationMessage,
   persistName,
   readStoredName,
+  INVALID_PLAYER_NAME_MESSAGE,
 } from "../utils/playerNameStorage";
 import {
   MAX_NAME_LENGTH,
@@ -94,9 +95,7 @@ const StartScreen = ({
 
       const sanitized = sanitizePlayerName(trimmed);
       if (!sanitized) {
-        setLocalError(
-          `Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos (letras, incluindo acentos, números, espaços, hífens ou sublinhados).`
-        );
+        setLocalError(INVALID_PLAYER_NAME_MESSAGE);
         focusInput();
         return;
       }
