@@ -124,6 +124,24 @@ describe("StartScreen", () => {
     expect(window.localStorage.getItem("micr-omega:player-name")).toBe("Alice");
   });
 
+  it("mantém o nome persistido ao sair", () => {
+    const onQuit = vi.fn();
+
+    act(() => {
+      gameStore.actions.setPlayerName("Carol");
+    });
+
+    window.localStorage.setItem("micr-omega:player-name", "Carol");
+
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={onQuit} />);
+
+    const quitButton = screen.getByRole("button", { name: /sair da sala/i });
+    fireEvent.click(quitButton);
+
+    expect(onQuit).toHaveBeenCalledTimes(1);
+    expect(window.localStorage.getItem("micr-omega:player-name")).toBe("Carol");
+  });
+
   it("atualiza o store de configurações quando os toggles mudam", async () => {
     const settingsSpy = vi.fn();
 
