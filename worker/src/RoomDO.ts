@@ -1682,7 +1682,12 @@ export class RoomDO {
       state: joinDiff
     };
 
-    this.broadcast(joinBroadcast, socket);
+    const willStartImmediately =
+      this.phase === "waiting" && this.countConnectedPlayers() >= MIN_PLAYERS_TO_START;
+
+    if (!willStartImmediately) {
+      this.broadcast(joinBroadcast, socket);
+    }
 
     const rankingMessage: RankingMessage = {
       type: "ranking",
@@ -2336,12 +2341,23 @@ export class RoomDO {
     this.world = createInitialWorldState();
     this.rebuildWorldCaches();
 
+    const resetTimestamp = Date.now();
     for (const player of this.players.values()) {
       player.combo = 1;
-      player.lastActiveAt = Date.now();
+      player.lastActiveAt = resetTimestamp;
+      player.movementVector = createVector();
+      player.orientation = createOrientation();
+      player.position = this.clampPosition(getSpawnPositionForPlayer(player.id));
+      player.health = createHealthState({
+        max: player.health.max,
+        current: player.health.max,
+      });
+      player.combatStatus = createCombatStatusState();
     }
 
+    this.playersDirty = true;
     this.invalidateGameStateSnapshot();
+    this.markRankingDirty();
 
     this.alarmSchedule.delete("reset");
     await this.persistAndSyncAlarms();
