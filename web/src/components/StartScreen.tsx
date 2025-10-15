@@ -131,7 +131,6 @@ const StartScreen = ({
 
   const handleQuit = useCallback(() => {
     onQuit();
-    persistName("");
     setInputValue("");
     setLocalError(null);
     gameStore.actions.setJoinError(null);
