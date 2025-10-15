@@ -25,6 +25,14 @@ describe("resolveWebSocketUrl", () => {
     expect(resolveWebSocketUrl()).toBe("wss://realtime.example.com");
   });
 
+  it("keeps loopback-style localhost subdomains without realtime prefix", () => {
+    vi.stubGlobal("window", {
+      location: { hostname: "dev.localhost", protocol: "https:", port: "" }
+    } as Window);
+
+    expect(resolveWebSocketUrl()).toBe("wss://dev.localhost");
+  });
+
   it("keeps registrable domain for multi-level ccTLDs", () => {
     vi.stubGlobal("window", {
       location: { hostname: "arena.example.com.br", protocol: "https:", port: "" }
