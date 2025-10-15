@@ -44,8 +44,6 @@ export {
   type ResetMessage,
   type UpgradeRequiredMessage,
   type ErrorMessage,
-  type PlayerJoinedMessage,
-  type PlayerLeftMessage,
   type ServerMessage,
   clientMessageSchema,
   joinMessageSchema,

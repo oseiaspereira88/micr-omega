@@ -444,11 +444,6 @@ export const useGameSocket = (
         gameStore.actions.applyFullState(message.state);
         break;
       }
-      case "player_joined":
-      case "player_left": {
-        gameStore.actions.applyFullState(message.state);
-        break;
-      }
       case "error": {
         gameStore.actions.setJoinError(errorReasonToMessage(message));
         shouldReconnectRef.current = false;

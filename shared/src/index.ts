@@ -379,20 +379,6 @@ export const errorMessageSchema = z.object({
   retryAfterMs: z.number().nonnegative().optional()
 });
 
-export const playerJoinedMessageSchema = z.object({
-  type: z.literal("player_joined"),
-  playerId: playerIdSchema,
-  name: playerNameSchema,
-  state: sharedGameStateSchema
-});
-
-export const playerLeftMessageSchema = z.object({
-  type: z.literal("player_left"),
-  playerId: playerIdSchema,
-  name: playerNameSchema,
-  state: sharedGameStateSchema
-});
-
 export const serverMessageSchema = z.union([
   joinedMessageSchema,
   rankingMessageSchema,
@@ -400,9 +386,7 @@ export const serverMessageSchema = z.union([
   pongMessageSchema,
   resetMessageSchema,
   upgradeRequiredMessageSchema,
-  errorMessageSchema,
-  playerJoinedMessageSchema,
-  playerLeftMessageSchema
+  errorMessageSchema
 ]);
 
 export type GamePhase = z.infer<typeof sharedGameStateSchema.shape.phase>;
@@ -447,8 +431,6 @@ export type PongMessage = z.infer<typeof pongMessageSchema>;
 export type ResetMessage = z.infer<typeof resetMessageSchema>;
 export type UpgradeRequiredMessage = z.infer<typeof upgradeRequiredMessageSchema>;
 export type ErrorMessage = z.infer<typeof errorMessageSchema>;
-export type PlayerJoinedMessage = z.infer<typeof playerJoinedMessageSchema>;
-export type PlayerLeftMessage = z.infer<typeof playerLeftMessageSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
 
 export const sanitizePlayerName = (name: string): string | null => {
