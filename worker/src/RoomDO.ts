@@ -47,9 +47,11 @@ const INACTIVE_TIMEOUT_MS = 45_000;
 
 const MAX_COMBO_MULTIPLIER = 50;
 
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const MAX_MESSAGES_PER_CONNECTION = 120;
-const MAX_MESSAGES_GLOBAL = 600;
+// Allow clients to sustain at least 20 messages per second without being
+// throttled by using a one-minute sliding window.
+export const RATE_LIMIT_WINDOW_MS = 60_000;
+export const MAX_MESSAGES_PER_CONNECTION = 1_200;
+export const MAX_MESSAGES_GLOBAL = 6_000;
 
 const PLAYERS_KEY = "players";
 const WORLD_KEY = "world";
