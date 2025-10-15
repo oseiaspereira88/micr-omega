@@ -193,13 +193,8 @@ const GameCanvas = ({ settings, onQuit }) => {
   }, [currentSkillInfo, energy, hasMultipleSkills, mgCurrent, skillList, xpCurrent]);
 
   const handleRestart = useCallback(() => {
-    if (onQuit) {
-      onQuit();
-      return;
-    }
-
     restartGame();
-  }, [onQuit, restartGame]);
+  }, [restartGame]);
 
   if (gameState.gameOver) {
     return (
