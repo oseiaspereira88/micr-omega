@@ -1557,10 +1557,22 @@ export class RoomDO {
     const existingByName = this.nameToPlayerId.get(nameKey);
     if (!player && existingByName) {
       const existing = this.players.get(existingByName);
-      if (existing && (existing.connected || now - existing.lastSeenAt <= RECONNECT_WINDOW_MS)) {
-        this.send(socket, { type: "error", reason: "name_taken" });
-        socket.close(1008, "name_taken");
-        return null;
+      if (existing) {
+        const withinReconnectWindow = now - existing.lastSeenAt <= RECONNECT_WINDOW_MS;
+        if (existing.connected) {
+          this.send(socket, { type: "error", reason: "name_taken" });
+          socket.close(1008, "name_taken");
+          return null;
+        }
+
+        if (withinReconnectWindow) {
+          player = existing;
+        } else {
+          await this.removePlayer(existing.id, "expired");
+          expiredPlayerRemoved = true;
+        }
+      } else {
+        this.nameToPlayerId.delete(nameKey);
       }
     }
 

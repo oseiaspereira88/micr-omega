@@ -170,6 +170,50 @@ describe("RoomDO", () => {
     }
   });
 
+  it("allows reconnecting by name within the reconnect window without a playerId", async () => {
+    const mf = await createMiniflare();
+    try {
+      const firstSocket = await openSocket(mf);
+      const firstJoinedPromise = onceMessage<{
+        type: string;
+        playerId: string;
+      }>(firstSocket, "joined");
+
+      firstSocket.send(
+        JSON.stringify({
+          type: "join",
+          name: "Alice",
+        }),
+      );
+
+      const firstJoined = await firstJoinedPromise;
+
+      firstSocket.close();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const secondSocket = await openSocket(mf);
+      const secondJoinedPromise = onceMessage<{
+        type: string;
+        playerId: string;
+      }>(secondSocket, "joined");
+
+      secondSocket.send(
+        JSON.stringify({
+          type: "join",
+          name: "Alice",
+        }),
+      );
+
+      const secondJoined = await secondJoinedPromise;
+
+      expect(secondJoined.playerId).toBe(firstJoined.playerId);
+
+      secondSocket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
   it("closes the previous socket when reconnecting with the same playerId", async () => {
     const mf = await createMiniflare();
     try {
