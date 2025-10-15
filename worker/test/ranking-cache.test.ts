@@ -85,9 +85,8 @@ describe("RoomDO ranking cache", () => {
       nutrients: {},
     };
 
-    roomAny.organicMatter.clear();
-    roomAny.organicMatter.set(matter.id, matter);
     roomAny.world.organicMatter = [matter];
+    roomAny.rebuildWorldCaches();
 
     const worldDiff: SharedWorldStateDiff = {};
     const combatLog: CombatLogEntry[] = [];

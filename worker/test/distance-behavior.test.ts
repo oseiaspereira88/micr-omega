@@ -70,10 +70,9 @@ describe("RoomDO distance-sensitive behaviour", () => {
       nutrients: {},
     };
 
-    roomAny.organicMatter.clear();
-    roomAny.organicMatter.set(nearMatter.id, nearMatter);
-    roomAny.organicMatter.set(farMatter.id, farMatter);
     roomAny.world.organicMatter = [nearMatter, farMatter];
+    roomAny.rebuildWorldCaches();
+    const originalWorldOrganicMatter = roomAny.world.organicMatter;
 
     const worldDiff: SharedWorldStateDiff = {};
     const combatLog: CombatLogEntry[] = [];
@@ -84,6 +83,9 @@ describe("RoomDO distance-sensitive behaviour", () => {
     expect(result.playerUpdated).toBe(true);
     expect(roomAny.organicMatter.has(nearMatter.id)).toBe(false);
     expect(roomAny.organicMatter.has(farMatter.id)).toBe(true);
+    expect(roomAny.world.organicMatter).toBe(originalWorldOrganicMatter);
+    expect(roomAny.world.organicMatter).toHaveLength(1);
+    expect(roomAny.world.organicMatter[0]).toBe(farMatter);
     const removedIds = worldDiff.removeOrganicMatterIds ?? [];
     expect(removedIds).toContain(nearMatter.id);
     expect(removedIds).not.toContain(farMatter.id);
