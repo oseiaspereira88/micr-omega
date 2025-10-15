@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveWebSocketUrl } from "./useGameSocket";
-
+import type { ClientMessage } from "../utils/messageTypes";
+import { prepareClientMessagePayload, resolveWebSocketUrl } from "./useGameSocket";
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -47,5 +47,46 @@ describe("resolveWebSocketUrl", () => {
   it("falls back to host when window is unavailable", () => {
     vi.stubGlobal("window", undefined as unknown as Window);
     expect(resolveWebSocketUrl()).toBe("");
+  });
+});
+
+describe("prepareClientMessagePayload", () => {
+  const originalError = console.error;
+
+  afterEach(() => {
+    console.error = originalError;
+  });
+
+  it("validates messages when validation is enabled", () => {
+    const spy = vi.fn();
+    console.error = spy;
+
+    const invalidMessage = { type: "movement" } as unknown as ClientMessage;
+    const payload = prepareClientMessagePayload(invalidMessage, true);
+
+    expect(payload).toBeNull();
+    expect(spy).toHaveBeenCalledOnce();
+  });
+
+  it("returns validated payload when message is valid", () => {
+    const spy = vi.fn();
+    console.error = spy;
+
+    const validMessage: ClientMessage = { type: "ping", ts: Date.now() };
+    const payload = prepareClientMessagePayload(validMessage, true);
+
+    expect(payload).toEqual(validMessage);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("skips validation when disabled", () => {
+    const spy = vi.fn();
+    console.error = spy;
+
+    const invalidMessage = { type: "movement" } as unknown as ClientMessage;
+    const payload = prepareClientMessagePayload(invalidMessage, false);
+
+    expect(payload).toBe(invalidMessage);
+    expect(spy).not.toHaveBeenCalled();
   });
 });
