@@ -110,9 +110,10 @@ export const resolveWebSocketUrl = (explicitUrl?: string) => {
   const { hostname, protocol, port } = window.location;
   const websocketProtocol = protocol === "https:" ? "wss:" : "ws:";
 
-  const isLoopbackHost = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(
-    hostname
-  );
+  const normalizedHostname = hostname.toLowerCase();
+  const isLoopbackHost =
+    ["localhost", "127.0.0.1", "::1", "[::1]"].includes(normalizedHostname) ||
+    normalizedHostname.endsWith(".localhost");
 
   if (isLoopbackHost) {
     const portSuffix = port ? `:${port}` : "";
