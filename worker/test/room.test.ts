@@ -169,4 +169,56 @@ describe("RoomDO", () => {
       await mf.dispose();
     }
   });
+
+  it("closes the previous socket when reconnecting with the same playerId", async () => {
+    const mf = await createMiniflare();
+    try {
+      const firstSocket = await openSocket(mf);
+      const firstJoinedPromise = onceMessage<{
+        type: string;
+        playerId: string;
+      }>(firstSocket, "joined");
+
+      firstSocket.send(
+        JSON.stringify({
+          type: "join",
+          name: "Alice",
+        }),
+      );
+
+      const firstJoined = await firstJoinedPromise;
+
+      const firstClosePromise = new Promise<{ code: number; reason: string }>((resolve) => {
+        const listener = (event: Event) => {
+          const closeEvent = event as Event & { code: number; reason: string };
+          resolve({ code: closeEvent.code, reason: closeEvent.reason });
+        };
+        firstSocket.addEventListener("close", listener as EventListener, { once: true });
+      });
+
+      const secondSocket = await openSocket(mf);
+      const secondJoinedPromise = onceMessage<{
+        type: string;
+        playerId: string;
+      }>(secondSocket, "joined");
+
+      secondSocket.send(
+        JSON.stringify({
+          type: "join",
+          name: "Alice",
+          playerId: firstJoined.playerId,
+        }),
+      );
+
+      const [secondJoined, firstClose] = await Promise.all([secondJoinedPromise, firstClosePromise]);
+
+      expect(secondJoined.playerId).toBe(firstJoined.playerId);
+      expect(firstClose.code).toBe(1008);
+      expect(firstClose.reason).toBe("session_taken");
+
+      secondSocket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
 });
