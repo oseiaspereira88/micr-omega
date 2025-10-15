@@ -45,6 +45,14 @@ describe("resolveWebSocketUrl", () => {
     expect(resolveWebSocketUrl()).toBe("wss://dev.localhost");
   });
 
+  it("keeps original host for known multi-tenant platforms", () => {
+    vi.stubGlobal("window", {
+      location: { hostname: "my-app.pages.dev", protocol: "https:", port: "" }
+    } as Window);
+
+    expect(resolveWebSocketUrl()).toBe("wss://my-app.pages.dev");
+  });
+
   it("keeps registrable domain for multi-level ccTLDs", () => {
     vi.stubGlobal("window", {
       location: { hostname: "arena.example.com.br", protocol: "https:", port: "" }

@@ -97,6 +97,14 @@ const isIpAddress = (hostname: string) => {
   return isIpv4Address(hostname);
 };
 
+const MULTI_TENANT_HOST_SUFFIXES = new Set([
+  "pages.dev",
+  "vercel.app",
+  "netlify.app",
+  "surge.sh",
+  "cloudflareapps.com"
+]);
+
 const formatHostnameForWebSocket = (hostname: string) => {
   if (!hostname.includes(":")) {
     return hostname;
@@ -138,6 +146,22 @@ export const resolveWebSocketUrl = (explicitUrl?: string) => {
   if (isIpAddress(hostname)) {
     const portSuffix = port ? `:${port}` : "";
     return `${websocketProtocol}//${formatHostnameForWebSocket(hostname)}${portSuffix}`;
+  }
+
+  const matchesMultiTenantSuffix = (() => {
+    for (const suffix of MULTI_TENANT_HOST_SUFFIXES) {
+      if (
+        normalizedHostname === suffix ||
+        normalizedHostname.endsWith(`.${suffix}`)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  })();
+
+  if (matchesMultiTenantSuffix) {
+    return `${websocketProtocol}//${formatHostnameForWebSocket(hostname)}`;
   }
 
   const hostnameParts = hostname.split(".").filter(Boolean);
