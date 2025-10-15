@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
-import { RoomDO } from "../src/RoomDO";
+import { RoomDO, WORLD_TICK_INTERVAL_MS } from "../src/RoomDO";
 import type { Env } from "../src";
 import type {
   CombatLogEntry,
@@ -215,6 +215,41 @@ describe("RoomDO distance-sensitive behaviour", () => {
     expect(updatedPlayers.has(playerFar.id)).toBe(false);
     expect(roomAny.microorganismBehavior.get(microorganism.id)?.lastAttackAt).toBe(now);
     expect(combatLog.some((entry) => entry.targetId === playerNear.id)).toBe(true);
+  });
+
+  it("ignores large position jumps from clients and caps movement per tick", async () => {
+    const { roomAny } = await createRoom();
+
+    const player: TestPlayer = createTestPlayer("speedster", {
+      position: { x: -360, y: -360 },
+      combatAttributes: { attack: 0, defense: 0, speed: 120, range: 0 },
+    });
+
+    roomAny.players.set(player.id, player);
+
+    const initialPosition = { ...player.position };
+
+    const action = {
+      type: "movement" as const,
+      position: { x: 10_000, y: 10_000 },
+      movementVector: { x: 5, y: 0 },
+      orientation: { angle: 0 },
+    };
+
+    const result = roomAny.applyPlayerAction(player, action);
+
+    expect(result).not.toBeNull();
+    expect(player.position).toEqual(initialPosition);
+    expect(player.movementVector.x).toBeCloseTo(1);
+    expect(player.movementVector.y).toBeCloseTo(0);
+
+    const deltaMs = WORLD_TICK_INTERVAL_MS * 10;
+    const moved = roomAny.movePlayerDuringTick(player, deltaMs);
+
+    expect(moved).toBe(true);
+    const expectedDistance = (player.combatAttributes.speed * WORLD_TICK_INTERVAL_MS) / 1000;
+    expect(player.position.x - initialPosition.x).toBeCloseTo(expectedDistance);
+    expect(player.position.y).toBeCloseTo(initialPosition.y);
   });
 });
 

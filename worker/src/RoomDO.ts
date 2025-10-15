@@ -58,7 +58,7 @@ const WORLD_KEY = "world";
 const ALARM_KEY = "alarms";
 const SNAPSHOT_STATE_KEY = "snapshot_state";
 
-const WORLD_TICK_INTERVAL_MS = 250;
+export const WORLD_TICK_INTERVAL_MS = 250;
 const SNAPSHOT_FLUSH_INTERVAL_MS = 500;
 const PLAYER_ATTACK_COOLDOWN_MS = 800;
 const PLAYER_COLLECT_RADIUS = 60;
@@ -876,7 +876,12 @@ export class RoomDO {
 
     const normalizedX = movement.x / magnitude;
     const normalizedY = movement.y / magnitude;
-    const distance = (speed * deltaMs) / 1000;
+    const cappedDeltaMs = Math.max(0, Math.min(deltaMs, WORLD_TICK_INTERVAL_MS));
+    if (cappedDeltaMs === 0) {
+      return false;
+    }
+
+    const distance = (speed * cappedDeltaMs) / 1000;
     const candidate = this.clampPosition({
       x: player.position.x + normalizedX * distance,
       y: player.position.y + normalizedY * distance,
@@ -1643,7 +1648,6 @@ export class RoomDO {
         return { updatedPlayers };
       }
       case "movement": {
-        const targetPosition = this.clampPosition(cloneVector(action.position));
         const normalizedMovement = cloneVector(action.movementVector);
         const magnitude = Math.sqrt(normalizedMovement.x ** 2 + normalizedMovement.y ** 2);
         if (!Number.isFinite(magnitude)) {
@@ -1654,10 +1658,12 @@ export class RoomDO {
           normalizedMovement.y /= magnitude;
         }
 
-        if (!this.isBlockedByObstacle(targetPosition)) {
-          player.position = targetPosition;
-        } else {
-          player.position = this.clampPosition(player.position);
+        const clampedPosition = this.clampPosition(player.position);
+        if (clampedPosition.x !== player.position.x || clampedPosition.y !== player.position.y) {
+          player.position = clampedPosition;
+        }
+
+        if (this.isBlockedByObstacle(player.position)) {
           normalizedMovement.x = 0;
           normalizedMovement.y = 0;
         }
