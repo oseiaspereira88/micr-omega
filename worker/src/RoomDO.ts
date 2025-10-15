@@ -890,9 +890,10 @@ export class RoomDO {
     now: number
   ): { playerUpdated: boolean; worldChanged: boolean; scoresChanged: boolean } {
     const collectedEntries: { id: string; matter: OrganicMatter }[] = [];
+    const collectRadiusSquared = PLAYER_COLLECT_RADIUS ** 2;
     for (const [id, matter] of this.organicMatter.entries()) {
-      const distance = this.distance(player.position, matter.position);
-      if (distance <= PLAYER_COLLECT_RADIUS) {
+      const distanceSquared = this.distanceSquared(player.position, matter.position);
+      if (distanceSquared <= collectRadiusSquared) {
         collectedEntries.push({ id, matter });
       }
     }
@@ -968,8 +969,9 @@ export class RoomDO {
       }
 
       const range = player.combatAttributes.range + PLAYER_ATTACK_RANGE_BUFFER;
-      const distance = this.distance(player.position, target.position);
-      if (distance > range) {
+      const rangeSquared = range ** 2;
+      const distanceSquared = this.distanceSquared(player.position, target.position);
+      if (distanceSquared > rangeSquared) {
         return { worldChanged, scoresChanged };
       }
 
@@ -1026,8 +1028,9 @@ export class RoomDO {
       }
 
       const range = player.combatAttributes.range + PLAYER_ATTACK_RANGE_BUFFER;
-      const distance = this.distance(player.position, microorganism.position);
-      if (distance > range) {
+      const rangeSquared = range ** 2;
+      const distanceSquared = this.distanceSquared(player.position, microorganism.position);
+      if (distanceSquared > rangeSquared) {
         return { worldChanged, scoresChanged };
       }
 
@@ -1155,11 +1158,11 @@ export class RoomDO {
         continue;
       }
 
-      let closest: { player: PlayerInternal; distance: number } | null = null;
+      let closest: { player: PlayerInternal; distanceSquared: number } | null = null;
       for (const player of this.players.values()) {
-        const distance = this.distance(player.position, microorganism.position);
-        if (!closest || distance < closest.distance) {
-          closest = { player, distance };
+        const distanceSquared = this.distanceSquared(player.position, microorganism.position);
+        if (!closest || distanceSquared < closest.distanceSquared) {
+          closest = { player, distanceSquared };
         }
       }
 
@@ -1168,7 +1171,8 @@ export class RoomDO {
       }
 
       const attackRange = 100;
-      if (closest.distance > attackRange) {
+      const attackRangeSquared = attackRange ** 2;
+      if (closest.distanceSquared > attackRangeSquared) {
         continue;
       }
 
