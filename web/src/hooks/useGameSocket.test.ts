@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { serverMessageSchema } from "../utils/messageTypes";
 import type { ClientMessage } from "../utils/messageTypes";
 import {
   computeReconnectDelay,
@@ -113,5 +114,42 @@ describe("computeReconnectDelay", () => {
     const delay = computeReconnectDelay(3, baseDelay, maxDelay, () => 0.25);
     const baseForAttempt = baseDelay * Math.pow(2, 2);
     expect(delay).toBe(baseForAttempt * 0.75);
+  });
+});
+
+describe("serverMessageSchema", () => {
+  it("accepts state diff messages with player removals", () => {
+    const message = {
+      type: "state" as const,
+      mode: "diff" as const,
+      state: { removedPlayerIds: ["player-1"] }
+    };
+
+    const result = serverMessageSchema.safeParse(message);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects legacy player join events with full snapshots", () => {
+    const message = {
+      type: "player_joined",
+      playerId: "player-1",
+      name: "Player",
+      state: {
+        phase: "waiting",
+        roundId: null,
+        roundStartedAt: null,
+        roundEndsAt: null,
+        players: [],
+        world: {
+          microorganisms: [],
+          organicMatter: [],
+          obstacles: [],
+          roomObjects: []
+        }
+      }
+    };
+
+    const result = serverMessageSchema.safeParse(message);
+    expect(result.success).toBe(false);
   });
 });

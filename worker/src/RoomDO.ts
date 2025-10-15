@@ -14,8 +14,6 @@ import {
   type PlayerAction,
   type PlayerAttackAction,
   type PlayerCollectAction,
-  type PlayerLeftMessage,
-  type PlayerJoinedMessage,
   type PlayerMovementAction,
   type PongMessage,
   type RankingEntry,
@@ -1661,11 +1659,13 @@ export class RoomDO {
 
     this.send(socket, joinedMessage);
 
-    const joinBroadcast: PlayerJoinedMessage = {
-      type: "player_joined",
-      playerId: player.id,
-      name: player.name,
-      state: sharedState
+    const joinDiff: SharedGameStateDiff = {
+      upsertPlayers: [this.serializePlayer(player)]
+    };
+    const joinBroadcast: StateDiffMessage = {
+      type: "state",
+      mode: "diff",
+      state: joinDiff
     };
 
     this.broadcast(joinBroadcast, socket);
@@ -2525,14 +2525,10 @@ export class RoomDO {
 
     this.markPlayersDirty();
 
-    const leftMessage: PlayerLeftMessage = {
-      type: "player_left",
-      playerId: removed.id,
-      name: removed.name,
-      state: this.serializeGameState()
-    };
+    const diff: SharedGameStateDiff = { removedPlayerIds: [removed.id] };
+    const stateMessage: StateDiffMessage = { type: "state", mode: "diff", state: diff };
 
-    this.broadcast(leftMessage);
+    this.broadcast(stateMessage);
 
     this.observability.log("info", "player_removed", {
       playerId: removed.id,
