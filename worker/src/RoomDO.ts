@@ -420,6 +420,8 @@ export class RoomDO {
     MAX_MESSAGES_GLOBAL,
     RATE_LIMIT_WINDOW_MS
   );
+  private rankingCache: RankingEntry[] = [];
+  private rankingDirty = true;
 
   private phase: GamePhase = "waiting";
   private roundId: string | null = null;
@@ -787,6 +789,10 @@ export class RoomDO {
     }
   }
 
+  private markRankingDirty(): void {
+    this.rankingDirty = true;
+  }
+
   private markWorldDirty(): void {
     const wasDirty = this.worldDirty;
     this.worldDirty = true;
@@ -948,6 +954,7 @@ export class RoomDO {
 
     if (totalScore > 0) {
       player.score = Math.max(0, player.score + totalScore);
+      this.markRankingDirty();
     }
 
     return {
@@ -1014,6 +1021,7 @@ export class RoomDO {
       const scoreAwarded = outcome === "defeated" ? 150 : 10;
       player.score = Math.max(0, player.score + scoreAwarded);
       scoresChanged = true;
+      this.markRankingDirty();
 
       if (outcome === "defeated") {
         target.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
@@ -1096,6 +1104,7 @@ export class RoomDO {
         const scoreAwarded = 120;
         player.score = Math.max(0, player.score + scoreAwarded);
         scoresChanged = true;
+        this.markRankingDirty();
 
         combatLog.push({
           timestamp: now,
@@ -1432,6 +1441,8 @@ export class RoomDO {
 
     const previousSocket = player ? this.socketsByPlayer.get(player.id) : undefined;
 
+    let rankingShouldUpdate = false;
+
     if (!player) {
       const id = crypto.randomUUID();
       const spawnPosition = this.clampPosition(getSpawnPositionForPlayer(id));
@@ -1455,7 +1466,9 @@ export class RoomDO {
       };
       this.players.set(id, player);
       this.nameToPlayerId.set(nameKey, id);
+      rankingShouldUpdate = true;
     } else {
+      const previousName = player.name;
       const previousKey = player.name.toLowerCase();
       if (previousKey !== nameKey && this.nameToPlayerId.get(previousKey) === player.id) {
         this.nameToPlayerId.delete(previousKey);
@@ -1468,6 +1481,9 @@ export class RoomDO {
       player.combatAttributes = createCombatAttributes(player.combatAttributes);
       this.players.set(player.id, player);
       this.nameToPlayerId.set(nameKey, player.id);
+      if (previousName !== normalizedName) {
+        rankingShouldUpdate = true;
+      }
     }
 
     if (previousSocket && previousSocket !== socket) {
@@ -1500,6 +1516,10 @@ export class RoomDO {
     });
 
     const reconnectUntil = now + RECONNECT_WINDOW_MS;
+
+    if (rankingShouldUpdate) {
+      this.markRankingDirty();
+    }
 
     const joinedMessage: JoinedMessage = {
       type: "joined",
@@ -1624,6 +1644,7 @@ export class RoomDO {
     }
 
     if (result.scoresChanged) {
+      this.markRankingDirty();
       const rankingMessage: RankingMessage = {
         type: "ranking",
         ranking: this.getRanking()
@@ -2034,6 +2055,7 @@ export class RoomDO {
     }
 
     if (scoresChanged) {
+      this.markRankingDirty();
       const rankingMessage: RankingMessage = {
         type: "ranking",
         ranking: this.getRanking(),
@@ -2227,11 +2249,15 @@ export class RoomDO {
   }
 
   private getRanking(): RankingEntry[] {
-    return Array.from(this.players.values())
+    if (!this.rankingDirty) {
+      return this.rankingCache;
+    }
+
+    this.rankingCache = Array.from(this.players.values())
       .map<RankingEntry>((player) => ({
         playerId: player.id,
         name: player.name,
-        score: player.score
+        score: player.score,
       }))
       .sort((a, b) => {
         if (b.score === a.score) {
@@ -2239,6 +2265,8 @@ export class RoomDO {
         }
         return b.score - a.score;
       });
+    this.rankingDirty = false;
+    return this.rankingCache;
   }
 
   private detachPlayer(playerId: string): PlayerInternal | null {
@@ -2248,6 +2276,7 @@ export class RoomDO {
     }
 
     this.players.delete(playerId);
+    this.markRankingDirty();
 
     const nameKey = player.name.toLowerCase();
     if (this.nameToPlayerId.get(nameKey) === playerId) {
