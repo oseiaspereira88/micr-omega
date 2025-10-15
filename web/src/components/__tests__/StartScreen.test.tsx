@@ -4,6 +4,7 @@ import StartScreen from "../StartScreen";
 import { GameSettingsProvider, useGameSettings } from "../../store/gameSettings";
 import { gameStore, type GameStoreState } from "../../store/gameStore";
 import { MIN_NAME_LENGTH } from "../../utils/messageTypes";
+import { INVALID_PLAYER_NAME_MESSAGE } from "../../utils/playerNameStorage";
 import React, { useEffect } from "react";
 
 const baseState = gameStore.getState();
@@ -77,7 +78,9 @@ describe("StartScreen", () => {
     fireEvent.click(startButton);
 
     expect(onStart).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent("Use entre");
+    const validationAlert = screen.getByRole("alert");
+    expect(validationAlert).toHaveTextContent(INVALID_PLAYER_NAME_MESSAGE);
+    expect(validationAlert.textContent).toBe(INVALID_PLAYER_NAME_MESSAGE);
   });
 
   it("mantém o foco no campo de nome quando a validação falha", () => {
