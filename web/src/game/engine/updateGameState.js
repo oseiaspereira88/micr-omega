@@ -38,9 +38,24 @@ const DEFAULT_SPECIES_COLOR = '#8fb8ff';
 
 const clampColorChannel = (value) => Math.min(255, Math.max(0, Math.round(value ?? 0)));
 
+const expandShorthandHex = (value) =>
+  value
+    .replace(/^#/, '')
+    .split('')
+    .map((char) => char + char)
+    .join('');
+
 const normalizeHexColor = (value) => {
-  if (typeof value !== 'string' || !value) return DEFAULT_SPECIES_COLOR;
-  return value.startsWith('#') ? value : `#${value}`;
+  if (typeof value !== 'string') return DEFAULT_SPECIES_COLOR;
+  const trimmed = value.trim();
+  if (!trimmed) return DEFAULT_SPECIES_COLOR;
+  if (/^#?[0-9a-fA-F]{6}$/.test(trimmed)) {
+    return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  }
+  if (/^#?[0-9a-fA-F]{3}$/.test(trimmed)) {
+    return `#${expandShorthandHex(trimmed)}`;
+  }
+  return DEFAULT_SPECIES_COLOR;
 };
 
 const adjustHexColor = (hex, delta) => {
@@ -76,6 +91,47 @@ const sumModifiers = (modifiers = []) =>
   (Array.isArray(modifiers) ? modifiers : [])
     .map((value) => (Number.isFinite(value) ? value : 0))
     .reduce((total, value) => total + value, 0);
+
+const MAX_HUD_NOTIFICATIONS = 5;
+
+const cloneNotifications = (items = []) =>
+  (Array.isArray(items) ? items : [])
+    .slice(-MAX_HUD_NOTIFICATIONS)
+    .map((entry) => ({ ...(typeof entry === 'object' ? entry : { text: entry }) }));
+
+const safeNumber = (value, fallback) => (Number.isFinite(value) ? value : fallback);
+
+const mergeNumericRecord = (defaults, ...sources) => {
+  const result = { ...defaults };
+  sources.forEach((source) => {
+    if (!source || typeof source !== 'object') return;
+    Object.entries(source).forEach(([key, value]) => {
+      if (Number.isFinite(value)) {
+        result[key] = value;
+      }
+    });
+  });
+  return result;
+};
+
+const mergeEvolutionSlots = (...sources) => {
+  const keys = ['small', 'medium', 'large'];
+  const result = Object.fromEntries(keys.map((key) => [key, { used: 0, max: 0 }]));
+  sources.forEach((source) => {
+    if (!source || typeof source !== 'object') return;
+    keys.forEach((key) => {
+      const slot = source[key];
+      if (!slot || typeof slot !== 'object') return;
+      if (Number.isFinite(slot.used)) {
+        result[key].used = slot.used;
+      }
+      if (Number.isFinite(slot.max)) {
+        result[key].max = slot.max;
+      }
+    });
+  });
+  return result;
+};
 
 export const calculateDamageWithResistances = ({
   baseDamage = 0,
@@ -129,10 +185,8 @@ export const calculateDamageWithResistances = ({
     ? combo.multiplier - 1
     : 0;
   const comboApplied = combo?.apply !== false;
-  const comboMultiplier = comboApplied
-    ? clampDamageMultiplier(1 + comboSourceBonus)
-    : 1;
   const reportedComboMultiplier = clampDamageMultiplier(1 + comboSourceBonus);
+  const comboMultiplier = comboApplied ? Math.max(1, reportedComboMultiplier) : 1;
 
   if (typeof hooks.onComboApplied === 'function') {
     hooks.onComboApplied({
@@ -407,14 +461,15 @@ const ensureVector = (value, fallback = { x: 0, y: 0 }) => {
   return { x, y };
 };
 
-const ensureHealth = (health) => {
+export const ensureHealth = (health) => {
   if (!health || typeof health !== 'object') {
     return { current: 0, max: 1 };
   }
 
-  const current = Number.isFinite(health.current) ? health.current : 0;
-  const max = Number.isFinite(health.max) && health.max > 0 ? health.max : Math.max(1, current);
-  return { current, max };
+  const rawCurrent = Number.isFinite(health.current) ? health.current : 0;
+  const safeMax = Number.isFinite(health.max) && health.max > 0 ? Math.max(1, health.max) : Math.max(1, rawCurrent);
+  const clampedCurrent = Math.min(Math.max(rawCurrent, 0), safeMax);
+  return { current: clampedCurrent, max: safeMax };
 };
 
 const normalizeMovementIntent = (intent = {}) => {
@@ -457,7 +512,7 @@ const createRenderPlayer = (sharedPlayer) => {
     id: sharedPlayer.id,
     name: sharedPlayer.name,
     score: Number.isFinite(sharedPlayer.score) ? sharedPlayer.score : 0,
-    combo: Number.isFinite(sharedPlayer.combo) ? sharedPlayer.combo : 0,
+    combo: Number.isFinite(sharedPlayer.combo) ? sharedPlayer.combo : 1,
     palette,
     position,
     renderPosition: { ...position },
@@ -534,7 +589,8 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
     existing.isLocal = player.id === localPlayerId;
     existing.name = player.name;
     existing.score = Number.isFinite(player.score) ? player.score : existing.score ?? 0;
-    existing.combo = Number.isFinite(player.combo) ? player.combo : existing.combo ?? 0;
+    const fallbackCombo = existing.combo ?? 1;
+    existing.combo = Number.isFinite(player.combo) ? player.combo : fallbackCombo;
     existing.element =
       player.element ??
       player.combatAttributes?.element ??
@@ -660,41 +716,92 @@ const updateWorldView = (renderState, sharedWorld) => {
   };
 };
 
-const buildHudSnapshot = (localPlayer, playerList, notifications, camera) => {
+const buildHudSnapshot = (
+  localPlayer,
+  playerList,
+  notifications,
+  camera,
+  previousHud = {}
+) => {
   const resourceBag = localPlayer?.resources || {};
-  const xp = resourceBag.xp || localPlayer?.xp || { ...DEFAULT_RESOURCE_STUB };
-  const geneticMaterial = resourceBag.geneticMaterial || { current: 0, total: 0, bonus: 0 };
-  const characteristicPoints = resourceBag.characteristicPoints || {
-    total: 0,
-    available: 0,
-    spent: 0,
-    perLevel: [],
-  };
-  const evolutionSlots = resourceBag.evolutionSlots || {
-    small: { used: 0, max: 0 },
-    medium: { used: 0, max: 0 },
-    large: { used: 0, max: 0 },
-  };
-  const reroll = resourceBag.reroll || { baseCost: 25, cost: 25, count: 0, pity: 0 };
-  const dropPity = resourceBag.dropPity || { fragment: 0, stableGene: 0 };
-  const geneFragments = {
-    minor: 0,
-    major: 0,
-    apex: 0,
-    ...(resourceBag.geneFragments || localPlayer?.geneFragments || {}),
-  };
-  const stableGenes = {
-    minor: 0,
-    major: 0,
-    apex: 0,
-    ...(resourceBag.stableGenes || localPlayer?.stableGenes || {}),
+
+  const xp = mergeNumericRecord(
+    DEFAULT_RESOURCE_STUB,
+    previousHud?.xp,
+    resourceBag.xp,
+    localPlayer?.xp
+  );
+  xp.current = safeNumber(xp.current, 0);
+  xp.next = safeNumber(xp.next, DEFAULT_RESOURCE_STUB.next);
+  xp.total = safeNumber(xp.total, 0);
+  xp.level = safeNumber(xp.level, DEFAULT_RESOURCE_STUB.level);
+
+  const geneticMaterial = mergeNumericRecord(
+    { current: 0, total: 0, bonus: 0 },
+    previousHud?.geneticMaterial,
+    resourceBag.geneticMaterial
+  );
+
+  const characteristicPointsSource =
+    resourceBag.characteristicPoints ?? previousHud.characteristicPoints ?? {};
+  const characteristicPoints = {
+    total: safeNumber(characteristicPointsSource.total, 0),
+    available: safeNumber(characteristicPointsSource.available, 0),
+    spent: safeNumber(characteristicPointsSource.spent, 0),
+    perLevel: Array.isArray(resourceBag.characteristicPoints?.perLevel)
+      ? [...resourceBag.characteristicPoints.perLevel]
+      : Array.isArray(previousHud.characteristicPoints?.perLevel)
+      ? [...previousHud.characteristicPoints.perLevel]
+      : [],
   };
 
-  const element = localPlayer?.element ?? ELEMENT_TYPES.BIO;
-  const affinity = localPlayer?.affinity ?? AFFINITY_TYPES.NEUTRAL;
-  const resistances = createResistanceSnapshot(localPlayer?.resistances);
+  const evolutionSlots = mergeEvolutionSlots(
+    previousHud.evolutionSlots,
+    resourceBag.evolutionSlots,
+    localPlayer?.evolutionSlots
+  );
+
+  const reroll = mergeNumericRecord(
+    { baseCost: 25, cost: 25, count: 0, pity: 0 },
+    previousHud.reroll,
+    resourceBag.reroll
+  );
+
+  const dropPity = mergeNumericRecord(
+    { fragment: 0, stableGene: 0 },
+    previousHud.dropPity,
+    resourceBag.dropPity
+  );
+
+  const geneFragments = mergeNumericRecord(
+    { minor: 0, major: 0, apex: 0 },
+    previousHud.geneFragments,
+    resourceBag.geneFragments,
+    localPlayer?.geneFragments
+  );
+
+  const stableGenes = mergeNumericRecord(
+    { minor: 0, major: 0, apex: 0 },
+    previousHud.stableGenes,
+    resourceBag.stableGenes,
+    localPlayer?.stableGenes
+  );
+
+  const element =
+    localPlayer?.element ?? previousHud.element ?? ELEMENT_TYPES.BIO;
+  const affinity =
+    localPlayer?.affinity ?? previousHud.affinity ?? AFFINITY_TYPES.NEUTRAL;
+  const resistances = createResistanceSnapshot(
+    localPlayer?.resistances ?? previousHud.resistances ?? {}
+  );
   const statusEffects = Array.isArray(localPlayer?.statusEffects)
-    ? localPlayer.statusEffects
+    ? localPlayer.statusEffects.map((effect) =>
+        typeof effect === 'object' ? { ...effect } : effect
+      )
+    : Array.isArray(previousHud.statusEffects)
+    ? previousHud.statusEffects.map((effect) =>
+        typeof effect === 'object' ? { ...effect } : effect
+      )
     : [];
 
   const opponents = playerList
@@ -718,47 +825,179 @@ const buildHudSnapshot = (localPlayer, playerList, notifications, camera) => {
       };
     });
 
-  return {
-    energy: 0,
-    level: 1,
-    score: localPlayer?.score ?? 0,
-    health: localPlayer?.health?.current ?? 0,
-    maxHealth: localPlayer?.health?.max ?? 1,
-    dashCharge: 100,
-    combo: localPlayer?.combo ?? 0,
-    maxCombo: localPlayer?.combo ?? 0,
-    activePowerUps: [],
-    bossActive: false,
-    bossHealth: 0,
-    bossMaxHealth: 0,
-    skillList: [],
-    hasMultipleSkills: false,
-    currentSkill: null,
-    notifications,
-    evolutionMenu: {
+  const notificationsSnapshot = cloneNotifications(notifications);
+
+  const energy = safeNumber(
+    resourceBag.energy ?? localPlayer?.energy,
+    safeNumber(previousHud.energy, 0)
+  );
+  const dashCharge = safeNumber(
+    resourceBag.dashCharge ?? localPlayer?.dashCharge,
+    safeNumber(previousHud.dashCharge, 100)
+  );
+  const score = safeNumber(
+    localPlayer?.score,
+    safeNumber(previousHud.score, 0)
+  );
+  const currentCombo = Number.isFinite(localPlayer?.combo)
+    ? Math.max(0, localPlayer.combo)
+    : Math.max(0, previousHud.combo ?? 0);
+  const maxCombo = Math.max(
+    Number.isFinite(previousHud.maxCombo) ? previousHud.maxCombo : currentCombo,
+    currentCombo
+  );
+
+  const activePowerUpsSource = Array.isArray(localPlayer?.activePowerUps)
+    ? localPlayer.activePowerUps
+    : Array.isArray(previousHud.activePowerUps)
+    ? previousHud.activePowerUps
+    : [];
+  const activePowerUps = activePowerUpsSource.map((powerUp) =>
+    typeof powerUp === 'object' ? { ...powerUp } : powerUp
+  );
+
+  const skillListSource = Array.isArray(localPlayer?.skillList)
+    ? localPlayer.skillList
+    : Array.isArray(previousHud.skillList)
+    ? previousHud.skillList
+    : [];
+  const skillList = skillListSource.map((skill) =>
+    typeof skill === 'object' ? { ...skill } : skill
+  );
+
+  const hasMultipleSkills =
+    typeof localPlayer?.hasMultipleSkills === 'boolean'
+      ? localPlayer.hasMultipleSkills
+      : Boolean(previousHud.hasMultipleSkills);
+  const currentSkill =
+    localPlayer?.currentSkill ?? previousHud.currentSkill ?? null;
+
+  const bossActive =
+    typeof localPlayer?.bossActive === 'boolean'
+      ? localPlayer.bossActive
+      : typeof previousHud.bossActive === 'boolean'
+      ? previousHud.bossActive
+      : false;
+  const bossHealth = safeNumber(
+    localPlayer?.bossHealth,
+    safeNumber(previousHud.bossHealth, 0)
+  );
+  const bossMaxHealth = safeNumber(
+    localPlayer?.bossMaxHealth,
+    safeNumber(previousHud.bossMaxHealth, bossHealth || 0)
+  );
+
+  const evolutionMenuSource =
+    localPlayer?.evolutionMenu ??
+    resourceBag.evolutionMenu ??
+    previousHud.evolutionMenu ?? {
       activeTier: 'small',
       options: { small: [], medium: [], large: [] },
+    };
+  const previousEvolutionMenu =
+    previousHud.evolutionMenu ?? evolutionMenuSource ?? {};
+  const evolutionMenu = {
+    activeTier:
+      evolutionMenuSource.activeTier ?? previousEvolutionMenu.activeTier ?? 'small',
+    options: {
+      small: Array.isArray(evolutionMenuSource.options?.small)
+        ? [...evolutionMenuSource.options.small]
+        : Array.isArray(previousEvolutionMenu.options?.small)
+        ? [...previousEvolutionMenu.options.small]
+        : [],
+      medium: Array.isArray(evolutionMenuSource.options?.medium)
+        ? [...evolutionMenuSource.options.medium]
+        : Array.isArray(previousEvolutionMenu.options?.medium)
+        ? [...previousEvolutionMenu.options.medium]
+        : [],
+      large: Array.isArray(evolutionMenuSource.options?.large)
+        ? [...evolutionMenuSource.options.large]
+        : Array.isArray(previousEvolutionMenu.options?.large)
+        ? [...previousEvolutionMenu.options.large]
+        : [],
     },
-    currentForm: null,
-    evolutionType: null,
-    showEvolutionChoice: false,
-    showMenu: false,
-    gameOver: false,
-    cameraZoom: camera?.zoom ?? 1,
+  };
+
+  const currentForm =
+    localPlayer?.currentForm ?? previousHud.currentForm ?? null;
+  const evolutionType =
+    localPlayer?.evolutionType ?? previousHud.evolutionType ?? null;
+  const showEvolutionChoice =
+    typeof localPlayer?.showEvolutionChoice === 'boolean'
+      ? localPlayer.showEvolutionChoice
+      : typeof previousHud.showEvolutionChoice === 'boolean'
+      ? previousHud.showEvolutionChoice
+      : false;
+  const showMenu =
+    typeof localPlayer?.showMenu === 'boolean'
+      ? localPlayer.showMenu
+      : typeof previousHud.showMenu === 'boolean'
+      ? previousHud.showMenu
+      : false;
+  const gameOver =
+    typeof localPlayer?.gameOver === 'boolean'
+      ? localPlayer.gameOver
+      : typeof previousHud.gameOver === 'boolean'
+      ? previousHud.gameOver
+      : false;
+
+  const cameraZoom = safeNumber(
+    camera?.zoom,
+    safeNumber(previousHud.cameraZoom, 1)
+  );
+
+  const recentRewards = previousHud.recentRewards
+    ? { ...previousHud.recentRewards }
+    : { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 };
+
+  const healthCurrent = safeNumber(
+    localPlayer?.health?.current,
+    safeNumber(previousHud.health, 0)
+  );
+  const healthMax = safeNumber(
+    localPlayer?.health?.max,
+    safeNumber(previousHud.maxHealth, 1)
+  );
+
+  const level = safeNumber(
+    resourceBag.level ?? localPlayer?.level ?? xp.level,
+    safeNumber(previousHud.level, xp.level)
+  );
+
+  const snapshot = {
+    energy,
+    level,
+    score,
+    health: healthCurrent,
+    maxHealth: Math.max(1, healthMax),
+    dashCharge,
+    combo: currentCombo,
+    maxCombo,
+    activePowerUps,
+    bossActive,
+    bossHealth,
+    bossMaxHealth,
+    skillList,
+    hasMultipleSkills,
+    currentSkill,
+    notifications: notificationsSnapshot,
+    evolutionMenu,
+    currentForm,
+    evolutionType,
+    showEvolutionChoice,
+    showMenu,
+    gameOver,
+    cameraZoom,
     opponents,
-    xp: { ...xp },
-    geneticMaterial: { ...geneticMaterial },
-    characteristicPoints: { ...characteristicPoints },
+    xp,
+    geneticMaterial,
+    characteristicPoints,
     geneFragments,
     stableGenes,
-    evolutionSlots: {
-      small: { ...(evolutionSlots.small || { used: 0, max: 0 }) },
-      medium: { ...(evolutionSlots.medium || { used: 0, max: 0 }) },
-      large: { ...(evolutionSlots.large || { used: 0, max: 0 }) },
-    },
-    reroll: { ...reroll },
-    dropPity: { ...dropPity },
-    recentRewards: { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 },
+    evolutionSlots,
+    reroll,
+    dropPity,
+    recentRewards,
     element,
     affinity,
     resistances,
@@ -766,6 +1005,21 @@ const buildHudSnapshot = (localPlayer, playerList, notifications, camera) => {
     elementLabel: ELEMENT_LABELS[element] ?? element,
     affinityLabel: AFFINITY_LABELS[affinity] ?? affinity,
   };
+
+  if (previousHud.archetypeSelection) {
+    snapshot.archetypeSelection = {
+      ...previousHud.archetypeSelection,
+      options: previousHud.archetypeSelection.options
+        ? { ...previousHud.archetypeSelection.options }
+        : previousHud.archetypeSelection.options,
+    };
+  }
+
+  if (previousHud.selectedArchetype) {
+    snapshot.selectedArchetype = previousHud.selectedArchetype;
+  }
+
+  return snapshot;
 };
 
 const collectCommands = (renderState, movementIntent, actionBuffer) => {
@@ -863,7 +1117,8 @@ export const updateGameState = ({
     localRenderPlayer,
     renderState.playerList,
     renderState.notifications,
-    renderState.camera
+    renderState.camera,
+    renderState.hudSnapshot
   );
   if (renderState.localArchetypeSelection) {
     hudSnapshot.archetypeSelection = {
@@ -879,6 +1134,8 @@ export const updateGameState = ({
     rng: helpers.rng ?? Math.random,
     xpConfig: helpers.xpConfig ?? XP_DISTRIBUTION,
   });
+
+  renderState.hudSnapshot = hudSnapshot;
 
   if (typeof helpers.playSound === 'function' && commands.attacks.length > 0) {
     helpers.playSound('attack');

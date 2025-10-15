@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   updateGameState,
@@ -7,6 +7,7 @@ import {
   applyProgressionEvents,
   XP_DISTRIBUTION,
   calculateDamageWithResistances,
+  ensureHealth,
 } from './updateGameState';
 import { DROP_TABLES } from '../config/enemyTemplates';
 import { AFFINITY_TYPES, ELEMENT_TYPES } from '../../shared/combat';
@@ -130,6 +131,14 @@ const createSharedState = (overrides = {}) => ({
   },
 });
 
+describe('ensureHealth', () => {
+  it('clamps health values within safe bounds', () => {
+    expect(ensureHealth({ current: 150, max: 100 })).toEqual({ current: 100, max: 100 });
+    expect(ensureHealth({ current: -5, max: 0 })).toEqual({ current: 0, max: 1 });
+    expect(ensureHealth({ current: 20 })).toEqual({ current: 20, max: 20 });
+  });
+});
+
 describe('calculateDamageWithResistances', () => {
   it('applies RPS advantage, affinity and resistances', () => {
     const result = calculateDamageWithResistances({
@@ -181,6 +190,22 @@ describe('calculateDamageWithResistances', () => {
     expect(result.damage).toBe(103);
     expect(result.breakdown.resistance).toBeCloseTo(0.9, 2);
     expect(result.breakdown.rps).toBeCloseTo(1.15, 2);
+  });
+
+  it('does not reduce damage when combo multipliers fall below one', () => {
+    const hook = vi.fn();
+    const result = calculateDamageWithResistances({
+      baseDamage: 100,
+      combo: { multiplier: 0.4 },
+      hooks: { onComboApplied: hook },
+    });
+
+    expect(result.damage).toBe(100);
+    expect(result.breakdown.combo).toBe(1);
+    expect(result.multiplier).toBe(1);
+    expect(hook).toHaveBeenCalledWith(
+      expect.objectContaining({ multiplier: 0.4, applied: true })
+    );
   });
 });
 
@@ -342,6 +367,111 @@ describe('updateGameState', () => {
     expect(hudSnapshot.geneticMaterial).toEqual(
       expect.objectContaining({ current: expect.any(Number), total: expect.any(Number) })
     );
+  });
+
+  it('persists HUD data between frames and normalizes short hex colors', () => {
+    const renderState = createRenderState();
+    const previousHud = {
+      energy: 42,
+      level: 4,
+      score: 99,
+      health: 88,
+      maxHealth: 120,
+      dashCharge: 77,
+      combo: 3,
+      maxCombo: 7,
+      recentRewards: { xp: 1, geneticMaterial: 2, fragments: 3, stableGenes: 4 },
+      xp: { current: 10, next: 120, total: 10, level: 2 },
+      geneticMaterial: { current: 5, total: 15, bonus: 1 },
+      characteristicPoints: { total: 2, available: 1, spent: 1, perLevel: [1] },
+      geneFragments: { minor: 1, major: 2, apex: 3 },
+      stableGenes: { minor: 0, major: 1, apex: 0 },
+      evolutionSlots: {
+        small: { used: 1, max: 2 },
+        medium: { used: 0, max: 1 },
+        large: { used: 0, max: 1 },
+      },
+      reroll: { baseCost: 30, cost: 45, count: 2, pity: 1 },
+      dropPity: { fragment: 2, stableGene: 3 },
+      evolutionMenu: { activeTier: 'medium', options: { small: ['a'], medium: ['b'], large: [] } },
+      archetypeSelection: { activeTier: 'medium', options: { small: ['a'], medium: ['b'], large: [] } },
+      selectedArchetype: 'guardian',
+      statusEffects: [{ type: 'shield', stacks: 1 }],
+      element: ELEMENT_TYPES.BIO,
+      affinity: AFFINITY_TYPES.NEUTRAL,
+      resistances: { [ELEMENT_TYPES.BIO]: 0.1 },
+      cameraZoom: 1.1,
+      notifications: [],
+    };
+    renderState.hudSnapshot = previousHud;
+    renderState.notifications = Array.from({ length: 7 }, (_, index) => ({
+      id: index,
+      text: `note-${index}`,
+    }));
+
+    const localPlayer = createPlayer({ id: 'p1', name: 'Local' });
+    delete localPlayer.combo;
+
+    const sharedState = createSharedState({
+      playerId: 'p1',
+      players: [localPlayer],
+      world: {
+        microorganisms: [
+          {
+            id: 'micro-short-hex',
+            kind: 'microorganism',
+            species: 'mystic',
+            position: { x: 0, y: 0 },
+            movementVector: { x: 0, y: 0 },
+            orientation: { angle: 0 },
+            health: { current: 2, max: 4 },
+            color: '#0f0',
+          },
+        ],
+        organicMatter: [],
+        obstacles: [],
+        roomObjects: [],
+      },
+    });
+
+    const result = updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    expect(result.hudSnapshot.energy).toBe(42);
+    expect(result.hudSnapshot.dashCharge).toBe(77);
+    expect(result.hudSnapshot.combo).toBe(1);
+    expect(result.hudSnapshot.maxCombo).toBe(7);
+    expect(result.hudSnapshot.recentRewards).toEqual(previousHud.recentRewards);
+    expect(result.hudSnapshot.recentRewards).not.toBe(previousHud.recentRewards);
+    expect(result.hudSnapshot.dropPity).toEqual(previousHud.dropPity);
+    expect(result.hudSnapshot.dropPity).not.toBe(previousHud.dropPity);
+    expect(result.hudSnapshot.geneFragments).toEqual(previousHud.geneFragments);
+    expect(result.hudSnapshot.geneFragments).not.toBe(previousHud.geneFragments);
+    expect(result.hudSnapshot.stableGenes).toEqual(previousHud.stableGenes);
+    expect(result.hudSnapshot.stableGenes).not.toBe(previousHud.stableGenes);
+    expect(result.hudSnapshot.notifications).toHaveLength(5);
+    expect(result.hudSnapshot.notifications.map((note) => note.text)).toEqual([
+      'note-2',
+      'note-3',
+      'note-4',
+      'note-5',
+      'note-6',
+    ]);
+    expect(result.hudSnapshot.notifications).not.toBe(renderState.notifications);
+    expect(result.hudSnapshot.xp).toEqual(previousHud.xp);
+    expect(result.hudSnapshot.xp).not.toBe(previousHud.xp);
+    expect(result.hudSnapshot.statusEffects).toEqual(previousHud.statusEffects);
+    expect(result.hudSnapshot.statusEffects).not.toBe(previousHud.statusEffects);
+    expect(result.hudSnapshot.evolutionMenu).toEqual(previousHud.evolutionMenu);
+    expect(result.hudSnapshot.archetypeSelection).toEqual(previousHud.archetypeSelection);
+    expect(result.hudSnapshot.selectedArchetype).toBe(previousHud.selectedArchetype);
+    expect(renderState.hudSnapshot).toBe(result.hudSnapshot);
+    expect(renderState.worldView.microorganisms[0].color).toBe('#00ff00');
   });
 
   it('maps microorganisms into renderer-friendly descriptors', () => {
