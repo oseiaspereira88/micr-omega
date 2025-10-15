@@ -41,7 +41,10 @@ const App = () => {
           ? players[playerId] ?? state?.remotePlayers?.byId?.[playerId]
           : null;
 
-      if (hasMovementCommand && playerId && player) {
+      const phase = state?.room?.phase;
+      const isGamePhaseActive = phase === 'active';
+
+      if (hasMovementCommand && playerId && player && isGamePhaseActive) {
         const vector = hasMovementCommand.vector ?? {};
         const rawSpeed = hasMovementCommand.speed;
         const timestamp = hasMovementCommand.timestamp;
