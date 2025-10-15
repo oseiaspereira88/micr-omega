@@ -136,6 +136,49 @@ describe("RankingPanel", () => {
     expect(secondRow.getByLabelText("Jogador desconectado")).toBeVisible();
   });
 
+  it("matches snapshot for a populated ranking", () => {
+    const { asFragment } = render(<RankingPanel />);
+
+    act(() => {
+      const players: GameStoreState["players"] = {
+        alpha: createPlayer({
+          id: "alpha",
+          name: "Alice",
+          connected: true,
+          score: 4_200,
+          combo: 2,
+          lastActiveAt: 10_000,
+        }),
+        beta: createPlayer({
+          id: "beta",
+          name: "Bruno",
+          connected: false,
+          score: 3_150,
+          combo: 1,
+          lastActiveAt: 9_000,
+        }),
+      };
+      const remotePlayers = {
+        byId: players,
+        all: Object.values(players),
+      };
+
+      gameStore.setState(() => ({
+        ...snapshot(),
+        connectionStatus: "connected",
+        playerId: "beta",
+        players,
+        remotePlayers,
+        ranking: [
+          { playerId: "alpha", name: "Alice", score: 4_200 },
+          { playerId: "beta", name: "Bruno", score: 3_150 },
+        ],
+      }));
+    });
+
+    expect(asFragment()).toMatchSnapshot();
+  });
+
   it("orders ranking entries by score and name for ties", () => {
     render(<RankingPanel />);
 

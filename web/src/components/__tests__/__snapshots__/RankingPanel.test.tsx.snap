@@ -1,0 +1,89 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`RankingPanel > matches snapshot for a populated ranking 1`] = `
+<DocumentFragment>
+  <aside
+    aria-label="Ranking da partida"
+    class="_panel_0f10a4"
+  >
+    <header
+      class="_header_0f10a4"
+    >
+      <h3
+        class="_title_0f10a4"
+      >
+        Ranking
+      </h3>
+      <span
+        class="_statusBadge_0f10a4 _statusConnected_0f10a4"
+      >
+        Ao vivo
+      </span>
+    </header>
+    <ol
+      class="_list_0f10a4"
+    >
+      <li
+        class="_item_0f10a4 _top1_0f10a4"
+      >
+        <span
+          class="_rankBadge_0f10a4"
+        >
+          1
+        </span>
+        <div
+          class="_nameCell_0f10a4"
+        >
+          <span
+            class="_name_0f10a4"
+            title="Alice"
+          >
+            Alice
+          </span>
+        </div>
+        <span
+          class="_score_0f10a4"
+        >
+          4.200
+        </span>
+      </li>
+      <li
+        class="_item_0f10a4 _top2_0f10a4 _localPlayer_0f10a4"
+      >
+        <span
+          class="_rankBadge_0f10a4"
+        >
+          2
+        </span>
+        <div
+          class="_nameCell_0f10a4"
+        >
+          <span
+            class="_name_0f10a4"
+            title="Bruno"
+          >
+            Bruno
+          </span>
+          <span
+            class="_localTag_0f10a4"
+          >
+            Você
+          </span>
+        </div>
+        <span
+          class="_score_0f10a4"
+        >
+          3.150
+          <span
+            aria-label="Jogador desconectado"
+            class="_disconnected_0f10a4"
+            title="Jogador desconectado"
+          >
+             ⚠️
+          </span>
+        </span>
+      </li>
+    </ol>
+  </aside>
+</DocumentFragment>
+`;
