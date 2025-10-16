@@ -682,7 +682,66 @@ const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
   roomObjects: [],
 };
 
-const createInitialWorldState = (): SharedWorldState => cloneWorldState(INITIAL_WORLD_TEMPLATE);
+type WorldGenerationOptions = {
+  primarySpawn?: Vector2 | null;
+};
+
+const clampToWorldBounds = (position: Vector2): Vector2 => ({
+  x: clamp(position.x, WORLD_BOUNDS.minX, WORLD_BOUNDS.maxX),
+  y: clamp(position.y, WORLD_BOUNDS.minY, WORLD_BOUNDS.maxY),
+});
+
+const translateWithinWorldBounds = (position: Vector2, offset: Vector2): Vector2 =>
+  clampToWorldBounds({
+    x: position.x + offset.x,
+    y: position.y + offset.y,
+  });
+
+const createInitialWorldState = (options: WorldGenerationOptions = {}): SharedWorldState => {
+  const base = cloneWorldState(INITIAL_WORLD_TEMPLATE);
+  const primarySpawn = options.primarySpawn;
+  if (!primarySpawn) {
+    return base;
+  }
+
+  const offset = { x: primarySpawn.x, y: primarySpawn.y };
+
+  const translatedMicroorganisms = base.microorganisms.map((entity) => ({
+    ...entity,
+    position: translateWithinWorldBounds(entity.position, offset),
+  }));
+
+  const translatedOrganicMatter = base.organicMatter.map((matter) => ({
+    ...matter,
+    position: translateWithinWorldBounds(matter.position, offset),
+  }));
+
+  return {
+    ...base,
+    microorganisms: translatedMicroorganisms,
+    organicMatter: translatedOrganicMatter,
+  };
+};
+
+const haveEntityPositionsChanged = <T extends { id: string; position: Vector2 }>(
+  previous: readonly T[],
+  next: readonly T[],
+): boolean => {
+  if (previous.length !== next.length) {
+    return true;
+  }
+  const nextById = new Map(next.map((entity) => [entity.id, entity]));
+  for (const entity of previous) {
+    const candidate = nextById.get(entity.id);
+    if (!candidate) {
+      return true;
+    }
+    if (entity.position.x !== candidate.position.x || entity.position.y !== candidate.position.y) {
+      return true;
+    }
+  }
+  return false;
+};
 
 const PLAYER_SPAWN_DISTANCE_RATIO = 18 / 25;
 const PLAYER_SPAWN_DISTANCE = WORLD_RADIUS * PLAYER_SPAWN_DISTANCE_RATIO;
@@ -1060,7 +1119,8 @@ export class RoomDO {
     if (storedWorld) {
       this.world = cloneWorldState(storedWorld);
     } else {
-      this.world = createInitialWorldState();
+      const primarySpawn = this.getPrimarySpawnPosition();
+      this.world = createInitialWorldState({ primarySpawn });
       await this.state.storage.put(WORLD_KEY, cloneWorldState(this.world));
     }
     this.rebuildWorldCaches();
@@ -1144,6 +1204,64 @@ export class RoomDO {
     for (const microorganism of this.microorganisms.values()) {
       this.microorganismBehavior.set(microorganism.id, { lastAttackAt: now });
     }
+  }
+
+  private getPrimaryPlayerForSpawn(): PlayerInternal | null {
+    const connectedPlayers = Array.from(this.players.values())
+      .filter((player) => player.connected)
+      .sort((a, b) => {
+        const aConnectedAt = a.connectedAt ?? Number.MAX_SAFE_INTEGER;
+        const bConnectedAt = b.connectedAt ?? Number.MAX_SAFE_INTEGER;
+        if (aConnectedAt === bConnectedAt) {
+          return a.id.localeCompare(b.id);
+        }
+        return aConnectedAt - bConnectedAt;
+      });
+
+    if (connectedPlayers.length > 0) {
+      return connectedPlayers[0];
+    }
+
+    const iterator = this.players.values().next();
+    return iterator.value ?? null;
+  }
+
+  private getPrimarySpawnPosition(): Vector2 | null {
+    const player = this.getPrimaryPlayerForSpawn();
+    if (!player) {
+      return null;
+    }
+    const spawn = getSpawnPositionForPlayer(player.id);
+    return { x: spawn.x, y: spawn.y };
+  }
+
+  private regenerateWorldForPrimarySpawn(): SharedWorldStateDiff | null {
+    const primarySpawn = this.getPrimarySpawnPosition();
+    const nextWorld = createInitialWorldState({ primarySpawn });
+
+    const previousWorld = this.world;
+    const microorganismsChanged = haveEntityPositionsChanged(
+      previousWorld.microorganisms,
+      nextWorld.microorganisms,
+    );
+    const organicMatterChanged = haveEntityPositionsChanged(
+      previousWorld.organicMatter,
+      nextWorld.organicMatter,
+    );
+
+    this.world = nextWorld;
+    this.rebuildWorldCaches();
+
+    if (!microorganismsChanged && !organicMatterChanged) {
+      return null;
+    }
+
+    this.markWorldDirty();
+
+    return {
+      upsertMicroorganisms: nextWorld.microorganisms.map((entity) => cloneMicroorganism(entity)),
+      upsertOrganicMatter: nextWorld.organicMatter.map((matter) => cloneOrganicMatter(matter)),
+    };
   }
 
   private getOrganicMatterCellKeyFromCoordinates(cellX: number, cellY: number): string {
@@ -2889,6 +3007,8 @@ export class RoomDO {
       return;
     }
 
+    const worldDiff = this.regenerateWorldForPrimarySpawn();
+
     this.phase = "active";
     this.roundId = crypto.randomUUID();
     this.roundStartedAt = Date.now();
@@ -2905,6 +3025,15 @@ export class RoomDO {
     };
 
     this.broadcast(stateMessage);
+
+    if (worldDiff) {
+      const worldDiffMessage: StateDiffMessage = {
+        type: "state",
+        mode: "diff",
+        state: { world: worldDiff },
+      };
+      this.broadcast(worldDiffMessage);
+    }
 
     const now = Date.now();
     this.lastWorldTickAt = now;
@@ -2972,8 +3101,7 @@ export class RoomDO {
     this.roundId = null;
     this.roundStartedAt = null;
     this.roundEndsAt = null;
-    this.world = createInitialWorldState();
-    this.rebuildWorldCaches();
+    const worldDiff = this.regenerateWorldForPrimarySpawn();
 
     const resetTimestamp = Date.now();
     for (const player of this.players.values()) {
@@ -3014,6 +3142,15 @@ export class RoomDO {
     };
 
     this.broadcast(message);
+
+    if (worldDiff) {
+      const worldDiffMessage: StateDiffMessage = {
+        type: "state",
+        mode: "diff",
+        state: { world: worldDiff },
+      };
+      this.broadcast(worldDiffMessage);
+    }
 
     await this.maybeStartGame();
   }
