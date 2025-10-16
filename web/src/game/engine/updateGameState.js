@@ -1297,23 +1297,32 @@ const collectCommands = (renderState, movementIntent, actionBuffer) => {
   const commands = { movement: null, attacks: [] };
 
   const lastIntent = renderState.lastMovementIntent || { ...normalized };
+  const lastAngle = Number.isFinite(renderState.lastMovementAngle)
+    ? renderState.lastMovementAngle
+    : null;
   const movementChanged =
     Math.abs(lastIntent.x - normalized.x) > 0.01 || Math.abs(lastIntent.y - normalized.y) > 0.01;
 
   if (normalized.active && movementChanged) {
+    const angle = Math.atan2(normalized.y, normalized.x);
     commands.movement = {
       vector: { x: normalized.x, y: normalized.y },
       speed: SPEED_SCALER,
       timestamp: Date.now(),
+      orientation: { angle },
     };
     renderState.lastMovementIntent = { ...normalized };
+    renderState.lastMovementAngle = angle;
   } else if (!normalized.active && movementChanged) {
+    const angle = Number.isFinite(lastAngle) ? lastAngle : 0;
     commands.movement = {
       vector: { x: 0, y: 0 },
       speed: 0,
       timestamp: Date.now(),
+      orientation: { angle },
     };
     renderState.lastMovementIntent = { ...normalized };
+    renderState.lastMovementAngle = angle;
   }
 
   if (Array.isArray(actionBuffer?.attacks) && actionBuffer.attacks.length > 0) {
@@ -1409,6 +1418,19 @@ export const updateGameState = ({
   }
 
   const commands = collectCommands(renderState, movementIntent, actionBuffer);
+
+  if (
+    localRenderPlayer &&
+    commands.movement?.orientation &&
+    Number.isFinite(commands.movement.orientation.angle)
+  ) {
+    const angle = commands.movement.orientation.angle;
+    localRenderPlayer.orientation = angle;
+    const localEntry = renderState.playersById?.get(localRenderPlayer.id);
+    if (localEntry) {
+      localEntry.orientation = angle;
+    }
+  }
 
   const hudSnapshot = buildHudSnapshot(
     localRenderPlayer,

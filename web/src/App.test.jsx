@@ -257,4 +257,32 @@ describe('App command batch handling', () => {
 
     expect(sendAttackMock).not.toHaveBeenCalled();
   });
+
+  it('prioritizes command orientation when sending movement updates', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockSettingsRef.current).toBeTruthy();
+    });
+
+    const settings = mockSettingsRef.current;
+    sendMovementMock.mockClear();
+
+    const commandOrientation = { angle: Math.PI / 3, tilt: 0.25 };
+
+    await act(async () => {
+      settings.onCommandBatch({
+        movement: {
+          vector: { x: 0.5, y: 0.5 },
+          speed: 30,
+          timestamp: 123,
+          orientation: commandOrientation,
+        },
+      });
+    });
+
+    expect(sendMovementMock).toHaveBeenCalledTimes(1);
+    const [payload] = sendMovementMock.mock.calls[0];
+    expect(payload.orientation).toEqual(commandOrientation);
+  });
 });

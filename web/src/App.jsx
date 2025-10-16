@@ -63,12 +63,18 @@ const App = () => {
         const posY = Number.isFinite(position?.y) ? position.y : null;
 
         if (posX !== null && posY !== null) {
+          const commandOrientation = hasMovementCommand.orientation ?? {};
           const orientationState = player.orientation ?? {};
+          const angleFromCommand = Number.isFinite(commandOrientation.angle)
+            ? commandOrientation.angle
+            : null;
           const orientation = {
-            angle: Number.isFinite(orientationState.angle) ? orientationState.angle : 0,
+            angle: angleFromCommand ?? (Number.isFinite(orientationState.angle) ? orientationState.angle : 0),
           };
 
-          if (Number.isFinite(orientationState.tilt)) {
+          if (Number.isFinite(commandOrientation.tilt)) {
+            orientation.tilt = commandOrientation.tilt;
+          } else if (Number.isFinite(orientationState.tilt)) {
             orientation.tilt = orientationState.tilt;
           }
 
