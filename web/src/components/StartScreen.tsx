@@ -210,6 +210,8 @@ const StartScreen = ({
                 <label className={styles.toggleWrapper}>
                   <input
                     type="checkbox"
+                    id="audio-enabled"
+                    name="audio-enabled"
                     className={styles.toggle}
                     checked={settings.audioEnabled}
                     onChange={handleAudioToggle}
@@ -221,12 +223,19 @@ const StartScreen = ({
 
               <div className={styles.optionRow}>
                 <div className={styles.optionContent}>
-                  <span className={styles.optionTitle}>Densidade visual</span>
+                  <label
+                    className={styles.optionTitle}
+                    htmlFor="visual-density"
+                  >
+                    Densidade visual
+                  </label>
                   <span className={styles.optionDescription}>
                     Ajuste a quantidade de partículas e elementos em cena.
                   </span>
                 </div>
                 <select
+                  id="visual-density"
+                  name="visual-density"
                   className={`${styles.select} ${styles.input}`.trim()}
                   value={settings.visualDensity}
                   onChange={handleDensityChange}
@@ -249,6 +258,8 @@ const StartScreen = ({
                 <label className={styles.toggleWrapper}>
                   <input
                     type="checkbox"
+                    id="show-touch-controls"
+                    name="show-touch-controls"
                     className={styles.checkbox}
                     checked={settings.showTouchControls}
                     onChange={handleTouchToggle}
