@@ -6,14 +6,16 @@ import App from './App.jsx';
 import { gameStore } from './store/gameStore';
 
 const sendMock = vi.fn();
+const sendAttackMock = vi.fn();
+const sendMovementMock = vi.fn();
 const mockSettingsRef = { current: null };
 
 vi.mock('./hooks/useGameSocket', () => ({
   useGameSocket: () => ({
     connect: vi.fn(),
     disconnect: vi.fn(),
-    sendMovement: vi.fn(),
-    sendAttack: vi.fn(),
+    sendMovement: sendMovementMock,
+    sendAttack: sendAttackMock,
     send: sendMock,
   }),
 }));
@@ -71,18 +73,15 @@ const createPlayer = () => ({
   archetypeKey: null,
 });
 
-describe('App archetype actions', () => {
-  beforeEach(() => {
-    sendMock.mockReset();
-    mockSettingsRef.current = null;
+const initializeStoreWithPlayer = () => {
+  const player = createPlayer();
+  const remotePlayers = {
+    byId: { [player.id]: player },
+    all: [player],
+    indexById: new Map([[player.id, 0]]),
+  };
 
-    const player = createPlayer();
-    const remotePlayers = {
-      byId: { [player.id]: player },
-      all: [player],
-      indexById: new Map([[player.id, 0]]),
-    };
-
+  act(() => {
     gameStore.setState(() => ({
       ...baseState,
       connectionStatus: 'connected',
@@ -91,13 +90,31 @@ describe('App archetype actions', () => {
       joinError: null,
       players: remotePlayers.byId,
       remotePlayers,
+      room: { ...(baseState.room || {}), phase: 'active' },
     }));
   });
 
+  return player;
+};
+
+describe('App archetype actions', () => {
+  beforeEach(() => {
+    sendMock.mockReset();
+    sendAttackMock.mockReset();
+    sendMovementMock.mockReset();
+    sendAttackMock.mockReturnValue(true);
+    mockSettingsRef.current = null;
+    initializeStoreWithPlayer();
+  });
+
   afterEach(() => {
-    gameStore.setState(() => baseState);
+    act(() => {
+      gameStore.setState(() => baseState);
+    });
     mockSettingsRef.current = null;
     sendMock.mockReset();
+    sendAttackMock.mockReset();
+    sendMovementMock.mockReset();
   });
 
   it('sends archetype commands and updates local combat attributes', async () => {
@@ -137,5 +154,107 @@ describe('App archetype actions', () => {
     expect(updated.remotePlayers.byId['player-1'].combatAttributes.attack).toBe(12);
     expect(updated.players['player-1'].archetype).toBe('virus');
     expect(updated.players['player-1'].archetypeKey).toBe('virus');
+  });
+});
+
+describe('App command batch handling', () => {
+  beforeEach(() => {
+    sendMock.mockReset();
+    sendAttackMock.mockReset();
+    sendMovementMock.mockReset();
+    sendAttackMock.mockReturnValue(true);
+    mockSettingsRef.current = null;
+    initializeStoreWithPlayer();
+  });
+
+  afterEach(() => {
+    act(() => {
+      gameStore.setState(() => baseState);
+    });
+    mockSettingsRef.current = null;
+    sendMock.mockReset();
+    sendAttackMock.mockReset();
+    sendMovementMock.mockReset();
+  });
+
+  it('sends dash commands without explicit targets', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockSettingsRef.current).toBeTruthy();
+    });
+
+    const settings = mockSettingsRef.current;
+    sendAttackMock.mockClear();
+
+    await act(async () => {
+      settings.onCommandBatch({
+        attacks: [
+          {
+            kind: 'dash',
+            timestamp: 123,
+          },
+        ],
+      });
+    });
+
+    expect(sendAttackMock).toHaveBeenCalledTimes(1);
+    const [payload] = sendAttackMock.mock.calls[0];
+    expect(payload.kind).toBe('dash');
+    expect(payload.playerId).toBe('player-1');
+    expect(payload).not.toHaveProperty('targetPlayerId');
+    expect(payload).not.toHaveProperty('targetObjectId');
+    expect(typeof payload.clientTime).toBe('number');
+  });
+
+  it('allows skill commands without a resolved target', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockSettingsRef.current).toBeTruthy();
+    });
+
+    const settings = mockSettingsRef.current;
+    sendAttackMock.mockClear();
+
+    await act(async () => {
+      settings.onCommandBatch({
+        attacks: [
+          {
+            kind: 'skill',
+          },
+        ],
+      });
+    });
+
+    expect(sendAttackMock).toHaveBeenCalledTimes(1);
+    const [payload] = sendAttackMock.mock.calls[0];
+    expect(payload.kind).toBe('skill');
+    expect(payload.playerId).toBe('player-1');
+    expect(payload).not.toHaveProperty('targetPlayerId');
+    expect(payload).not.toHaveProperty('targetObjectId');
+  });
+
+  it('keeps ignoring basic attacks without targets', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockSettingsRef.current).toBeTruthy();
+    });
+
+    const settings = mockSettingsRef.current;
+    sendAttackMock.mockClear();
+
+    await act(async () => {
+      settings.onCommandBatch({
+        attacks: [
+          {
+            kind: 'basic',
+          },
+        ],
+      });
+    });
+
+    expect(sendAttackMock).not.toHaveBeenCalled();
   });
 });

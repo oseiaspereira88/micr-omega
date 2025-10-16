@@ -388,6 +388,7 @@ export const useGameSocket = (
       const message: AttackMessage = {
         type: "attack",
         playerId,
+        kind: command.kind,
         targetPlayerId: command.targetPlayerId,
         targetObjectId: command.targetObjectId,
       };

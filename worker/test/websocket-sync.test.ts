@@ -215,4 +215,65 @@ describe("RoomDO integration", () => {
       await mf.dispose();
     }
   });
+
+  it("accepts dash attacks without explicit targets", async () => {
+    const mf = await createMiniflare();
+
+    try {
+      const socket = await openSocket(mf);
+
+      const joinedPromise = onceMessage<{
+        type: string;
+        playerId: string;
+      }>(socket, "joined", 5000);
+      socket.send(JSON.stringify({ type: "join", name: "Gina" }));
+      const joined = await joinedPromise;
+
+      await onceMessage<{ type: string }>(socket, "state", 5000);
+
+      const stateDiffPromise = onceMessage<{
+        type: string;
+        state: {
+          upsertPlayers?: {
+            id: string;
+            combatStatus?: {
+              state: string;
+              targetPlayerId: string | null;
+              targetObjectId: string | null;
+            };
+          }[];
+        };
+      }>(socket, "state", 5000);
+
+      const errorPromise = onceMessage<{ type: string }>(socket, "error", 500).catch(
+        (err) => err as Error,
+      );
+
+      socket.send(
+        JSON.stringify({
+          type: "attack",
+          playerId: joined.playerId,
+          kind: "dash",
+          clientTime: Date.now(),
+        }),
+      );
+
+      const stateDiff = await stateDiffPromise;
+      const updatedPlayer = stateDiff.state.upsertPlayers?.find(
+        (entry) => entry.id === joined.playerId,
+      );
+
+      expect(updatedPlayer?.combatStatus?.state).toBe("engaged");
+      expect(updatedPlayer?.combatStatus?.targetPlayerId).toBeNull();
+      expect(updatedPlayer?.combatStatus?.targetObjectId).toBeNull();
+
+      const errorResult = await errorPromise;
+      expect(errorResult).toBeInstanceOf(Error);
+      expect((errorResult as Error).message).toContain("Timed out waiting for error message");
+
+      socket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
 });

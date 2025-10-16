@@ -15,6 +15,7 @@ import {
   type JoinMessage,
   type PlayerAction,
   type PlayerAttackAction,
+  type AttackKind,
   type PlayerCollectAction,
   type PlayerMovementAction,
   type PongMessage,
@@ -44,7 +45,8 @@ import {
   type PlayerEvolutionAction,
   type ArchetypeKey,
   aggregateDrops,
-  DROP_TABLES
+  DROP_TABLES,
+  TARGET_OPTIONAL_ATTACK_KINDS
 } from "./types";
 
 const MIN_PLAYERS_TO_START = 1;
@@ -2607,9 +2609,11 @@ export class RoomDO {
         return { updatedPlayers };
       }
       case "attack": {
+        const attackKind = (action.kind ?? "basic") as AttackKind;
+        const targetOptional = TARGET_OPTIONAL_ATTACK_KINDS.has(attackKind);
         const hasTargetPlayer = action.targetPlayerId !== undefined && action.targetPlayerId !== null;
         const hasTargetObject = action.targetObjectId !== undefined && action.targetObjectId !== null;
-        if (!hasTargetPlayer && !hasTargetObject) {
+        if (!hasTargetPlayer && !hasTargetObject && !targetOptional) {
           return null;
         }
 

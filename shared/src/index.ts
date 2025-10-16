@@ -575,6 +575,17 @@ export const abilityActionSchema = z.object({
   value: z.number().finite().optional()
 });
 
+const ATTACK_KIND_VALUES = ["basic", "dash", "skill"] as const;
+
+export const attackKindSchema = z.enum(ATTACK_KIND_VALUES);
+
+export type AttackKind = z.infer<typeof attackKindSchema>;
+
+export const TARGET_OPTIONAL_ATTACK_KINDS: ReadonlySet<AttackKind> = new Set([
+  "dash",
+  "skill",
+]);
+
 export const movementActionSchema = z.object({
   type: z.literal("movement"),
   position: vector2Schema,
@@ -584,6 +595,7 @@ export const movementActionSchema = z.object({
 
 const attackActionBaseSchema = z.object({
   type: z.literal("attack"),
+  kind: attackKindSchema.optional(),
   targetPlayerId: playerIdSchema.optional(),
   targetObjectId: worldObjectIdSchema.optional(),
   damage: z.number().finite().nonnegative().optional(),
@@ -616,15 +628,20 @@ export const playerActionSchema = z
     archetypeActionSchema
   ])
   .superRefine((value, ctx) => {
-    if (
-      value.type === "attack" &&
-      value.targetPlayerId === undefined &&
-      value.targetObjectId === undefined
-    ) {
+    if (value.type !== "attack") {
+      return;
+    }
+
+    const kind = (value.kind ?? "basic") as AttackKind;
+    const targetRequired = !TARGET_OPTIONAL_ATTACK_KINDS.has(kind);
+    const hasTargetPlayer = value.targetPlayerId !== undefined && value.targetPlayerId !== null;
+    const hasTargetObject = value.targetObjectId !== undefined && value.targetObjectId !== null;
+
+    if (targetRequired && !hasTargetPlayer && !hasTargetObject) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "attack_target_required",
-        path: ["targetPlayerId"]
+        path: ["targetPlayerId"],
       });
     }
   });
@@ -661,15 +678,20 @@ export const clientMessageSchema = z
     collectMessageSchema
   ])
   .superRefine((value, ctx) => {
-    if (
-      value.type === "attack" &&
-      value.targetPlayerId === undefined &&
-      value.targetObjectId === undefined
-    ) {
+    if (value.type !== "attack") {
+      return;
+    }
+
+    const kind = (value.kind ?? "basic") as AttackKind;
+    const targetRequired = !TARGET_OPTIONAL_ATTACK_KINDS.has(kind);
+    const hasTargetPlayer = value.targetPlayerId !== undefined && value.targetPlayerId !== null;
+    const hasTargetObject = value.targetObjectId !== undefined && value.targetObjectId !== null;
+
+    if (targetRequired && !hasTargetPlayer && !hasTargetObject) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "attack_target_required",
-        path: ["targetPlayerId"]
+        path: ["targetPlayerId"],
       });
     }
   });
