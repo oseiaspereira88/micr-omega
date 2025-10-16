@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => {
     renderFrame: vi.fn(() => null),
     soundEffectsFactory: vi.fn(() => ({ playSound: vi.fn() })),
     restartGame: vi.fn(),
+    selectArchetype: vi.fn(),
     gameStoreState: {},
     gameStoreListeners: listeners,
   };
@@ -35,6 +36,7 @@ vi.mock('../audio/soundEffects', () => ({
 
 vi.mock('../systems', () => ({
   restartGame: (...args) => mocks.restartGame(...args),
+  selectArchetype: (...args) => mocks.selectArchetype(...args),
 }));
 
 vi.mock('../../store/gameStore', () => ({
@@ -65,14 +67,20 @@ const createCanvas = () => {
   return canvas;
 };
 
-const HookWrapper = ({ canvas, dispatch }) => {
+const HookWrapper = ({ canvas, dispatch, settings, onReady }) => {
   const canvasRef = useRef(canvas);
 
   useEffect(() => {
     canvasRef.current = canvas;
   }, [canvas]);
 
-  useGameLoop({ canvasRef, dispatch });
+  const api = useGameLoop({ canvasRef, dispatch, settings });
+
+  useEffect(() => {
+    if (typeof onReady === 'function') {
+      onReady(api);
+    }
+  }, [api, onReady]);
 
   return null;
 };
@@ -89,6 +97,7 @@ describe('useGameLoop timing safeguards', () => {
     mocks.updateGameState.mockClear();
     mocks.renderFrame.mockClear();
     mocks.soundEffectsFactory.mockClear();
+    mocks.selectArchetype.mockClear();
     performanceNowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -165,5 +174,85 @@ describe('useGameLoop timing safeguards', () => {
     expect(mocks.updateGameState.mock.calls[3][0].delta).toBeGreaterThan(0);
     expect(mocks.updateGameState.mock.calls[3][0].delta).toBeLessThan(0.1);
     expect(mocks.updateGameState.mock.calls[3][0].delta).toBeCloseTo(0.016, 3);
+  });
+
+  it('applies archetype selection through the progression system', async () => {
+    const canvas = createCanvas();
+    const dispatch = vi.fn();
+    const onReady = vi.fn();
+    const onArchetypeSelect = vi.fn();
+
+    mocks.selectArchetype.mockImplementation((state, helpers, archetypeKey) => {
+      state.selectedArchetype = archetypeKey;
+      state.archetypeSelection = { pending: false, options: ['virus', 'bacteria'] };
+      state.energy = 42;
+      state.health = 123;
+      state.maxHealth = 150;
+      state.level = 5;
+      state.element = 'bio';
+      state.affinity = 'neutral';
+      state.resistances = { bio: 0.1 };
+      state.elementLabel = 'Bio';
+      state.affinityLabel = 'Neutro';
+      state.organism = {
+        ...(state.organism || {}),
+        attack: 9,
+        defense: 7,
+        speed: 1.2,
+        range: 80,
+        attackRange: 80,
+      };
+      helpers.syncState?.(state);
+    });
+
+    render(
+      <HookWrapper
+        canvas={canvas}
+        dispatch={dispatch}
+        settings={{ onArchetypeSelect }}
+        onReady={onReady}
+      />
+    );
+
+    await waitFor(() => {
+      expect(onReady).toHaveBeenCalled();
+    });
+
+    const api = onReady.mock.calls[0][0];
+
+    dispatch.mockClear();
+    onArchetypeSelect.mockClear();
+
+    act(() => {
+      api.selectArchetype('virus');
+    });
+
+    expect(mocks.selectArchetype).toHaveBeenCalledTimes(1);
+    expect(mocks.selectArchetype.mock.calls[0][2]).toBe('virus');
+
+    const syncCall = dispatch.mock.calls.find(([action]) => action?.type === 'SYNC_STATE');
+    expect(syncCall?.[0]?.payload).toMatchObject({
+      selectedArchetype: 'virus',
+      energy: 42,
+      health: 123,
+      maxHealth: 150,
+      element: 'bio',
+      affinity: 'neutral',
+      resistances: { bio: 0.1 },
+    });
+
+    expect(onArchetypeSelect).toHaveBeenCalledWith(
+      'virus',
+      expect.objectContaining({
+        health: 123,
+        maxHealth: 150,
+        combatAttributes: expect.objectContaining({
+          attack: 9,
+          defense: 7,
+          speed: 1.2,
+          range: 80,
+        }),
+      })
+    );
   });
 });

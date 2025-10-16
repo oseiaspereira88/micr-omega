@@ -281,13 +281,145 @@ const App = () => {
     [send]
   );
 
+  const handleArchetypeSelect = useCallback(
+    (archetypeKey, snapshot) => {
+      const normalized =
+        typeof archetypeKey === 'string' ? archetypeKey.trim() : '';
+      if (!normalized) {
+        return;
+      }
+
+      const state = gameStore.getState();
+      const playerId = state?.playerId;
+      if (!playerId) {
+        return;
+      }
+
+      try {
+        send({
+          type: 'action',
+          playerId,
+          action: {
+            type: 'archetype',
+            archetype: normalized,
+          },
+        });
+      } catch (error) {
+        console.error('Erro ao enviar ação de arquétipo', error);
+      }
+
+      if (!snapshot || typeof snapshot !== 'object') {
+        return;
+      }
+
+      const combatSnapshot =
+        snapshot.combatAttributes && typeof snapshot.combatAttributes === 'object'
+          ? snapshot.combatAttributes
+          : null;
+
+      const resolveNumber = (value) =>
+        Number.isFinite(value) ? Number(value) : undefined;
+
+      const nextHealthValue = resolveNumber(snapshot.health);
+      const nextMaxHealthValue = resolveNumber(snapshot.maxHealth);
+
+      gameStore.setState((prev) => {
+        const currentPlayer =
+          prev.players[playerId] ?? prev.remotePlayers.byId[playerId];
+        if (!currentPlayer) {
+          return prev;
+        }
+
+        let changed = false;
+
+        const nextHealth = { ...currentPlayer.health };
+        if (
+          nextHealthValue !== undefined &&
+          nextHealthValue !== currentPlayer.health.current
+        ) {
+          nextHealth.current = nextHealthValue;
+          changed = true;
+        }
+        if (
+          nextMaxHealthValue !== undefined &&
+          nextMaxHealthValue !== currentPlayer.health.max
+        ) {
+          nextHealth.max = nextMaxHealthValue;
+          changed = true;
+        }
+
+        const nextCombatAttributes = { ...currentPlayer.combatAttributes };
+        if (combatSnapshot) {
+          const applyStat = (key) => {
+            const value = resolveNumber(combatSnapshot[key]);
+            if (value !== undefined && value !== nextCombatAttributes[key]) {
+              nextCombatAttributes[key] = value;
+              changed = true;
+            }
+          };
+
+          applyStat('attack');
+          applyStat('defense');
+          applyStat('speed');
+          applyStat('range');
+        }
+
+        if (!changed) {
+          return prev;
+        }
+
+        const nextPlayer = {
+          ...currentPlayer,
+          combatAttributes: nextCombatAttributes,
+          health: nextHealth,
+        };
+
+        const nextPlayers = { ...prev.players, [playerId]: nextPlayer };
+
+        let nextRemotePlayers = prev.remotePlayers;
+        const remoteIndex = prev.remotePlayers.indexById.get(playerId);
+        if (remoteIndex !== undefined) {
+          const nextAll = prev.remotePlayers.all.slice();
+          nextAll[remoteIndex] = nextPlayer;
+          const nextById = { ...prev.remotePlayers.byId, [playerId]: nextPlayer };
+          const nextIndexById = new Map(prev.remotePlayers.indexById);
+          nextIndexById.set(playerId, remoteIndex);
+          nextRemotePlayers = {
+            byId: nextById,
+            all: nextAll,
+            indexById: nextIndexById,
+          };
+        } else if (prev.remotePlayers.byId[playerId]) {
+          const nextById = { ...prev.remotePlayers.byId, [playerId]: nextPlayer };
+          const nextAll = prev.remotePlayers.all.map((entry) =>
+            entry.id === playerId ? nextPlayer : entry
+          );
+          const nextIndexById = new Map(prev.remotePlayers.indexById);
+          nextRemotePlayers = {
+            byId: nextById,
+            all: nextAll,
+            indexById: nextIndexById,
+          };
+        }
+
+        return {
+          ...prev,
+          players: nextPlayers,
+          remotePlayers: nextRemotePlayers,
+        };
+      });
+    },
+    [send]
+  );
+
   const resolvedSettings = useMemo(
     () => ({
       ...(settings || {}),
       onCommandBatch: handleCommandBatch,
       onEvolutionDelta: handleEvolutionDelta,
+      onArchetypeSelect: handleArchetypeSelect,
     }),
-    [settings, handleCommandBatch, handleEvolutionDelta]
+    [settings, handleCommandBatch, handleEvolutionDelta, handleArchetypeSelect]
   );
 
   const removeToast = useCallback((id) => {
