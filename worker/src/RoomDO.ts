@@ -7,6 +7,7 @@ import {
   joinMessageSchema,
   actionMessageSchema,
   sanitizePlayerName,
+  sanitizeArchetypeKey,
   type ActionMessage,
   type ClientMessage,
   type GamePhase,
@@ -41,6 +42,7 @@ import {
   type HealthState,
   type CombatStatus,
   type PlayerEvolutionAction,
+  type ArchetypeKey,
   aggregateDrops,
   DROP_TABLES
 } from "./types";
@@ -164,6 +166,7 @@ type StoredPlayer = {
   combatStatus: CombatStatus;
   combatAttributes: CombatAttributes;
   evolutionState: PlayerEvolutionState;
+  archetypeKey: string | null;
   totalSessionDurationMs?: number;
   sessionCount?: number;
 };
@@ -182,6 +185,7 @@ type StoredPlayerSnapshot = Omit<
       | "combatStatus"
       | "combatAttributes"
       | "evolutionState"
+      | "archetypeKey"
     >
   >;
 
@@ -237,8 +241,10 @@ const cloneOrientation = (orientation: OrientationState): OrientationState =>
     ? { angle: orientation.angle }
     : { angle: orientation.angle, tilt: orientation.tilt };
 
+const DEFAULT_MAX_HEALTH = 100;
+
 const createHealthState = (health?: HealthState): HealthState => {
-  const max = health?.max ?? 100;
+  const max = health?.max ?? DEFAULT_MAX_HEALTH;
   const current = health?.current ?? max;
   return {
     current: Math.max(0, Math.min(max, current)),
@@ -278,6 +284,86 @@ const createCombatAttributes = (attributes?: CombatAttributes): CombatAttributes
   speed: attributes?.speed ?? DEFAULT_COMBAT_ATTRIBUTES.speed,
   range: attributes?.range ?? DEFAULT_COMBAT_ATTRIBUTES.range,
 });
+
+type ArchetypeDefinition = {
+  key: ArchetypeKey;
+  maxHealth: number;
+  combatAttributes: CombatAttributes;
+};
+
+const ARCHETYPE_DEFINITIONS: Record<ArchetypeKey, ArchetypeDefinition> = {
+  virus: {
+    key: "virus",
+    maxHealth: 90,
+    combatAttributes: createCombatAttributes({
+      attack: 12,
+      defense: 3,
+      speed: 176,
+      range: 88,
+    }),
+  },
+  bacteria: {
+    key: "bacteria",
+    maxHealth: 120,
+    combatAttributes: createCombatAttributes({
+      attack: 9,
+      defense: 7,
+      speed: 144,
+      range: 84,
+    }),
+  },
+  archaea: {
+    key: "archaea",
+    maxHealth: 125,
+    combatAttributes: createCombatAttributes({
+      attack: 10,
+      defense: 8,
+      speed: 140,
+      range: 82,
+    }),
+  },
+  protozoa: {
+    key: "protozoa",
+    maxHealth: 100,
+    combatAttributes: createCombatAttributes({
+      attack: 13,
+      defense: 4,
+      speed: 172,
+      range: 90,
+    }),
+  },
+  algae: {
+    key: "algae",
+    maxHealth: 115,
+    combatAttributes: createCombatAttributes({
+      attack: 9,
+      defense: 6,
+      speed: 150,
+      range: 92,
+    }),
+  },
+  fungus: {
+    key: "fungus",
+    maxHealth: 130,
+    combatAttributes: createCombatAttributes({
+      attack: 11,
+      defense: 9,
+      speed: 136,
+      range: 82,
+    }),
+  },
+};
+
+const getArchetypeDefinition = (key: string | null | undefined): ArchetypeDefinition | null => {
+  if (!key) {
+    return null;
+  }
+  const normalized = sanitizeArchetypeKey(key);
+  if (!normalized) {
+    return null;
+  }
+  return ARCHETYPE_DEFINITIONS[normalized] ?? null;
+};
 
 const cloneCombatAttributes = (attributes: CombatAttributes): CombatAttributes => ({
   attack: attributes.attack,
@@ -926,6 +1012,9 @@ export class RoomDO {
       const now = Date.now();
       for (const stored of storedPlayers) {
         const evolutionState = createEvolutionState(stored.evolutionState);
+        const archetypeKey = stored.archetypeKey
+          ? sanitizeArchetypeKey(stored.archetypeKey)
+          : null;
         const normalized: StoredPlayer = {
           id: stored.id,
           name: stored.name,
@@ -938,6 +1027,7 @@ export class RoomDO {
           combatStatus: createCombatStatusState(stored.combatStatus),
           combatAttributes: createCombatAttributes(stored.combatAttributes),
           evolutionState,
+          archetypeKey: archetypeKey ?? null,
           totalSessionDurationMs: stored.totalSessionDurationMs ?? 0,
           sessionCount: stored.sessionCount ?? 0
         };
@@ -948,6 +1038,15 @@ export class RoomDO {
           lastSeenAt: now,
           connectedAt: null
         };
+        const definition = getArchetypeDefinition(player.archetypeKey);
+        if (definition) {
+          const maxHealth = Math.max(1, definition.maxHealth);
+          const currentHealth = Math.max(0, Math.min(player.health.current, maxHealth));
+          player.health = {
+            current: currentHealth,
+            max: maxHealth,
+          };
+        }
         player.combatAttributes = this.computePlayerCombatAttributes(player);
         this.players.set(player.id, player);
         this.nameToPlayerId.set(player.name.toLowerCase(), player.id);
@@ -1431,7 +1530,10 @@ export class RoomDO {
     if (!player.evolutionState) {
       player.evolutionState = createEvolutionState();
     }
-    const base = getDeterministicCombatAttributesForPlayer(player.id);
+    const archetypeDefinition = getArchetypeDefinition(player.archetypeKey);
+    const base = archetypeDefinition
+      ? archetypeDefinition.combatAttributes
+      : getDeterministicCombatAttributesForPlayer(player.id);
     const modifiers = player.evolutionState.modifiers;
 
     return createCombatAttributes({
@@ -1980,6 +2082,7 @@ export class RoomDO {
         combatStatus: createCombatStatusState(),
         combatAttributes: getDeterministicCombatAttributesForPlayer(id),
         evolutionState,
+        archetypeKey: null,
         connected: true,
         lastActiveAt: now,
         lastSeenAt: now,
@@ -2208,6 +2311,37 @@ export class RoomDO {
       case "combo": {
         const multiplier = clamp(action.multiplier, 1, MAX_COMBO_MULTIPLIER);
         player.combo = multiplier;
+        updatedPlayers.push(player);
+        return { updatedPlayers };
+      }
+      case "archetype": {
+        const definition = getArchetypeDefinition(action.archetype);
+        if (!definition) {
+          return null;
+        }
+
+        player.archetypeKey = definition.key;
+
+        if (!player.evolutionState) {
+          player.evolutionState = createEvolutionState();
+        }
+
+        if (!player.evolutionState.traits.includes(definition.key)) {
+          player.evolutionState.traits.push(definition.key);
+        }
+
+        const nextMaxHealth = Math.max(1, definition.maxHealth);
+        const nextCurrentHealth = Math.max(
+          0,
+          Math.min(player.health.current, nextMaxHealth),
+        );
+        player.health = {
+          current: nextCurrentHealth,
+          max: nextMaxHealth,
+        };
+
+        this.updatePlayerCombatAttributes(player);
+
         updatedPlayers.push(player);
         return { updatedPlayers };
       }
@@ -2822,7 +2956,9 @@ export class RoomDO {
       orientation: cloneOrientation(player.orientation),
       health: cloneHealthState(player.health),
       combatStatus: cloneCombatStatusState(player.combatStatus),
-      combatAttributes: cloneCombatAttributes(player.combatAttributes)
+      combatAttributes: cloneCombatAttributes(player.combatAttributes),
+      archetype: player.archetypeKey ?? null,
+      archetypeKey: player.archetypeKey ?? null,
     };
   }
 
@@ -3147,6 +3283,7 @@ export class RoomDO {
       combatStatus: cloneCombatStatusState(player.combatStatus),
       combatAttributes: cloneCombatAttributes(player.combatAttributes),
       evolutionState: cloneEvolutionState(player.evolutionState),
+      archetypeKey: player.archetypeKey ?? null,
       totalSessionDurationMs: player.totalSessionDurationMs ?? 0,
       sessionCount: player.sessionCount ?? 0
     }));

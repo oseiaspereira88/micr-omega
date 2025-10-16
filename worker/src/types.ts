@@ -36,6 +36,8 @@ export {
   type PlayerAttackAction,
   type PlayerCollectAction,
   type PlayerEvolutionAction,
+  type PlayerArchetypeAction,
+  type ArchetypeKey,
   type PlayerAction,
   type ActionMessage,
   type MovementMessage,
@@ -62,6 +64,7 @@ export {
   movementActionSchema,
   attackActionSchema,
   collectActionSchema,
+  archetypeActionSchema,
   evolutionActionSchema,
   evolutionTierSchema,
   pingMessageSchema,
@@ -88,11 +91,14 @@ export {
   movementMessageSchema,
   attackMessageSchema,
   collectMessageSchema,
+  ARCHETYPE_KEYS,
+  archetypeKeySchema,
   aggregateDrops,
   calculateExperienceFromEvents,
   XP_DISTRIBUTION,
   DROP_TABLES,
   sanitizePlayerName,
   sanitizeAbilityId,
-  sanitizePlayerId
+  sanitizePlayerId,
+  sanitizeArchetypeKey
 } from "@micr-omega/shared";

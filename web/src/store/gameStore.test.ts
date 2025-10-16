@@ -44,6 +44,8 @@ const createPlayerState = (
       speed: 1,
       range: 1,
     },
+  archetype: overrides.archetype ?? null,
+  archetypeKey: overrides.archetypeKey ?? null,
 });
 
 const createEmptyCollection = <T extends { id: string }>(): {
