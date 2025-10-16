@@ -73,17 +73,27 @@ describe("RoomDO", () => {
 
       socket.removeEventListener("message", onStateMessage as EventListener);
 
-      const stateDiffPromise = onceMessage<{
-        type: string;
-        mode: string;
-        state: {
-          upsertPlayers?: {
-            id: string;
-            position?: { x: number; y: number };
-            movementVector?: { x: number; y: number };
-          }[];
-        };
-      }>(socket, "state", 5000);
+      const receivePlayerDiff = async () => {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const message = await onceMessage<{
+            type: string;
+            mode: string;
+            state: {
+              upsertPlayers?: {
+                id: string;
+                position?: { x: number; y: number };
+                movementVector?: { x: number; y: number };
+              }[];
+            };
+          }>(socket, "state", 5000);
+          const hasPlayerUpdate =
+            message.mode === "diff" && (message.state.upsertPlayers?.length ?? 0) > 0;
+          if (hasPlayerUpdate) {
+            return message;
+          }
+        }
+        throw new Error("Did not receive player diff message");
+      };
       const errorPromise = onceMessage<{ type: string; reason: string }>(socket, "error", 200);
 
       socket.send(
@@ -101,7 +111,7 @@ describe("RoomDO", () => {
       );
 
       await expect(errorPromise).rejects.toThrow("Timed out waiting for error message");
-      const stateDiff = await stateDiffPromise;
+      const stateDiff = await receivePlayerDiff();
 
       expect(stateDiff.mode).toBe("diff");
       const soloUpdate = stateDiff.state.upsertPlayers?.find((player) => player.id === joined.playerId);

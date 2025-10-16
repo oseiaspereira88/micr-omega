@@ -37,6 +37,51 @@ const getSpawnPositionForPlayer = (playerId: string) => {
   return { x: spawn.x, y: spawn.y };
 };
 
+const ENTITY_OFFSET_RATIOS = [0.22, 0.18, 0.16, 0.14, 0.12, 0.1] as const;
+
+const normalizeVector = (vector: { x: number; y: number }) => {
+  const magnitude = Math.hypot(vector.x, vector.y);
+  if (magnitude === 0) {
+    return { x: 0, y: 0 };
+  }
+  return { x: vector.x / magnitude, y: vector.y / magnitude };
+};
+
+const getOrderedSpawnDirections = (primarySpawn: { x: number; y: number }) => {
+  const remaining = [...PLAYER_SPAWN_POSITIONS];
+  const primaryIndex = remaining.findIndex(
+    (position) => position.x === primarySpawn.x && position.y === primarySpawn.y,
+  );
+
+  if (primaryIndex >= 0) {
+    const [primary] = remaining.splice(primaryIndex, 1);
+    return [primary, ...remaining].map((position) => normalizeVector(position));
+  }
+
+  return [primarySpawn, ...remaining].map((position) => normalizeVector(position));
+};
+
+const getOffsetsForSpawn = (primarySpawn: { x: number; y: number }, count: number) => {
+  const directions = getOrderedSpawnDirections(primarySpawn);
+  return Array.from({ length: count }, (_, index) => {
+    const direction = directions[index % directions.length] ?? { x: 0, y: 0 };
+    const ratio = ENTITY_OFFSET_RATIOS[index % ENTITY_OFFSET_RATIOS.length] ?? 0;
+    const distance = WORLD_RADIUS * ratio;
+    return {
+      x: direction.x * distance,
+      y: direction.y * distance,
+    };
+  });
+};
+
+const applyOffset = (
+  position: { x: number; y: number },
+  offset: { x: number; y: number },
+) => ({
+  x: clamp(position.x + offset.x, -WORLD_RADIUS, WORLD_RADIUS),
+  y: clamp(position.y + offset.y, -WORLD_RADIUS, WORLD_RADIUS),
+});
+
 describe("RoomDO resetGame", () => {
   async function createRoom() {
     const mockState = new MockDurableObjectState();
@@ -119,16 +164,26 @@ describe("RoomDO resetGame", () => {
     expect(snapshotAfter).not.toBe(snapshotBefore);
 
     const anchorSpawn = getSpawnPositionForPlayer(playerB.id);
-    const translate = (position: { x: number; y: number }) => ({
-      x: clamp(position.x + anchorSpawn.x, -WORLD_RADIUS, WORLD_RADIUS),
-      y: clamp(position.y + anchorSpawn.y, -WORLD_RADIUS, WORLD_RADIUS),
-    });
+    const offsets = getOffsetsForSpawn(
+      anchorSpawn,
+      baseMicroPositions.length + baseOrganicPositions.length,
+    );
 
-    const updatedMicroPositions = roomAny.world.microorganisms.map((entity: { position: { x: number; y: number } }) => entity.position);
-    const updatedOrganicPositions = roomAny.world.organicMatter.map((matter: { position: { x: number; y: number } }) => matter.position);
+    const updatedMicroPositions = roomAny.world.microorganisms.map(
+      (entity: { position: { x: number; y: number } }) => entity.position,
+    );
+    const updatedOrganicPositions = roomAny.world.organicMatter.map(
+      (matter: { position: { x: number; y: number } }) => matter.position,
+    );
 
-    expect(updatedMicroPositions).toEqual(baseMicroPositions.map(translate));
-    expect(updatedOrganicPositions).toEqual(baseOrganicPositions.map(translate));
+    expect(updatedMicroPositions).toEqual(
+      baseMicroPositions.map((position, index) => applyOffset(position, offsets[index]!)),
+    );
+    expect(updatedOrganicPositions).toEqual(
+      baseOrganicPositions.map((position, index) =>
+        applyOffset(position, offsets[baseMicroPositions.length + index]!),
+      ),
+    );
 
     const updatedPlayerA = players.get(playerA.id)!;
     const updatedPlayerB = players.get(playerB.id)!;

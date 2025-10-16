@@ -697,6 +697,45 @@ const translateWithinWorldBounds = (position: Vector2, offset: Vector2): Vector2
     y: position.y + offset.y,
   });
 
+const ENTITY_OFFSET_RATIOS: readonly number[] = [0.22, 0.18, 0.16, 0.14, 0.12, 0.1];
+
+const normalizeVector = (vector: Vector2): Vector2 => {
+  const magnitude = Math.hypot(vector.x, vector.y);
+  if (magnitude === 0) {
+    return { x: 0, y: 0 };
+  }
+  return { x: vector.x / magnitude, y: vector.y / magnitude };
+};
+
+const getOrderedSpawnDirections = (primarySpawn: Vector2): Vector2[] => {
+  const remainingPositions = PLAYER_SPAWN_POSITIONS.slice();
+  const primaryIndex = remainingPositions.findIndex(
+    (position) => position.x === primarySpawn.x && position.y === primarySpawn.y,
+  );
+
+  if (primaryIndex >= 0) {
+    const [primaryPosition] = remainingPositions.splice(primaryIndex, 1);
+    return [primaryPosition, ...remainingPositions].map((position) =>
+      normalizeVector(position),
+    );
+  }
+
+  return [primarySpawn, ...remainingPositions].map((position) => normalizeVector(position));
+};
+
+const getEntityOffset = (directions: Vector2[], index: number): Vector2 => {
+  if (directions.length === 0) {
+    return { x: 0, y: 0 };
+  }
+  const direction = directions[index % directions.length]!;
+  const ratio = ENTITY_OFFSET_RATIOS[index % ENTITY_OFFSET_RATIOS.length] ?? 0;
+  const distance = WORLD_RADIUS * ratio;
+  return {
+    x: direction.x * distance,
+    y: direction.y * distance,
+  };
+};
+
 const createInitialWorldState = (options: WorldGenerationOptions = {}): SharedWorldState => {
   const base = cloneWorldState(INITIAL_WORLD_TEMPLATE);
   const primarySpawn = options.primarySpawn;
@@ -704,16 +743,19 @@ const createInitialWorldState = (options: WorldGenerationOptions = {}): SharedWo
     return base;
   }
 
-  const offset = { x: primarySpawn.x, y: primarySpawn.y };
+  const directions = getOrderedSpawnDirections(primarySpawn);
 
-  const translatedMicroorganisms = base.microorganisms.map((entity) => ({
+  const translatedMicroorganisms = base.microorganisms.map((entity, index) => ({
     ...entity,
-    position: translateWithinWorldBounds(entity.position, offset),
+    position: translateWithinWorldBounds(entity.position, getEntityOffset(directions, index)),
   }));
 
-  const translatedOrganicMatter = base.organicMatter.map((matter) => ({
+  const translatedOrganicMatter = base.organicMatter.map((matter, index) => ({
     ...matter,
-    position: translateWithinWorldBounds(matter.position, offset),
+    position: translateWithinWorldBounds(
+      matter.position,
+      getEntityOffset(directions, index + base.microorganisms.length),
+    ),
   }));
 
   return {
