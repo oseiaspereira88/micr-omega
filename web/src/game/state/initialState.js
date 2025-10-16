@@ -1,4 +1,4 @@
-import { WORLD_RADIUS, WORLD_SIZE } from '@micr-omega/shared';
+import { WORLD_SIZE } from '@micr-omega/shared';
 
 import { createOrganism } from '../entities/organism';
 import { applyArchetypeToState, archetypeList } from '../config/archetypes';
@@ -62,8 +62,8 @@ export const createInitialState = ({ archetypeKey } = {}) => {
     worldSize: WORLD_SIZE,
 
     camera: {
-      x: WORLD_RADIUS,
-      y: WORLD_RADIUS,
+      x: 0,
+      y: 0,
       zoom: 1,
       offsetX: 0,
       offsetY: 0,
@@ -71,6 +71,7 @@ export const createInitialState = ({ archetypeKey } = {}) => {
         width: viewportWidth,
         height: viewportHeight,
       },
+      initialized: false,
     },
 
     spawnInterval: 2000,
