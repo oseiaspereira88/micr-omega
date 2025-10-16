@@ -19,6 +19,7 @@ import {
   cycleSkill as cycleSkillSystem,
   openEvolutionMenu as openEvolutionMenuSystem,
   requestEvolutionReroll as requestEvolutionRerollSystem,
+  selectArchetype as selectArchetypeSystem,
 } from '../systems';
 import { spawnObstacle as createObstacleSpawn } from '../factories/obstacleFactory';
 import { spawnNebula as createNebulaSpawn } from '../factories/nebulaFactory';
@@ -195,6 +196,9 @@ const createInitialRenderState = () => ({
   playersById: new Map(),
   playerAppearanceById: new Map(),
   playerList: [],
+  selectedArchetype: null,
+  localArchetypeSelection: null,
+  localSelectedArchetype: null,
   combatIndicators: [],
   pendingInputs: {
     movement: null,
@@ -474,49 +478,84 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   const selectArchetype = useCallback(
     (key) => {
       if (!key) return;
-      const normalized = String(key).trim();
+      const normalized = typeof key === 'string' ? key.trim() : '';
       if (!normalized) return;
 
-      const baseState = createInitialState({ archetypeKey: normalized });
-      renderStateRef.current.localArchetypeSelection = baseState.archetypeSelection;
-      renderStateRef.current.localSelectedArchetype = baseState.selectedArchetype;
-      renderStateRef.current.hudSnapshot = {
-        ...(renderStateRef.current.hudSnapshot || {}),
-        energy: baseState.energy,
-        health: baseState.health,
-        maxHealth: baseState.maxHealth,
-        level: baseState.level,
-        element: baseState.element,
-        affinity: baseState.affinity,
-        resistances: baseState.resistances,
-        elementLabel: baseState.elementLabel,
-        affinityLabel: baseState.affinityLabel,
-        archetypeSelection: baseState.archetypeSelection,
-        selectedArchetype: baseState.selectedArchetype,
+      const state = renderStateRef.current;
+      if (!state) return;
+
+      const helpers = {
+        createEffect,
+        createParticle,
+        addNotification: (targetState, text) => {
+          if (!text) return;
+          if (targetState && targetState !== renderStateRef.current) {
+            targetState.notifications = appendNotification(targetState.notifications, text);
+          }
+          pushNotification(text);
+        },
+        syncState: syncHudState,
       };
 
-      dispatchRef.current({
-        type: 'SYNC_STATE',
-        payload: {
-          energy: baseState.energy,
-          health: baseState.health,
-          maxHealth: baseState.maxHealth,
-          level: baseState.level,
-          element: baseState.element,
-          affinity: baseState.affinity,
-          resistances: baseState.resistances,
-          elementLabel: baseState.elementLabel,
-          affinityLabel: baseState.affinityLabel,
-          archetypeSelection: baseState.archetypeSelection,
-          selectedArchetype: baseState.selectedArchetype,
-        },
-      });
+      const result = selectArchetypeSystem(state, helpers, normalized) || state;
+
+      if (result.archetypeSelection) {
+        state.localArchetypeSelection = { ...result.archetypeSelection };
+      } else {
+        state.localArchetypeSelection = null;
+      }
+      state.localSelectedArchetype = result.selectedArchetype ?? normalized;
+      state.selectedArchetype = result.selectedArchetype ?? normalized;
+      state.hudSnapshot = {
+        ...(state.hudSnapshot || {}),
+        energy: result.energy,
+        health: result.health,
+        maxHealth: result.maxHealth,
+        level: result.level,
+        element: result.element,
+        affinity: result.affinity,
+        resistances: result.resistances,
+        elementLabel: result.elementLabel,
+        affinityLabel: result.affinityLabel,
+        archetypeSelection: result.archetypeSelection,
+        selectedArchetype: result.selectedArchetype ?? normalized,
+      };
+
+      syncHudState(state);
 
       if (typeof resolvedSettings.onArchetypeSelect === 'function') {
-        resolvedSettings.onArchetypeSelect(normalized, baseState);
+        const organism = result.organism || state.organism || null;
+        const resolveStat = (value) => (Number.isFinite(value) ? Number(value) : undefined);
+        const combatAttributes = organism
+          ? {
+              attack: resolveStat(organism.attack),
+              defense: resolveStat(organism.defense),
+              speed: resolveStat(organism.speed),
+              range: resolveStat(organism.range ?? organism.attackRange),
+            }
+          : undefined;
+
+        const snapshot = {
+          energy: resolveStat(result.energy),
+          health: resolveStat(result.health),
+          maxHealth: resolveStat(result.maxHealth),
+          element: result.element ?? null,
+          affinity: result.affinity ?? null,
+          resistances: result.resistances ?? null,
+          selectedArchetype: result.selectedArchetype ?? normalized,
+          combatAttributes,
+        };
+
+        resolvedSettings.onArchetypeSelect(normalized, snapshot);
       }
     },
-    [resolvedSettings]
+    [
+      createEffect,
+      createParticle,
+      pushNotification,
+      resolvedSettings,
+      syncHudState,
+    ]
   );
 
   const initializeBackground = useCallback(() => {
@@ -800,6 +839,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   }, [initializeBackground]);
 
   const restartGameHandler = useCallback(() => {
+    const preservedArchetype = renderStateRef.current?.selectedArchetype ?? null;
     const createEntityId = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random()
       .toString(36)
       .slice(2, 8)}`;
@@ -887,6 +927,10 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     };
 
     renderStateRef.current = createInitialRenderState();
+    if (preservedArchetype) {
+      renderStateRef.current.selectedArchetype = preservedArchetype;
+      renderStateRef.current.localSelectedArchetype = preservedArchetype;
+    }
     initializeBackground();
     resetControls();
 
