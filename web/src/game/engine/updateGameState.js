@@ -20,6 +20,17 @@ const MOVEMENT_EPSILON = 0.05;
 const POSITION_SMOOTHING = 7.5;
 const CAMERA_SMOOTHING = 4;
 const SPEED_SCALER = 60;
+const BLINK_INTERVAL_MIN = 2.8;
+const BLINK_INTERVAL_MAX = 5.4;
+const BLINK_HOLD_DURATION = 0.08;
+const LOCAL_BLINK_SPEED = { closing: 18, opening: 14 };
+const REMOTE_BLINK_SPEED = { closing: 12, opening: 9 };
+const LOOK_STRENGTH = { local: 0.6, remote: 0.42 };
+const EXPRESSION_DECAY = {
+  local: { attack: 2.6, hurt: 1.9 },
+  remote: { attack: 1.7, hurt: 1.3 },
+};
+const EXPRESSION_CHARGE = { local: 4.8, remote: 3 };
 
 const PLAYER_PALETTE = [
   { base: '#47c2ff', accent: '#0b82c1', label: '#ffffff' },
@@ -38,6 +49,30 @@ const SPECIES_COLORS = {
 const DEFAULT_SPECIES_COLOR = '#8fb8ff';
 
 const clampColorChannel = (value) => Math.min(255, Math.max(0, Math.round(value ?? 0)));
+const clamp01 = (value) => Math.min(1, Math.max(0, value ?? 0));
+const randomBetween = (min, max) => min + Math.random() * (max - min);
+
+const createEyeBlinkState = () => ({
+  timer: randomBetween(BLINK_INTERVAL_MIN, BLINK_INTERVAL_MAX),
+  hold: 0,
+  openness: 1,
+  state: 'open',
+});
+
+const createEyeLookState = () => ({
+  x: 0,
+  y: 0,
+  targetX: 0,
+  targetY: 0,
+});
+
+const createEyeExpressionState = () => ({
+  attacking: 0,
+  hurt: 0,
+  attackTimer: 0,
+  hurtTimer: 0,
+  lastAttackAt: null,
+});
 
 const expandShorthandHex = (value) =>
   value
@@ -349,6 +384,137 @@ const updateCamera = (renderState, targetPlayer, delta) => {
   camera.y = interpolate(camera.y, targetY, smoothing);
 };
 
+const updateEyeBlink = (previous, delta, { isLocal = false, forceBlink = false } = {}) => {
+  const blink = previous && typeof previous === 'object' ? previous : createEyeBlinkState();
+  const speedProfile = isLocal ? LOCAL_BLINK_SPEED : REMOTE_BLINK_SPEED;
+  if (!Number.isFinite(blink.timer)) {
+    blink.timer = randomBetween(BLINK_INTERVAL_MIN, BLINK_INTERVAL_MAX);
+  }
+  if (!Number.isFinite(blink.openness)) {
+    blink.openness = 1;
+  }
+  if (forceBlink && blink.state !== 'closing' && blink.state !== 'closed') {
+    blink.state = 'closing';
+  }
+
+  switch (blink.state) {
+    case 'closing': {
+      blink.openness = Math.max(0, blink.openness - delta * speedProfile.closing);
+      if (blink.openness <= 0.05) {
+        blink.openness = 0;
+        blink.state = 'closed';
+        blink.hold = BLINK_HOLD_DURATION;
+      }
+      break;
+    }
+    case 'closed': {
+      blink.hold = Math.max(0, (blink.hold ?? 0) - delta);
+      if (blink.hold <= 0) {
+        blink.state = 'opening';
+      }
+      break;
+    }
+    case 'opening': {
+      blink.openness = Math.min(1, blink.openness + delta * speedProfile.opening);
+      if (blink.openness >= 0.995) {
+        blink.openness = 1;
+        blink.state = 'open';
+        blink.timer = randomBetween(BLINK_INTERVAL_MIN, BLINK_INTERVAL_MAX);
+      }
+      break;
+    }
+    default: {
+      blink.timer -= delta;
+      if (blink.timer <= 0) {
+        blink.state = 'closing';
+      }
+      break;
+    }
+  }
+
+  return blink;
+};
+
+const updateEyeLook = (
+  previous,
+  delta,
+  { isLocal = false, orientation = 0, movementVector = { x: 0, y: 0 } } = {}
+) => {
+  const look = previous && typeof previous === 'object' ? previous : createEyeLookState();
+  const smoothing = Math.min(1, delta * (isLocal ? 12 : 6));
+  const targetStrength = isLocal ? LOOK_STRENGTH.local : LOOK_STRENGTH.remote;
+
+  const mvX = Number.isFinite(movementVector.x) ? movementVector.x : 0;
+  const mvY = Number.isFinite(movementVector.y) ? movementVector.y : 0;
+  const magnitude = Math.sqrt(mvX * mvX + mvY * mvY);
+  const hasMovement = magnitude > MOVEMENT_EPSILON;
+
+  let targetX = look.targetX ?? 0;
+  let targetY = look.targetY ?? 0;
+
+  if (isLocal && Number.isFinite(orientation)) {
+    targetX = Math.cos(orientation) * targetStrength;
+    targetY = Math.sin(orientation) * targetStrength;
+  } else if (hasMovement) {
+    targetX = (mvX / magnitude) * targetStrength;
+    targetY = (mvY / magnitude) * targetStrength;
+  } else if (Number.isFinite(orientation)) {
+    targetX = Math.cos(orientation) * targetStrength;
+    targetY = Math.sin(orientation) * targetStrength;
+  } else {
+    const relax = smoothing * (isLocal ? 0.6 : 0.12);
+    targetX = interpolate(targetX, 0, relax);
+    targetY = interpolate(targetY, 0, relax);
+  }
+
+  look.targetX = targetX;
+  look.targetY = targetY;
+  look.x = interpolate(look.x ?? 0, targetX, smoothing);
+  look.y = interpolate(look.y ?? 0, targetY, smoothing);
+
+  return look;
+};
+
+const AGGRESSIVE_COMBAT_STATES = new Set(['engaged', 'attacking', 'charging']);
+
+const updateEyeExpression = (
+  previous,
+  delta,
+  { isLocal = false, combatStatus = {}, tookDamage = false, lastAttackAt = null } = {}
+) => {
+  const expression = previous && typeof previous === 'object' ? previous : createEyeExpressionState();
+  const decayProfile = isLocal ? EXPRESSION_DECAY.local : EXPRESSION_DECAY.remote;
+  const chargeRate = isLocal ? EXPRESSION_CHARGE.local : EXPRESSION_CHARGE.remote;
+
+  const attackTimestamp = Number.isFinite(lastAttackAt) ? lastAttackAt : null;
+  if (attackTimestamp !== null && attackTimestamp !== expression.lastAttackAt) {
+    expression.lastAttackAt = attackTimestamp;
+    expression.attackTimer = Math.min(1, Math.max(expression.attackTimer, isLocal ? 0.9 : 0.7));
+  }
+
+  const isAggressive = combatStatus && AGGRESSIVE_COMBAT_STATES.has(combatStatus.state);
+  if (isAggressive) {
+    expression.attackTimer = Math.min(1, expression.attackTimer + delta * chargeRate);
+  } else {
+    expression.attackTimer = Math.max(0, expression.attackTimer - delta * decayProfile.attack);
+  }
+
+  if (tookDamage) {
+    expression.hurtTimer = Math.min(1, Math.max(expression.hurtTimer, isLocal ? 1 : 0.85));
+  }
+
+  expression.hurtTimer = Math.max(0, expression.hurtTimer - delta * decayProfile.hurt);
+
+  const smoothing = Math.min(1, delta * (isLocal ? 10 : 6));
+  const targetAttack = clamp01(expression.attackTimer);
+  const targetHurt = clamp01(expression.hurtTimer);
+
+  expression.attacking = interpolate(expression.attacking ?? 0, targetAttack, smoothing);
+  expression.hurt = interpolate(expression.hurt ?? 0, targetHurt, smoothing);
+
+  return expression;
+};
+
 const createRenderPlayer = (sharedPlayer) => {
   const palette = getPaletteForPlayer(sharedPlayer.id);
   const position = ensureVector(sharedPlayer.position);
@@ -392,6 +558,9 @@ const createRenderPlayer = (sharedPlayer) => {
     resistances: createResistanceSnapshot(
       sharedPlayer.combatAttributes?.resistances ?? sharedPlayer.resistances
     ),
+    eyeBlink: createEyeBlinkState(),
+    eyeLook: createEyeLookState(),
+    eyeExpression: createEyeExpressionState(),
   };
 };
 
@@ -408,6 +577,7 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
     const position = ensureVector(player.position, existing.position);
     const movementVector = ensureVector(player.movementVector, existing.movementVector);
     const health = ensureHealth(player.health);
+    const previousHealth = existing.health;
 
     const smoothing = Math.min(1, delta * POSITION_SMOOTHING);
 
@@ -433,7 +603,8 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
     };
     existing.lastAttackAt = existing.combatStatus.lastAttackAt;
     existing.palette = palette;
-    existing.isLocal = player.id === localPlayerId;
+    const isLocal = player.id === localPlayerId;
+    existing.isLocal = isLocal;
     existing.name = player.name;
     existing.score = Number.isFinite(player.score) ? player.score : existing.score ?? 0;
     const fallbackCombo = existing.combo ?? 1;
@@ -455,6 +626,29 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
     } else if (!existing.resistances) {
       existing.resistances = createResistanceSnapshot();
     }
+
+    const tookDamage =
+      previousHealth &&
+      Number.isFinite(previousHealth.current) &&
+      Number.isFinite(health.current) &&
+      health.current < previousHealth.current - 0.01;
+
+    existing.eyeBlink = updateEyeBlink(existing.eyeBlink, delta, {
+      isLocal,
+      forceBlink: tookDamage,
+    });
+    existing.eyeLook = updateEyeLook(existing.eyeLook, delta, {
+      isLocal,
+      orientation: existing.orientation,
+      movementVector,
+    });
+    existing.eyeExpression = updateEyeExpression(existing.eyeExpression, delta, {
+      isLocal,
+      combatStatus: existing.combatStatus,
+      tookDamage,
+      lastAttackAt: existing.combatStatus.lastAttackAt,
+    });
+
     existing.pulse = (existing.pulse + delta * (1 + existing.speed * 0.2)) % (Math.PI * 2);
   });
 
