@@ -31,6 +31,132 @@ const DEFAULT_SETTINGS = {
   showTouchControls: false,
 };
 
+const EVOLUTION_STAT_KEYS = ['attack', 'defense', 'speed', 'range'];
+const EVOLUTION_HISTORY_TIERS = ['small', 'medium', 'large'];
+
+const snapshotEvolutionState = (organism) => {
+  const persistentPassives = organism?.persistentPassives || {};
+  const bases = {};
+  EVOLUTION_STAT_KEYS.forEach((stat) => {
+    const key = `base${stat.charAt(0).toUpperCase()}${stat.slice(1)}`;
+    const value = organism && Number.isFinite(organism[key]) ? Number(organism[key]) : null;
+    bases[stat] = value;
+  });
+
+  const history = {
+    small: { ...(organism?.evolutionHistory?.small || {}) },
+    medium: { ...(organism?.evolutionHistory?.medium || {}) },
+    large: { ...(organism?.evolutionHistory?.large || {}) },
+  };
+
+  const traits = new Set(
+    Array.isArray(organism?.traits)
+      ? organism.traits
+          .map((trait) => (typeof trait === 'string' ? trait.trim() : ''))
+          .filter((trait) => trait.length > 0)
+      : [],
+  );
+
+  return {
+    passives: { ...persistentPassives },
+    bases,
+    history,
+    traits,
+  };
+};
+
+const diffEvolutionSnapshots = (before, after, evolutionId, hintedTier) => {
+  if (!evolutionId) {
+    return null;
+  }
+
+  const traitDeltas = [];
+  after.traits.forEach((trait) => {
+    if (!before.traits.has(trait)) {
+      traitDeltas.push(trait);
+    }
+  });
+
+  let resolvedTier = typeof hintedTier === 'string' && hintedTier ? hintedTier : null;
+  let countDelta = 0;
+  for (const tier of EVOLUTION_HISTORY_TIERS) {
+    const prev = Number.isFinite(before.history?.[tier]?.[evolutionId])
+      ? Number(before.history[tier][evolutionId])
+      : 0;
+    const next = Number.isFinite(after.history?.[tier]?.[evolutionId])
+      ? Number(after.history[tier][evolutionId])
+      : 0;
+    const delta = next - prev;
+    if (delta !== 0) {
+      countDelta = delta;
+      resolvedTier = tier;
+      break;
+    }
+  }
+
+  const additiveDelta = {};
+  const multiplierDelta = {};
+  const baseDelta = {};
+
+  EVOLUTION_STAT_KEYS.forEach((stat) => {
+    const bonusKey = `${stat}Bonus`;
+    const prevBonus = Number.isFinite(before.passives?.[bonusKey]) ? Number(before.passives[bonusKey]) : 0;
+    const nextBonus = Number.isFinite(after.passives?.[bonusKey]) ? Number(after.passives[bonusKey]) : 0;
+    if (nextBonus !== prevBonus) {
+      additiveDelta[stat] = nextBonus - prevBonus;
+    }
+
+    const multiplierKey = `${stat}Multiplier`;
+    const prevMultiplier = Number.isFinite(before.passives?.[multiplierKey])
+      ? Number(before.passives[multiplierKey])
+      : 0;
+    const nextMultiplier = Number.isFinite(after.passives?.[multiplierKey])
+      ? Number(after.passives[multiplierKey])
+      : 0;
+    if (nextMultiplier !== prevMultiplier) {
+      multiplierDelta[stat] = nextMultiplier - prevMultiplier;
+    }
+
+    const prevBase = Number.isFinite(before.bases?.[stat]) ? Number(before.bases[stat]) : null;
+    const nextBase = Number.isFinite(after.bases?.[stat]) ? Number(after.bases[stat]) : null;
+    if (prevBase !== null && nextBase !== null && nextBase !== prevBase) {
+      baseDelta[stat] = nextBase - prevBase;
+    }
+  });
+
+  const hasAdditive = Object.keys(additiveDelta).length > 0;
+  const hasMultiplier = Object.keys(multiplierDelta).length > 0;
+  const hasBase = Object.keys(baseDelta).length > 0;
+  const hasTraits = traitDeltas.length > 0;
+  const hasCount = countDelta !== 0;
+
+  if (!hasAdditive && !hasMultiplier && !hasBase && !hasTraits && !hasCount) {
+    return null;
+  }
+
+  const payload = { evolutionId };
+  if (resolvedTier) {
+    payload.tier = resolvedTier;
+  }
+  if (hasCount) {
+    payload.countDelta = countDelta;
+  }
+  if (hasTraits) {
+    payload.traitDeltas = traitDeltas;
+  }
+  if (hasAdditive) {
+    payload.additiveDelta = additiveDelta;
+  }
+  if (hasMultiplier) {
+    payload.multiplierDelta = multiplierDelta;
+  }
+  if (hasBase) {
+    payload.baseDelta = baseDelta;
+  }
+
+  return payload;
+};
+
 const DENSITY_SCALE = {
   low: 0.6,
   medium: 1,
@@ -105,6 +231,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   const actionBufferRef = useRef({ attacks: [] });
   const dispatchRef = useRef(dispatch);
   const commandCallbackRef = useRef(settings?.onCommandBatch ?? null);
+  const evolutionCallbackRef = useRef(settings?.onEvolutionDelta ?? null);
 
   useEffect(() => {
     dispatchRef.current = dispatch;
@@ -112,6 +239,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
   useEffect(() => {
     commandCallbackRef.current = settings?.onCommandBatch ?? null;
+    evolutionCallbackRef.current = settings?.onEvolutionDelta ?? null;
   }, [settings]);
 
   useEffect(() => {
@@ -742,6 +870,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
       const state = renderStateRef.current;
       if (!state) return;
 
+      const beforeSnapshot = snapshotEvolutionState(state.organism);
       const helpers = {
         createEffect,
         createParticle,
@@ -757,6 +886,11 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
       };
 
       chooseEvolutionSystem(state, helpers, evolutionKey, tier);
+      const afterSnapshot = snapshotEvolutionState(state.organism);
+      const evolutionDelta = diffEvolutionSnapshots(beforeSnapshot, afterSnapshot, evolutionKey, tier);
+      if (evolutionDelta && evolutionCallbackRef.current) {
+        evolutionCallbackRef.current(evolutionDelta);
+      }
       syncHudState(state);
     },
     [createEffect, createParticle, playSound, pushNotification, syncHudState]

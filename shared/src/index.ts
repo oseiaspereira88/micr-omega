@@ -71,6 +71,36 @@ export const combatAttributesSchema = z.object({
   range: z.number().finite().nonnegative()
 });
 
+const combatStatAdjustmentSchema = z
+  .object({
+    attack: z.number().finite().optional(),
+    defense: z.number().finite().optional(),
+    speed: z.number().finite().optional(),
+    range: z.number().finite().optional()
+  })
+  .partial()
+  .refine((value) => Object.values(value).some((entry) => entry !== undefined), {
+    message: "empty_stat_adjustment"
+  });
+
+export const evolutionTierSchema = z.union([
+  z.literal("small"),
+  z.literal("medium"),
+  z.literal("large"),
+  z.literal("macro")
+]);
+
+export const evolutionActionSchema = z.object({
+  type: z.literal("evolution"),
+  evolutionId: z.string().trim().min(1).max(64),
+  tier: evolutionTierSchema.optional(),
+  countDelta: z.number().finite().int().optional(),
+  traitDeltas: z.array(z.string().trim().min(1).max(64)).optional(),
+  additiveDelta: combatStatAdjustmentSchema.optional(),
+  multiplierDelta: combatStatAdjustmentSchema.optional(),
+  baseDelta: combatStatAdjustmentSchema.optional()
+});
+
 export const sharedPlayerStateSchema = z.object({
   id: playerIdSchema,
   name: playerNameSchema,
@@ -563,7 +593,8 @@ export const playerActionSchema = z
     deathActionSchema,
     movementActionSchema,
     attackActionBaseSchema,
-    collectActionSchema
+    collectActionSchema,
+    evolutionActionSchema
   ])
   .superRefine((value, ctx) => {
     if (
@@ -716,6 +747,8 @@ export type PlayerAbilityAction = z.infer<typeof abilityActionSchema>;
 export type PlayerMovementAction = z.infer<typeof movementActionSchema>;
 export type PlayerAttackAction = z.infer<typeof attackActionSchema>;
 export type PlayerCollectAction = z.infer<typeof collectActionSchema>;
+export type PlayerEvolutionAction = z.infer<typeof evolutionActionSchema>;
+export type EvolutionTier = z.infer<typeof evolutionTierSchema>;
 export type PlayerAction = z.infer<typeof playerActionSchema>;
 export type ActionMessage = z.infer<typeof actionMessageSchema>;
 export type MovementMessage = z.infer<typeof movementMessageSchema>;

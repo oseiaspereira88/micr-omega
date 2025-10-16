@@ -9,7 +9,7 @@ import { useGameSettings } from './store/gameSettings';
 const TOAST_DURATION = 5000;
 
 const App = () => {
-  const { connect, disconnect, sendMovement, sendAttack } = useGameSocket();
+  const { connect, disconnect, sendMovement, sendAttack, send } = useGameSocket();
   const joinError = useGameStore((state) => state.joinError);
   const connectionStatus = useGameStore((state) => state.connectionStatus);
   const { settings } = useGameSettings();
@@ -193,12 +193,101 @@ const App = () => {
     [sendMovement, sendAttack]
   );
 
+  const handleEvolutionDelta = useCallback(
+    (delta) => {
+      if (!delta || typeof delta !== 'object') {
+        return;
+      }
+
+      const { evolutionId } = delta;
+      if (typeof evolutionId !== 'string' || !evolutionId.trim()) {
+        return;
+      }
+
+      const state = gameStore.getState();
+      const playerId = state?.playerId;
+      if (!playerId) {
+        return;
+      }
+
+      const actionPayload = {
+        type: 'evolution',
+        evolutionId: evolutionId.trim(),
+      };
+
+      if (typeof delta.tier === 'string' && delta.tier) {
+        actionPayload.tier = delta.tier;
+      }
+
+      if (Number.isFinite(delta.countDelta) && delta.countDelta !== 0) {
+        actionPayload.countDelta = Math.trunc(delta.countDelta);
+      }
+
+      if (Array.isArray(delta.traitDeltas) && delta.traitDeltas.length > 0) {
+        const traits = Array.from(
+          new Set(
+            delta.traitDeltas
+              .map((trait) => (typeof trait === 'string' ? trait.trim() : ''))
+              .filter((trait) => trait.length > 0),
+          ),
+        );
+        if (traits.length > 0) {
+          actionPayload.traitDeltas = traits;
+        }
+      }
+
+      const prepareAdjustments = (adjustments) => {
+        if (!adjustments || typeof adjustments !== 'object') return undefined;
+        const entries = Object.entries(adjustments).filter(([, value]) => Number.isFinite(value) && value !== 0);
+        if (entries.length === 0) return undefined;
+        return entries.reduce((acc, [key, value]) => {
+          acc[key] = Number(value);
+          return acc;
+        }, {});
+      };
+
+      const additiveDelta = prepareAdjustments(delta.additiveDelta);
+      if (additiveDelta) {
+        actionPayload.additiveDelta = additiveDelta;
+      }
+
+      const multiplierDelta = prepareAdjustments(delta.multiplierDelta);
+      if (multiplierDelta) {
+        actionPayload.multiplierDelta = multiplierDelta;
+      }
+
+      const baseDelta = prepareAdjustments(delta.baseDelta);
+      if (baseDelta) {
+        actionPayload.baseDelta = baseDelta;
+      }
+
+      const hasAdjustments =
+        Boolean(actionPayload.countDelta) ||
+        Boolean(actionPayload.traitDeltas?.length) ||
+        Boolean(additiveDelta) ||
+        Boolean(multiplierDelta) ||
+        Boolean(baseDelta);
+
+      if (!hasAdjustments) {
+        return;
+      }
+
+      send({
+        type: 'action',
+        playerId,
+        action: actionPayload,
+      });
+    },
+    [send]
+  );
+
   const resolvedSettings = useMemo(
     () => ({
       ...(settings || {}),
       onCommandBatch: handleCommandBatch,
+      onEvolutionDelta: handleEvolutionDelta,
     }),
-    [settings, handleCommandBatch]
+    [settings, handleCommandBatch, handleEvolutionDelta]
   );
 
   const removeToast = useCallback((id) => {
