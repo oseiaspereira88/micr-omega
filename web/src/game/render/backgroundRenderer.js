@@ -5,6 +5,17 @@ import {
   withCameraTransform,
 } from './utils/cameraHelpers.js';
 
+const normalizeAngle = (angle) => {
+  let result = angle;
+  while (result > Math.PI) {
+    result -= Math.PI * 2;
+  }
+  while (result < -Math.PI) {
+    result += Math.PI * 2;
+  }
+  return result;
+};
+
 export const backgroundRenderer = {
   render(ctx, state, camera) {
     if (!ctx) return;
@@ -98,30 +109,95 @@ export const backgroundRenderer = {
       });
 
       microorganisms.forEach((micro) => {
+        micro.animPhase += 0.05;
+        micro.updateFrame = (micro.updateFrame + 1) % micro.updateStride;
+
+        if (micro.updateFrame === 0) {
+          micro.headingTimer -= 1;
+          micro.speedTimer -= 1;
+          micro.noiseOffset += micro.noiseSpeed;
+          const noise = Math.sin(micro.noiseOffset) * 0.5 + Math.sin(micro.noiseOffset * 0.73) * 0.5;
+          const noiseHeading = noise * micro.noiseHeadingScale;
+          const noiseSpeed = noise * micro.noiseSpeedScale;
+
+          if (micro.headingTimer <= 0) {
+            micro.headingInterval = 90 + Math.random() * 180;
+            micro.headingTimer = micro.headingInterval;
+            micro.targetHeading =
+              micro.heading + (Math.random() - 0.5) * micro.headingVariance + noiseHeading;
+          }
+
+          if (micro.speedTimer <= 0) {
+            micro.speedInterval = 150 + Math.random() * 200;
+            micro.speedTimer = micro.speedInterval;
+            micro.targetSpeed = Math.max(
+              0.05,
+              micro.baseSpeed * (0.6 + Math.random() * 0.8) + noiseSpeed * micro.baseSpeed
+            );
+          }
+
+          const edgeMargin = micro.edgeMargin ?? 160;
+          if (
+            micro.x < edgeMargin ||
+            micro.x > WORLD_SIZE - edgeMargin ||
+            micro.y < edgeMargin ||
+            micro.y > WORLD_SIZE - edgeMargin
+          ) {
+            const inwardHeading = Math.atan2(micro.homeY - micro.y, micro.homeX - micro.x);
+            micro.targetHeading = inwardHeading;
+            micro.targetSpeed = Math.max(micro.targetSpeed, micro.baseSpeed * 0.9);
+            micro.headingTimer = Math.min(micro.headingTimer, micro.headingInterval * 0.5);
+          }
+
+          const headingDelta = normalizeAngle(micro.targetHeading - micro.heading);
+          micro.heading += headingDelta * micro.turnRate;
+          micro.speed += (micro.targetSpeed - micro.speed) * micro.speedLerp;
+
+          micro.swirlPhase += micro.swirlSpeed;
+          const toVortexAngle = Math.atan2(micro.vortexY - micro.y, micro.vortexX - micro.x);
+          const swirlAngle = toVortexAngle + Math.PI / 2;
+          const swirlForce = Math.sin(micro.swirlPhase) * micro.swirlStrength;
+
+          const baseVx = Math.cos(micro.heading) * micro.speed;
+          const baseVy = Math.sin(micro.heading) * micro.speed;
+          const swirlVx = Math.cos(swirlAngle) * swirlForce;
+          const swirlVy = Math.sin(swirlAngle) * swirlForce;
+
+          micro.vx = baseVx + swirlVx;
+          micro.vy = baseVy + swirlVy;
+
+          micro.scalePhase += micro.scaleSpeed + Math.abs(headingDelta) * micro.scaleTurnInfluence;
+          const scaleWave = 0.85 + Math.sin(micro.scalePhase) * 0.2;
+          micro.currentScale = scaleWave;
+          const opacityWave = 0.7 + Math.cos(micro.scalePhase + headingDelta * 3) * 0.2;
+          micro.currentOpacity = Math.min(1, Math.max(0.05, micro.opacity * opacityWave));
+        }
+
         micro.x += micro.vx;
         micro.y += micro.vy;
-        micro.animPhase += 0.05;
 
-        if (micro.x < 0) micro.x = WORLD_SIZE;
-        if (micro.x > WORLD_SIZE) micro.x = 0;
-        if (micro.y < 0) micro.y = WORLD_SIZE;
-        if (micro.y > WORLD_SIZE) micro.y = 0;
+        if (micro.x < 0) micro.x = 0;
+        if (micro.x > WORLD_SIZE) micro.x = WORLD_SIZE;
+        if (micro.y < 0) micro.y = 0;
+        if (micro.y > WORLD_SIZE) micro.y = WORLD_SIZE;
 
         const depth = micro.depth ?? 1;
         const dx = (micro.x - centerX) * depth;
         const dy = (micro.y - centerY) * depth;
-        if (Math.abs(dx) > halfWidth + 100 || Math.abs(dy) > halfHeight + 100) {
+        if (Math.abs(dx) > halfWidth + 120 || Math.abs(dy) > halfHeight + 120) {
           return;
         }
 
         const screenX = micro.x - camera.offsetX * depth;
         const screenY = micro.y - camera.offsetY * depth;
-        const pulse = Math.sin(micro.animPhase) * 0.2 + 1;
+        const swimPulse = 0.9 + Math.sin(micro.animPhase) * 0.1;
+        const drawScale = (micro.currentScale ?? 1) * swimPulse * depth;
+        const drawOpacity = micro.currentOpacity ?? micro.opacity;
 
-        ctx.fillStyle = micro.color + micro.opacity + ')';
-        ctx.globalAlpha = micro.opacity;
+        ctx.fillStyle = micro.color + drawOpacity + ')';
+        ctx.globalAlpha = drawOpacity;
         ctx.beginPath();
-        ctx.arc(screenX, screenY, micro.size * pulse * depth, 0, Math.PI * 2);
+        ctx.arc(screenX, screenY, micro.size * drawScale, 0, Math.PI * 2);
         ctx.fill();
       });
       ctx.globalAlpha = 1;
