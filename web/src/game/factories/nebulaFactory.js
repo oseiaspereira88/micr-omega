@@ -1,3 +1,5 @@
+import { WORLD_SIZE } from '@micr-omega/shared';
+
 import { nebulaTypes } from '../config/nebulaTypes';
 
 const getRandom = (rng = Math.random) => (typeof rng === 'function' ? rng : Math.random);
@@ -9,7 +11,7 @@ const pickRandom = (items = [], random) => {
 };
 
 export const spawnNebula = ({
-  worldSize = 4000,
+  worldSize = WORLD_SIZE,
   types = nebulaTypes,
   forcedType,
   rng = Math.random

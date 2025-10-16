@@ -2,6 +2,9 @@ import { z } from "zod";
 
 export const PROTOCOL_VERSION = "1.0.0" as const;
 
+export const WORLD_SIZE = 4000;
+export const WORLD_RADIUS = WORLD_SIZE / 2;
+
 export const NAME_PATTERN = /^[\p{L}\p{N} _-]+$/u;
 export const ABILITY_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 

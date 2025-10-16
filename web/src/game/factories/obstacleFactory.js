@@ -1,3 +1,5 @@
+import { WORLD_SIZE } from '@micr-omega/shared';
+
 import { obstacleTypes } from '../config/obstacleTypes';
 
 const getRandom = (rng = Math.random) => (typeof rng === 'function' ? rng : Math.random);
@@ -26,7 +28,7 @@ const ensureAlpha = (color, alpha = '88') => {
   return color;
 };
 
-export const spawnObstacle = ({ worldSize = 4000, types = obstacleTypes, rng = Math.random } = {}) => {
+export const spawnObstacle = ({ worldSize = WORLD_SIZE, types = obstacleTypes, rng = Math.random } = {}) => {
   const random = getRandom(rng);
   const availableTypes = Object.keys(types || {});
   if (!availableTypes.length) return null;

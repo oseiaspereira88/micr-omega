@@ -1,3 +1,5 @@
+import { WORLD_SIZE } from '@micr-omega/shared';
+
 import { createPowerUp } from '../entities/powerUp';
 
 const getRandom = (rng = Math.random) => (typeof rng === 'function' ? rng : Math.random);
@@ -9,7 +11,7 @@ const pickRandom = (items = [], random) => {
 };
 
 export const spawnPowerUp = ({
-  worldSize = 4000,
+  worldSize = WORLD_SIZE,
   types = {},
   forcedType,
   position,

@@ -1,3 +1,5 @@
+import { WORLD_RADIUS } from '@micr-omega/shared';
+
 import { ensureResourceProfile } from '../state/resourceProfile';
 import {
   createStatusResistanceProfile,
@@ -46,8 +48,8 @@ export const createOrganism = (overrides = {}) => {
   } = resources;
 
   const defaults = {
-    x: 2000,
-    y: 2000,
+    x: WORLD_RADIUS,
+    y: WORLD_RADIUS,
     vx: 0,
     vy: 0,
     size: 32,

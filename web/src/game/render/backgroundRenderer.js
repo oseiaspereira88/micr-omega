@@ -1,3 +1,5 @@
+import { WORLD_SIZE } from '@micr-omega/shared';
+
 import {
   getCameraViewMetrics,
   withCameraTransform,
@@ -69,7 +71,7 @@ export const backgroundRenderer = {
 
       lightRays.forEach((ray) => {
         ray.y += ray.speed;
-        if (ray.y > 4000) ray.y = -200;
+        if (ray.y > WORLD_SIZE) ray.y = -200;
 
         const parallax = 0.3;
         const dx = (ray.x - centerX) * parallax;
@@ -100,10 +102,10 @@ export const backgroundRenderer = {
         micro.y += micro.vy;
         micro.animPhase += 0.05;
 
-        if (micro.x < 0) micro.x = 4000;
-        if (micro.x > 4000) micro.x = 0;
-        if (micro.y < 0) micro.y = 4000;
-        if (micro.y > 4000) micro.y = 0;
+        if (micro.x < 0) micro.x = WORLD_SIZE;
+        if (micro.x > WORLD_SIZE) micro.x = 0;
+        if (micro.y < 0) micro.y = WORLD_SIZE;
+        if (micro.y > WORLD_SIZE) micro.y = 0;
 
         const depth = micro.depth ?? 1;
         const dx = (micro.x - centerX) * depth;
@@ -129,10 +131,10 @@ export const backgroundRenderer = {
         p.y += p.vy;
         p.pulsePhase += 0.03;
 
-        if (p.x < 0) p.x = 4000;
-        if (p.x > 4000) p.x = 0;
-        if (p.y < 0) p.y = 4000;
-        if (p.y > 4000) p.y = 0;
+        if (p.x < 0) p.x = WORLD_SIZE;
+        if (p.x > WORLD_SIZE) p.x = 0;
+        if (p.y < 0) p.y = WORLD_SIZE;
+        if (p.y > WORLD_SIZE) p.y = 0;
 
         const depth = 0.5 + (p.depth ?? 0) * 0.5;
         const dx = (p.x - centerX) * depth;
@@ -161,10 +163,10 @@ export const backgroundRenderer = {
         p.y += p.vy * (1 + p.depth);
         p.pulsePhase += p.pulseSpeed * 0.02;
 
-        if (p.x < 0) p.x = 4000;
-        if (p.x > 4000) p.x = 0;
-        if (p.y < 0) p.y = 4000;
-        if (p.y > 4000) p.y = 0;
+        if (p.x < 0) p.x = WORLD_SIZE;
+        if (p.x > WORLD_SIZE) p.x = 0;
+        if (p.y < 0) p.y = WORLD_SIZE;
+        if (p.y > WORLD_SIZE) p.y = 0;
 
         const depth = 0.3 + (p.depth ?? 0) * 0.7;
         const dx = (p.x - centerX) * depth;
