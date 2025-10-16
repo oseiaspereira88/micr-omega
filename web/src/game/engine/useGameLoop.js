@@ -516,27 +516,105 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     syncHudState(state);
   }, [playSound, pushNotification, syncHudState]);
 
+  const captureLocalCombatSnapshot = useCallback(() => {
+    const sharedState = sharedStateRef.current;
+    const renderState = renderStateRef.current;
+
+    const fallback = { targetPlayerId: null, targetObjectId: null, state: null };
+
+    if (!sharedState) {
+      return fallback;
+    }
+
+    const localPlayerId = sharedState.playerId;
+    if (!localPlayerId) {
+      return fallback;
+    }
+
+    const applyStatus = (status, accumulator) => {
+      if (!status || typeof status !== 'object') {
+        return;
+      }
+
+      if (!accumulator.state && typeof status.state === 'string' && status.state) {
+        accumulator.state = status.state;
+      }
+
+      const isActiveState = status.state === 'engaged' || status.state === 'cooldown';
+
+      if (isActiveState) {
+        if (!accumulator.targetPlayerId && typeof status.targetPlayerId === 'string' && status.targetPlayerId) {
+          accumulator.targetPlayerId = status.targetPlayerId;
+        }
+
+        if (!accumulator.targetObjectId && typeof status.targetObjectId === 'string' && status.targetObjectId) {
+          accumulator.targetObjectId = status.targetObjectId;
+        }
+      }
+    };
+
+    const accumulator = { ...fallback };
+
+    const playersById = renderState?.playersById;
+    if (playersById && typeof playersById.get === 'function') {
+      const renderPlayer = playersById.get(localPlayerId);
+      if (renderPlayer?.combatStatus) {
+        applyStatus(renderPlayer.combatStatus, accumulator);
+      }
+    }
+
+    const sharedPlayers = sharedState.players ?? null;
+    if (sharedPlayers && sharedPlayers[localPlayerId]?.combatStatus) {
+      applyStatus(sharedPlayers[localPlayerId].combatStatus, accumulator);
+    }
+
+    const remotePlayersById = sharedState.remotePlayers?.byId ?? null;
+    if (remotePlayersById && remotePlayersById[localPlayerId]?.combatStatus) {
+      applyStatus(remotePlayersById[localPlayerId].combatStatus, accumulator);
+    }
+
+    return accumulator;
+  }, []);
+
+  const queueAttackCommand = useCallback(
+    (kind) => {
+      const timestamp = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const combatSnapshot = captureLocalCombatSnapshot();
+
+      const payload = {
+        kind,
+        timestamp,
+      };
+
+      if (combatSnapshot?.targetPlayerId) {
+        payload.targetPlayerId = combatSnapshot.targetPlayerId;
+      }
+
+      if (combatSnapshot?.targetObjectId) {
+        payload.targetObjectId = combatSnapshot.targetObjectId;
+      }
+
+      if (combatSnapshot?.state) {
+        payload.state = combatSnapshot.state;
+      }
+
+      actionBufferRef.current.attacks.push(payload);
+    },
+    [captureLocalCombatSnapshot]
+  );
+
   const { joystick, actions: inputActions } = useInputController({
     onMovementIntent: (intent) => {
       movementIntentRef.current = intent;
     },
     onAttack: () => {
-      actionBufferRef.current.attacks.push({
-        kind: 'basic',
-        timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
-      });
+      queueAttackCommand('basic');
     },
     onDash: () => {
-      actionBufferRef.current.attacks.push({
-        kind: 'dash',
-        timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
-      });
+      queueAttackCommand('dash');
     },
     onUseSkill: () => {
-      actionBufferRef.current.attacks.push({
-        kind: 'skill',
-        timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
-      });
+      queueAttackCommand('skill');
     },
     onCycleSkill: cycleSkillHandler,
     onOpenEvolutionMenu: openEvolutionMenuHandler,

@@ -92,6 +92,40 @@ const App = () => {
         if (typeof sendAttack === 'function' && playerId && player && isGamePhaseActive) {
           const combatStatus = player.combatStatus ?? {};
 
+          const validatePlayerTarget = (candidate) => {
+            if (typeof candidate !== 'string' || !candidate) {
+              return null;
+            }
+            if (players?.[candidate]) {
+              return candidate;
+            }
+            if (state?.remotePlayers?.byId?.[candidate]) {
+              return candidate;
+            }
+            return null;
+          };
+
+          const validateObjectTarget = (candidate) => {
+            if (typeof candidate !== 'string' || !candidate) {
+              return null;
+            }
+
+            const collections = [
+              state?.microorganisms?.byId,
+              state?.organicMatter?.byId,
+              state?.obstacles?.byId,
+              state?.roomObjects?.byId,
+            ];
+
+            for (const collection of collections) {
+              if (collection && collection[candidate]) {
+                return candidate;
+              }
+            }
+
+            return null;
+          };
+
           attackQueue.forEach((attackCommand) => {
             if (!attackCommand || typeof attackCommand !== 'object') {
               return;
@@ -106,14 +140,16 @@ const App = () => {
               : Date.now();
             payload.clientTime = timestamp;
 
-            const targetPlayerId =
-              typeof attackCommand.targetPlayerId === 'string'
-                ? attackCommand.targetPlayerId
-                : combatStatus?.targetPlayerId;
-            const targetObjectId =
-              typeof attackCommand.targetObjectId === 'string'
-                ? attackCommand.targetObjectId
-                : combatStatus?.targetObjectId;
+            const capturedPlayerTarget = validatePlayerTarget(attackCommand.targetPlayerId);
+            const capturedObjectTarget = validateObjectTarget(attackCommand.targetObjectId);
+
+            let targetPlayerId = capturedPlayerTarget;
+            let targetObjectId = capturedObjectTarget;
+
+            if (!targetPlayerId && !targetObjectId) {
+              targetPlayerId = validatePlayerTarget(combatStatus?.targetPlayerId);
+              targetObjectId = validateObjectTarget(combatStatus?.targetObjectId);
+            }
 
             if (targetPlayerId) {
               payload.targetPlayerId = targetPlayerId;
@@ -123,7 +159,7 @@ const App = () => {
             }
 
             if (!payload.targetPlayerId && !payload.targetObjectId) {
-              console.warn('Ignorando comando de ataque sem alvo', attackCommand);
+              console.warn('Ignorando comando de ataque sem alvo válido', attackCommand);
               return;
             }
 
