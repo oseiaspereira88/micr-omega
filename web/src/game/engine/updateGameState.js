@@ -1048,10 +1048,34 @@ const collectCommands = (renderState, movementIntent, actionBuffer) => {
   }
 
   if (Array.isArray(actionBuffer?.attacks) && actionBuffer.attacks.length > 0) {
-    commands.attacks = actionBuffer.attacks.map((attack) => ({
-      kind: attack.kind ?? 'basic',
-      timestamp: attack.timestamp ?? Date.now(),
-    }));
+    commands.attacks = actionBuffer.attacks.map((attack) => {
+      const normalized = {
+        kind: typeof attack?.kind === 'string' && attack.kind ? attack.kind : 'basic',
+        timestamp: Number.isFinite(attack?.timestamp) ? attack.timestamp : Date.now(),
+      };
+
+      if (typeof attack?.targetPlayerId === 'string' && attack.targetPlayerId) {
+        normalized.targetPlayerId = attack.targetPlayerId;
+      }
+
+      if (typeof attack?.targetObjectId === 'string' && attack.targetObjectId) {
+        normalized.targetObjectId = attack.targetObjectId;
+      }
+
+      if (typeof attack?.state === 'string' && attack.state) {
+        normalized.state = attack.state;
+      }
+
+      if (Number.isFinite(attack?.damage)) {
+        normalized.damage = attack.damage;
+      }
+
+      if (attack?.resultingHealth && typeof attack.resultingHealth === 'object') {
+        normalized.resultingHealth = { ...attack.resultingHealth };
+      }
+
+      return normalized;
+    });
     actionBuffer.attacks.length = 0;
   }
 

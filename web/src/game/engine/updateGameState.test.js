@@ -235,10 +235,22 @@ describe('updateGameState', () => {
     expect(second.commands.movement).toBeNull();
   });
 
-  it('flushes attack queue into command batch', () => {
+  it('flushes attack queue into command batch with combat metadata', () => {
     const renderState = createRenderState();
     const sharedState = createSharedState();
-    const actionBuffer = { attacks: [{ kind: 'basic', timestamp: 123 }] };
+    const actionBuffer = {
+      attacks: [
+        {
+          kind: 'skill',
+          timestamp: 123,
+          targetPlayerId: 'p2',
+          targetObjectId: 'micro-1',
+          state: 'engaged',
+          damage: 42,
+          resultingHealth: { current: 58, max: 120 },
+        },
+      ],
+    };
 
     const result = updateGameState({
       renderState,
@@ -249,6 +261,15 @@ describe('updateGameState', () => {
     });
 
     expect(result.commands.attacks).toHaveLength(1);
+    expect(result.commands.attacks[0]).toMatchObject({
+      kind: 'skill',
+      timestamp: 123,
+      targetPlayerId: 'p2',
+      targetObjectId: 'micro-1',
+      state: 'engaged',
+      damage: 42,
+      resultingHealth: { current: 58, max: 120 },
+    });
     expect(actionBuffer.attacks).toHaveLength(0);
   });
 
