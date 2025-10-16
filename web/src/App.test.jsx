@@ -67,6 +67,8 @@ const createPlayer = () => ({
     lastAttackAt: null,
   },
   combatAttributes: { attack: 1, defense: 1, speed: 1, range: 1 },
+  archetype: null,
+  archetypeKey: null,
 });
 
 describe('App archetype actions', () => {
@@ -133,5 +135,7 @@ describe('App archetype actions', () => {
     });
     expect(updated.players['player-1'].health).toEqual({ current: 140, max: 180 });
     expect(updated.remotePlayers.byId['player-1'].combatAttributes.attack).toBe(12);
+    expect(updated.players['player-1'].archetype).toBe('virus');
+    expect(updated.players['player-1'].archetypeKey).toBe('virus');
   });
 });

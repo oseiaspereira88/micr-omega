@@ -5,6 +5,7 @@ import ToastStack from './components/ToastStack';
 import { useGameSocket } from './hooks/useGameSocket';
 import { gameStore, useGameStore } from './store/gameStore';
 import { useGameSettings } from './store/gameSettings';
+import { sanitizeArchetypeKey } from './utils/messageTypes';
 
 const TOAST_DURATION = 5000;
 
@@ -283,8 +284,9 @@ const App = () => {
 
   const handleArchetypeSelect = useCallback(
     (archetypeKey, snapshot) => {
-      const normalized =
+      const candidate =
         typeof archetypeKey === 'string' ? archetypeKey.trim() : '';
+      const normalized = sanitizeArchetypeKey(candidate);
       if (!normalized) {
         return;
       }
@@ -308,21 +310,6 @@ const App = () => {
         console.error('Erro ao enviar ação de arquétipo', error);
       }
 
-      if (!snapshot || typeof snapshot !== 'object') {
-        return;
-      }
-
-      const combatSnapshot =
-        snapshot.combatAttributes && typeof snapshot.combatAttributes === 'object'
-          ? snapshot.combatAttributes
-          : null;
-
-      const resolveNumber = (value) =>
-        Number.isFinite(value) ? Number(value) : undefined;
-
-      const nextHealthValue = resolveNumber(snapshot.health);
-      const nextMaxHealthValue = resolveNumber(snapshot.maxHealth);
-
       gameStore.setState((prev) => {
         const currentPlayer =
           prev.players[playerId] ?? prev.remotePlayers.byId[playerId];
@@ -333,35 +320,56 @@ const App = () => {
         let changed = false;
 
         const nextHealth = { ...currentPlayer.health };
-        if (
-          nextHealthValue !== undefined &&
-          nextHealthValue !== currentPlayer.health.current
-        ) {
-          nextHealth.current = nextHealthValue;
-          changed = true;
-        }
-        if (
-          nextMaxHealthValue !== undefined &&
-          nextMaxHealthValue !== currentPlayer.health.max
-        ) {
-          nextHealth.max = nextMaxHealthValue;
-          changed = true;
-        }
-
         const nextCombatAttributes = { ...currentPlayer.combatAttributes };
-        if (combatSnapshot) {
-          const applyStat = (key) => {
-            const value = resolveNumber(combatSnapshot[key]);
-            if (value !== undefined && value !== nextCombatAttributes[key]) {
-              nextCombatAttributes[key] = value;
-              changed = true;
-            }
-          };
 
-          applyStat('attack');
-          applyStat('defense');
-          applyStat('speed');
-          applyStat('range');
+        if (snapshot && typeof snapshot === 'object') {
+          const combatSnapshot =
+            snapshot.combatAttributes && typeof snapshot.combatAttributes === 'object'
+              ? snapshot.combatAttributes
+              : null;
+
+          const resolveNumber = (value) =>
+            Number.isFinite(value) ? Number(value) : undefined;
+
+          const nextHealthValue = resolveNumber(snapshot.health);
+          const nextMaxHealthValue = resolveNumber(snapshot.maxHealth);
+
+          if (
+            nextHealthValue !== undefined &&
+            nextHealthValue !== currentPlayer.health.current
+          ) {
+            nextHealth.current = nextHealthValue;
+            changed = true;
+          }
+          if (
+            nextMaxHealthValue !== undefined &&
+            nextMaxHealthValue !== currentPlayer.health.max
+          ) {
+            nextHealth.max = nextMaxHealthValue;
+            changed = true;
+          }
+
+          if (combatSnapshot) {
+            const applyStat = (key) => {
+              const value = resolveNumber(combatSnapshot[key]);
+              if (value !== undefined && value !== nextCombatAttributes[key]) {
+                nextCombatAttributes[key] = value;
+                changed = true;
+              }
+            };
+
+            applyStat('attack');
+            applyStat('defense');
+            applyStat('speed');
+            applyStat('range');
+          }
+        }
+
+        if (currentPlayer.archetype !== normalized) {
+          changed = true;
+        }
+        if (currentPlayer.archetypeKey !== normalized) {
+          changed = true;
         }
 
         if (!changed) {
@@ -372,6 +380,8 @@ const App = () => {
           ...currentPlayer,
           combatAttributes: nextCombatAttributes,
           health: nextHealth,
+          archetype: normalized,
+          archetypeKey: normalized,
         };
 
         const nextPlayers = { ...prev.players, [playerId]: nextPlayer };

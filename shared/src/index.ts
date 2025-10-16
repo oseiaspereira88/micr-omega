@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "1.0.0" as const;
+export const PROTOCOL_VERSION = "1.1.0" as const;
 
 export const WORLD_SIZE = 4000;
 export const WORLD_RADIUS = WORLD_SIZE / 2;
@@ -14,6 +14,17 @@ export const MAX_PLAYER_ID_LENGTH = 64;
 export const MAX_ABILITY_ID_LENGTH = 64;
 export const MAX_VERSION_LENGTH = 16;
 export const MAX_WORLD_OBJECT_ID_LENGTH = 64;
+
+export const ARCHETYPE_KEYS = [
+  "virus",
+  "bacteria",
+  "archaea",
+  "protozoa",
+  "algae",
+  "fungus",
+] as const;
+
+export const archetypeKeySchema = z.enum(ARCHETYPE_KEYS);
 
 export const vector2Schema = z.object({
   x: z.number().finite(),
@@ -113,7 +124,9 @@ export const sharedPlayerStateSchema = z.object({
   orientation: orientationSchema,
   health: healthSchema,
   combatStatus: combatStatusSchema,
-  combatAttributes: combatAttributesSchema
+  combatAttributes: combatAttributesSchema,
+  archetype: archetypeKeySchema.nullable().optional().default(null),
+  archetypeKey: archetypeKeySchema.nullable().optional().default(null)
 });
 
 export const microorganismSchema = z.object({
@@ -587,6 +600,11 @@ export const collectActionSchema = z.object({
   resourceType: z.string().trim().min(1).max(64).optional()
 });
 
+export const archetypeActionSchema = z.object({
+  type: z.literal("archetype"),
+  archetype: archetypeKeySchema
+});
+
 export const playerActionSchema = z
   .discriminatedUnion("type", [
     comboActionSchema,
@@ -594,7 +612,8 @@ export const playerActionSchema = z
     movementActionSchema,
     attackActionBaseSchema,
     collectActionSchema,
-    evolutionActionSchema
+    evolutionActionSchema,
+    archetypeActionSchema
   ])
   .superRefine((value, ctx) => {
     if (
@@ -748,7 +767,9 @@ export type PlayerMovementAction = z.infer<typeof movementActionSchema>;
 export type PlayerAttackAction = z.infer<typeof attackActionSchema>;
 export type PlayerCollectAction = z.infer<typeof collectActionSchema>;
 export type PlayerEvolutionAction = z.infer<typeof evolutionActionSchema>;
+export type PlayerArchetypeAction = z.infer<typeof archetypeActionSchema>;
 export type EvolutionTier = z.infer<typeof evolutionTierSchema>;
+export type ArchetypeKey = z.infer<typeof archetypeKeySchema>;
 export type PlayerAction = z.infer<typeof playerActionSchema>;
 export type ActionMessage = z.infer<typeof actionMessageSchema>;
 export type MovementMessage = z.infer<typeof movementMessageSchema>;
@@ -783,6 +804,15 @@ export const sanitizeAbilityId = (abilityId: string): string | null => {
 
 export const sanitizePlayerId = (playerId: string): string | null => {
   const result = playerIdSchema.safeParse(playerId);
+  if (!result.success) {
+    return null;
+  }
+  return result.data;
+};
+
+export const sanitizeArchetypeKey = (archetype: string): ArchetypeKey | null => {
+  const normalized = typeof archetype === "string" ? archetype.trim() : archetype;
+  const result = archetypeKeySchema.safeParse(normalized);
   if (!result.success) {
     return null;
   }
