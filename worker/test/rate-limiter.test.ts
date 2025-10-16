@@ -51,4 +51,16 @@ describe("MessageRateLimiter", () => {
 
     expect(limiter.consume(RATE_LIMIT_WINDOW_MS - 1)).toBe(false);
   });
+
+  it("supports dynamically increasing the active limit when requested", () => {
+    const limiter = new MessageRateLimiter(2, 1_000);
+
+    expect(limiter.consume(0)).toBe(true);
+    expect(limiter.consume(10)).toBe(true);
+    expect(limiter.consume(20)).toBe(false);
+
+    expect(limiter.consume(20, 4)).toBe(true);
+    expect(limiter.consume(30, 4)).toBe(true);
+    expect(limiter.consume(40, 4)).toBe(false);
+  });
 });
