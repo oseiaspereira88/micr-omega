@@ -58,7 +58,9 @@ const MAX_COMBO_MULTIPLIER = 50;
 // throttled by using a one-minute sliding window.
 export const RATE_LIMIT_WINDOW_MS = 60_000;
 export const MAX_MESSAGES_PER_CONNECTION = 2_400;
+// Base global rate limit; the runtime cap scales with the number of active sockets.
 export const MAX_MESSAGES_GLOBAL = 12_000;
+export const GLOBAL_RATE_LIMIT_HEADROOM = 1.25;
 
 const PLAYERS_KEY = "players";
 const WORLD_KEY = "world";
@@ -91,9 +93,10 @@ export class MessageRateLimiter {
 
   constructor(private readonly limit: number, private readonly windowMs: number) {}
 
-  consume(now: number): boolean {
+  consume(now: number, limitOverride?: number): boolean {
     this.prune(now);
-    if (this.getActiveCount() >= this.limit) {
+    const limit = limitOverride ?? this.limit;
+    if (this.getActiveCount() >= limit) {
       return false;
     }
     this.timestamps.push(now);
@@ -442,6 +445,7 @@ export class RoomDO {
   private readonly observability: Observability;
 
   private readonly clientsBySocket = new Map<WebSocket, string>();
+  private readonly activeSockets = new Set<WebSocket>();
   private readonly socketsByPlayer = new Map<string, WebSocket>();
   private readonly players = new Map<string, PlayerInternal>();
   private readonly nameToPlayerId = new Map<string, string>();
@@ -596,11 +600,20 @@ export class RoomDO {
     return limiter;
   }
 
+  private getDynamicGlobalLimit(): number {
+    const activeConnections = Math.max(1, this.activeSockets.size);
+    const scaledLimit = Math.ceil(
+      activeConnections * MAX_MESSAGES_PER_CONNECTION * GLOBAL_RATE_LIMIT_HEADROOM
+    );
+    return Math.max(MAX_MESSAGES_GLOBAL, scaledLimit);
+  }
+
   private handleRateLimit(
     socket: WebSocket,
     scope: "connection" | "global",
     retryAfterMs: number,
-    playerId: string | null
+    playerId: string | null,
+    context: { limit?: number; activeConnections?: number } = {}
   ): void {
     const errorMessage: ErrorMessage = {
       type: "error",
@@ -610,16 +623,37 @@ export class RoomDO {
 
     this.send(socket, errorMessage);
 
-    this.observability.log(scope === "connection" ? "warn" : "error", "rate_limited", {
+    const logData: Record<string, unknown> = {
       scope,
       playerId,
       retryAfterMs,
       category: "protocol_error"
-    });
+    };
+
+    if (context.limit !== undefined) {
+      logData.limit = context.limit;
+    }
+    if (context.activeConnections !== undefined) {
+      logData.activeConnections = context.activeConnections;
+    }
+
+    this.observability.log(scope === "connection" ? "warn" : "error", "rate_limited", logData);
     this.observability.recordMetric("protocol_errors", 1, {
       type: "rate_limited",
       scope
     });
+
+    const metricDimensions: Record<string, string | number> = {
+      scope,
+      playerKnown: playerId ? "known" : "unknown",
+      activeConnections: context.activeConnections ?? this.activeSockets.size
+    };
+
+    if (context.limit !== undefined) {
+      metricDimensions.limit = context.limit;
+    }
+
+    this.observability.recordMetric("rate_limit_hits", 1, metricDimensions);
 
     socket.close(1013, "rate_limited");
   }
@@ -1398,6 +1432,8 @@ export class RoomDO {
   private async setupSession(socket: WebSocket): Promise<void> {
     let playerId: string | null = null;
 
+    this.activeSockets.add(socket);
+
     socket.addEventListener("message", (event) => {
       const data = typeof event.data === "string" ? event.data : String(event.data);
       const now = Date.now();
@@ -1406,14 +1442,21 @@ export class RoomDO {
       if (!perConnectionLimiter.consume(now)) {
         const retryAfter = perConnectionLimiter.getRetryAfterMs(now);
         const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
-        this.handleRateLimit(socket, "connection", retryAfter, knownPlayerId);
+        this.handleRateLimit(socket, "connection", retryAfter, knownPlayerId, {
+          limit: MAX_MESSAGES_PER_CONNECTION,
+          activeConnections: this.activeSockets.size,
+        });
         return;
       }
 
-      if (!this.globalRateLimiter.consume(now)) {
+      const globalLimit = this.getDynamicGlobalLimit();
+      if (!this.globalRateLimiter.consume(now, globalLimit)) {
         const retryAfter = this.globalRateLimiter.getRetryAfterMs(now);
         const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
-        this.handleRateLimit(socket, "global", retryAfter, knownPlayerId);
+        this.handleRateLimit(socket, "global", retryAfter, knownPlayerId, {
+          limit: globalLimit,
+          activeConnections: this.activeSockets.size,
+        });
         return;
       }
 
@@ -1542,6 +1585,7 @@ export class RoomDO {
         void this.handleDisconnect(socket, playerId);
       }
       this.clientsBySocket.delete(socket);
+      this.activeSockets.delete(socket);
     });
 
     socket.addEventListener("error", () => {
@@ -1674,6 +1718,7 @@ export class RoomDO {
         "close_stale_socket_failed",
       );
       this.clientsBySocket.delete(previousSocket);
+      this.activeSockets.delete(previousSocket);
       this.socketsByPlayer.delete(player.id);
     }
 
@@ -1989,6 +2034,7 @@ export class RoomDO {
 
   private async handleDisconnect(socket: WebSocket, playerId: string): Promise<void> {
     this.clientsBySocket.delete(socket);
+    this.activeSockets.delete(socket);
 
     const player = this.players.get(playerId);
     if (!player) {
@@ -2618,6 +2664,7 @@ export class RoomDO {
     for (const [socket, id] of this.clientsBySocket.entries()) {
       if (id === playerId) {
         this.clientsBySocket.delete(socket);
+        this.activeSockets.delete(socket);
       }
     }
 
