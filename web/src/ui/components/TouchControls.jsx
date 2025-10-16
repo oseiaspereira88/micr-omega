@@ -33,6 +33,7 @@ const TouchControls = ({
         onTouchStart={onJoystickStart}
         onTouchMove={onJoystickMove}
         onTouchEnd={onJoystickEnd}
+        onTouchCancel={onJoystickEnd}
       >
         <div
           className={styles.joystickKnob}
