@@ -3,6 +3,15 @@ import { withCameraTransform } from './utils/cameraHelpers.js';
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const clamp01 = (value) => Math.min(1, Math.max(0, value ?? 0));
 
+const resolvePaletteLayers = (palette = {}) => {
+  const base = palette.base ?? '#47c2ff';
+  const accent = palette.accent ?? '#0b82c1';
+  const label = palette.label ?? '#ffffff';
+  const secondary = palette.secondary ?? palette.accent ?? base;
+  const tertiary = palette.tertiary ?? base;
+  return { base, accent, label, secondary, tertiary };
+};
+
 const FORM_DESCRIPTORS = {
   sphere: { xScale: 1, yScale: 1, spikeCount: 0, spikeLength: 0 },
   elongated: { xScale: 1.4, yScale: 0.7, spikeCount: 0, spikeLength: 0 },
@@ -47,19 +56,21 @@ const resolveFormDescriptor = (player) => {
 };
 
 const drawOrganicShape = (ctx, radius, descriptor, palette, speed, pulsePhase, isLocal) => {
+  const colors = resolvePaletteLayers(palette);
   const xScale = descriptor.xScale ?? 1;
   const yScale = descriptor.yScale ?? 1;
   const spikeCount = Math.max(0, Math.round(descriptor.spikeCount ?? 0));
   const spikeLength = Math.max(0, descriptor.spikeLength ?? 0);
 
   const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius * Math.max(xScale, yScale));
-  gradient.addColorStop(0, `${palette.base}FF`);
-  gradient.addColorStop(0.6, `${palette.accent}CC`);
-  gradient.addColorStop(1, `${palette.base}33`);
+  gradient.addColorStop(0, `${colors.secondary}FF`);
+  gradient.addColorStop(0.45, `${colors.tertiary}CC`);
+  gradient.addColorStop(0.82, `${colors.base}AA`);
+  gradient.addColorStop(1, `${colors.accent}44`);
 
   ctx.save();
   ctx.shadowBlur = isLocal ? 25 : 12;
-  ctx.shadowColor = palette.base;
+  ctx.shadowColor = colors.accent;
   ctx.fillStyle = gradient;
 
   if (spikeCount >= 3) {
@@ -99,17 +110,18 @@ const drawHealthRing = (ctx, radius, health, palette) => {
   if (!health) return;
   const { current, max } = health;
   const ratio = max > 0 ? clamp(current / max, 0, 1) : 0;
+  const colors = resolvePaletteLayers(palette);
 
   ctx.save();
   ctx.rotate(-Math.PI / 2);
   ctx.lineWidth = 4;
-  ctx.strokeStyle = `${palette.accent}CC`;
+  ctx.strokeStyle = `${colors.accent}CC`;
   ctx.globalAlpha = 0.8;
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = palette.base;
+  ctx.strokeStyle = colors.base;
   ctx.globalAlpha = 0.95;
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2 * ratio);
@@ -124,11 +136,12 @@ const drawEyes = (ctx, player, radius) => {
   const attack = clamp01(expression.attacking);
   const hurt = clamp01(expression.hurt);
   const neutral = clamp01(1 - attack - hurt);
+  const paletteLayers = resolvePaletteLayers(player?.palette);
 
   const baseEyeRadius = radius * 0.23;
   const spacing = radius * 0.45;
   const offsetY = radius * 0.2;
-  const accent = player?.palette?.accent ?? '#1a1a1a';
+  const accent = paletteLayers.accent ?? '#1a1a1a';
 
   const expressionOpenness = neutral * 1 + attack * 0.78 + hurt * 0.55;
   const openness = clamp(expressionOpenness * blink, 0.08, 1);
@@ -216,6 +229,7 @@ const drawPlayerBody = (ctx, player, pulsePhase) => {
   const sizePulse = Math.sin((player.pulse ?? 0) + pulsePhase * 0.5) * 3;
   const totalRadius = baseSize + sizePulse;
   const descriptor = resolveFormDescriptor(player);
+  const colors = resolvePaletteLayers(palette);
 
   ctx.save();
   ctx.rotate(orientation ?? 0);
@@ -223,7 +237,7 @@ const drawPlayerBody = (ctx, player, pulsePhase) => {
   if (isLocal) {
     ctx.save();
     ctx.globalAlpha = 0.75;
-    ctx.fillStyle = `${palette.base}22`;
+    ctx.fillStyle = `${colors.base}22`;
     ctx.beginPath();
     ctx.ellipse(0, 0, totalRadius * 1.5, totalRadius * 1.3, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -255,6 +269,7 @@ const drawNameplate = (ctx, player, camera) => {
   const height = viewport.height ?? 0;
   const offsetX = camera.offsetX ?? camera.x - width / 2;
   const offsetY = camera.offsetY ?? camera.y - height / 2;
+  const colors = resolvePaletteLayers(player?.palette);
 
   const screenX = player.renderPosition.x - offsetX;
   const screenY = player.renderPosition.y - offsetY - 32;
@@ -264,7 +279,7 @@ const drawNameplate = (ctx, player, camera) => {
   ctx.font = 'bold 14px "Nunito", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = `${player.palette.label}DD`;
+  ctx.fillStyle = `${colors.label}DD`;
   ctx.strokeStyle = 'rgba(12, 15, 24, 0.6)';
   ctx.lineWidth = 3;
   ctx.strokeText(player.name, 0, 0);

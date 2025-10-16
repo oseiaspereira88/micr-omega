@@ -193,6 +193,7 @@ const createInitialRenderState = () => ({
     roomObjects: [],
   },
   playersById: new Map(),
+  playerAppearanceById: new Map(),
   playerList: [],
   combatIndicators: [],
   pendingInputs: {

@@ -10,6 +10,7 @@ import {
   ensureHealth,
 } from './updateGameState';
 import { DROP_TABLES } from '../config/enemyTemplates';
+import { archetypePalettes } from '../config/archetypePalettes';
 import { AFFINITY_TYPES, ELEMENT_TYPES } from '../../shared/combat';
 
 const createRenderState = () => ({
@@ -36,6 +37,7 @@ const createRenderState = () => ({
     roomObjects: [],
   },
   playersById: new Map(),
+  playerAppearanceById: new Map(),
   playerList: [],
   combatIndicators: [],
   notifications: [],
@@ -367,6 +369,46 @@ describe('updateGameState', () => {
     expect(renderState.combatIndicators).toEqual([
       expect.objectContaining({ id: 'pilot-local', targetPlayerId: 'raider-remote' }),
     ]);
+  });
+
+  it('applies archetype appearance data to render players', () => {
+    const renderState = createRenderState();
+    const virusAppearance = archetypePalettes.virus;
+    const localPlayer = createPlayer({ id: 'pilot-local', name: 'Pilot' });
+    const remotePlayer = {
+      ...createPlayer({ id: 'arch-player', name: 'Virion' }),
+      selectedArchetype: 'virus',
+    };
+    const sharedState = createSharedState({
+      playerId: localPlayer.id,
+      players: [localPlayer, remotePlayer],
+    });
+
+    updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    const appearance = renderState.playerAppearanceById.get(remotePlayer.id);
+    expect(appearance).toBeDefined();
+    expect(appearance).toMatchObject({ form: virusAppearance.form });
+    expect(appearance.hybridForms).toEqual(expect.arrayContaining(virusAppearance.hybridForms));
+    expect(appearance.palette).toEqual(expect.objectContaining(virusAppearance.palette));
+
+    const remoteRenderPlayer = renderState.playerList.find((player) => player.id === remotePlayer.id);
+    expect(remoteRenderPlayer).toBeDefined();
+    expect(remoteRenderPlayer.form).toBe(virusAppearance.form);
+    expect(remoteRenderPlayer.hybridForms).toEqual(expect.arrayContaining(virusAppearance.hybridForms));
+    expect(remoteRenderPlayer.palette).toEqual(
+      expect.objectContaining({
+        base: virusAppearance.palette.base,
+        secondary: virusAppearance.palette.secondary,
+        tertiary: virusAppearance.palette.tertiary,
+      })
+    );
   });
 
   it('builds HUD snapshot with opponents list', () => {
