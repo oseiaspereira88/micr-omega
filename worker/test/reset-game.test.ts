@@ -6,6 +6,8 @@ import type { Env } from "../src";
 import { RoomDO } from "../src/RoomDO";
 import { MockDurableObjectState } from "./utils/mock-state";
 
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
 const PLAYER_SPAWN_DISTANCE_RATIO = 18 / 25;
 const PLAYER_SPAWN_DISTANCE = WORLD_RADIUS * PLAYER_SPAWN_DISTANCE_RATIO;
 
@@ -49,6 +51,15 @@ describe("RoomDO resetGame", () => {
 
     const players: Map<string, any> = roomAny.players;
 
+    const baseMicroPositions = roomAny.world.microorganisms.map((entity: { position: { x: number; y: number } }) => ({
+      x: entity.position.x,
+      y: entity.position.y,
+    }));
+    const baseOrganicPositions = roomAny.world.organicMatter.map((matter: { position: { x: number; y: number } }) => ({
+      x: matter.position.x,
+      y: matter.position.y,
+    }));
+
     const playerA = {
       id: "player-a",
       name: "Alice",
@@ -90,9 +101,9 @@ describe("RoomDO resetGame", () => {
       },
       combatAttributes: { attack: 8, defense: 4, speed: 140, range: 80 },
       connected: true,
+      connectedAt: 1,
       lastActiveAt: 0,
       lastSeenAt: 0,
-      connectedAt: null,
       totalSessionDurationMs: 0,
       sessionCount: 0,
     };
@@ -106,6 +117,18 @@ describe("RoomDO resetGame", () => {
 
     const snapshotAfter = roomAny.serializeGameState();
     expect(snapshotAfter).not.toBe(snapshotBefore);
+
+    const anchorSpawn = getSpawnPositionForPlayer(playerB.id);
+    const translate = (position: { x: number; y: number }) => ({
+      x: clamp(position.x + anchorSpawn.x, -WORLD_RADIUS, WORLD_RADIUS),
+      y: clamp(position.y + anchorSpawn.y, -WORLD_RADIUS, WORLD_RADIUS),
+    });
+
+    const updatedMicroPositions = roomAny.world.microorganisms.map((entity: { position: { x: number; y: number } }) => entity.position);
+    const updatedOrganicPositions = roomAny.world.organicMatter.map((matter: { position: { x: number; y: number } }) => matter.position);
+
+    expect(updatedMicroPositions).toEqual(baseMicroPositions.map(translate));
+    expect(updatedOrganicPositions).toEqual(baseOrganicPositions.map(translate));
 
     const updatedPlayerA = players.get(playerA.id)!;
     const updatedPlayerB = players.get(playerB.id)!;

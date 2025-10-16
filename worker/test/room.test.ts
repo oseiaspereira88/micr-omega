@@ -44,19 +44,34 @@ describe("RoomDO", () => {
         type: string;
         playerId: string;
       }>(socket, "joined", 5000);
-      const activeStatePromise = onceMessage<{
-        type: string;
-        mode: string;
-        state: { phase: string };
-      }>(socket, "state", 5000);
+
+      const stateMessages: { type: string; mode: string; state: any }[] = [];
+      const onStateMessage = (event: MessageEvent) => {
+        const data = typeof event.data === "string" ? event.data : String(event.data);
+        const parsed = JSON.parse(data) as { type: string; mode?: string; state?: unknown };
+        if (parsed.type === "state") {
+          stateMessages.push(parsed as { type: string; mode: string; state: any });
+        }
+      };
+      socket.addEventListener("message", onStateMessage as EventListener);
 
       socket.send(JSON.stringify({ type: "join", name: "Solo" }));
 
       const joined = await joinedPromise;
-      const activeState = await activeStatePromise;
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(activeState.mode).toBe("full");
-      expect(activeState.state.phase).toBe("active");
+      const activeState = stateMessages.find((message) => message.mode === "full");
+      expect(activeState).toBeDefined();
+      expect(activeState?.state.phase).toBe("active");
+
+      const worldDiffState = stateMessages.find(
+        (message) => message.mode === "diff" && message.state.world,
+      );
+      expect(worldDiffState).toBeDefined();
+      expect(worldDiffState?.state.world.upsertMicroorganisms?.length ?? 0).toBeGreaterThan(0);
+      expect(worldDiffState?.state.world.upsertOrganicMatter?.length ?? 0).toBeGreaterThan(0);
+
+      socket.removeEventListener("message", onStateMessage as EventListener);
 
       const stateDiffPromise = onceMessage<{
         type: string;
