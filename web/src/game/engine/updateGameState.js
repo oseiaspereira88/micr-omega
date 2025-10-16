@@ -1,3 +1,4 @@
+import { aggregateDrops, calculateExperienceFromEvents, XP_DISTRIBUTION } from '@micr-omega/shared';
 import { DROP_TABLES } from '../config/enemyTemplates';
 import { HOSTILITY_MATRIX } from '../config/ecosystem';
 import { resolveNpcCombat } from '../systems/ai';
@@ -75,6 +76,13 @@ const adjustHexColor = (hex, delta) => {
     .join('');
 
   return `#${next}`;
+};
+
+const DEFAULT_RESOURCE_STUB = {
+  current: 0,
+  next: 120,
+  total: 0,
+  level: 1,
 };
 
 const createMicroorganismPalette = (baseColor) => {
@@ -220,167 +228,6 @@ export const calculateDamageWithResistances = ({
     },
     comboApplied,
   };
-};
-
-export const XP_DISTRIBUTION = {
-  perDamage: 0.45,
-  perObjective: 120,
-  baseKillXp: {
-    minion: 40,
-    elite: 120,
-    boss: 400,
-  },
-};
-
-const FRAGMENT_KEY_BY_TIER = {
-  minion: 'minor',
-  elite: 'major',
-  boss: 'apex',
-};
-
-const STABLE_KEY_BY_TIER = {
-  minion: 'minor',
-  elite: 'major',
-  boss: 'apex',
-};
-
-const DEFAULT_RESOURCE_STUB = {
-  current: 0,
-  next: 120,
-  total: 0,
-  level: 1,
-};
-
-const createGeneCounter = () => ({ minor: 0, major: 0, apex: 0 });
-
-export const calculateExperienceFromEvents = (events = {}, xpConfig = XP_DISTRIBUTION) => {
-  if (!events) return 0;
-  const damageEvents = Array.isArray(events.damage) ? events.damage : [];
-  const objectiveEvents = Array.isArray(events.objectives) ? events.objectives : [];
-  const killEvents = Array.isArray(events.kills) ? events.kills : [];
-
-  const damageXp = damageEvents.reduce((total, event) => {
-    const amount = Number.isFinite(event?.amount) ? event.amount : 0;
-    const multiplier = Number.isFinite(event?.multiplier) ? event.multiplier : 1;
-    return total + Math.max(0, amount) * (xpConfig.perDamage ?? 0) * Math.max(multiplier, 0);
-  }, 0);
-
-  const objectiveXp = objectiveEvents.reduce((total, event) => {
-    if (Number.isFinite(event?.xp)) {
-      return total + Math.max(0, event.xp);
-    }
-    return total + (xpConfig.perObjective ?? 0);
-  }, 0);
-
-  const killXp = killEvents.reduce((total, kill) => {
-    const tier = kill?.dropTier ?? kill?.tier ?? 'minion';
-    const base = xpConfig.baseKillXp?.[tier] ?? xpConfig.baseKillXp?.minion ?? 0;
-    const multiplier = Number.isFinite(kill?.xpMultiplier) ? kill.xpMultiplier : 1;
-    return total + base * Math.max(multiplier, 0);
-  }, 0);
-
-  return Math.max(0, damageXp + objectiveXp + killXp);
-};
-
-const clampChance = (value) => Math.min(1, Math.max(0, value ?? 0));
-
-const computePityChance = (baseChance, pityCounter, config) => {
-  if (!config) return clampChance(baseChance);
-  const threshold = Number.isFinite(config.pityThreshold) ? config.pityThreshold : Infinity;
-  const increment = Number.isFinite(config.pityIncrement) ? config.pityIncrement : 0;
-  if (!Number.isFinite(pityCounter) || pityCounter < threshold) {
-    return clampChance(baseChance);
-  }
-
-  const stacks = Math.max(0, pityCounter - threshold + 1);
-  return clampChance((baseChance ?? 0) + stacks * increment);
-};
-
-const rollValueBetween = (min, max, roll) => {
-  const lower = Number.isFinite(min) ? min : 0;
-  const upper = Number.isFinite(max) ? max : lower;
-  if (upper <= lower) return lower;
-  const normalized = clampChance(roll);
-  return lower + Math.round((upper - lower) * normalized);
-};
-
-export const aggregateDrops = (
-  kills = [],
-  {
-    dropTables = DROP_TABLES,
-    rng = Math.random,
-    initialPity = { fragment: 0, stableGene: 0 },
-  } = {}
-) => {
-  const counters = {
-    geneticMaterial: 0,
-    fragments: createGeneCounter(),
-    stableGenes: createGeneCounter(),
-    pity: {
-      fragment: Number.isFinite(initialPity?.fragment) ? initialPity.fragment : 0,
-      stableGene: Number.isFinite(initialPity?.stableGene) ? initialPity.stableGene : 0,
-    },
-  };
-
-  kills.forEach((kill) => {
-    const tier = kill?.dropTier ?? kill?.tier ?? 'minion';
-    const profile = dropTables?.[tier] ?? dropTables?.minion;
-    if (!profile) return;
-
-    const advantageMultiplier = kill?.advantage ? ELEMENTAL_ADVANTAGE_MULTIPLIER : 1;
-    const baseMin = Number.isFinite(profile.geneticMaterial?.min)
-      ? profile.geneticMaterial.min
-      : 0;
-    const baseMax = Number.isFinite(profile.geneticMaterial?.max)
-      ? profile.geneticMaterial.max
-      : baseMin;
-    const mgRoll = kill?.rolls?.mg ?? rng();
-    const mgGain = Math.max(
-      baseMin,
-      Math.round(rollValueBetween(baseMin, baseMax, mgRoll) * Math.max(advantageMultiplier, 0))
-    );
-    counters.geneticMaterial += mgGain;
-
-    const fragmentKey = FRAGMENT_KEY_BY_TIER[tier] ?? 'minor';
-    const fragmentConfig = profile.fragment ?? {};
-    const fragmentChance = computePityChance(
-      fragmentConfig.chance,
-      counters.pity.fragment,
-      fragmentConfig
-    );
-    const fragmentRoll = kill?.rolls?.fragment ?? rng();
-    if (fragmentRoll < fragmentChance) {
-      const amount = rollValueBetween(
-        fragmentConfig.min ?? 1,
-        fragmentConfig.max ?? fragmentConfig.min ?? 1,
-        kill?.rolls?.fragmentAmount ?? rng()
-      );
-      counters.fragments[fragmentKey] =
-        (counters.fragments[fragmentKey] ?? 0) + Math.max(1, amount);
-      counters.pity.fragment = 0;
-    } else {
-      counters.pity.fragment += 1;
-    }
-
-    const stableKey = STABLE_KEY_BY_TIER[tier] ?? 'minor';
-    const stableConfig = profile.stableGene ?? {};
-    const stableChance = computePityChance(
-      stableConfig.chance,
-      counters.pity.stableGene,
-      stableConfig
-    );
-    const stableRoll = kill?.rolls?.stableGene ?? rng();
-    if (stableRoll < stableChance) {
-      const amount = Number.isFinite(stableConfig.amount) ? stableConfig.amount : 1;
-      counters.stableGenes[stableKey] =
-        (counters.stableGenes[stableKey] ?? 0) + Math.max(1, amount);
-      counters.pity.stableGene = 0;
-    } else {
-      counters.pity.stableGene += 1;
-    }
-  });
-
-  return counters;
 };
 
 export const applyProgressionEvents = (
@@ -1154,11 +1001,29 @@ export const updateGameState = ({
     }
   }
 
-  applyProgressionEvents(hudSnapshot, sharedState.progression, {
-    dropTables: helpers.dropTables ?? DROP_TABLES,
-    rng: helpers.rng ?? Math.random,
-    xpConfig: helpers.xpConfig ?? XP_DISTRIBUTION,
-  });
+  if (!renderState.progressionSequences) {
+    renderState.progressionSequences = new Map();
+  }
+
+  const localProgressionStream =
+    localPlayerId && sharedState.progression?.players
+      ? sharedState.progression.players[localPlayerId] ?? null
+      : null;
+
+  if (localPlayerId && localProgressionStream) {
+    const currentSequence = Number.isFinite(localProgressionStream.sequence)
+      ? localProgressionStream.sequence
+      : 0;
+    const lastSequence = renderState.progressionSequences.get(localPlayerId) ?? 0;
+    if (currentSequence > lastSequence) {
+      applyProgressionEvents(hudSnapshot, localProgressionStream, {
+        dropTables: helpers.dropTables ?? DROP_TABLES,
+        rng: helpers.rng ?? Math.random,
+        xpConfig: helpers.xpConfig ?? XP_DISTRIBUTION,
+      });
+      renderState.progressionSequences.set(localPlayerId, currentSequence);
+    }
+  }
 
   renderState.hudSnapshot = hudSnapshot;
 
@@ -1172,3 +1037,5 @@ export const updateGameState = ({
     localPlayerId,
   };
 };
+
+export { aggregateDrops, calculateExperienceFromEvents, XP_DISTRIBUTION };

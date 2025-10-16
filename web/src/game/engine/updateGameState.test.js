@@ -42,6 +42,7 @@ const createRenderState = () => ({
   effects: [],
   particles: [],
   lastMovementIntent: { x: 0, y: 0, active: false },
+  progressionSequences: new Map(),
 });
 
 const createPlayer = (overrides = {}) => ({
@@ -129,6 +130,7 @@ const createSharedState = (overrides = {}) => ({
       },
     ],
   },
+  progression: overrides.progression ?? { players: {} },
 });
 
 describe('ensureHealth', () => {
@@ -719,5 +721,90 @@ describe('progression utilities', () => {
     expect(updated.geneFragments.minor + updated.geneFragments.major + updated.geneFragments.apex).toBeGreaterThanOrEqual(0);
     expect(updated.dropPity.fragment).toBeGreaterThanOrEqual(0);
     expect(updated.recentRewards.xp).toBeGreaterThan(0);
+  });
+
+  it('applies progression kills once per sequence when updating game state', () => {
+    const renderState = createRenderState();
+    renderState.hudSnapshot = {
+      xp: { current: 0, next: 120, total: 0 },
+      geneticMaterial: { current: 0, total: 0, bonus: 0 },
+      geneFragments: { minor: 0, major: 0, apex: 0 },
+      stableGenes: { minor: 0, major: 0, apex: 0 },
+      dropPity: { fragment: 0, stableGene: 0 },
+      recentRewards: { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 },
+    };
+
+    const sharedState = createSharedState({
+      progression: {
+        players: {
+          p1: {
+            sequence: 1,
+            dropPity: { fragment: 0, stableGene: 0 },
+            kills: [
+              {
+                dropTier: 'minion',
+                rolls: { fragment: 0.02, fragmentAmount: 0.3, stableGene: 0.4, mg: 0.2 },
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const first = updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.16,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+      helpers: { rng: () => 0.5 },
+    });
+
+    expect(first.hudSnapshot.xp.current).toBeGreaterThan(0);
+    expect(first.hudSnapshot.geneticMaterial.current).toBeGreaterThan(0);
+
+    const xpAfterFirst = first.hudSnapshot.xp.current;
+    const gmAfterFirst = first.hudSnapshot.geneticMaterial.current;
+
+    const second = updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.16,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+      helpers: { rng: () => 0.5 },
+    });
+
+    expect(second.hudSnapshot.xp.current).toBe(xpAfterFirst);
+    expect(second.hudSnapshot.geneticMaterial.current).toBe(gmAfterFirst);
+
+    const nextState = createSharedState({
+      progression: {
+        players: {
+          p1: {
+            sequence: 2,
+            dropPity: { fragment: 0, stableGene: 0 },
+            kills: [
+              {
+                dropTier: 'minion',
+                rolls: { fragment: 0.1, fragmentAmount: 0.6, stableGene: 0.3, mg: 0.4 },
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const third = updateGameState({
+      renderState,
+      sharedState: nextState,
+      delta: 0.16,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+      helpers: { rng: () => 0.5 },
+    });
+
+    expect(third.hudSnapshot.xp.current).toBeGreaterThan(xpAfterFirst);
+    expect(third.hudSnapshot.geneticMaterial.current).toBeGreaterThan(gmAfterFirst);
   });
 });

@@ -1,64 +1,7 @@
+import { DROP_TABLES as SHARED_DROP_TABLES } from '@micr-omega/shared';
 import { AFFINITY_TYPES, ELEMENT_TYPES } from '../../shared/combat';
 
-export const DROP_TABLES = {
-  minion: {
-    xp: { base: 24, variance: 0.2 },
-    geneticMaterial: { min: 2, max: 4 },
-    fragment: {
-      chance: 0.1,
-      min: 1,
-      max: 1,
-      pityThreshold: 5,
-      pityIncrement: 0.1,
-    },
-    stableGene: {
-      chance: 0.02,
-      amount: 1,
-      pityThreshold: 12,
-      pityIncrement: 0.05,
-    },
-    fragmentKey: 'minor',
-    stableKey: 'minor',
-  },
-  elite: {
-    xp: { base: 80, variance: 0.15 },
-    geneticMaterial: { min: 6, max: 10 },
-    fragment: {
-      chance: 0.22,
-      min: 1,
-      max: 2,
-      pityThreshold: 4,
-      pityIncrement: 0.12,
-    },
-    stableGene: {
-      chance: 0.08,
-      amount: 1,
-      pityThreshold: 6,
-      pityIncrement: 0.1,
-    },
-    fragmentKey: 'major',
-    stableKey: 'major',
-  },
-  boss: {
-    xp: { base: 260, variance: 0.1 },
-    geneticMaterial: { min: 20, max: 32 },
-    fragment: {
-      chance: 0.55,
-      min: 3,
-      max: 5,
-      pityThreshold: 2,
-      pityIncrement: 0.2,
-    },
-    stableGene: {
-      chance: 0.35,
-      amount: 1,
-      pityThreshold: 3,
-      pityIncrement: 0.25,
-    },
-    fragmentKey: 'apex',
-    stableKey: 'apex',
-  },
-};
+export const DROP_TABLES = SHARED_DROP_TABLES;
 
 const mergeBehaviorTraits = (base = {}, addition = {}) => {
   const merged = { ...base };

@@ -154,13 +154,68 @@ export const sharedWorldStateDiffSchema = z.object({
   removeRoomObjectIds: z.array(worldObjectIdSchema).optional()
 });
 
+const progressionPitySchema = z.object({
+  fragment: z.number().finite().nonnegative().default(0),
+  stableGene: z.number().finite().nonnegative().default(0)
+});
+
+export const progressionRollsSchema = z
+  .object({
+    fragment: z.number().finite().min(0).max(1).optional(),
+    fragmentAmount: z.number().finite().min(0).max(1).optional(),
+    stableGene: z.number().finite().min(0).max(1).optional(),
+    mg: z.number().finite().min(0).max(1).optional()
+  })
+  .partial();
+
+const dropTierSchema = z.union([z.literal("minion"), z.literal("elite"), z.literal("boss")]);
+
+const progressionDamageEventSchema = z
+  .object({
+    amount: z.number().finite().nonnegative().optional(),
+    multiplier: z.number().finite().nonnegative().optional()
+  })
+  .partial();
+
+const progressionObjectiveEventSchema = z
+  .object({
+    xp: z.number().finite().nonnegative().optional()
+  })
+  .partial();
+
+export const progressionKillEventSchema = z
+  .object({
+    timestamp: z.number().finite().nonnegative().optional(),
+    playerId: playerIdSchema.optional(),
+    targetId: worldObjectIdSchema.optional(),
+    dropTier: dropTierSchema.optional(),
+    tier: dropTierSchema.optional(),
+    xpMultiplier: z.number().finite().nonnegative().optional(),
+    advantage: z.boolean().optional(),
+    rolls: progressionRollsSchema.optional()
+  })
+  .partial();
+
+export const sharedProgressionStreamSchema = z.object({
+  sequence: z.number().int().nonnegative().default(0),
+  dropPity: progressionPitySchema.optional(),
+  damage: z.array(progressionDamageEventSchema).optional(),
+  objectives: z.array(progressionObjectiveEventSchema).optional(),
+  kills: z.array(progressionKillEventSchema).optional()
+});
+
+export const sharedProgressionStateSchema = z.object({
+  players: z.record(playerIdSchema, sharedProgressionStreamSchema).default({})
+});
+
 export const sharedGameStateSchema = z.object({
   phase: z.union([z.literal("waiting"), z.literal("active"), z.literal("ended")]),
   roundId: z.string().trim().min(1).max(64).nullable(),
   roundStartedAt: z.number().finite().nullable(),
   roundEndsAt: z.number().finite().nullable(),
   players: z.array(sharedPlayerStateSchema),
-  world: sharedWorldStateSchema
+  world: sharedWorldStateSchema,
+  progression: sharedProgressionStateSchema.optional()
 });
 
 export const combatLogEntrySchema = z.object({
@@ -189,8 +244,249 @@ export const sharedGameStateDiffSchema = z.object({
   upsertPlayers: z.array(sharedPlayerStateSchema).optional(),
   removedPlayerIds: z.array(playerIdSchema).optional(),
   world: sharedWorldStateDiffSchema.optional(),
-  combatLog: z.array(combatLogEntrySchema).optional()
+  combatLog: z.array(combatLogEntrySchema).optional(),
+  progression: sharedProgressionStateSchema.optional()
 });
+
+export type SharedProgressionStream = z.infer<typeof sharedProgressionStreamSchema>;
+export type SharedProgressionState = z.infer<typeof sharedProgressionStateSchema>;
+export type SharedProgressionKillEvent = z.infer<typeof progressionKillEventSchema>;
+
+export const DROP_TABLES = {
+  minion: {
+    xp: { base: 24, variance: 0.2 },
+    geneticMaterial: { min: 2, max: 4 },
+    fragment: {
+      chance: 0.1,
+      min: 1,
+      max: 1,
+      pityThreshold: 5,
+      pityIncrement: 0.1
+    },
+    stableGene: {
+      chance: 0.02,
+      amount: 1,
+      pityThreshold: 12,
+      pityIncrement: 0.05
+    },
+    fragmentKey: "minor",
+    stableKey: "minor"
+  },
+  elite: {
+    xp: { base: 80, variance: 0.15 },
+    geneticMaterial: { min: 6, max: 10 },
+    fragment: {
+      chance: 0.22,
+      min: 1,
+      max: 2,
+      pityThreshold: 4,
+      pityIncrement: 0.12
+    },
+    stableGene: {
+      chance: 0.08,
+      amount: 1,
+      pityThreshold: 6,
+      pityIncrement: 0.1
+    },
+    fragmentKey: "major",
+    stableKey: "major"
+  },
+  boss: {
+    xp: { base: 260, variance: 0.1 },
+    geneticMaterial: { min: 20, max: 32 },
+    fragment: {
+      chance: 0.55,
+      min: 3,
+      max: 5,
+      pityThreshold: 2,
+      pityIncrement: 0.2
+    },
+    stableGene: {
+      chance: 0.35,
+      amount: 1,
+      pityThreshold: 3,
+      pityIncrement: 0.25
+    },
+    fragmentKey: "apex",
+    stableKey: "apex"
+  }
+} as const;
+
+export type DropTables = typeof DROP_TABLES;
+export type DropTier = keyof DropTables;
+
+export const XP_DISTRIBUTION = {
+  perDamage: 0.45,
+  perObjective: 120,
+  baseKillXp: {
+    minion: 40,
+    elite: 120,
+    boss: 400
+  }
+} as const;
+
+const createGeneCounter = () => ({ minor: 0, major: 0, apex: 0 });
+
+const FRAGMENT_KEY_BY_TIER: Record<string, keyof ReturnType<typeof createGeneCounter>> = {
+  minion: "minor",
+  elite: "major",
+  boss: "apex"
+};
+
+const STABLE_KEY_BY_TIER: Record<string, keyof ReturnType<typeof createGeneCounter>> = {
+  minion: "minor",
+  elite: "major",
+  boss: "apex"
+};
+
+const clampChance = (value: number | undefined) => Math.min(1, Math.max(0, value ?? 0));
+
+const computePityChance = (
+  baseChance: number | undefined,
+  pityCounter: number,
+  config: { pityThreshold?: number; pityIncrement?: number } | undefined
+) => {
+  if (!config) {
+    return clampChance(baseChance);
+  }
+  const threshold = Number.isFinite(config.pityThreshold) ? Number(config.pityThreshold) : Infinity;
+  const increment = Number.isFinite(config.pityIncrement) ? Number(config.pityIncrement) : 0;
+  if (!Number.isFinite(pityCounter) || pityCounter < threshold) {
+    return clampChance(baseChance);
+  }
+
+  const stacks = Math.max(0, Math.floor(pityCounter - threshold + 1));
+  return clampChance((baseChance ?? 0) + stacks * increment);
+};
+
+const rollValueBetween = (min: number | undefined, max: number | undefined, roll: number | undefined) => {
+  const lower = Number.isFinite(min) ? Number(min) : 0;
+  const upper = Number.isFinite(max) ? Number(max) : lower;
+  if (upper <= lower) {
+    return lower;
+  }
+  const normalized = clampChance(roll);
+  return lower + Math.round((upper - lower) * normalized);
+};
+
+export const calculateExperienceFromEvents = (
+  events: Partial<SharedProgressionStream> | undefined,
+  xpConfig: typeof XP_DISTRIBUTION = XP_DISTRIBUTION
+): number => {
+  if (!events) {
+    return 0;
+  }
+
+  const damageEvents = Array.isArray(events.damage) ? events.damage : [];
+  const objectiveEvents = Array.isArray(events.objectives) ? events.objectives : [];
+  const killEvents = Array.isArray(events.kills) ? events.kills : [];
+
+  const damageXp = damageEvents.reduce((total, event) => {
+    const amount = Number.isFinite(event?.amount) ? Number(event?.amount) : 0;
+    const multiplier = Number.isFinite(event?.multiplier) ? Number(event?.multiplier) : 1;
+    return total + Math.max(0, amount) * (xpConfig.perDamage ?? 0) * Math.max(multiplier, 0);
+  }, 0);
+
+  const objectiveXp = objectiveEvents.reduce((total, event) => {
+    if (Number.isFinite(event?.xp)) {
+      return total + Math.max(0, Number(event?.xp));
+    }
+    return total + (xpConfig.perObjective ?? 0);
+  }, 0);
+
+  const killXp = killEvents.reduce((total, kill) => {
+    const tier = (kill?.dropTier ?? kill?.tier ?? "minion") as DropTier;
+    const base = xpConfig.baseKillXp?.[tier] ?? xpConfig.baseKillXp?.minion ?? 0;
+    const multiplier = Number.isFinite(kill?.xpMultiplier) ? Number(kill?.xpMultiplier) : 1;
+    return total + base * Math.max(multiplier, 0);
+  }, 0);
+
+  return Math.max(0, damageXp + objectiveXp + killXp);
+};
+
+export const aggregateDrops = (
+  kills: readonly SharedProgressionKillEvent[] | undefined,
+  {
+    dropTables = DROP_TABLES,
+    rng = Math.random,
+    initialPity = { fragment: 0, stableGene: 0 }
+  }: {
+    dropTables?: DropTables;
+    rng?: () => number;
+    initialPity?: { fragment?: number; stableGene?: number } | null;
+  } = {}
+) => {
+  const counters = {
+    geneticMaterial: 0,
+    fragments: createGeneCounter(),
+    stableGenes: createGeneCounter(),
+    pity: {
+      fragment: Number.isFinite(initialPity?.fragment) ? Number(initialPity?.fragment) : 0,
+      stableGene: Number.isFinite(initialPity?.stableGene) ? Number(initialPity?.stableGene) : 0
+    }
+  };
+
+  if (!Array.isArray(kills)) {
+    return counters;
+  }
+
+  kills.forEach((kill) => {
+    const tier = ((kill?.dropTier ?? kill?.tier) as DropTier) || "minion";
+    const profile = dropTables?.[tier] ?? dropTables?.minion;
+    if (!profile) {
+      return;
+    }
+
+    const advantageMultiplier = kill?.advantage ? 1.25 : 1;
+    const baseMin = Number.isFinite(profile.geneticMaterial?.min)
+      ? Number(profile.geneticMaterial?.min)
+      : 0;
+    const baseMax = Number.isFinite(profile.geneticMaterial?.max)
+      ? Number(profile.geneticMaterial?.max)
+      : baseMin;
+    const mgRoll = kill?.rolls?.mg ?? rng();
+    const mgGain = Math.max(
+      baseMin,
+      Math.round(rollValueBetween(baseMin, baseMax, mgRoll) * Math.max(advantageMultiplier, 0))
+    );
+    counters.geneticMaterial += mgGain;
+
+    const fragmentKey = FRAGMENT_KEY_BY_TIER[tier] ?? "minor";
+    const fragmentConfig = profile.fragment ?? {};
+    const fragmentChance = computePityChance(fragmentConfig.chance, counters.pity.fragment, fragmentConfig);
+    const fragmentRoll = kill?.rolls?.fragment ?? rng();
+    if (fragmentRoll < fragmentChance) {
+      const amount = rollValueBetween(
+        fragmentConfig.min ?? 1,
+        fragmentConfig.max ?? fragmentConfig.min ?? 1,
+        kill?.rolls?.fragmentAmount ?? rng()
+      );
+      counters.fragments[fragmentKey] = (counters.fragments[fragmentKey] ?? 0) + Math.max(1, amount);
+      counters.pity.fragment = 0;
+    } else {
+      counters.pity.fragment += 1;
+    }
+
+    const stableKey = STABLE_KEY_BY_TIER[tier] ?? "minor";
+    const stableConfig = profile.stableGene ?? {};
+    const stableChance = computePityChance(
+      stableConfig.chance,
+      counters.pity.stableGene,
+      stableConfig
+    );
+    const stableRoll = kill?.rolls?.stableGene ?? rng();
+    if (stableRoll < stableChance) {
+      const amount = Number.isFinite(stableConfig.amount) ? Number(stableConfig.amount) : 1;
+      counters.stableGenes[stableKey] =
+        (counters.stableGenes[stableKey] ?? 0) + Math.max(1, amount);
+      counters.pity.stableGene = 0;
+    } else {
+      counters.pity.stableGene += 1;
+    }
+  });
+
+  return counters;
+};
 
 export const rankingEntrySchema = z.object({
   playerId: playerIdSchema,
