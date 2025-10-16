@@ -39,8 +39,9 @@ import {
   type CombatStatus
 } from "./types";
 
-const MIN_PLAYERS_TO_START = 2;
+const MIN_PLAYERS_TO_START = 1;
 const WAITING_START_DELAY_MS = 15_000;
+const WAITING_START_DELAY_ENABLED = MIN_PLAYERS_TO_START > 1;
 const ROUND_DURATION_MS = 120_000;
 const RESET_DELAY_MS = 10_000;
 const RECONNECT_WINDOW_MS = 30_000;
@@ -2225,6 +2226,11 @@ export class RoomDO {
   }
 
   private async maybeStartGame(): Promise<void> {
+    if (this.phase === "ended") {
+      await this.resetGame();
+      return;
+    }
+
     if (this.phase !== "waiting") {
       return;
     }
@@ -2244,7 +2250,7 @@ export class RoomDO {
       return;
     }
 
-    if (!this.alarmSchedule.has("waiting_start")) {
+    if (WAITING_START_DELAY_ENABLED && !this.alarmSchedule.has("waiting_start")) {
       const at = Date.now() + WAITING_START_DELAY_MS;
       this.alarmSchedule.set("waiting_start", at);
       await this.persistAndSyncAlarms();
