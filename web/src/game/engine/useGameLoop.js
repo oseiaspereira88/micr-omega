@@ -603,7 +603,93 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
   const initializeBackground = useCallback(() => {
     const state = renderStateRef.current;
-    const { background } = state;
+    if (!state) return;
+
+    const { background, camera } = state;
+    if (!background || !camera) return;
+
+    const sharedState = sharedStateRef.current;
+
+    const zoom = Number.isFinite(camera.zoom) ? camera.zoom : 1;
+    const viewportWidth = Number.isFinite(camera.viewport?.width)
+      ? camera.viewport.width
+      : typeof window !== 'undefined'
+      ? window.innerWidth
+      : 1280;
+    const viewportHeight = Number.isFinite(camera.viewport?.height)
+      ? camera.viewport.height
+      : typeof window !== 'undefined'
+      ? Math.max(0, window.innerHeight - 40)
+      : 720;
+
+    const halfWidth = viewportWidth > 0 ? viewportWidth / (zoom * 2) : WORLD_RADIUS;
+    const halfHeight = viewportHeight > 0 ? viewportHeight / (zoom * 2) : WORLD_RADIUS;
+    const spawnRadiusX = Math.max(halfWidth * 1.6, 480);
+    const spawnRadiusY = Math.max(halfHeight * 1.6, 360);
+
+    const wrapCoordinate = (value) => {
+      if (!Number.isFinite(value)) return 0;
+      let result = value % WORLD_SIZE;
+      if (result < 0) {
+        result += WORLD_SIZE;
+      }
+      return result;
+    };
+
+    const randomOffset = (radius) => (Math.random() - 0.5) * 2 * radius;
+
+    const localPlayerId = sharedState?.playerId ?? null;
+    const renderPlayer =
+      localPlayerId && typeof state.playersById?.get === 'function'
+        ? state.playersById.get(localPlayerId)
+        : null;
+    const sharedLocalPlayer = localPlayerId
+      ? sharedState?.players?.[localPlayerId] ?? sharedState?.remotePlayers?.byId?.[localPlayerId] ?? null
+      : null;
+
+    const resolveAxis = (axis) => {
+      const renderValue = Number.isFinite(renderPlayer?.renderPosition?.[axis])
+        ? renderPlayer.renderPosition[axis]
+        : null;
+      if (renderValue !== null) return renderValue;
+
+      const sharedValue = Number.isFinite(sharedLocalPlayer?.position?.[axis])
+        ? sharedLocalPlayer.position[axis]
+        : null;
+      if (sharedValue !== null) return sharedValue;
+
+      const cameraValue = Number.isFinite(camera?.[axis]) ? camera[axis] : null;
+      if (cameraValue !== null) return cameraValue;
+
+      return WORLD_RADIUS;
+    };
+
+    const anchorX = resolveAxis('x');
+    const anchorY = resolveAxis('y');
+
+    const createAnchoredPosition = (radiusMultiplier = 1, customOffset) => {
+      const offsetX = Number.isFinite(customOffset?.x)
+        ? customOffset.x
+        : randomOffset(spawnRadiusX * radiusMultiplier);
+      const offsetY = Number.isFinite(customOffset?.y)
+        ? customOffset.y
+        : randomOffset(spawnRadiusY * radiusMultiplier);
+      const x = wrapCoordinate(anchorX + offsetX);
+      const y = wrapCoordinate(anchorY + offsetY);
+      return {
+        x,
+        y,
+        spawnOffsetX: offsetX,
+        spawnOffsetY: offsetY,
+        anchorX,
+        anchorY,
+      };
+    };
+
+    const createAnchoredValue = (radiusMultiplier = 1) =>
+      wrapCoordinate(anchorX + randomOffset(spawnRadiusX * radiusMultiplier));
+    const createAnchoredValueY = (radiusMultiplier = 1) =>
+      wrapCoordinate(anchorY + randomOffset(spawnRadiusY * radiusMultiplier));
 
     background.floatingParticles = [];
     background.glowParticles = [];
@@ -613,9 +699,9 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
     const floatingCount = Math.max(150, Math.round(500 * densityScale));
     for (let i = 0; i < floatingCount; i += 1) {
+      const position = createAnchoredPosition(1.1);
       background.floatingParticles.push({
-        x: Math.random() * WORLD_SIZE,
-        y: Math.random() * WORLD_SIZE,
+        ...position,
         vx: (Math.random() - 0.5) * 0.4,
         vy: (Math.random() - 0.5) * 0.4,
         size: Math.random() * 3 + 0.5,
@@ -629,9 +715,9 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
     const glowCount = Math.max(60, Math.round(150 * densityScale));
     for (let i = 0; i < glowCount; i += 1) {
+      const position = createAnchoredPosition(1.05);
       background.glowParticles.push({
-        x: Math.random() * WORLD_SIZE,
-        y: Math.random() * WORLD_SIZE,
+        ...position,
         vx: (Math.random() - 0.5) * 0.2,
         vy: (Math.random() - 0.5) * 0.2,
         size: Math.random() * 4 + 2,
@@ -651,16 +737,16 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
       const baseOpacity = Math.random() * 0.3 + 0.1;
       const heading = Math.random() * Math.PI * 2;
       const baseSpeed = 0.1 + Math.random() * 0.25;
-      const homeX = WORLD_SIZE * 0.5 + (Math.random() - 0.5) * WORLD_SIZE * 0.3;
-      const homeY = WORLD_SIZE * 0.5 + (Math.random() - 0.5) * WORLD_SIZE * 0.3;
+      const homeX = createAnchoredValue(1.6);
+      const homeY = createAnchoredValueY(1.6);
       const vortexRadius = 120 + Math.random() * 160;
       const vortexAngle = Math.random() * Math.PI * 2;
-      const vortexX = homeX + Math.cos(vortexAngle) * vortexRadius;
-      const vortexY = homeY + Math.sin(vortexAngle) * vortexRadius;
+      const vortexX = wrapCoordinate(homeX + Math.cos(vortexAngle) * vortexRadius);
+      const vortexY = wrapCoordinate(homeY + Math.sin(vortexAngle) * vortexRadius);
+      const position = createAnchoredPosition(1.4);
 
       background.microorganisms.push({
-        x: Math.random() * WORLD_SIZE,
-        y: Math.random() * WORLD_SIZE,
+        ...position,
         vx: Math.cos(heading) * baseSpeed,
         vy: Math.sin(heading) * baseSpeed,
         heading,
@@ -706,9 +792,13 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
     const lightRayCount = Math.max(3, Math.round(5 * densityScale));
     for (let i = 0; i < lightRayCount; i += 1) {
+      const offset = {
+        x: randomOffset(spawnRadiusX * 1.2),
+        y: -spawnRadiusY * 0.8 - 200 + Math.random() * 150,
+      };
+      const position = createAnchoredPosition(1, offset);
       background.lightRays.push({
-        x: Math.random() * WORLD_SIZE,
-        y: -200,
+        ...position,
         angle: (Math.random() - 0.5) * 0.3,
         width: Math.random() * 100 + 50,
         opacity: Math.random() * 0.1 + 0.05,
@@ -718,9 +808,9 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     }
 
     for (let i = 0; i < 3; i += 1) {
+      const position = createAnchoredPosition(1.8);
       background.backgroundLayers.push({
-        x: Math.random() * WORLD_SIZE,
-        y: Math.random() * WORLD_SIZE,
+        ...position,
         size: Math.random() * 300 + 200,
         opacity: Math.random() * 0.05 + 0.02,
         color: i === 0 ? '#0a3a4a' : i === 1 ? '#1a2a3a' : '#2a1a3a',
@@ -728,6 +818,9 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
         pulsePhase: Math.random() * Math.PI * 2,
       });
     }
+
+    background.spawnAnchor = { x: anchorX, y: anchorY };
+    background.spawnBounds = { radiusX: spawnRadiusX, radiusY: spawnRadiusY };
   }, [densityScale]);
 
   const cycleSkillHandler = useCallback(
@@ -1208,6 +1301,27 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
       renderState.pendingInputs = updateResult.commands;
       if (updateResult.commands && commandCallbackRef.current) {
         commandCallbackRef.current(updateResult.commands);
+      }
+
+      const background = renderState.background;
+      if (background) {
+        const tracker = background.lifeTracker || { wasAlive: false, seenPlayer: false };
+        const localPlayer = updateResult.localPlayerId
+          ? renderState.playersById.get(updateResult.localPlayerId)
+          : null;
+        const isAlive = !!localPlayer && Number.isFinite(localPlayer?.health?.current)
+          ? localPlayer.health.current > 0
+          : !!localPlayer;
+
+        const shouldReinitialize = isAlive && (!tracker.seenPlayer || !tracker.wasAlive);
+        if (shouldReinitialize) {
+          initializeBackground();
+        }
+
+        background.lifeTracker = {
+          wasAlive: isAlive,
+          seenPlayer: tracker.seenPlayer || !!localPlayer,
+        };
       }
 
       if (updateResult.hudSnapshot) {
