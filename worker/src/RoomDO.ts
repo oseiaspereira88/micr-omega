@@ -462,12 +462,17 @@ export class RoomDO {
     const pathname = url.pathname === "" ? "/" : url.pathname;
     const isSupportedRoute = pathname === "/" || pathname === "/ws";
 
+    const baseHeaders = {
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    } as const;
+
     if (!isSupportedRoute) {
-      return new Response("Not Found", { status: 404 });
+      return new Response("Not Found", { status: 404, headers: baseHeaders });
     }
 
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
-      return new Response("Expected WebSocket", { status: 426 });
+      return new Response("Expected WebSocket", { status: 426, headers: baseHeaders });
     }
 
     const pair = new WebSocketPair();
@@ -483,7 +488,7 @@ export class RoomDO {
       }
     });
 
-    return new Response(null, { status: 101, webSocket: client });
+    return new Response(null, { status: 101, webSocket: client, headers: baseHeaders });
   }
 
   async alarm(): Promise<void> {
