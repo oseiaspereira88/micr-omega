@@ -600,6 +600,13 @@ const updateCamera = (renderState, targetPlayer, delta) => {
   const targetX = targetPlayer.renderPosition.x;
   const targetY = targetPlayer.renderPosition.y;
 
+  if (!camera.initialized) {
+    camera.x = targetX;
+    camera.y = targetY;
+    camera.initialized = true;
+    return;
+  }
+
   camera.x = interpolate(camera.x, targetX, smoothing);
   camera.y = interpolate(camera.y, targetY, smoothing);
 };

@@ -170,8 +170,8 @@ const DENSITY_SCALE = {
 
 const createInitialRenderState = () => ({
   camera: {
-    x: WORLD_RADIUS,
-    y: WORLD_RADIUS,
+    x: 0,
+    y: 0,
     zoom: 1,
     offsetX: 0,
     offsetY: 0,
@@ -179,6 +179,7 @@ const createInitialRenderState = () => ({
       width: 0,
       height: 0,
     },
+    initialized: false,
   },
   pulsePhase: 0,
   effects: [],

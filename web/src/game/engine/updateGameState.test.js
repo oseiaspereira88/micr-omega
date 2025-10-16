@@ -21,6 +21,7 @@ const createRenderState = () => ({
     offsetX: 0,
     offsetY: 0,
     viewport: { width: 640, height: 480 },
+    initialized: false,
   },
   pulsePhase: 0,
   background: {
