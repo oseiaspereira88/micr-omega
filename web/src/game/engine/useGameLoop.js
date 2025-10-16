@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { createSoundEffects } from '../audio/soundEffects';
+import { createSkills } from '../config';
 import { createParticle as generateParticle } from '../effects/particles';
 import { createVisualEffect as generateVisualEffect } from '../effects/visualEffects';
 import { addNotification as appendNotification } from '../ui/notifications';
@@ -10,7 +11,11 @@ import useInputController from '../input/useInputController';
 import { DEFAULT_JOYSTICK_STATE } from '../input/utils';
 import { gameStore } from '../../store/gameStore';
 import { createInitialState } from '../state/initialState';
-import { chooseEvolution as chooseEvolutionSystem, restartGame as restartGameSystem } from '../systems';
+import {
+  chooseEvolution as chooseEvolutionSystem,
+  restartGame as restartGameSystem,
+  cycleSkill as cycleSkillSystem,
+} from '../systems';
 import { spawnObstacle as createObstacleSpawn } from '../factories/obstacleFactory';
 import { spawnNebula as createNebulaSpawn } from '../factories/nebulaFactory';
 import { spawnPowerUp as createPowerUpSpawn } from '../factories/powerUpFactory';
@@ -129,6 +134,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   );
 
   const { playSound } = useMemo(() => createSoundEffects(() => audioCtxRef.current), []);
+  const skills = useMemo(() => createSkills({ playSound }), [playSound]);
 
   const createParticle = useCallback((x, y, color, size = 3) => {
     const particle = generateParticle(x, y, color, size);
@@ -153,8 +159,90 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     state.notifications = appendNotification(state.notifications, text);
   }, []);
 
+  const updateLocalSkillState = useCallback(
+    (state) => {
+      if (!state) return;
+
+      const organism = state.organism;
+      if (!organism) {
+        state.skillList = [];
+        state.currentSkill = null;
+        state.hasMultipleSkills = false;
+        return;
+      }
+
+      const rawSkillKeys = Array.isArray(organism.skills) ? organism.skills : [];
+      const skillKeys = rawSkillKeys
+        .map((key) => {
+          if (typeof key === 'string') return key;
+          if (key === null || key === undefined) return null;
+          return String(key);
+        })
+        .filter((key) => typeof key === 'string' && key.length > 0);
+
+      const totalSkills = skillKeys.length;
+      if (totalSkills === 0) {
+        state.skillList = [];
+        state.currentSkill = null;
+        state.hasMultipleSkills = false;
+        return;
+      }
+
+      const cooldowns =
+        organism.skillCooldowns && typeof organism.skillCooldowns === 'object'
+          ? organism.skillCooldowns
+          : {};
+
+      const rawIndex = Number.isFinite(organism.currentSkillIndex)
+        ? Math.trunc(organism.currentSkillIndex)
+        : 0;
+      const normalizedIndex = ((rawIndex % totalSkills) + totalSkills) % totalSkills;
+      if (normalizedIndex !== rawIndex) {
+        organism.currentSkillIndex = normalizedIndex;
+      }
+
+      const list = skillKeys.map((skillKey, index) => {
+        const definition = skills?.[skillKey];
+        const cooldownSeconds = Number.isFinite(cooldowns?.[skillKey])
+          ? Math.max(0, cooldowns[skillKey])
+          : 0;
+        const maxCooldownSeconds = definition && Number.isFinite(definition.cooldown)
+          ? Math.max(0, definition.cooldown / 1000)
+          : 0;
+
+        const baseDefinition = definition
+          ? { ...definition }
+          : {
+              name: skillKey,
+              icon: '❔',
+              type: 'active',
+              element: null,
+              applies: [],
+              cost: {},
+            };
+
+        return {
+          ...baseDefinition,
+          key: skillKey,
+          cooldown: cooldownSeconds,
+          maxCooldown: maxCooldownSeconds,
+          isActive: index === normalizedIndex,
+        };
+      });
+
+      state.skillList = list;
+      state.hasMultipleSkills = list.length > 1;
+
+      const activeSkill = list[normalizedIndex] ? { ...list[normalizedIndex] } : null;
+      state.currentSkill = activeSkill;
+    },
+    [skills]
+  );
+
   const syncHudState = useCallback((state) => {
     if (!state) return;
+
+    updateLocalSkillState(state);
 
     const safeArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -229,7 +317,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
         resistances: state.resistances ?? null,
       },
     });
-  }, [dispatchRef]);
+  }, [dispatchRef, updateLocalSkillState]);
 
   const setCameraZoom = useCallback((zoomValue) => {
     const state = renderStateRef.current;
@@ -384,6 +472,28 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     }
   }, [densityScale]);
 
+  const cycleSkillHandler = useCallback(
+    (direction = 1) => {
+      const state = renderStateRef.current;
+      if (!state) return;
+
+      const helpers = {
+        skills,
+        addNotification: (targetState, text) => {
+          if (!text) return;
+          if (targetState && targetState !== renderStateRef.current) {
+            targetState.notifications = appendNotification(targetState.notifications, text);
+          }
+          pushNotification(text);
+        },
+        syncState: syncHudState,
+      };
+
+      cycleSkillSystem(state, helpers, direction);
+    },
+    [skills, syncHudState, pushNotification]
+  );
+
   const { joystick, actions: inputActions } = useInputController({
     onMovementIntent: (intent) => {
       movementIntentRef.current = intent;
@@ -406,7 +516,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
         timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
       });
     },
-    onCycleSkill: () => {},
+    onCycleSkill: cycleSkillHandler,
     onOpenEvolutionMenu: () => {},
     onActionButtonChange: () => {},
   });
