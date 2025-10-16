@@ -210,6 +210,7 @@ const createInitialRenderState = () => ({
   },
   hudSnapshot: null,
   lastMovementIntent: { ...DEFAULT_JOYSTICK_STATE },
+  lastMovementAngle: 0,
   progressionSequences: new Map(),
 });
 
@@ -1016,6 +1017,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
       actionBufferRef.current = { attacks: [] };
       renderStateRef.current.pendingInputs = { movement: null, attacks: [] };
       renderStateRef.current.lastMovementIntent = { ...DEFAULT_JOYSTICK_STATE };
+      renderStateRef.current.lastMovementAngle = 0;
     };
 
     const spawnObstacle = (state) => {

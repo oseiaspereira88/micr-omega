@@ -44,6 +44,7 @@ const createRenderState = () => ({
   effects: [],
   particles: [],
   lastMovementIntent: { x: 0, y: 0, active: false },
+  lastMovementAngle: 0,
   progressionSequences: new Map(),
 });
 
@@ -226,7 +227,10 @@ describe('updateGameState', () => {
       actionBuffer: { attacks: [] },
     });
 
-    expect(first.commands.movement).toMatchObject({ vector: { x: 1, y: 0 } });
+    expect(first.commands.movement).toMatchObject({
+      vector: { x: 1, y: 0 },
+      orientation: { angle: 0 },
+    });
 
     const second = updateGameState({
       renderState,
@@ -237,6 +241,40 @@ describe('updateGameState', () => {
     });
 
     expect(second.commands.movement).toBeNull();
+  });
+
+  it('preserves last movement angle when stopping and updates local renderer', () => {
+    const renderState = createRenderState();
+    const sharedState = createSharedState();
+
+    const moving = updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 2 },
+      actionBuffer: { attacks: [] },
+    });
+
+    expect(moving.commands.movement).toMatchObject({
+      vector: { x: 0, y: 1 },
+      orientation: { angle: Math.PI / 2 },
+    });
+
+    const stopping = updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    expect(stopping.commands.movement).toMatchObject({
+      vector: { x: 0, y: 0 },
+      orientation: { angle: Math.PI / 2 },
+    });
+
+    const localPlayer = renderState.playerList.find((player) => player.isLocal);
+    expect(localPlayer?.orientation).toBeCloseTo(Math.PI / 2, 5);
   });
 
   it('flushes attack queue into command batch with combat metadata', () => {
