@@ -1,5 +1,6 @@
 import { aggregateDrops, calculateExperienceFromEvents, XP_DISTRIBUTION } from '@micr-omega/shared';
 import { DROP_TABLES } from '../config/enemyTemplates';
+import { archetypePalettes } from '../config/archetypePalettes';
 import { HOSTILITY_MATRIX } from '../config/ecosystem';
 import { resolveNpcCombat } from '../systems/ai';
 import {
@@ -331,9 +332,228 @@ const hashId = (id = '') => {
   return Math.abs(hash);
 };
 
-const getPaletteForPlayer = (playerId) => {
+const normalizePaletteDefinition = (palette) => {
+  if (!palette || typeof palette !== 'object') {
+    return null;
+  }
+
+  const base = normalizeHexColor(palette.base ?? palette.color ?? palette.primary ?? DEFAULT_SPECIES_COLOR);
+  const accent = normalizeHexColor(palette.accent ?? adjustHexColor(base, -48));
+  const label = normalizeHexColor(palette.label ?? '#ffffff');
+  const secondary = normalizeHexColor(palette.secondary ?? adjustHexColor(base, 32));
+  const tertiary = normalizeHexColor(palette.tertiary ?? adjustHexColor(base, -24));
+
+  return { base, accent, label, secondary, tertiary };
+};
+
+const applyPaletteVariation = (palette, playerId) => {
+  if (!palette) return null;
+  const hash = hashId(playerId ?? '');
+  const variant = hash % 4;
+  if (variant === 0) {
+    return { ...palette };
+  }
+
+  const delta = variant === 1 ? 12 : variant === 2 ? -12 : 18;
+  const accentDelta = Math.round(delta * 0.7);
+  const secondaryDelta = Math.round(delta * 0.5);
+  const tertiaryDelta = Math.round(delta * -0.4);
+
+  return {
+    ...palette,
+    base: adjustHexColor(palette.base, delta),
+    accent: adjustHexColor(palette.accent, accentDelta),
+    secondary: adjustHexColor(palette.secondary, secondaryDelta),
+    tertiary: adjustHexColor(palette.tertiary, tertiaryDelta),
+  };
+};
+
+const getPaletteForPlayer = (playerId, appearance) => {
+  if (appearance?.palette) {
+    return { ...appearance.palette };
+  }
+
   const index = hashId(playerId) % PLAYER_PALETTE.length;
-  return PLAYER_PALETTE[index];
+  const normalized = normalizePaletteDefinition(PLAYER_PALETTE[index]);
+  return normalized ? { ...normalized } : { ...PLAYER_PALETTE[index] };
+};
+
+const resolvePlayerForms = (appearance, sharedPlayer, existing = {}) => {
+  const formCandidates = [
+    appearance?.form,
+    sharedPlayer?.currentForm,
+    sharedPlayer?.form,
+    existing.form,
+  ];
+  const form = formCandidates.find((value) => typeof value === 'string' && value) ?? null;
+
+  const hybridCandidates = [
+    Array.isArray(appearance?.hybridForms) ? appearance.hybridForms : null,
+    Array.isArray(sharedPlayer?.hybridForms) ? sharedPlayer.hybridForms : null,
+    Array.isArray(existing.hybridForms) ? existing.hybridForms : null,
+  ];
+
+  let hybridForms = null;
+  for (const candidate of hybridCandidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      hybridForms = candidate.filter((value) => typeof value === 'string' && value);
+      break;
+    }
+  }
+
+  if (form) {
+    if (!hybridForms) {
+      hybridForms = [form];
+    } else if (!hybridForms.includes(form)) {
+      hybridForms = [...hybridForms, form];
+    }
+  }
+
+  if (!hybridForms) {
+    hybridForms = [];
+  }
+
+  hybridForms = Array.from(new Set(hybridForms));
+
+  return { form, hybridForms };
+};
+
+const ensureAppearanceMap = (renderState) => {
+  if (!renderState.playerAppearanceById || !(renderState.playerAppearanceById instanceof Map)) {
+    renderState.playerAppearanceById = new Map();
+  }
+  return renderState.playerAppearanceById;
+};
+
+const mergeAppearanceEntry = (player, existing = {}, fallbackHud = null) => {
+  if (!player) {
+    return existing;
+  }
+
+  const archetypeCandidates = [
+    typeof player?.selectedArchetype === 'string' ? player.selectedArchetype : null,
+    typeof player?.archetype === 'string' ? player.archetype : null,
+    typeof player?.archetypeKey === 'string' ? player.archetypeKey : null,
+    typeof player?.archetype?.key === 'string' ? player.archetype.key : null,
+    typeof fallbackHud?.selectedArchetype === 'string' ? fallbackHud.selectedArchetype : null,
+    typeof existing?.archetype === 'string' ? existing.archetype : null,
+  ];
+  const archetypeKey = archetypeCandidates.find((value) => typeof value === 'string' && value) ?? null;
+  const archetypeDefinition = archetypeKey ? archetypePalettes[archetypeKey] ?? null : null;
+
+  const formCandidates = [
+    typeof player?.currentForm === 'string' ? player.currentForm : null,
+    typeof player?.form === 'string' ? player.form : null,
+    typeof fallbackHud?.currentForm === 'string' ? fallbackHud.currentForm : null,
+    archetypeDefinition?.form ?? null,
+    existing?.form ?? null,
+  ];
+  const form = formCandidates.find((value) => typeof value === 'string' && value) ?? null;
+
+  const hybridCandidates = [
+    Array.isArray(player?.hybridForms) ? player.hybridForms : null,
+    Array.isArray(archetypeDefinition?.hybridForms) ? archetypeDefinition.hybridForms : null,
+    Array.isArray(existing?.hybridForms) ? existing.hybridForms : null,
+  ];
+  let hybridForms = null;
+  for (const candidate of hybridCandidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      hybridForms = candidate.filter((value) => typeof value === 'string' && value);
+      break;
+    }
+  }
+  if (form) {
+    if (!hybridForms) {
+      hybridForms = [form];
+    } else if (!hybridForms.includes(form)) {
+      hybridForms = [...hybridForms, form];
+    }
+  }
+  if (!hybridForms) {
+    hybridForms = [];
+  }
+  hybridForms = Array.from(new Set(hybridForms));
+
+  const paletteSource = (() => {
+    if (player?.palette && typeof player.palette === 'object') {
+      return { palette: player.palette, source: 'player' };
+    }
+    if (archetypeDefinition?.palette) {
+      return { palette: archetypeDefinition.palette, source: 'archetype' };
+    }
+    if (existing?.basePalette) {
+      return { palette: existing.basePalette, source: existing.source ?? (existing.archetype ? 'archetype' : 'existing') };
+    }
+    if (existing?.palette) {
+      return { palette: existing.palette, source: existing.source ?? 'existing' };
+    }
+    return { palette: null, source: existing?.source ?? null };
+  })();
+
+  const basePalette = paletteSource.palette
+    ? normalizePaletteDefinition(paletteSource.palette)
+    : existing?.basePalette ?? null;
+
+  const id = typeof player?.id === 'string' ? player.id : existing?.id ?? '';
+  const shouldVary =
+    paletteSource.source === 'archetype' ||
+    (paletteSource.source === 'existing' && existing?.source === 'archetype');
+
+  const palette = basePalette
+    ? shouldVary
+      ? applyPaletteVariation(basePalette, id)
+      : { ...basePalette }
+    : existing?.palette ?? null;
+
+  const resolvedId = id || existing?.id || null;
+  const resolvedSource = shouldVary
+    ? 'archetype'
+    : paletteSource.source ?? existing?.source ?? null;
+
+  return {
+    id: resolvedId,
+    archetype: archetypeKey ?? existing?.archetype ?? null,
+    form: form ?? existing?.form ?? null,
+    hybridForms,
+    basePalette: basePalette ?? existing?.basePalette ?? null,
+    palette: palette ?? existing?.palette ?? null,
+    source: resolvedSource,
+  };
+};
+
+const updateAppearanceMapFromShared = (renderState, sharedPlayers, localPlayerId, previousHud) => {
+  const appearanceMap = ensureAppearanceMap(renderState);
+  const seenIds = new Set();
+
+  sharedPlayers.forEach((player) => {
+    if (!player || typeof player.id !== 'string') return;
+    const existing = appearanceMap.get(player.id) ?? { id: player.id };
+    const fallbackHud = player.id === localPlayerId ? previousHud : null;
+    const merged = mergeAppearanceEntry(player, existing, fallbackHud);
+    appearanceMap.set(player.id, merged);
+    seenIds.add(player.id);
+  });
+
+  Array.from(appearanceMap.keys()).forEach((id) => {
+    if (!seenIds.has(id)) {
+      appearanceMap.delete(id);
+    }
+  });
+
+  return appearanceMap;
+};
+
+const updateAppearanceMapFromHud = (renderState, hudSnapshot, localPlayerId) => {
+  if (!localPlayerId || !hudSnapshot) return;
+  const appearanceMap = ensureAppearanceMap(renderState);
+  const existing = appearanceMap.get(localPlayerId) ?? { id: localPlayerId };
+  const pseudoPlayer = {
+    id: localPlayerId,
+    selectedArchetype: hudSnapshot.selectedArchetype,
+    currentForm: hudSnapshot.currentForm,
+  };
+  const merged = mergeAppearanceEntry(pseudoPlayer, existing, hudSnapshot);
+  appearanceMap.set(localPlayerId, merged);
 };
 
 const ensureVector = (value, fallback = { x: 0, y: 0 }) => {
@@ -515,11 +735,12 @@ const updateEyeExpression = (
   return expression;
 };
 
-const createRenderPlayer = (sharedPlayer) => {
-  const palette = getPaletteForPlayer(sharedPlayer.id);
+const createRenderPlayer = (sharedPlayer, appearance) => {
+  const palette = getPaletteForPlayer(sharedPlayer.id, appearance);
   const position = ensureVector(sharedPlayer.position);
   const movementVector = ensureVector(sharedPlayer.movementVector);
   const health = ensureHealth(sharedPlayer.health);
+  const forms = resolvePlayerForms(appearance, sharedPlayer);
 
   return {
     id: sharedPlayer.id,
@@ -527,6 +748,8 @@ const createRenderPlayer = (sharedPlayer) => {
     score: Number.isFinite(sharedPlayer.score) ? sharedPlayer.score : 0,
     combo: Number.isFinite(sharedPlayer.combo) ? sharedPlayer.combo : 1,
     palette,
+    form: forms.form,
+    hybridForms: forms.hybridForms,
     position,
     renderPosition: { ...position },
     movementVector,
@@ -566,14 +789,16 @@ const createRenderPlayer = (sharedPlayer) => {
 
 const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) => {
   const playersById = renderState.playersById;
+  const appearanceMap = ensureAppearanceMap(renderState);
   const seenIds = new Set();
 
   sharedPlayers.forEach((player) => {
-    const existing = playersById.get(player.id) ?? createRenderPlayer(player);
+    const appearance = appearanceMap.get(player.id);
+    const existing = playersById.get(player.id) ?? createRenderPlayer(player, appearance);
     playersById.set(player.id, existing);
     seenIds.add(player.id);
 
-    const palette = getPaletteForPlayer(player.id);
+    const palette = getPaletteForPlayer(player.id, appearance);
     const position = ensureVector(player.position, existing.position);
     const movementVector = ensureVector(player.movementVector, existing.movementVector);
     const health = ensureHealth(player.health);
@@ -603,6 +828,9 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
     };
     existing.lastAttackAt = existing.combatStatus.lastAttackAt;
     existing.palette = palette;
+    const forms = resolvePlayerForms(appearance, player, existing);
+    existing.form = forms.form;
+    existing.hybridForms = forms.hybridForms;
     const isLocal = player.id === localPlayerId;
     existing.isLocal = isLocal;
     existing.name = player.name;
@@ -1140,6 +1368,9 @@ export const updateGameState = ({
     ? sharedPlayersCollection
     : Object.values(sharedState.players || {});
   const localPlayerId = sharedState.playerId ?? null;
+  const previousHudSnapshot = renderState.hudSnapshot ?? null;
+
+  updateAppearanceMapFromShared(renderState, sharedPlayers, localPlayerId, previousHudSnapshot);
 
   const localRenderPlayer = updateRenderPlayers(renderState, sharedPlayers, delta, localPlayerId);
   updateCamera(renderState, localRenderPlayer, delta);
@@ -1220,6 +1451,7 @@ export const updateGameState = ({
   }
 
   renderState.hudSnapshot = hudSnapshot;
+  updateAppearanceMapFromHud(renderState, hudSnapshot, localPlayerId);
 
   if (typeof helpers.playSound === 'function' && commands.attacks.length > 0) {
     helpers.playSound('attack');
