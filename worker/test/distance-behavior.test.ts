@@ -50,7 +50,7 @@ function createTestPlayer(
 }
 
 describe("RoomDO distance-sensitive behaviour", () => {
-  it("collects organic matter at the collection radius threshold", async () => {
+  it("collects organic matter and respawns a new entity near the collector", async () => {
     const { roomAny } = await createRoom();
 
     const player: TestPlayer = createTestPlayer("collector");
@@ -75,6 +75,12 @@ describe("RoomDO distance-sensitive behaviour", () => {
     roomAny.rebuildWorldCaches();
     const originalWorldOrganicMatter = roomAny.world.organicMatter;
 
+    const randomValues = [0.25, 0.4, 0.6, 0.8];
+    roomAny.organicMatterRespawnRng = () => {
+      const next = randomValues.shift();
+      return next !== undefined ? next : 0.5;
+    };
+
     const worldDiff: SharedWorldStateDiff = {};
     const combatLog: CombatLogEntry[] = [];
     const now = Date.now();
@@ -85,13 +91,98 @@ describe("RoomDO distance-sensitive behaviour", () => {
     expect(roomAny.organicMatter.has(nearMatter.id)).toBe(false);
     expect(roomAny.organicMatter.has(farMatter.id)).toBe(true);
     expect(roomAny.world.organicMatter).toBe(originalWorldOrganicMatter);
-    expect(roomAny.world.organicMatter).toHaveLength(1);
-    expect(roomAny.world.organicMatter[0]).toBe(farMatter);
+    expect(roomAny.world.organicMatter).toHaveLength(2);
+    const worldMatterIds = roomAny.world.organicMatter.map((matter: OrganicMatter) => matter.id);
+    expect(worldMatterIds).toContain(farMatter.id);
+    const replacementId = worldMatterIds.find((id: string) => id !== farMatter.id);
+    expect(replacementId).toBeDefined();
+    const replacement = replacementId ? roomAny.organicMatter.get(replacementId) : undefined;
+    expect(replacement?.id).not.toBe(nearMatter.id);
     const removedIds = worldDiff.removeOrganicMatterIds ?? [];
     expect(removedIds).toContain(nearMatter.id);
     expect(removedIds).not.toContain(farMatter.id);
+    expect(worldDiff.upsertOrganicMatter).toBeDefined();
+    const upsertedIds = worldDiff.upsertOrganicMatter?.map((matter) => matter.id) ?? [];
+    expect(upsertedIds).toContain(replacementId);
+    if (replacementId) {
+      const diffEntry = worldDiff.upsertOrganicMatter?.find((matter) => matter.id === replacementId);
+      const storedEntry = roomAny.organicMatter.get(replacementId);
+      expect(diffEntry).toEqual(storedEntry);
+      expect(diffEntry).not.toBe(storedEntry);
+    }
     expect(player.score).toBeGreaterThan(0);
     expect(combatLog.some((entry) => entry.targetKind === "organic_matter")).toBe(true);
+    if (replacement) {
+      const distance = Math.hypot(
+        replacement.position.x - player.position.x,
+        replacement.position.y - player.position.y,
+      );
+      expect(distance).toBeGreaterThan(0);
+    }
+  });
+
+  it("maintains organic matter saturation after collecting multiple pieces", async () => {
+    const { roomAny } = await createRoom();
+
+    const player: TestPlayer = createTestPlayer("collector");
+    roomAny.players.set(player.id, player);
+
+    const matters: OrganicMatter[] = [
+      {
+        id: "matter-one",
+        kind: "organic_matter",
+        position: { x: 40, y: 0 },
+        quantity: 4,
+        nutrients: {},
+      },
+      {
+        id: "matter-two",
+        kind: "organic_matter",
+        position: { x: -30, y: 10 },
+        quantity: 6,
+        nutrients: {},
+      },
+      {
+        id: "matter-three",
+        kind: "organic_matter",
+        position: { x: 0, y: -45 },
+        quantity: 8,
+        nutrients: {},
+      },
+    ];
+
+    roomAny.world.organicMatter = [...matters];
+    roomAny.rebuildWorldCaches();
+    const originalReference = roomAny.world.organicMatter;
+    const originalCount = originalReference.length;
+
+    const randomValues = [0.1, 0.3, 0.5, 0.7, 0.2, 0.4];
+    roomAny.organicMatterRespawnRng = () => {
+      const next = randomValues.shift();
+      return next !== undefined ? next : 0.5;
+    };
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const now = Date.now();
+
+    const result = roomAny.handleCollectionsDuringTick(player, worldDiff, combatLog, now);
+
+    expect(result.playerUpdated).toBe(true);
+    expect(roomAny.world.organicMatter).toBe(originalReference);
+    expect(roomAny.world.organicMatter).toHaveLength(originalCount);
+    const currentIds = new Set(roomAny.world.organicMatter.map((matter: OrganicMatter) => matter.id));
+    for (const matter of matters) {
+      expect(currentIds.has(matter.id)).toBe(false);
+    }
+    const upsert = worldDiff.upsertOrganicMatter ?? [];
+    expect(upsert).toHaveLength(matters.length);
+    const remove = worldDiff.removeOrganicMatterIds ?? [];
+    expect(remove).toHaveLength(matters.length);
+    const storedIds = new Set(roomAny.organicMatter.keys());
+    for (const entry of upsert) {
+      expect(storedIds.has(entry.id)).toBe(true);
+    }
   });
 
   it("resolves player attacks when targets are within range", async () => {
