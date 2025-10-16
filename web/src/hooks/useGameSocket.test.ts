@@ -1,11 +1,14 @@
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { serverMessageSchema } from "../utils/messageTypes";
 import type { ClientMessage } from "../utils/messageTypes";
 import {
   computeReconnectDelay,
   prepareClientMessagePayload,
-  resolveWebSocketUrl
+  resolveWebSocketUrl,
+  useGameSocket
 } from "./useGameSocket";
+import { gameStore } from "../store/gameStore";
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -207,5 +210,54 @@ describe("serverMessageSchema", () => {
 
     const result = serverMessageSchema.safeParse(message);
     expect(result.success).toBe(false);
+  });
+});
+
+describe("useGameSocket", () => {
+  it("sets status to reconnecting when the initial connection fails and reconnection is enabled", () => {
+    const timeoutSpy = vi.spyOn(window, "setTimeout");
+    timeoutSpy.mockImplementation((() => 1) as unknown as Window["setTimeout"]);
+
+    class ThrowingWebSocket {
+      static OPEN = 1;
+      constructor() {
+        throw new Error("fail");
+      }
+    }
+
+    vi.stubGlobal("WebSocket", ThrowingWebSocket as unknown as typeof WebSocket);
+
+    const statusSpy = vi.spyOn(gameStore.actions, "setConnectionStatus");
+    const reconnectSpy = vi.spyOn(gameStore.actions, "incrementReconnectAttempts");
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    gameStore.setPartial({
+      playerName: "Tester",
+      reconnectAttempts: 0,
+      connectionStatus: "idle",
+      joinError: null,
+    });
+
+    try {
+      const { result } = renderHook(() =>
+        useGameSocket({ autoConnect: false, url: "ws://example.test" })
+      );
+
+      statusSpy.mockClear();
+      reconnectSpy.mockClear();
+
+      act(() => {
+        result.current.connect();
+      });
+
+      expect(reconnectSpy).toHaveBeenCalledTimes(1);
+      expect(statusSpy).toHaveBeenCalledWith("reconnecting");
+      expect(timeoutSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleSpy.mockRestore();
+      statusSpy.mockRestore();
+      reconnectSpy.mockRestore();
+      timeoutSpy.mockRestore();
+    }
   });
 });

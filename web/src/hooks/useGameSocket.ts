@@ -621,6 +621,7 @@ export const useGameSocket = (
           );
 
           if (typeof window !== "undefined") {
+            gameStore.actions.setConnectionStatus("reconnecting");
             reconnectTimerRef.current = window.setTimeout(() => {
               const connector = connectInternalRef.current;
               if (connector) {
@@ -628,6 +629,8 @@ export const useGameSocket = (
               }
             }, delay);
           }
+        } else {
+          gameStore.actions.setConnectionStatus("disconnected");
         }
       }
     },
