@@ -1,3 +1,5 @@
+import { WORLD_RADIUS, WORLD_SIZE } from '@micr-omega/shared';
+
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { createSoundEffects } from '../audio/soundEffects';
@@ -37,8 +39,8 @@ const DENSITY_SCALE = {
 
 const createInitialRenderState = () => ({
   camera: {
-    x: 2000,
-    y: 2000,
+    x: WORLD_RADIUS,
+    y: WORLD_RADIUS,
     zoom: 1,
     offsetX: 0,
     offsetY: 0,
@@ -400,8 +402,8 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     const floatingCount = Math.max(150, Math.round(500 * densityScale));
     for (let i = 0; i < floatingCount; i += 1) {
       background.floatingParticles.push({
-        x: Math.random() * 4000,
-        y: Math.random() * 4000,
+        x: Math.random() * WORLD_SIZE,
+        y: Math.random() * WORLD_SIZE,
         vx: (Math.random() - 0.5) * 0.4,
         vy: (Math.random() - 0.5) * 0.4,
         size: Math.random() * 3 + 0.5,
@@ -416,8 +418,8 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     const glowCount = Math.max(60, Math.round(150 * densityScale));
     for (let i = 0; i < glowCount; i += 1) {
       background.glowParticles.push({
-        x: Math.random() * 4000,
-        y: Math.random() * 4000,
+        x: Math.random() * WORLD_SIZE,
+        y: Math.random() * WORLD_SIZE,
         vx: (Math.random() - 0.5) * 0.2,
         vy: (Math.random() - 0.5) * 0.2,
         size: Math.random() * 4 + 2,
@@ -434,8 +436,8 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     const microorganismCount = Math.max(30, Math.round(80 * densityScale));
     for (let i = 0; i < microorganismCount; i += 1) {
       background.microorganisms.push({
-        x: Math.random() * 4000,
-        y: Math.random() * 4000,
+        x: Math.random() * WORLD_SIZE,
+        y: Math.random() * WORLD_SIZE,
         vx: (Math.random() - 0.5) * 0.3,
         vy: (Math.random() - 0.5) * 0.3,
         size: Math.random() * 6 + 3,
@@ -451,7 +453,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     const lightRayCount = Math.max(3, Math.round(5 * densityScale));
     for (let i = 0; i < lightRayCount; i += 1) {
       background.lightRays.push({
-        x: Math.random() * 4000,
+        x: Math.random() * WORLD_SIZE,
         y: -200,
         angle: (Math.random() - 0.5) * 0.3,
         width: Math.random() * 100 + 50,
@@ -463,8 +465,8 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
     for (let i = 0; i < 3; i += 1) {
       background.backgroundLayers.push({
-        x: Math.random() * 4000,
-        y: Math.random() * 4000,
+        x: Math.random() * WORLD_SIZE,
+        y: Math.random() * WORLD_SIZE,
         size: Math.random() * 300 + 200,
         opacity: Math.random() * 0.05 + 0.02,
         color: i === 0 ? '#0a3a4a' : i === 1 ? '#1a2a3a' : '#2a1a3a',
@@ -641,7 +643,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
     const spawnObstacle = (state) => {
       if (!state) return;
-      const obstacle = createObstacleSpawn({ worldSize: state.worldSize ?? 4000 });
+      const obstacle = createObstacleSpawn({ worldSize: state.worldSize ?? WORLD_SIZE });
       if (!obstacle) return;
 
       const normalized = {
@@ -666,7 +668,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
     const spawnNebula = (state) => {
       if (!state) return;
-      const nebula = createNebulaSpawn({ worldSize: state.worldSize ?? 4000 });
+      const nebula = createNebulaSpawn({ worldSize: state.worldSize ?? WORLD_SIZE });
       if (!nebula) return;
 
       state.nebulas = [...ensureArray(state.nebulas), nebula];
@@ -674,7 +676,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
     const spawnPowerUp = (state) => {
       if (!state) return;
-      const powerUp = createPowerUpSpawn({ worldSize: state.worldSize ?? 4000 });
+      const powerUp = createPowerUpSpawn({ worldSize: state.worldSize ?? WORLD_SIZE });
       if (!powerUp) return;
 
       const normalized = {
@@ -692,7 +694,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
       if (!state) return;
       const batch = createOrganicMatterBatch({
         count: Math.max(6, Math.round(10 * densityScale)),
-        worldSize: state.worldSize ?? 4000,
+        worldSize: state.worldSize ?? WORLD_SIZE,
       });
       if (!batch?.length) return;
 

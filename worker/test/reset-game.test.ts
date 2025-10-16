@@ -1,3 +1,4 @@
+import { WORLD_RADIUS } from "@micr-omega/shared";
 import { describe, expect, it } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
@@ -5,15 +6,18 @@ import type { Env } from "../src";
 import { RoomDO } from "../src/RoomDO";
 import { MockDurableObjectState } from "./utils/mock-state";
 
+const PLAYER_SPAWN_DISTANCE_RATIO = 18 / 25;
+const PLAYER_SPAWN_DISTANCE = WORLD_RADIUS * PLAYER_SPAWN_DISTANCE_RATIO;
+
 const PLAYER_SPAWN_POSITIONS = [
-  { x: -360, y: -360 },
-  { x: 360, y: -360 },
-  { x: -360, y: 360 },
-  { x: 360, y: 360 },
-  { x: 0, y: -360 },
-  { x: 0, y: 360 },
-  { x: 360, y: 0 },
-  { x: -360, y: 0 },
+  { x: -PLAYER_SPAWN_DISTANCE, y: -PLAYER_SPAWN_DISTANCE },
+  { x: PLAYER_SPAWN_DISTANCE, y: -PLAYER_SPAWN_DISTANCE },
+  { x: -PLAYER_SPAWN_DISTANCE, y: PLAYER_SPAWN_DISTANCE },
+  { x: PLAYER_SPAWN_DISTANCE, y: PLAYER_SPAWN_DISTANCE },
+  { x: 0, y: -PLAYER_SPAWN_DISTANCE },
+  { x: 0, y: PLAYER_SPAWN_DISTANCE },
+  { x: PLAYER_SPAWN_DISTANCE, y: 0 },
+  { x: -PLAYER_SPAWN_DISTANCE, y: 0 },
 ] as const;
 
 const hashString = (value: string): number => {

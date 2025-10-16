@@ -1,3 +1,5 @@
+import { WORLD_SIZE } from '@micr-omega/shared';
+
 import {
   STATUS_METADATA,
   getStatusEffectVisual,
@@ -213,8 +215,8 @@ export const updateOrganismPhysics = (state, helpers = {}, delta = 0) => {
   organism.x += organism.vx;
   organism.y += organism.vy;
 
-  organism.x = Math.max(organism.size, Math.min(4000 - organism.size, organism.x));
-  organism.y = Math.max(organism.size, Math.min(4000 - organism.size, organism.y));
+  organism.x = Math.max(organism.size, Math.min(WORLD_SIZE - organism.size, organism.x));
+  organism.y = Math.max(organism.size, Math.min(WORLD_SIZE - organism.size, organism.y));
 
   const speedFactor = Math.min(speed / maxSpeed, 1);
 

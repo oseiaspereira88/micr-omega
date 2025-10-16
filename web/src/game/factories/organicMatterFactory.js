@@ -1,3 +1,5 @@
+import { WORLD_SIZE } from '@micr-omega/shared';
+
 import { organicMatterTypes as defaultOrganicMatterTypes } from '../config/organicMatterTypes';
 import { createOrganicMatter } from '../entities/organicMatter';
 
@@ -11,7 +13,7 @@ const pickRandom = (items = [], random) => {
 
 export const spawnOrganicMatter = ({
   count = 1,
-  worldSize = 4000,
+  worldSize = WORLD_SIZE,
   types = defaultOrganicMatterTypes,
   rng = Math.random
 } = {}) => {

@@ -2,6 +2,7 @@ import type { Env } from "./index";
 import { createObservability, serializeError, type Observability } from "./observability";
 import {
   PROTOCOL_VERSION,
+  WORLD_RADIUS,
   clientMessageSchema,
   joinMessageSchema,
   actionMessageSchema,
@@ -70,10 +71,10 @@ const ORGANIC_MATTER_CELL_SIZE = PLAYER_COLLECT_RADIUS;
 const CLIENT_TIME_MAX_FUTURE_DRIFT_MS = 2_000;
 
 const WORLD_BOUNDS = {
-  minX: -500,
-  maxX: 500,
-  minY: -500,
-  maxY: 500
+  minX: -WORLD_RADIUS,
+  maxX: WORLD_RADIUS,
+  minY: -WORLD_RADIUS,
+  maxY: WORLD_RADIUS
 } as const;
 
 const SUPPORTED_CLIENT_VERSIONS = new Set([PROTOCOL_VERSION]);
@@ -367,15 +368,18 @@ const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
 
 const createInitialWorldState = (): SharedWorldState => cloneWorldState(INITIAL_WORLD_TEMPLATE);
 
+const PLAYER_SPAWN_DISTANCE_RATIO = 18 / 25;
+const PLAYER_SPAWN_DISTANCE = WORLD_RADIUS * PLAYER_SPAWN_DISTANCE_RATIO;
+
 const PLAYER_SPAWN_POSITIONS: Vector2[] = [
-  { x: -360, y: -360 },
-  { x: 360, y: -360 },
-  { x: -360, y: 360 },
-  { x: 360, y: 360 },
-  { x: 0, y: -360 },
-  { x: 0, y: 360 },
-  { x: 360, y: 0 },
-  { x: -360, y: 0 },
+  { x: -PLAYER_SPAWN_DISTANCE, y: -PLAYER_SPAWN_DISTANCE },
+  { x: PLAYER_SPAWN_DISTANCE, y: -PLAYER_SPAWN_DISTANCE },
+  { x: -PLAYER_SPAWN_DISTANCE, y: PLAYER_SPAWN_DISTANCE },
+  { x: PLAYER_SPAWN_DISTANCE, y: PLAYER_SPAWN_DISTANCE },
+  { x: 0, y: -PLAYER_SPAWN_DISTANCE },
+  { x: 0, y: PLAYER_SPAWN_DISTANCE },
+  { x: PLAYER_SPAWN_DISTANCE, y: 0 },
+  { x: -PLAYER_SPAWN_DISTANCE, y: 0 },
 ];
 
 const hashString = (value: string): number => {
