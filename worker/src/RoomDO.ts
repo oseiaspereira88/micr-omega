@@ -759,6 +759,8 @@ export class RoomDO {
   private organicMatterCells = new Map<string, Set<string>>();
   private organicMatterCellById = new Map<string, string>();
   private organicMatterOrder = new Map<string, number>();
+  private entitySequence = 0;
+  private organicMatterRespawnRng: () => number = Math.random;
   private obstacles = new Map<string, Obstacle>();
   private microorganismBehavior = new Map<string, { lastAttackAt: number }>();
   private lastWorldTickAt: number | null = null;
@@ -1232,6 +1234,51 @@ export class RoomDO {
     return matter;
   }
 
+  private createEntityId(prefix: string, isTaken: (candidate: string) => boolean): string {
+    let candidate: string;
+    do {
+      this.entitySequence += 1;
+      candidate = `${prefix}-${this.entitySequence.toString(36)}`;
+    } while (isTaken(candidate));
+    return candidate;
+  }
+
+  private findOrganicMatterRespawnPosition(origin: Vector2, attempts = 12): Vector2 | null {
+    const rng = this.organicMatterRespawnRng;
+    const minimumDistance = PLAYER_COLLECT_RADIUS * 1.1;
+    const distanceSpread = Math.max(PLAYER_COLLECT_RADIUS * 0.6, 1);
+
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const angle = rng() * Math.PI * 2;
+      const radialOffset = attempt * PLAYER_COLLECT_RADIUS * 0.35;
+      const distance = minimumDistance + radialOffset + rng() * distanceSpread;
+      const candidate = this.clampPosition({
+        x: origin.x + Math.cos(angle) * distance,
+        y: origin.y + Math.sin(angle) * distance,
+      });
+
+      if (this.isBlockedByObstacle(candidate)) {
+        continue;
+      }
+
+      if (this.distanceSquared(origin, candidate) < PLAYER_COLLECT_RADIUS ** 2) {
+        continue;
+      }
+
+      return candidate;
+    }
+
+    const fallback = this.clampPosition({
+      x: origin.x + minimumDistance + attempts * PLAYER_COLLECT_RADIUS * 0.35,
+      y: origin.y,
+    });
+    if (!this.isBlockedByObstacle(fallback) && this.distanceSquared(origin, fallback) >= PLAYER_COLLECT_RADIUS ** 2) {
+      return fallback;
+    }
+
+    return null;
+  }
+
   private markAlarmsDirty(options: { persistent?: boolean } = {}): void {
     const { persistent = false } = options;
     this.alarmsDirty = true;
@@ -1492,11 +1539,39 @@ export class RoomDO {
       this.removeOrganicMatterEntity(id);
     }
 
+    const respawnedMatter: OrganicMatter[] = [];
+    for (const { matter } of collectedEntries) {
+      const spawnPosition = this.findOrganicMatterRespawnPosition(player.position);
+      if (!spawnPosition) {
+        continue;
+      }
+
+      const id = this.createEntityId(
+        "organic",
+        (candidate) =>
+          this.organicMatter.has(candidate) || respawnedMatter.some((entry) => entry.id === candidate),
+      );
+      const replacement: OrganicMatter = {
+        ...matter,
+        id,
+        position: spawnPosition,
+      };
+      this.addOrganicMatterEntity(replacement);
+      respawnedMatter.push(replacement);
+    }
+
     const removedIds = collectedEntries.map((entry) => entry.id);
     worldDiff.removeOrganicMatterIds = [
       ...(worldDiff.removeOrganicMatterIds ?? []),
       ...removedIds,
     ];
+
+    if (respawnedMatter.length > 0) {
+      worldDiff.upsertOrganicMatter = [
+        ...(worldDiff.upsertOrganicMatter ?? []),
+        ...respawnedMatter.map((matter) => cloneOrganicMatter(matter)),
+      ];
+    }
 
     let totalScore = 0;
     for (const { matter } of collectedEntries) {
