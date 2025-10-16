@@ -55,13 +55,14 @@ const INACTIVE_TIMEOUT_MS = 45_000;
 
 const MAX_COMBO_MULTIPLIER = 50;
 
-// Allow clients to sustain at least 40 messages per second without being
+// Allow clients to sustain at least 70 messages per second without being
 // throttled by using a one-minute sliding window.
 export const RATE_LIMIT_WINDOW_MS = 60_000;
-export const MAX_MESSAGES_PER_CONNECTION = 2_400;
+export const MAX_MESSAGES_PER_CONNECTION = 4_200;
 // Base global rate limit; the runtime cap scales with the number of active sockets.
 export const MAX_MESSAGES_GLOBAL = 12_000;
 export const GLOBAL_RATE_LIMIT_HEADROOM = 1.25;
+const RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS = 5_000;
 
 const PLAYERS_KEY = "players";
 const WORLD_KEY = "world";
@@ -102,6 +103,15 @@ export class MessageRateLimiter {
     }
     this.timestamps.push(now);
     return true;
+  }
+
+  getUtilization(now: number, limitOverride?: number): number {
+    this.prune(now);
+    const limit = limitOverride ?? this.limit;
+    if (limit <= 0) {
+      return 0;
+    }
+    return this.getActiveCount() / limit;
   }
 
   getRetryAfterMs(now: number): number {
@@ -643,10 +653,12 @@ export class RoomDO {
   private readonly players = new Map<string, PlayerInternal>();
   private readonly nameToPlayerId = new Map<string, string>();
   private readonly connectionRateLimiters = new WeakMap<WebSocket, MessageRateLimiter>();
+  private readonly rateLimitUtilizationLastReported = new WeakMap<WebSocket, number>();
   private readonly globalRateLimiter = new MessageRateLimiter(
     MAX_MESSAGES_GLOBAL,
     RATE_LIMIT_WINDOW_MS
   );
+  private lastGlobalRateLimitReportAt = 0;
   private rankingCache: RankingEntry[] = [];
   private rankingDirty = true;
 
@@ -791,6 +803,63 @@ export class RoomDO {
       this.connectionRateLimiters.set(socket, limiter);
     }
     return limiter;
+  }
+
+  private maybeRecordRateLimitUtilization(
+    socket: WebSocket,
+    limiter: MessageRateLimiter,
+    now: number,
+    limit: number
+  ): void {
+    if (limit <= 0) {
+      return;
+    }
+
+    const utilization = limiter.getUtilization(now, limit);
+    if (utilization < 0.7) {
+      if (utilization < 0.5) {
+        this.rateLimitUtilizationLastReported.delete(socket);
+      }
+      return;
+    }
+
+    const lastReportedAt = this.rateLimitUtilizationLastReported.get(socket) ?? 0;
+    if (now - lastReportedAt < RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS) {
+      return;
+    }
+
+    const playerId = this.clientsBySocket.get(socket) ?? null;
+    this.observability.recordMetric("rate_limit_utilization", utilization, {
+      scope: "connection",
+      limit,
+      bucket: Math.min(100, Math.round(utilization * 100)),
+      playerKnown: playerId ? "known" : "unknown",
+    });
+
+    this.rateLimitUtilizationLastReported.set(socket, now);
+  }
+
+  private maybeRecordGlobalRateLimitUtilization(now: number, limit: number): void {
+    if (limit <= 0) {
+      return;
+    }
+
+    const utilization = this.globalRateLimiter.getUtilization(now, limit);
+    if (utilization < 0.7) {
+      return;
+    }
+
+    if (now - this.lastGlobalRateLimitReportAt < RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS) {
+      return;
+    }
+
+    this.observability.recordMetric("rate_limit_utilization", utilization, {
+      scope: "global",
+      limit,
+      bucket: Math.min(100, Math.round(utilization * 100)),
+    });
+
+    this.lastGlobalRateLimitReportAt = now;
   }
 
   private getDynamicGlobalLimit(): number {
@@ -1671,6 +1740,13 @@ export class RoomDO {
         return;
       }
 
+      this.maybeRecordRateLimitUtilization(
+        socket,
+        perConnectionLimiter,
+        now,
+        MAX_MESSAGES_PER_CONNECTION
+      );
+
       const globalLimit = this.getDynamicGlobalLimit();
       if (!this.globalRateLimiter.consume(now, globalLimit)) {
         const retryAfter = this.globalRateLimiter.getRetryAfterMs(now);
@@ -1681,6 +1757,8 @@ export class RoomDO {
         });
         return;
       }
+
+      this.maybeRecordGlobalRateLimitUtilization(now, globalLimit);
 
       let json: unknown;
       try {
