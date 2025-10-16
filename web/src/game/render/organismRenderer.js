@@ -1,6 +1,7 @@
 import { withCameraTransform } from './utils/cameraHelpers.js';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const clamp01 = (value) => Math.min(1, Math.max(0, value ?? 0));
 
 const FORM_DESCRIPTORS = {
   sphere: { xScale: 1, yScale: 1, spikeCount: 0, spikeLength: 0 },
@@ -116,6 +117,99 @@ const drawHealthRing = (ctx, radius, health, palette) => {
   ctx.restore();
 };
 
+const drawEyes = (ctx, player, radius) => {
+  const blink = clamp01(player?.eyeBlink?.openness ?? 1);
+  const look = player?.eyeLook ?? { x: 0, y: 0 };
+  const expression = player?.eyeExpression ?? {};
+  const attack = clamp01(expression.attacking);
+  const hurt = clamp01(expression.hurt);
+  const neutral = clamp01(1 - attack - hurt);
+
+  const baseEyeRadius = radius * 0.23;
+  const spacing = radius * 0.45;
+  const offsetY = radius * 0.2;
+  const accent = player?.palette?.accent ?? '#1a1a1a';
+
+  const expressionOpenness = neutral * 1 + attack * 0.78 + hurt * 0.55;
+  const openness = clamp(expressionOpenness * blink, 0.08, 1);
+  const widthScale = 1 + attack * 0.15 - hurt * 0.08;
+  const pupilBase = baseEyeRadius * (0.52 + attack * 0.08 - hurt * 0.05);
+
+  const scleraAlpha = 0.72 + neutral * 0.18 + attack * 0.05;
+  const eyelidAlpha = 0.42 + attack * 0.28 + hurt * 0.32;
+  const lowerLidAlpha = 0.28 + hurt * 0.4;
+
+  const lookX = clamp(look.x ?? 0, -1, 1);
+  const lookY = clamp(look.y ?? 0, -1, 1);
+
+  [ -offsetY, offsetY ].forEach((yOffset, index) => {
+    ctx.save();
+    ctx.translate(spacing, yOffset);
+    const slant = (attack * 0.25 - hurt * 0.12) * (index === 0 ? -1 : 1);
+    ctx.rotate(slant);
+
+    const eyeWidth = baseEyeRadius * widthScale;
+    const eyeHeight = baseEyeRadius * openness;
+
+    ctx.fillStyle = `rgba(255, 255, 255, ${scleraAlpha})`;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, eyeWidth, eyeHeight, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const pupilOffsetX = lookX * eyeWidth * 0.7;
+    const pupilOffsetY = lookY * eyeHeight * 0.7;
+    ctx.fillStyle = '#050505';
+    ctx.beginPath();
+    ctx.ellipse(pupilOffsetX, pupilOffsetY, pupilBase, pupilBase * (1 + hurt * 0.25), 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(
+      pupilOffsetX - pupilBase * 0.35,
+      pupilOffsetY - pupilBase * 0.35,
+      pupilBase * 0.45,
+      pupilBase * 0.35,
+      0,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+
+    const upperLid = baseEyeRadius * (1 - openness);
+    if (upperLid > 0.005) {
+      ctx.save();
+      ctx.fillStyle = accent;
+      ctx.globalAlpha = eyelidAlpha;
+      ctx.beginPath();
+      ctx.moveTo(-eyeWidth - 1, -eyeHeight);
+      ctx.quadraticCurveTo(0, -eyeHeight - upperLid * (0.6 + attack * 0.5), eyeWidth + 1, -eyeHeight);
+      ctx.lineTo(eyeWidth + 1, -eyeHeight + upperLid * 0.8);
+      ctx.quadraticCurveTo(0, -eyeHeight + upperLid * 0.25, -eyeWidth - 1, -eyeHeight + upperLid * 0.8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    const lowerLid = baseEyeRadius * (1 - openness) * (0.35 + hurt * 0.45);
+    if (lowerLid > 0.004) {
+      ctx.save();
+      ctx.fillStyle = accent;
+      ctx.globalAlpha = lowerLidAlpha;
+      ctx.beginPath();
+      ctx.moveTo(-eyeWidth - 1, eyeHeight);
+      ctx.quadraticCurveTo(0, eyeHeight + lowerLid * (0.4 + hurt * 0.6), eyeWidth + 1, eyeHeight);
+      ctx.lineTo(eyeWidth + 1, eyeHeight - lowerLid * 0.6);
+      ctx.quadraticCurveTo(0, eyeHeight - lowerLid * 0.2, -eyeWidth - 1, eyeHeight - lowerLid * 0.6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.restore();
+  });
+};
+
 const drawPlayerBody = (ctx, player, pulsePhase) => {
   const { palette, renderPosition, orientation, speed, isLocal } = player;
   const baseSize = 22 + clamp(speed * 12, 0, 10);
@@ -148,18 +242,7 @@ const drawPlayerBody = (ctx, player, pulsePhase) => {
 
   ctx.save();
   ctx.rotate(orientation ?? 0);
-  ctx.fillStyle = '#fff';
-  ctx.globalAlpha = 0.85;
-  ctx.beginPath();
-  ctx.arc(totalRadius * 0.45, -totalRadius * 0.2, totalRadius * 0.23, 0, Math.PI * 2);
-  ctx.arc(totalRadius * 0.45, totalRadius * 0.2, totalRadius * 0.23, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#050505';
-  ctx.beginPath();
-  ctx.arc(totalRadius * 0.55, -totalRadius * 0.2, totalRadius * 0.13, 0, Math.PI * 2);
-  ctx.arc(totalRadius * 0.55, totalRadius * 0.2, totalRadius * 0.13, 0, Math.PI * 2);
-  ctx.fill();
+  drawEyes(ctx, player, totalRadius);
   ctx.restore();
 
   ctx.shadowBlur = 0;
