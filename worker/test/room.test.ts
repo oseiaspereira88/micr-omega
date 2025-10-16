@@ -36,6 +36,73 @@ describe("RoomDO", () => {
     }
   });
 
+  it("starts a solo session immediately and accepts movement actions", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const joinedPromise = onceMessage<{
+        type: string;
+        playerId: string;
+      }>(socket, "joined", 5000);
+      const activeStatePromise = onceMessage<{
+        type: string;
+        mode: string;
+        state: { phase: string };
+      }>(socket, "state", 5000);
+
+      socket.send(JSON.stringify({ type: "join", name: "Solo" }));
+
+      const joined = await joinedPromise;
+      const activeState = await activeStatePromise;
+
+      expect(activeState.mode).toBe("full");
+      expect(activeState.state.phase).toBe("active");
+
+      const stateDiffPromise = onceMessage<{
+        type: string;
+        mode: string;
+        state: {
+          upsertPlayers?: {
+            id: string;
+            position?: { x: number; y: number };
+            movementVector?: { x: number; y: number };
+          }[];
+        };
+      }>(socket, "state", 5000);
+      const errorPromise = onceMessage<{ type: string; reason: string }>(socket, "error", 200);
+
+      socket.send(
+        JSON.stringify({
+          type: "action",
+          playerId: joined.playerId,
+          clientTime: Date.now(),
+          action: {
+            type: "movement",
+            position: { x: 0, y: 0 },
+            movementVector: { x: 10, y: 0 },
+            orientation: { angle: 0 }
+          }
+        })
+      );
+
+      await expect(errorPromise).rejects.toThrow("Timed out waiting for error message");
+      const stateDiff = await stateDiffPromise;
+
+      expect(stateDiff.mode).toBe("diff");
+      const soloUpdate = stateDiff.state.upsertPlayers?.find((player) => player.id === joined.playerId);
+      expect(soloUpdate).toBeDefined();
+      expect(soloUpdate?.movementVector).toBeDefined();
+      const movementVector = soloUpdate?.movementVector;
+      if (movementVector) {
+        expect(Math.abs(movementVector.x) + Math.abs(movementVector.y)).toBeGreaterThan(0);
+      }
+
+      socket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
   it("allows joining with accented unicode characters", async () => {
     const mf = await createMiniflare();
     try {

@@ -29,7 +29,7 @@ describe("RoomDO serializeGameState usage", () => {
 
     try {
       await roomAny.handleJoin(socket, { type: "join", name: "Alice" });
-      expect(serializeSpy).toHaveBeenCalledTimes(1);
+      expect(serializeSpy).toHaveBeenCalledTimes(2);
     } finally {
       serializeSpy.mockRestore();
       if (originalWebSocket === undefined) {
