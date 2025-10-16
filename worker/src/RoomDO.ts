@@ -2285,6 +2285,8 @@ export class RoomDO {
     this.socketsByPlayer.delete(playerId);
 
     player.connected = false;
+    player.movementVector = createVector();
+    player.combatStatus = createCombatStatusState();
     player.lastSeenAt = Date.now();
     const now = player.lastSeenAt;
     let sessionDurationMs: number | null = null;
@@ -2447,6 +2449,9 @@ export class RoomDO {
     let scoresChanged = false;
 
     for (const player of this.players.values()) {
+      if (!player.connected) {
+        continue;
+      }
       if (stalePlayerIds.has(player.id)) {
         continue;
       }
