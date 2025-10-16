@@ -47,18 +47,18 @@ const INACTIVE_TIMEOUT_MS = 45_000;
 
 const MAX_COMBO_MULTIPLIER = 50;
 
-// Allow clients to sustain at least 20 messages per second without being
+// Allow clients to sustain at least 40 messages per second without being
 // throttled by using a one-minute sliding window.
 export const RATE_LIMIT_WINDOW_MS = 60_000;
-export const MAX_MESSAGES_PER_CONNECTION = 1_200;
-export const MAX_MESSAGES_GLOBAL = 6_000;
+export const MAX_MESSAGES_PER_CONNECTION = 2_400;
+export const MAX_MESSAGES_GLOBAL = 12_000;
 
 const PLAYERS_KEY = "players";
 const WORLD_KEY = "world";
 const ALARM_KEY = "alarms";
 const SNAPSHOT_STATE_KEY = "snapshot_state";
 
-export const WORLD_TICK_INTERVAL_MS = 250;
+export const WORLD_TICK_INTERVAL_MS = 50;
 const SNAPSHOT_FLUSH_INTERVAL_MS = 500;
 const PLAYER_ATTACK_COOLDOWN_MS = 800;
 const PLAYER_COLLECT_RADIUS = 60;
