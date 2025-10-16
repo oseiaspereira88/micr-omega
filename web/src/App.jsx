@@ -5,7 +5,7 @@ import ToastStack from './components/ToastStack';
 import { useGameSocket } from './hooks/useGameSocket';
 import { gameStore, useGameStore } from './store/gameStore';
 import { useGameSettings } from './store/gameSettings';
-import { sanitizeArchetypeKey } from './utils/messageTypes';
+import { sanitizeArchetypeKey, TARGET_OPTIONAL_ATTACK_KINDS } from './utils/messageTypes';
 import {
   findNearestHostileMicroorganismId,
   resolvePlayerPosition,
@@ -136,8 +136,15 @@ const App = () => {
               return;
             }
 
+            const normalizedKind =
+              typeof attackCommand.kind === 'string' && attackCommand.kind
+                ? attackCommand.kind
+                : 'basic';
+            const isTargetOptional = TARGET_OPTIONAL_ATTACK_KINDS.has(normalizedKind);
+
             const payload = {
               playerId,
+              kind: normalizedKind,
             };
 
             const timestamp = Number.isFinite(attackCommand.timestamp)
@@ -151,12 +158,12 @@ const App = () => {
             let targetPlayerId = capturedPlayerTarget;
             let targetObjectId = capturedObjectTarget;
 
-            if (!targetPlayerId && !targetObjectId) {
+            if (!targetPlayerId && !targetObjectId && !isTargetOptional) {
               targetPlayerId = validatePlayerTarget(combatStatus?.targetPlayerId);
               targetObjectId = validateObjectTarget(combatStatus?.targetObjectId);
             }
 
-            if (!targetPlayerId && !targetObjectId) {
+            if (!targetPlayerId && !targetObjectId && !isTargetOptional) {
               const playerPosition = resolvePlayerPosition({ sharedPlayer: player });
               const sharedMicroorganisms = [
                 ...(Array.isArray(state?.world?.microorganisms)
@@ -186,7 +193,7 @@ const App = () => {
               payload.targetObjectId = targetObjectId;
             }
 
-            if (!payload.targetPlayerId && !payload.targetObjectId) {
+            if (!payload.targetPlayerId && !payload.targetObjectId && !isTargetOptional) {
               console.warn('Ignorando comando de ataque sem alvo válido', attackCommand);
               return;
             }

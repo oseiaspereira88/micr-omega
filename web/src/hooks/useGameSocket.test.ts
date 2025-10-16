@@ -143,6 +143,19 @@ describe("prepareClientMessagePayload", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
+  it("permite mensagens de dash sem alvo explícito", () => {
+    const message: ClientMessage = {
+      type: "attack",
+      playerId: "player-1",
+      kind: "dash",
+      clientTime: Date.now(),
+    };
+
+    const payload = prepareClientMessagePayload(message, true);
+
+    expect(payload).toEqual(message);
+  });
+
   it("skips validation when disabled", () => {
     const spy = vi.fn();
     console.error = spy;
