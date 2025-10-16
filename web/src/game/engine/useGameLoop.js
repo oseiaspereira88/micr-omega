@@ -563,15 +563,57 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
       });
     }
 
-    const microorganismCount = Math.max(30, Math.round(80 * densityScale));
+    const microorganismCount = Math.max(24, Math.round(60 * densityScale));
     for (let i = 0; i < microorganismCount; i += 1) {
+      const baseSize = Math.random() * 6 + 3;
+      const baseOpacity = Math.random() * 0.3 + 0.1;
+      const heading = Math.random() * Math.PI * 2;
+      const baseSpeed = 0.1 + Math.random() * 0.25;
+      const homeX = WORLD_SIZE * 0.5 + (Math.random() - 0.5) * WORLD_SIZE * 0.3;
+      const homeY = WORLD_SIZE * 0.5 + (Math.random() - 0.5) * WORLD_SIZE * 0.3;
+      const vortexRadius = 120 + Math.random() * 160;
+      const vortexAngle = Math.random() * Math.PI * 2;
+      const vortexX = homeX + Math.cos(vortexAngle) * vortexRadius;
+      const vortexY = homeY + Math.sin(vortexAngle) * vortexRadius;
+
       background.microorganisms.push({
         x: Math.random() * WORLD_SIZE,
         y: Math.random() * WORLD_SIZE,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        size: Math.random() * 6 + 3,
-        opacity: Math.random() * 0.3 + 0.1,
+        vx: Math.cos(heading) * baseSpeed,
+        vy: Math.sin(heading) * baseSpeed,
+        heading,
+        targetHeading: heading,
+        turnRate: 0.04 + Math.random() * 0.04,
+        headingTimer: 90 + Math.random() * 180,
+        headingInterval: 90 + Math.random() * 180,
+        headingVariance: Math.PI * (0.2 + Math.random() * 0.3),
+        speed: baseSpeed,
+        targetSpeed: baseSpeed,
+        baseSpeed,
+        speedTimer: 120 + Math.random() * 200,
+        speedInterval: 120 + Math.random() * 200,
+        speedLerp: 0.05 + Math.random() * 0.05,
+        noiseOffset: Math.random() * 1000,
+        noiseSpeed: 0.0005 + Math.random() * 0.001,
+        noiseHeadingScale: 0.1 + Math.random() * 0.2,
+        noiseSpeedScale: 0.2 + Math.random() * 0.3,
+        vortexX,
+        vortexY,
+        swirlStrength: 0.01 + Math.random() * 0.04,
+        swirlSpeed: 0.005 + Math.random() * 0.01,
+        swirlPhase: Math.random() * Math.PI * 2,
+        homeX,
+        homeY,
+        edgeMargin: 150 + Math.random() * 80,
+        scalePhase: Math.random() * Math.PI * 2,
+        scaleSpeed: 0.015 + Math.random() * 0.03,
+        scaleTurnInfluence: 0.3 + Math.random() * 0.5,
+        currentScale: 1,
+        currentOpacity: baseOpacity,
+        updateStride: 1 + Math.floor(Math.random() * 3),
+        updateFrame: Math.floor(Math.random() * 3),
+        size: baseSize,
+        opacity: baseOpacity,
         color: ['rgba(100, 200, 255, ', 'rgba(100, 255, 200, ', 'rgba(255, 200, 100, '][
           Math.floor(Math.random() * 3)
         ],
