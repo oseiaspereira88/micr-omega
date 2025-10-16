@@ -16,6 +16,7 @@ import {
   restartGame as restartGameSystem,
   cycleSkill as cycleSkillSystem,
   openEvolutionMenu as openEvolutionMenuSystem,
+  requestEvolutionReroll as requestEvolutionRerollSystem,
 } from '../systems';
 import { spawnObstacle as createObstacleSpawn } from '../factories/obstacleFactory';
 import { spawnNebula as createNebulaSpawn } from '../factories/nebulaFactory';
@@ -680,6 +681,26 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     [createEffect, createParticle, playSound, pushNotification, syncHudState]
   );
 
+  const requestEvolutionRerollHandler = useCallback(() => {
+    const state = renderStateRef.current;
+    if (!state) return;
+
+    const helpers = {
+      addNotification: (targetState, text) => {
+        if (!text) return;
+        if (targetState && targetState !== renderStateRef.current) {
+          targetState.notifications = appendNotification(targetState.notifications, text);
+        }
+        pushNotification(text);
+      },
+      playSound,
+      syncState: syncHudState,
+    };
+
+    requestEvolutionRerollSystem(state, helpers);
+    syncHudState(state);
+  }, [playSound, pushNotification, syncHudState]);
+
   useEffect(() => {
     if (!resolvedSettings.audioEnabled) {
       if (audioCtxRef.current && typeof audioCtxRef.current.close === 'function') {
@@ -882,6 +903,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     joystick,
     inputActions,
     chooseEvolution: chooseEvolutionHandler,
+    requestEvolutionReroll: requestEvolutionRerollHandler,
     restartGame: restartGameHandler,
     selectArchetype,
     setCameraZoom,

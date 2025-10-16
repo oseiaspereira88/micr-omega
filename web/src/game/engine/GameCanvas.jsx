@@ -77,6 +77,7 @@ const GameCanvas = ({ settings, onQuit }) => {
     joystick,
     inputActions,
     chooseEvolution,
+    requestEvolutionReroll,
     restartGame,
     selectArchetype,
     setCameraZoom,
@@ -132,6 +133,9 @@ const GameCanvas = ({ settings, onQuit }) => {
 
   const xpCurrent = xp?.current ?? 0;
   const mgCurrent = geneticMaterial?.current ?? 0;
+  const rerollCost = Math.floor(reroll?.cost ?? reroll?.baseCost ?? 25);
+  const rerollCount = Math.floor(reroll?.count ?? 0);
+  const rerollAvailable = mgCurrent >= rerollCost;
 
   const skillData = useMemo(() => {
     const resolveCost = (skill) => {
@@ -209,6 +213,10 @@ const GameCanvas = ({ settings, onQuit }) => {
 
   const evolutionMenu = evolutionMenuState || DEFAULT_EVOLUTION_MENU;
 
+  const handleEvolutionReroll = useCallback(() => {
+    requestEvolutionReroll?.();
+  }, [requestEvolutionReroll]);
+
   return (
     <div className={styles.container}>
       <canvas ref={canvasRef} className={styles.canvas} />
@@ -266,6 +274,30 @@ const GameCanvas = ({ settings, onQuit }) => {
         <div className={styles.evolutionOverlay}>
           <div className={styles.evolutionCard}>
             <h2 className={styles.evolutionTitle}>🧬 Evolução Nível {level}</h2>
+
+            <div className={styles.rerollControls}>
+              <button
+                type="button"
+                className={`${styles.rerollButton} ${
+                  rerollAvailable ? '' : styles.rerollButtonDisabled
+                }`.trim()}
+                onClick={handleEvolutionReroll}
+                aria-disabled={!rerollAvailable}
+              >
+                🔁 Rerrolar opções
+              </button>
+              <div className={styles.rerollInfo}>
+                <span className={styles.rerollCost}>Custo {rerollCost} MG</span>
+                <span className={styles.rerollCount}>Usado {rerollCount}x</span>
+                <span
+                  className={`${styles.rerollStatus} ${
+                    rerollAvailable ? styles.rerollStatusAvailable : styles.rerollStatusBlocked
+                  }`.trim()}
+                >
+                  {rerollAvailable ? 'Disponível' : 'MG insuficiente'}
+                </span>
+              </div>
+            </div>
 
             <div className={styles.evolutionTabs}>
               {(['small', 'medium', 'large']).map((tierKey) => {

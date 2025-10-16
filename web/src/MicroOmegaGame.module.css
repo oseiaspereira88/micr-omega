@@ -49,6 +49,68 @@
   -webkit-text-fill-color: transparent;
 }
 
+.rerollControls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 217, 255, 0.08);
+  border: 1px solid rgba(0, 217, 255, 0.2);
+}
+
+.rerollButton {
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #00d9ff, #7a3bff);
+  color: #0b0b24;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  box-shadow: 0 0 14px rgba(0, 217, 255, 0.3);
+}
+
+.rerollButton:hover {
+  transform: translateY(-1px);
+}
+
+.rerollButtonDisabled,
+.rerollButton[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.rerollInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.rerollCost,
+.rerollCount {
+  color: #9ec7ff;
+}
+
+.rerollStatus {
+  font-weight: 600;
+}
+
+.rerollStatusAvailable {
+  color: #63ffa3;
+}
+
+.rerollStatusBlocked {
+  color: #ff9a9a;
+}
+
 .optionList {
   display: grid;
   gap: 10px;
