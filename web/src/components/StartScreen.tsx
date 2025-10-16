@@ -187,7 +187,7 @@ const StartScreen = ({
               ref={inputRef}
               disabled={isConnecting}
               maxLength={MAX_NAME_LENGTH}
-              autoComplete="nickname"
+              autoComplete="name"
               autoFocus
             />
             {errorMessage ? (
