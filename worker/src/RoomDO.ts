@@ -40,6 +40,7 @@ import {
   type OrientationState,
   type HealthState,
   type CombatStatus,
+  type PlayerEvolutionAction,
   aggregateDrops,
   DROP_TABLES
 } from "./types";
@@ -152,18 +153,25 @@ type StoredPlayer = {
   health: HealthState;
   combatStatus: CombatStatus;
   combatAttributes: CombatAttributes;
+  evolutionState: PlayerEvolutionState;
   totalSessionDurationMs?: number;
   sessionCount?: number;
 };
 
 type StoredPlayerSnapshot = Omit<
   StoredPlayer,
-  "position" | "movementVector" | "orientation" | "health" | "combatStatus" | "combatAttributes"
+  "position" | "movementVector" | "orientation" | "health" | "combatStatus" | "combatAttributes" | "evolutionState"
 > &
   Partial<
     Pick<
       StoredPlayer,
-      "position" | "movementVector" | "orientation" | "health" | "combatStatus" | "combatAttributes"
+      | "position"
+      | "movementVector"
+      | "orientation"
+      | "health"
+      | "combatStatus"
+      | "combatAttributes"
+      | "evolutionState"
     >
   >;
 
@@ -267,6 +275,191 @@ const cloneCombatAttributes = (attributes: CombatAttributes): CombatAttributes =
   speed: attributes.speed,
   range: attributes.range,
 });
+
+const COMBAT_STAT_KEYS = ["attack", "defense", "speed", "range"] as const;
+type CombatStatKey = (typeof COMBAT_STAT_KEYS)[number];
+
+const EVOLUTION_TIERS = ["small", "medium", "large", "macro"] as const;
+type EvolutionTier = (typeof EVOLUTION_TIERS)[number];
+
+type CombatStatModifierState = {
+  additive: number;
+  multiplier: number;
+  baseOverride: number;
+};
+
+type EvolutionHistoryState = Record<EvolutionTier, Record<string, number>>;
+
+type PlayerEvolutionState = {
+  traits: string[];
+  history: EvolutionHistoryState;
+  modifiers: Record<CombatStatKey, CombatStatModifierState>;
+};
+
+const createCombatStatModifier = (modifier?: Partial<CombatStatModifierState>): CombatStatModifierState => ({
+  additive: Number.isFinite(modifier?.additive) ? Number(modifier?.additive) : 0,
+  multiplier: Number.isFinite(modifier?.multiplier) ? Number(modifier?.multiplier) : 0,
+  baseOverride: Number.isFinite(modifier?.baseOverride) ? Number(modifier?.baseOverride) : 0,
+});
+
+const sanitizeHistoryBucket = (bucket?: Record<string, unknown> | null): Record<string, number> => {
+  if (!bucket || typeof bucket !== "object") {
+    return {};
+  }
+
+  const normalized: Record<string, number> = {};
+  for (const [key, value] of Object.entries(bucket)) {
+    if (typeof key !== "string" || !key) {
+      continue;
+    }
+    const numeric = Number.isFinite(value) ? Math.trunc(Number(value)) : 0;
+    if (numeric > 0) {
+      normalized[key] = numeric;
+    }
+  }
+  return normalized;
+};
+
+const createEvolutionHistoryState = (history?: Partial<EvolutionHistoryState> | null): EvolutionHistoryState => ({
+  small: sanitizeHistoryBucket(history?.small),
+  medium: sanitizeHistoryBucket(history?.medium),
+  large: sanitizeHistoryBucket(history?.large),
+  macro: sanitizeHistoryBucket((history as Partial<EvolutionHistoryState> | undefined)?.macro),
+});
+
+const createEvolutionState = (state?: Partial<PlayerEvolutionState> | null): PlayerEvolutionState => {
+  const traits = Array.isArray(state?.traits)
+    ? Array.from(
+        new Set(
+          state!.traits
+            .map((trait) => (typeof trait === "string" ? trait.trim() : ""))
+            .filter((trait) => trait.length > 0),
+        ),
+      )
+    : [];
+
+  const modifiers: Record<CombatStatKey, CombatStatModifierState> = {
+    attack: createCombatStatModifier(state?.modifiers?.attack),
+    defense: createCombatStatModifier(state?.modifiers?.defense),
+    speed: createCombatStatModifier(state?.modifiers?.speed),
+    range: createCombatStatModifier(state?.modifiers?.range),
+  };
+
+  return {
+    traits,
+    history: createEvolutionHistoryState(state?.history),
+    modifiers,
+  };
+};
+
+const cloneEvolutionState = (state?: PlayerEvolutionState | null): PlayerEvolutionState => {
+  if (!state) {
+    return createEvolutionState();
+  }
+
+  return {
+    traits: [...state.traits],
+    history: {
+      small: { ...state.history.small },
+      medium: { ...state.history.medium },
+      large: { ...state.history.large },
+      macro: { ...state.history.macro },
+    },
+    modifiers: {
+      attack: { ...state.modifiers.attack },
+      defense: { ...state.modifiers.defense },
+      speed: { ...state.modifiers.speed },
+      range: { ...state.modifiers.range },
+    },
+  };
+};
+
+const applyStatAdjustments = (
+  target: Record<CombatStatKey, CombatStatModifierState>,
+  adjustments: Partial<Record<CombatStatKey, number>> | undefined,
+  kind: keyof CombatStatModifierState,
+): boolean => {
+  if (!adjustments) {
+    return false;
+  }
+
+  let changed = false;
+  for (const key of COMBAT_STAT_KEYS) {
+    const delta = adjustments[key];
+    if (!Number.isFinite(delta) || delta === 0) {
+      continue;
+    }
+    const modifier = target[key];
+    const next = modifier[kind] + Number(delta);
+    if (Number.isFinite(next)) {
+      modifier[kind] = next;
+      changed = true;
+    }
+  }
+  return changed;
+};
+
+const applyEvolutionActionToState = (
+  state: PlayerEvolutionState,
+  action: PlayerEvolutionAction,
+): boolean => {
+  let changed = false;
+
+  if (action.tier && action.evolutionId) {
+    const tier = EVOLUTION_TIERS.find((value) => value === action.tier);
+    if (tier) {
+      const bucket = state.history[tier];
+      const delta =
+        action.countDelta !== undefined && Number.isFinite(action.countDelta)
+          ? Math.trunc(Number(action.countDelta))
+          : 1;
+      if (delta !== 0) {
+        const next = (bucket[action.evolutionId] ?? 0) + delta;
+        if (next > 0) {
+          bucket[action.evolutionId] = next;
+        } else {
+          delete bucket[action.evolutionId];
+        }
+        changed = true;
+      }
+    }
+  }
+
+  if (Array.isArray(action.traitDeltas)) {
+    for (const trait of action.traitDeltas) {
+      if (typeof trait !== "string") {
+        continue;
+      }
+      const normalized = trait.trim();
+      if (normalized && !state.traits.includes(normalized)) {
+        state.traits.push(normalized);
+        changed = true;
+      }
+    }
+  }
+
+  const additiveChanged = applyStatAdjustments(state.modifiers, action.additiveDelta, "additive");
+  const multiplierChanged = applyStatAdjustments(state.modifiers, action.multiplierDelta, "multiplier");
+  const baseChanged = applyStatAdjustments(state.modifiers, action.baseDelta, "baseOverride");
+
+  return changed || additiveChanged || multiplierChanged || baseChanged;
+};
+
+const computeStatWithModifiers = (
+  base: number,
+  modifier: CombatStatModifierState,
+): number => {
+  const baseOverride = Number.isFinite(modifier.baseOverride) ? modifier.baseOverride : 0;
+  const additive = Number.isFinite(modifier.additive) ? modifier.additive : 0;
+  const multiplier = Number.isFinite(modifier.multiplier) ? modifier.multiplier : 0;
+
+  const effectiveBase = base + baseOverride;
+  const scaled = (effectiveBase + additive) * Math.max(0, 1 + multiplier);
+  if (!Number.isFinite(scaled)) {
+    return Math.max(0, base);
+  }
+  return Math.max(0, scaled);
+};
 
 const clonePityCounters = (pity: { fragment: number; stableGene: number }) => ({
   fragment: pity.fragment,
@@ -663,6 +856,7 @@ export class RoomDO {
     if (storedPlayers) {
       const now = Date.now();
       for (const stored of storedPlayers) {
+        const evolutionState = createEvolutionState(stored.evolutionState);
         const normalized: StoredPlayer = {
           id: stored.id,
           name: stored.name,
@@ -674,6 +868,7 @@ export class RoomDO {
           health: createHealthState(stored.health),
           combatStatus: createCombatStatusState(stored.combatStatus),
           combatAttributes: createCombatAttributes(stored.combatAttributes),
+          evolutionState,
           totalSessionDurationMs: stored.totalSessionDurationMs ?? 0,
           sessionCount: stored.sessionCount ?? 0
         };
@@ -684,6 +879,7 @@ export class RoomDO {
           lastSeenAt: now,
           connectedAt: null
         };
+        player.combatAttributes = this.computePlayerCombatAttributes(player);
         this.players.set(player.id, player);
         this.nameToPlayerId.set(player.name.toLowerCase(), player.id);
         this.ensureProgressionState(player.id);
@@ -1160,6 +1356,32 @@ export class RoomDO {
       worldChanged: true,
       scoresChanged: totalScore > 0,
     };
+  }
+
+  private computePlayerCombatAttributes(player: PlayerInternal): CombatAttributes {
+    if (!player.evolutionState) {
+      player.evolutionState = createEvolutionState();
+    }
+    const base = getDeterministicCombatAttributesForPlayer(player.id);
+    const modifiers = player.evolutionState.modifiers;
+
+    return createCombatAttributes({
+      attack: computeStatWithModifiers(base.attack, modifiers.attack),
+      defense: computeStatWithModifiers(base.defense, modifiers.defense),
+      speed: computeStatWithModifiers(base.speed, modifiers.speed),
+      range: computeStatWithModifiers(base.range, modifiers.range),
+    });
+  }
+
+  private updatePlayerCombatAttributes(player: PlayerInternal): boolean {
+    const next = this.computePlayerCombatAttributes(player);
+    const changed =
+      next.attack !== player.combatAttributes.attack ||
+      next.defense !== player.combatAttributes.defense ||
+      next.speed !== player.combatAttributes.speed ||
+      next.range !== player.combatAttributes.range;
+    player.combatAttributes = next;
+    return changed;
   }
 
   private resolvePlayerAttackDuringTick(
@@ -1667,6 +1889,7 @@ export class RoomDO {
     if (!player) {
       const id = crypto.randomUUID();
       const spawnPosition = this.clampPosition(getSpawnPositionForPlayer(id));
+      const evolutionState = createEvolutionState();
       player = {
         id,
         name: normalizedName,
@@ -1678,6 +1901,7 @@ export class RoomDO {
         health: createHealthState(),
         combatStatus: createCombatStatusState(),
         combatAttributes: getDeterministicCombatAttributesForPlayer(id),
+        evolutionState,
         connected: true,
         lastActiveAt: now,
         lastSeenAt: now,
@@ -1685,6 +1909,7 @@ export class RoomDO {
         totalSessionDurationMs: 0,
         sessionCount: 0
       };
+      player.combatAttributes = this.computePlayerCombatAttributes(player);
       this.players.set(id, player);
       this.nameToPlayerId.set(nameKey, id);
       rankingShouldUpdate = true;
@@ -1699,7 +1924,8 @@ export class RoomDO {
       player.lastSeenAt = now;
       player.lastActiveAt = now;
       player.connectedAt = now;
-      player.combatAttributes = createCombatAttributes(player.combatAttributes);
+      player.evolutionState = createEvolutionState(player.evolutionState);
+      this.updatePlayerCombatAttributes(player);
       this.players.set(player.id, player);
       this.nameToPlayerId.set(nameKey, player.id);
       if (previousName !== normalizedName) {
@@ -2011,6 +2237,16 @@ export class RoomDO {
           targetObjectId: action.objectId,
           lastAttackAt: player.combatStatus.lastAttackAt,
         });
+        updatedPlayers.push(player);
+        return { updatedPlayers };
+      }
+      case "evolution": {
+        if (!player.evolutionState) {
+          player.evolutionState = createEvolutionState();
+        }
+        applyEvolutionActionToState(player.evolutionState, action as PlayerEvolutionAction);
+        player.lastActiveAt = Date.now();
+        this.updatePlayerCombatAttributes(player);
         updatedPlayers.push(player);
         return { updatedPlayers };
       }
@@ -2827,6 +3063,7 @@ export class RoomDO {
       health: cloneHealthState(player.health),
       combatStatus: cloneCombatStatusState(player.combatStatus),
       combatAttributes: cloneCombatAttributes(player.combatAttributes),
+      evolutionState: cloneEvolutionState(player.evolutionState),
       totalSessionDurationMs: player.totalSessionDurationMs ?? 0,
       sessionCount: player.sessionCount ?? 0
     }));
