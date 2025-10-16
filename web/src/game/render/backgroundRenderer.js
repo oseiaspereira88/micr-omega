@@ -16,6 +16,39 @@ const normalizeAngle = (angle) => {
   return result;
 };
 
+const wrapCoordinate = (value) => {
+  if (!Number.isFinite(value)) return 0;
+  let result = value % WORLD_SIZE;
+  if (result < 0) {
+    result += WORLD_SIZE;
+  }
+  return result;
+};
+
+const applySpawnOffset = (entity, camera) => {
+  if (!entity) return;
+
+  const hasOffset = Number.isFinite(entity.spawnOffsetX) || Number.isFinite(entity.spawnOffsetY);
+  if (!hasOffset) {
+    return;
+  }
+
+  const anchorX = Number.isFinite(entity.anchorX) ? entity.anchorX : camera?.x ?? 0;
+  const anchorY = Number.isFinite(entity.anchorY) ? entity.anchorY : camera?.y ?? 0;
+
+  if (Number.isFinite(entity.spawnOffsetX)) {
+    entity.x = wrapCoordinate(anchorX + entity.spawnOffsetX);
+  }
+  if (Number.isFinite(entity.spawnOffsetY)) {
+    entity.y = wrapCoordinate(anchorY + entity.spawnOffsetY);
+  }
+
+  entity.spawnOffsetX = null;
+  entity.spawnOffsetY = null;
+  entity.anchorX = anchorX;
+  entity.anchorY = anchorY;
+};
+
 export const backgroundRenderer = {
   render(ctx, state, camera) {
     if (!ctx) return;
@@ -50,6 +83,7 @@ export const backgroundRenderer = {
 
     withCameraTransform(ctx, camera, () => {
       backgroundLayers.forEach((layer) => {
+        applySpawnOffset(layer, camera);
         layer.pulsePhase += 0.01;
         const pulse = Math.sin(layer.pulsePhase) * 0.5 + 0.5;
         const depth = layer.depth ?? 1;
@@ -81,6 +115,7 @@ export const backgroundRenderer = {
       ctx.globalAlpha = 1;
 
       lightRays.forEach((ray) => {
+        applySpawnOffset(ray, camera);
         ray.y += ray.speed;
         if (ray.y > WORLD_SIZE) ray.y = -200;
 
@@ -109,6 +144,7 @@ export const backgroundRenderer = {
       });
 
       microorganisms.forEach((micro) => {
+        applySpawnOffset(micro, camera);
         micro.animPhase += 0.05;
         micro.updateFrame = (micro.updateFrame + 1) % micro.updateStride;
 
@@ -203,6 +239,7 @@ export const backgroundRenderer = {
       ctx.globalAlpha = 1;
 
       glowParticles.forEach((p) => {
+        applySpawnOffset(p, camera);
         p.x += p.vx;
         p.y += p.vy;
         p.pulsePhase += 0.03;
@@ -235,6 +272,7 @@ export const backgroundRenderer = {
       ctx.shadowBlur = 0;
 
       floatingParticles.forEach((p) => {
+        applySpawnOffset(p, camera);
         p.x += p.vx * (1 + p.depth);
         p.y += p.vy * (1 + p.depth);
         p.pulsePhase += p.pulseSpeed * 0.02;
