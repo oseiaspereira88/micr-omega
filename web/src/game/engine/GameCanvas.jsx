@@ -34,6 +34,9 @@ const TIER_METADATA = Object.freeze({
   },
 });
 
+const EVOLUTION_TIER_KEYS = Object.freeze(['small', 'medium', 'large']);
+const EVOLUTION_OPTIONS_PANEL_ID = 'evolution-options-panel';
+
 const formatEvolutionCost = (cost = {}) => {
   const parts = [];
   if (Number.isFinite(cost.pc)) parts.push(`${cost.pc} PC`);
@@ -81,6 +84,7 @@ const GameCanvas = ({ settings, onQuit }) => {
     restartGame,
     selectArchetype,
     setCameraZoom,
+    setActiveEvolutionTier,
   } = useGameLoop({
     canvasRef,
     dispatch,
@@ -300,14 +304,23 @@ const GameCanvas = ({ settings, onQuit }) => {
             </div>
 
             <div className={styles.evolutionTabs}>
-              {(['small', 'medium', 'large']).map((tierKey) => {
+              {EVOLUTION_TIER_KEYS.map((tierKey) => {
                 const metadata = TIER_METADATA[tierKey];
                 const isActive = evolutionMenu.activeTier === tierKey;
                 const slots = evolutionSlots?.[tierKey] || { used: 0, max: 0 };
+                const handleActivateTier = () => {
+                  if (!isActive) {
+                    setActiveEvolutionTier?.(tierKey);
+                  }
+                };
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={tierKey}
                     className={`${styles.evolutionTab} ${isActive ? styles.evolutionTabActive : styles.evolutionTabDisabled}`.trim()}
+                    onClick={handleActivateTier}
+                    aria-pressed={isActive}
+                    aria-controls={EVOLUTION_OPTIONS_PANEL_ID}
                   >
                     <div className={styles.evolutionTabHeader}>
                       <span>{metadata.icon}</span>
@@ -317,7 +330,7 @@ const GameCanvas = ({ settings, onQuit }) => {
                     <small className={styles.evolutionTabSlots}>
                       Slots {slots.used}/{slots.max}
                     </small>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -325,7 +338,7 @@ const GameCanvas = ({ settings, onQuit }) => {
             <div className={styles.optionHeading}>
               {TIER_METADATA[evolutionMenu.activeTier]?.label || 'Evoluções'} disponíveis
             </div>
-            <div className={styles.optionList}>
+            <div className={styles.optionList} id={EVOLUTION_OPTIONS_PANEL_ID}>
               {(evolutionMenu.options?.[evolutionMenu.activeTier] || []).map((option) => {
                 const disabled = !option.available;
                 const multiplierPercent = Math.round((option.nextBonusMultiplier ?? 0) * 100);

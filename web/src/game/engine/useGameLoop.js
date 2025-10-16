@@ -475,6 +475,45 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     camera.zoom = clamped;
   }, []);
 
+  const setActiveEvolutionTier = useCallback(
+    (tierKey) => {
+      if (typeof tierKey !== 'string') return;
+
+      const normalizedTier = tierKey.trim().toLowerCase();
+      if (!EVOLUTION_HISTORY_TIERS.includes(normalizedTier)) {
+        return;
+      }
+
+      const state = renderStateRef.current;
+      if (!state) return;
+
+      const currentMenu =
+        state.evolutionMenu ?? {
+          activeTier: 'small',
+          options: { small: [], medium: [], large: [] },
+        };
+
+      if (currentMenu.activeTier === normalizedTier) {
+        return;
+      }
+
+      const safeOptions = currentMenu.options ?? { small: [], medium: [], large: [] };
+
+      state.evolutionMenu = {
+        ...currentMenu,
+        activeTier: normalizedTier,
+        options: {
+          small: Array.isArray(safeOptions.small) ? safeOptions.small : [],
+          medium: Array.isArray(safeOptions.medium) ? safeOptions.medium : [],
+          large: Array.isArray(safeOptions.large) ? safeOptions.large : [],
+        },
+      };
+
+      syncHudState(state);
+    },
+    [syncHudState]
+  );
+
   const selectArchetype = useCallback(
     (key) => {
       if (!key) return;
@@ -1209,6 +1248,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     restartGame: restartGameHandler,
     selectArchetype,
     setCameraZoom,
+    setActiveEvolutionTier,
   };
 };
 

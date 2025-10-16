@@ -256,3 +256,84 @@ describe('useGameLoop timing safeguards', () => {
     );
   });
 });
+
+describe('setActiveEvolutionTier', () => {
+  beforeEach(() => {
+    mocks.updateGameState.mockClear();
+    mocks.updateGameState.mockImplementation(({ renderState }) => {
+      if (renderState) {
+        renderState.evolutionMenu = {
+          activeTier: 'small',
+          options: {
+            small: [{ key: 'small-1', name: 'Pequena' }],
+            medium: [{ key: 'medium-1', name: 'Média' }],
+            large: [{ key: 'large-1', name: 'Grande' }],
+          },
+        };
+      }
+
+      return {
+        commands: [],
+        localPlayerId: null,
+        hudSnapshot: null,
+      };
+    });
+  });
+
+  afterEach(() => {
+    mocks.updateGameState.mockImplementation(() => ({
+      commands: [],
+      localPlayerId: null,
+      hudSnapshot: null,
+    }));
+  });
+
+  it('updates the HUD state when switching tiers and preserves options', async () => {
+    const canvas = createCanvas();
+    const dispatch = vi.fn();
+    const onReady = vi.fn();
+
+    render(<HookWrapper canvas={canvas} dispatch={dispatch} onReady={onReady} />);
+
+    await waitFor(() => {
+      expect(onReady).toHaveBeenCalled();
+    });
+
+    const api = onReady.mock.calls[0][0];
+
+    dispatch.mockClear();
+
+    act(() => {
+      api.setActiveEvolutionTier('medium');
+    });
+
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const mediumSync = dispatch.mock.calls[0][0];
+    expect(mediumSync.type).toBe('SYNC_STATE');
+    expect(mediumSync.payload.evolutionMenu).toMatchObject({
+      activeTier: 'medium',
+      options: {
+        small: [{ key: 'small-1', name: 'Pequena' }],
+        medium: [{ key: 'medium-1', name: 'Média' }],
+        large: [{ key: 'large-1', name: 'Grande' }],
+      },
+    });
+
+    dispatch.mockClear();
+
+    act(() => {
+      api.setActiveEvolutionTier('medium');
+    });
+
+    expect(dispatch).not.toHaveBeenCalled();
+
+    act(() => {
+      api.setActiveEvolutionTier('large');
+    });
+
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const largeSync = dispatch.mock.calls[0][0];
+    expect(largeSync.type).toBe('SYNC_STATE');
+    expect(largeSync.payload.evolutionMenu.activeTier).toBe('large');
+  });
+});
