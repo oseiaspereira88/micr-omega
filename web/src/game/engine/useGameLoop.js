@@ -75,6 +75,7 @@ const createInitialRenderState = () => ({
   },
   hudSnapshot: null,
   lastMovementIntent: { ...DEFAULT_JOYSTICK_STATE },
+  progressionSequences: new Map(),
 });
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));

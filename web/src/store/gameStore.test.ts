@@ -83,6 +83,7 @@ const createFreshState = (): GameStoreState => {
       obstacles: emptyObstacles.all,
       roomObjects: emptyRoomObjects.all,
     },
+    progression: { players: {} },
   };
 };
 

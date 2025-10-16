@@ -26,6 +26,9 @@ import {
   type SharedGameStateDiff,
   type SharedWorldState,
   type SharedWorldStateDiff,
+  type SharedProgressionState,
+  type SharedProgressionStream,
+  type SharedProgressionKillEvent,
   type CombatAttributes,
   type CombatLogEntry,
   type Microorganism,
@@ -36,7 +39,9 @@ import {
   type Vector2,
   type OrientationState,
   type HealthState,
-  type CombatStatus
+  type CombatStatus,
+  aggregateDrops,
+  DROP_TABLES
 } from "./types";
 
 const MIN_PLAYERS_TO_START = 1;
@@ -173,6 +178,19 @@ type ApplyPlayerActionResult = {
   scoresChanged?: boolean;
 };
 
+type PlayerProgressionState = {
+  dropPity: { fragment: number; stableGene: number };
+  sequence: number;
+};
+
+type PendingProgressionStream = {
+  sequence: number;
+  dropPity: { fragment: number; stableGene: number };
+  damage?: SharedProgressionStream["damage"];
+  objectives?: SharedProgressionStream["objectives"];
+  kills?: SharedProgressionKillEvent[];
+};
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -245,6 +263,11 @@ const cloneCombatAttributes = (attributes: CombatAttributes): CombatAttributes =
   defense: attributes.defense,
   speed: attributes.speed,
   range: attributes.range,
+});
+
+const clonePityCounters = (pity: { fragment: number; stableGene: number }) => ({
+  fragment: pity.fragment,
+  stableGene: pity.stableGene,
 });
 
 const cloneWorldState = (world: SharedWorldState): SharedWorldState => ({
@@ -453,6 +476,8 @@ export class RoomDO {
   private pendingSnapshotAlarm: number | null = null;
   private gameStateSnapshot: SharedGameState | null = null;
   private gameStateSnapshotDirty = true;
+  private progressionState = new Map<string, PlayerProgressionState>();
+  private pendingProgression = new Map<string, PendingProgressionStream>();
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
@@ -627,6 +652,7 @@ export class RoomDO {
         };
         this.players.set(player.id, player);
         this.nameToPlayerId.set(player.name.toLowerCase(), player.id);
+        this.ensureProgressionState(player.id);
       }
     }
 
@@ -1224,6 +1250,8 @@ export class RoomDO {
         ];
         worldChanged = true;
 
+        this.recordKillProgression(player, { targetId: microorganism.id, dropTier: "minion" });
+
         const remainsId = `${microorganism.id}-remains`;
         const remains: OrganicMatter = {
           id: remainsId,
@@ -1635,6 +1663,8 @@ export class RoomDO {
       }
     }
 
+    this.ensureProgressionState(player.id);
+
     if (previousSocket && previousSocket !== socket) {
       this.closePlayerSocketIfCurrent(
         player.id,
@@ -1791,6 +1821,11 @@ export class RoomDO {
     }
     if (result.combatLog && result.combatLog.length > 0) {
       diff.combatLog = result.combatLog;
+    }
+
+    const progression = this.flushPendingProgression();
+    if (progression) {
+      diff.progression = progression;
     }
 
     if (Object.keys(diff).length > 0) {
@@ -1981,6 +2016,11 @@ export class RoomDO {
     const diff: SharedGameStateDiff = {
       upsertPlayers: [this.serializePlayer(player)]
     };
+
+    const progression = this.flushPendingProgression();
+    if (progression) {
+      diff.progression = progression;
+    }
 
     const stateMessage: StateDiffMessage = {
       type: "state",
@@ -2204,7 +2244,12 @@ export class RoomDO {
       diff.combatLog = combatLog;
     }
 
-    if (diff.upsertPlayers || diff.world || diff.combatLog) {
+    const progression = this.flushPendingProgression();
+    if (progression) {
+      diff.progression = progression;
+    }
+
+    if (diff.upsertPlayers || diff.world || diff.combatLog || diff.progression) {
       const stateMessage: StateDiffMessage = {
         type: "state",
         mode: "diff",
@@ -2416,6 +2461,98 @@ export class RoomDO {
     };
   }
 
+  private ensureProgressionState(playerId: string): PlayerProgressionState {
+    let state = this.progressionState.get(playerId);
+    if (!state) {
+      state = { dropPity: { fragment: 0, stableGene: 0 }, sequence: 0 };
+      this.progressionState.set(playerId, state);
+      this.invalidateGameStateSnapshot();
+    }
+    return state;
+  }
+
+  private queueProgressionStream(playerId: string): PendingProgressionStream {
+    let pending = this.pendingProgression.get(playerId);
+    if (!pending) {
+      const state = this.ensureProgressionState(playerId);
+      pending = {
+        sequence: state.sequence + 1,
+        dropPity: clonePityCounters(state.dropPity),
+      };
+      this.pendingProgression.set(playerId, pending);
+    }
+    return pending;
+  }
+
+  private recordKillProgression(
+    player: PlayerInternal,
+    context: { targetId?: string; dropTier?: SharedProgressionKillEvent["dropTier"]; advantage?: boolean }
+  ): void {
+    const state = this.ensureProgressionState(player.id);
+    const pending = this.queueProgressionStream(player.id);
+    const event: SharedProgressionKillEvent = {
+      playerId: player.id,
+      targetId: context.targetId,
+      dropTier: (context.dropTier ?? "minion") as SharedProgressionKillEvent["dropTier"],
+      advantage: context.advantage ?? false,
+      xpMultiplier: 1,
+      rolls: {
+        fragment: Math.random(),
+        fragmentAmount: Math.random(),
+        stableGene: Math.random(),
+        mg: Math.random(),
+      },
+      timestamp: Date.now(),
+    };
+    pending.kills = [...(pending.kills ?? []), event];
+
+    const dropResults = aggregateDrops([event], {
+      dropTables: DROP_TABLES,
+      rng: Math.random,
+      initialPity: state.dropPity,
+    });
+    state.dropPity = clonePityCounters(dropResults.pity);
+    this.invalidateGameStateSnapshot();
+  }
+
+  private flushPendingProgression(): SharedProgressionState | null {
+    if (this.pendingProgression.size === 0) {
+      return null;
+    }
+
+    const players: SharedProgressionState["players"] = {};
+    for (const [playerId, stream] of this.pendingProgression.entries()) {
+      const state = this.ensureProgressionState(playerId);
+      players[playerId] = {
+        sequence: stream.sequence,
+        dropPity: clonePityCounters(stream.dropPity),
+        damage: stream.damage ? stream.damage.map((entry) => ({ ...entry })) : undefined,
+        objectives: stream.objectives ? stream.objectives.map((entry) => ({ ...entry })) : undefined,
+        kills: stream.kills ? stream.kills.map((entry) => ({ ...entry })) : undefined,
+      };
+      state.sequence = stream.sequence;
+      this.pendingProgression.delete(playerId);
+    }
+
+    if (Object.keys(players).length === 0) {
+      return null;
+    }
+
+    return { players };
+  }
+
+  private serializeProgressionState(): SharedProgressionState {
+    const players: SharedProgressionState["players"] = {};
+    for (const playerId of this.players.keys()) {
+      const state = this.ensureProgressionState(playerId);
+      players[playerId] = {
+        sequence: state.sequence,
+        dropPity: clonePityCounters(state.dropPity),
+      };
+    }
+    return { players };
+  }
+
   private serializeGameState(): SharedGameState {
     if (this.gameStateSnapshot !== null && !this.gameStateSnapshotDirty) {
       return this.gameStateSnapshot;
@@ -2431,7 +2568,8 @@ export class RoomDO {
       roundStartedAt: this.roundStartedAt,
       roundEndsAt: this.roundEndsAt,
       players,
-      world: cloneWorldState(this.world)
+      world: cloneWorldState(this.world),
+      progression: this.serializeProgressionState()
     };
 
     this.gameStateSnapshot = snapshot;
@@ -2483,6 +2621,10 @@ export class RoomDO {
       }
     }
 
+    this.progressionState.delete(playerId);
+    this.pendingProgression.delete(playerId);
+    this.invalidateGameStateSnapshot();
+
     return player;
   }
 
@@ -2532,6 +2674,10 @@ export class RoomDO {
     this.markPlayersDirty();
 
     const diff: SharedGameStateDiff = { removedPlayerIds: [removed.id] };
+    const progression = this.flushPendingProgression();
+    if (progression) {
+      diff.progression = progression;
+    }
     const stateMessage: StateDiffMessage = { type: "state", mode: "diff", state: diff };
     this.broadcast(stateMessage);
     this.send(socket, stateMessage);
@@ -2571,6 +2717,10 @@ export class RoomDO {
     this.markPlayersDirty();
 
     const diff: SharedGameStateDiff = { removedPlayerIds: [removed.id] };
+    const progression = this.flushPendingProgression();
+    if (progression) {
+      diff.progression = progression;
+    }
     const stateMessage: StateDiffMessage = { type: "state", mode: "diff", state: diff };
 
     this.broadcast(stateMessage);

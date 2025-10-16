@@ -12,6 +12,8 @@ import {
   SharedGameStateDiff,
   SharedPlayerState,
   SharedWorldState,
+  SharedProgressionState,
+  SharedProgressionStream,
   Vector2,
 } from "../utils/messageTypes";
 import { reportRealtimeLatency } from "../utils/observability";
@@ -48,6 +50,7 @@ type DerivedSynchronizedState = Pick<
   | "obstacles"
   | "roomObjects"
   | "world"
+  | "progression"
 >;
 
 const createEmptyEntityCollection = <T extends { id: string }>(): EntityCollection<T> => ({
@@ -219,6 +222,7 @@ const deriveSynchronizedStateFromFullSnapshot = (
     obstacles: worldCollections.obstacles,
     roomObjects: worldCollections.roomObjects,
     world: buildWorldFromCollections(worldCollections),
+    progression: cloneProgressionState(state.progression),
   };
 };
 
@@ -247,70 +251,8 @@ export interface GameStoreState {
   obstacles: EntityCollection<Obstacle>;
   roomObjects: EntityCollection<RoomObject>;
   world: SharedWorldState;
+  progression: SharedProgressionState;
 }
-
-const defaultRoomState: RoomStateSnapshot = {
-  phase: "waiting",
-  roundId: null,
-  roundStartedAt: null,
-  roundEndsAt: null,
-};
-
-const createEmptySynchronizedState = () => {
-  const remotePlayers = createEmptyEntityCollection<SharedPlayerState>();
-  const worldCollections = createEmptyWorldCollections();
-  return {
-    remotePlayers,
-    microorganisms: worldCollections.microorganisms,
-    organicMatter: worldCollections.organicMatter,
-    obstacles: worldCollections.obstacles,
-    roomObjects: worldCollections.roomObjects,
-    world: buildWorldFromCollections(worldCollections),
-  };
-};
-
-const emptySyncState = createEmptySynchronizedState();
-
-const initialState: GameStoreState = {
-  connectionStatus: "idle",
-  reconnectAttempts: 0,
-  reconnectUntil: null,
-  playerId: null,
-  playerName: null,
-  joinError: null,
-  lastPingAt: null,
-  lastPongAt: null,
-  room: defaultRoomState,
-  players: emptySyncState.remotePlayers.byId,
-  remotePlayers: emptySyncState.remotePlayers,
-  ranking: [],
-  microorganisms: emptySyncState.microorganisms,
-  organicMatter: emptySyncState.organicMatter,
-  obstacles: emptySyncState.obstacles,
-  roomObjects: emptySyncState.roomObjects,
-  world: emptySyncState.world,
-};
-
-type GameStoreListener = () => void;
-
-type StateUpdater = (state: GameStoreState) => GameStoreState;
-
-type StateSelector<T> = (state: GameStoreState) => T;
-
-let currentState: GameStoreState = initialState;
-const listeners = new Set<GameStoreListener>();
-
-const notify = () => {
-  listeners.forEach((listener) => listener());
-};
-
-const applyState = (updater: StateUpdater) => {
-  const nextState = updater(currentState);
-  if (nextState !== currentState) {
-    currentState = nextState;
-    notify();
-  }
-};
 
 const cloneVector = (vector: Vector2): Vector2 => ({ x: vector.x, y: vector.y });
 
@@ -379,6 +321,94 @@ const cloneRoomObject = (object: RoomObject): RoomObject => ({
   position: cloneVector(object.position),
   state: object.state ? { ...object.state } : undefined,
 });
+
+const cloneProgressionStream = (stream: SharedProgressionStream): SharedProgressionStream => ({
+  sequence: typeof stream.sequence === "number" ? stream.sequence : 0,
+  dropPity: stream.dropPity ? { ...stream.dropPity } : undefined,
+  damage: stream.damage ? stream.damage.map((entry) => ({ ...entry })) : undefined,
+  objectives: stream.objectives ? stream.objectives.map((entry) => ({ ...entry })) : undefined,
+  kills: stream.kills ? stream.kills.map((entry) => ({ ...entry })) : undefined,
+});
+
+const cloneProgressionState = (
+  state?: SharedProgressionState | null,
+): SharedProgressionState => {
+  if (!state || typeof state !== "object") {
+    return { players: {} };
+  }
+
+  const players: SharedProgressionState["players"] = {};
+  for (const [playerId, stream] of Object.entries(state.players ?? {})) {
+    players[playerId] = cloneProgressionStream(stream as SharedProgressionStream);
+  }
+
+  return { players };
+};
+
+const createEmptySynchronizedState = () => {
+  const remotePlayers = createEmptyEntityCollection<SharedPlayerState>();
+  const worldCollections = createEmptyWorldCollections();
+  return {
+    remotePlayers,
+    microorganisms: worldCollections.microorganisms,
+    organicMatter: worldCollections.organicMatter,
+    obstacles: worldCollections.obstacles,
+    roomObjects: worldCollections.roomObjects,
+    world: buildWorldFromCollections(worldCollections),
+    progression: cloneProgressionState(),
+  };
+};
+
+const emptySyncState = createEmptySynchronizedState();
+
+const defaultRoomState: RoomStateSnapshot = {
+  phase: "waiting",
+  roundId: null,
+  roundStartedAt: null,
+  roundEndsAt: null,
+};
+
+const initialState: GameStoreState = {
+  connectionStatus: "idle",
+  reconnectAttempts: 0,
+  reconnectUntil: null,
+  playerId: null,
+  playerName: null,
+  joinError: null,
+  lastPingAt: null,
+  lastPongAt: null,
+  room: defaultRoomState,
+  players: emptySyncState.remotePlayers.byId,
+  remotePlayers: emptySyncState.remotePlayers,
+  ranking: [],
+  microorganisms: emptySyncState.microorganisms,
+  organicMatter: emptySyncState.organicMatter,
+  obstacles: emptySyncState.obstacles,
+  roomObjects: emptySyncState.roomObjects,
+  world: emptySyncState.world,
+  progression: cloneProgressionState(emptySyncState.progression),
+};
+
+type GameStoreListener = () => void;
+
+type StateUpdater = (state: GameStoreState) => GameStoreState;
+
+type StateSelector<T> = (state: GameStoreState) => T;
+
+let currentState: GameStoreState = initialState;
+const listeners = new Set<GameStoreListener>();
+
+const notify = () => {
+  listeners.forEach((listener) => listener());
+};
+
+const applyState = (updater: StateUpdater) => {
+  const nextState = updater(currentState);
+  if (nextState !== currentState) {
+    currentState = nextState;
+    notify();
+  }
+};
 
 const isFullState = (
   state: SharedGameState | SharedGameStateDiff
@@ -566,6 +596,39 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       cloneRoomObject,
     );
 
+    let nextProgression = prev.progression;
+    let progressionChanged = false;
+
+    if (diff.progression?.players) {
+      const updatedPlayers: SharedProgressionState["players"] = { ...prev.progression.players };
+      for (const [playerId, stream] of Object.entries(diff.progression.players)) {
+        if (stream) {
+          updatedPlayers[playerId] = cloneProgressionStream(stream);
+          progressionChanged = true;
+        }
+      }
+      nextProgression = { players: updatedPlayers };
+    }
+
+    if (diff.removedPlayerIds && diff.removedPlayerIds.length > 0) {
+      const entries = nextProgression === prev.progression
+        ? { ...prev.progression.players }
+        : { ...nextProgression.players };
+      let removed = false;
+      for (const id of diff.removedPlayerIds) {
+        if (entries[id] !== undefined) {
+          delete entries[id];
+          removed = true;
+        }
+      }
+      if (removed) {
+        nextProgression = { players: entries };
+        progressionChanged = true;
+      } else if (nextProgression !== prev.progression) {
+        nextProgression = { players: { ...nextProgression.players } };
+      }
+    }
+
     const worldChanged =
       microorganismsResult.changed ||
       organicMatterResult.changed ||
@@ -575,7 +638,8 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
     const stateChanged =
       nextRoom !== prev.room ||
       playersResult.changed ||
-      worldChanged;
+      worldChanged ||
+      progressionChanged;
 
     if (!stateChanged) {
       return prev;
@@ -600,6 +664,7 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       obstacles: obstacleResult.next,
       roomObjects: roomObjectResult.next,
       world: nextWorld,
+      progression: progressionChanged ? nextProgression : prev.progression,
     };
   });
 };
