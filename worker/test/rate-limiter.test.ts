@@ -36,20 +36,36 @@ describe("MessageRateLimiter", () => {
     expect(limiter.getRetryAfterMs(1_101)).toBe(0);
   });
 
-  it("allows sustained bursts of at least 20 messages per second", () => {
+  it("allows sustained bursts of at least 70 messages per second", () => {
     const limiter = new MessageRateLimiter(
       MAX_MESSAGES_PER_CONNECTION,
       RATE_LIMIT_WINDOW_MS
     );
 
     const allowedMessagesPerSecond = (MAX_MESSAGES_PER_CONNECTION * 1_000) / RATE_LIMIT_WINDOW_MS;
-    expect(allowedMessagesPerSecond).toBeGreaterThanOrEqual(20);
+    expect(allowedMessagesPerSecond).toBeGreaterThanOrEqual(70);
 
     for (let i = 0; i < MAX_MESSAGES_PER_CONNECTION; i += 1) {
       expect(limiter.consume(i * (RATE_LIMIT_WINDOW_MS / MAX_MESSAGES_PER_CONNECTION))).toBe(true);
     }
 
     expect(limiter.consume(RATE_LIMIT_WINDOW_MS - 1)).toBe(false);
+  });
+
+  it("reports utilization ratios within the rolling window", () => {
+    const limiter = new MessageRateLimiter(10, 1_000);
+
+    for (let i = 0; i < 5; i += 1) {
+      expect(limiter.consume(i * 100)).toBe(true);
+    }
+
+    expect(limiter.getUtilization(500)).toBeCloseTo(0.5);
+
+    expect(limiter.consume(1_000)).toBe(true);
+    expect(limiter.getUtilization(1_050)).toBeCloseTo(0.5);
+    expect(limiter.getUtilization(1_050, 5)).toBeCloseTo(1);
+
+    expect(limiter.getUtilization(2_001)).toBe(0);
   });
 
   it("supports dynamically increasing the active limit when requested", () => {

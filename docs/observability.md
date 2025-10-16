@@ -55,3 +55,13 @@ informado via `--file`) e calcula:
 
 Esses dados podem ser exportados para um dashboard interno ou utilizados para relatórios semanais. Combine com o Logflare
 para visualizações em tempo real ou conecte o arquivo NDJSON a pipelines de BI.
+
+### Monitoramento de rate limit
+
+- O `RoomDO` agora permite até **4.200 mensagens por conexão** em uma janela deslizante de 60 segundos (≈70 msg/s),
+  o bastante para joystick analógico contínuo sem acionar `rate_limited`.
+- Cada vez que uma conexão ou o limite global ultrapassa 70% de utilização, o Worker publica a métrica `rate_limit_utilization`
+  com `scope` (`connection` ou `global`), `limit` efetivo e `bucket` (percentual arredondado).
+- Dashboards devem acompanhar tanto `rate_limit_utilization` quanto `rate_limit_hits` para verificar se os falsos positivos
+  cessaram e se não houve aumento de abuso. Uma sequência crescente de buckets próximos de 100 para um mesmo jogador indica que
+  ele está saturando o orçamento; investigue o caso antes de ajustar os limites novamente.
