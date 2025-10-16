@@ -6,6 +6,10 @@ import { useGameSocket } from './hooks/useGameSocket';
 import { gameStore, useGameStore } from './store/gameStore';
 import { useGameSettings } from './store/gameSettings';
 import { sanitizeArchetypeKey } from './utils/messageTypes';
+import {
+  findNearestHostileMicroorganismId,
+  resolvePlayerPosition,
+} from './utils/targeting';
 
 const TOAST_DURATION = 5000;
 
@@ -150,6 +154,29 @@ const App = () => {
             if (!targetPlayerId && !targetObjectId) {
               targetPlayerId = validatePlayerTarget(combatStatus?.targetPlayerId);
               targetObjectId = validateObjectTarget(combatStatus?.targetObjectId);
+            }
+
+            if (!targetPlayerId && !targetObjectId) {
+              const playerPosition = resolvePlayerPosition({ sharedPlayer: player });
+              const sharedMicroorganisms = [
+                ...(Array.isArray(state?.world?.microorganisms)
+                  ? state.world.microorganisms
+                  : []),
+                ...(Array.isArray(state?.microorganisms?.all)
+                  ? state.microorganisms.all
+                  : []),
+              ];
+
+              const nearestId = findNearestHostileMicroorganismId({
+                playerPosition,
+                sharedMicroorganisms:
+                  sharedMicroorganisms.length > 0 ? sharedMicroorganisms : undefined,
+              });
+
+              if (nearestId) {
+                payload.targetObjectId = nearestId;
+                targetObjectId = nearestId;
+              }
             }
 
             if (targetPlayerId) {

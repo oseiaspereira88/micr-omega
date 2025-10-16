@@ -25,6 +25,10 @@ import { spawnObstacle as createObstacleSpawn } from '../factories/obstacleFacto
 import { spawnNebula as createNebulaSpawn } from '../factories/nebulaFactory';
 import { spawnPowerUp as createPowerUpSpawn } from '../factories/powerUpFactory';
 import { spawnOrganicMatter as createOrganicMatterBatch } from '../factories/organicMatterFactory';
+import {
+  findNearestHostileMicroorganismId,
+  resolvePlayerPosition,
+} from '../../utils/targeting';
 
 const DEFAULT_SETTINGS = {
   audioEnabled: true,
@@ -816,13 +820,42 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     }
 
     const sharedPlayers = sharedState.players ?? null;
-    if (sharedPlayers && sharedPlayers[localPlayerId]?.combatStatus) {
-      applyStatus(sharedPlayers[localPlayerId].combatStatus, accumulator);
+    const sharedLocalPlayer = sharedPlayers?.[localPlayerId] ?? null;
+    if (sharedLocalPlayer?.combatStatus) {
+      applyStatus(sharedLocalPlayer.combatStatus, accumulator);
     }
 
     const remotePlayersById = sharedState.remotePlayers?.byId ?? null;
-    if (remotePlayersById && remotePlayersById[localPlayerId]?.combatStatus) {
-      applyStatus(remotePlayersById[localPlayerId].combatStatus, accumulator);
+    const remoteLocalPlayer = remotePlayersById?.[localPlayerId] ?? null;
+    if (remoteLocalPlayer?.combatStatus) {
+      applyStatus(remoteLocalPlayer.combatStatus, accumulator);
+    }
+
+    if (!accumulator.targetPlayerId && !accumulator.targetObjectId) {
+      const renderPlayer = playersById?.get?.(localPlayerId) ?? null;
+      const playerPosition = resolvePlayerPosition({
+        renderPlayer,
+        sharedPlayer: sharedLocalPlayer ?? remoteLocalPlayer ?? null,
+      });
+
+      const sharedMicroorganisms = [
+        ...(Array.isArray(sharedState?.world?.microorganisms)
+          ? sharedState.world.microorganisms
+          : []),
+        ...(Array.isArray(sharedState?.microorganisms?.all)
+          ? sharedState.microorganisms.all
+          : []),
+      ];
+
+      const targetId = findNearestHostileMicroorganismId({
+        playerPosition,
+        renderMicroorganisms: renderState?.worldView?.microorganisms,
+        sharedMicroorganisms: sharedMicroorganisms.length > 0 ? sharedMicroorganisms : undefined,
+      });
+
+      if (targetId) {
+        accumulator.targetObjectId = targetId;
+      }
     }
 
     return accumulator;
