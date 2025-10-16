@@ -99,7 +99,6 @@ const App = () => {
 
             const payload = {
               playerId,
-              kind: typeof attackCommand.kind === 'string' ? attackCommand.kind : 'basic',
             };
 
             const timestamp = Number.isFinite(attackCommand.timestamp)
@@ -121,6 +120,11 @@ const App = () => {
             }
             if (targetObjectId) {
               payload.targetObjectId = targetObjectId;
+            }
+
+            if (!payload.targetPlayerId && !payload.targetObjectId) {
+              console.warn('Ignorando comando de ataque sem alvo', attackCommand);
+              return;
             }
 
             if (Number.isFinite(attackCommand.damage)) {
