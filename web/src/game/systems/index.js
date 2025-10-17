@@ -10,6 +10,7 @@ export {
   selectArchetype,
   restartGame,
   requestEvolutionReroll,
+  cancelEvolutionChoice,
 } from './progression';
 
 import { updateOrganismPhysics } from './movement';

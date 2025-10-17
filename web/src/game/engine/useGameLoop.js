@@ -19,6 +19,7 @@ import {
   cycleSkill as cycleSkillSystem,
   openEvolutionMenu as openEvolutionMenuSystem,
   requestEvolutionReroll as requestEvolutionRerollSystem,
+  cancelEvolutionChoice as cancelEvolutionChoiceSystem,
   selectArchetype as selectArchetypeSystem,
 } from '../systems';
 import { spawnObstacle as createObstacleSpawn } from '../factories/obstacleFactory';
@@ -1227,6 +1228,18 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     syncHudState(state);
   }, [playSound, pushNotification, syncHudState]);
 
+  const cancelEvolutionChoiceHandler = useCallback(() => {
+    const state = renderStateRef.current;
+    if (!state) return;
+
+    const helpers = {
+      syncState: syncHudState,
+    };
+
+    cancelEvolutionChoiceSystem(state, helpers);
+    syncHudState(state);
+  }, [syncHudState]);
+
   useEffect(() => {
     if (!resolvedSettings.audioEnabled) {
       if (audioCtxRef.current && typeof audioCtxRef.current.close === 'function') {
@@ -1464,6 +1477,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     inputActions,
     chooseEvolution: chooseEvolutionHandler,
     requestEvolutionReroll: requestEvolutionRerollHandler,
+    cancelEvolutionChoice: cancelEvolutionChoiceHandler,
     restartGame: restartGameHandler,
     selectArchetype,
     setCameraZoom,

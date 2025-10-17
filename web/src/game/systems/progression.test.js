@@ -7,6 +7,7 @@ import {
   openEvolutionMenu,
   chooseEvolution,
   requestEvolutionReroll,
+  cancelEvolutionChoice,
   selectArchetype,
 } from './progression';
 import { smallEvolutions } from '../config/smallEvolutions';
@@ -205,5 +206,25 @@ describe('requestEvolutionReroll', () => {
     expect(state.geneticMaterial.current).toBe(mgBefore - costBefore);
     expect(state.reroll.cost).toBeGreaterThan(costBefore);
     expect(state.reroll.count).toBe(1);
+  });
+});
+
+describe('cancelEvolutionChoice', () => {
+  it('restores the queued tier and hides the menu', () => {
+    const state = createState();
+    state.progressionQueue.push('small');
+    openEvolutionMenu(state, helpers);
+
+    expect(state.showEvolutionChoice).toBe(true);
+    expect(state.progressionQueue).toHaveLength(0);
+
+    helpers.syncState.mockClear();
+
+    cancelEvolutionChoice(state, helpers);
+
+    expect(state.showEvolutionChoice).toBe(false);
+    expect(state.progressionQueue[0]).toBe('small');
+    expect(state.canEvolve).toBe(true);
+    expect(helpers.syncState).toHaveBeenCalled();
   });
 });
