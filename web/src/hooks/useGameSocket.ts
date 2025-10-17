@@ -216,6 +216,13 @@ const errorReasonToMessage = (error: ErrorMessage): string => {
   }
 };
 
+const RECOVERABLE_ERROR_REASONS: ReadonlySet<ErrorMessage["reason"]> = new Set([
+  "invalid_payload",
+  "game_not_active",
+  "rate_limited",
+  "unknown_player",
+]);
+
 type UseGameSocketOptions = {
   url?: string;
   autoConnect?: boolean;
@@ -503,7 +510,12 @@ export const useGameSocket = (
         break;
       }
       case "error": {
+        const isRecoverable = RECOVERABLE_ERROR_REASONS.has(message.reason);
         gameStore.actions.setJoinError(errorReasonToMessage(message));
+        if (isRecoverable) {
+          break;
+        }
+
         shouldReconnectRef.current = false;
         gameStore.actions.setConnectionStatus("disconnected");
         lastRequestedNameRef.current = null;
