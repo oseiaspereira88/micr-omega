@@ -9,6 +9,7 @@ import styles from './GameHud.module.css';
 import RankingPanel from '../../components/RankingPanel';
 import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
 import { shallowEqual, useGameStore } from '../../store/gameStore';
+import { useGameSettings } from '../../store/gameSettings';
 
 const GameHud = ({
   level,
@@ -69,10 +70,18 @@ const GameHud = ({
   const currentSkill = skillData?.currentSkill ?? null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarId = useId();
+  const minimapToggleId = useId();
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
   }, []);
+
+  const { settings, updateSettings } = useGameSettings();
+  const isMinimapEnabled = Boolean(settings?.showMinimap);
+
+  const handleToggleMinimap = useCallback(() => {
+    updateSettings({ showMinimap: !isMinimapEnabled });
+  }, [isMinimapEnabled, updateSettings]);
 
   const opponentSummaries = useMemo(() => {
     if (!Array.isArray(opponents) || opponents.length === 0) {
@@ -209,6 +218,30 @@ const GameHud = ({
             </div>
           ) : null}
           <CameraControls zoom={cameraZoom} onChange={onCameraZoomChange} />
+          <div className={styles.settingsPanel}>
+            <h3 className={styles.settingsHeading}>Exibição</h3>
+            <label className={styles.settingsToggle} htmlFor={minimapToggleId}>
+              <div className={styles.settingsToggleText}>
+                <span className={styles.settingsToggleTitle}>Minimapa</span>
+                <span className={styles.settingsToggleDescription}>
+                  Ative uma visão geral do mundo e compacte a barra de status do jogador.
+                </span>
+              </div>
+              <div className={styles.settingsToggleControl}>
+                <input
+                  id={minimapToggleId}
+                  type="checkbox"
+                  className={styles.toggleInput}
+                  checked={isMinimapEnabled}
+                  onChange={handleToggleMinimap}
+                  aria-checked={isMinimapEnabled}
+                />
+                <span className={styles.toggleStatusText} aria-live="polite" aria-atomic="true">
+                  {isMinimapEnabled ? 'Ativado' : 'Desativado'}
+                </span>
+              </div>
+            </label>
+          </div>
           {onQuit ? (
             <button type="button" className={styles.leaveButton} onClick={onQuit}>
               Sair da sala
@@ -242,6 +275,7 @@ const GameHud = ({
             affinityLabel={affinityLabel}
             resistances={resistances}
             statusEffects={statusEffects}
+            isMinimized={isMinimapEnabled}
           />
 
           <BossHealthBar active={bossActive} health={bossHealth} maxHealth={bossMaxHealth} />

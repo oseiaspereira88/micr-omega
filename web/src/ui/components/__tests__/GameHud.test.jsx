@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import GameHud from '../GameHud';
 import { gameStore } from '../../../store/gameStore';
+import { GameSettingsProvider } from '../../../store/gameSettings';
 
 const BASE_PROPS = {
   level: 1,
@@ -80,7 +81,11 @@ describe('GameHud connection status overlay', () => {
       gameStore.setPartial({ connectionStatus: 'connecting', joinError: null });
     });
 
-    const { rerender } = render(<GameHud {...BASE_PROPS} />);
+    const { rerender } = render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>
+    );
 
     expect(
       screen.getByRole('status', { name: /estado da conexão/i })
@@ -89,7 +94,11 @@ describe('GameHud connection status overlay', () => {
     act(() => {
       gameStore.setPartial({ connectionStatus: 'reconnecting' });
     });
-    rerender(<GameHud {...BASE_PROPS} />);
+    rerender(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>
+    );
     expect(
       screen.getByRole('status', { name: /estado da conexão/i })
     ).toHaveTextContent(/reconectando ao servidor/i);
@@ -97,7 +106,11 @@ describe('GameHud connection status overlay', () => {
     act(() => {
       gameStore.setPartial({ connectionStatus: 'connected' });
     });
-    rerender(<GameHud {...BASE_PROPS} />);
+    rerender(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>
+    );
     expect(
       screen.queryByRole('status', { name: /estado da conexão/i })
     ).not.toBeInTheDocument();
@@ -109,21 +122,23 @@ describe('GameHud touch controls', () => {
     const onCycleSkill = vi.fn();
 
     render(
-      <GameHud
-        {...BASE_PROPS}
-        showTouchControls
-        joystick={{ isTouchActive: false, position: { x: 0, y: 0 } }}
-        skillData={{
-          ...BASE_PROPS.skillData,
-          currentSkill: { icon: '🔥' },
-          skillDisabled: false,
-          skillCoolingDown: false,
-          skillCooldownLabel: 'Pronto',
-          skillCooldownPercent: 0,
-          costLabel: '5⚡',
-        }}
-        onCycleSkill={onCycleSkill}
-      />
+      <GameSettingsProvider>
+        <GameHud
+          {...BASE_PROPS}
+          showTouchControls
+          joystick={{ isTouchActive: false, position: { x: 0, y: 0 } }}
+          skillData={{
+            ...BASE_PROPS.skillData,
+            currentSkill: { icon: '🔥' },
+            skillDisabled: false,
+            skillCoolingDown: false,
+            skillCooldownLabel: 'Pronto',
+            skillCooldownPercent: 0,
+            costLabel: '5⚡',
+          }}
+          onCycleSkill={onCycleSkill}
+        />
+      </GameSettingsProvider>
     );
 
     const cycleButton = screen.getByRole('button', {

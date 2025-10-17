@@ -8,18 +8,22 @@ import {
   type ReactNode,
 } from "react";
 
+import { featureToggles } from "../config/featureToggles.js";
+
 export type VisualDensity = "low" | "medium" | "high";
 
 export type GameSettings = {
   audioEnabled: boolean;
   visualDensity: VisualDensity;
   showTouchControls: boolean;
+  showMinimap: boolean;
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
   audioEnabled: true,
   visualDensity: "medium",
   showTouchControls: false,
+  showMinimap: featureToggles.minimap,
 };
 
 const STORAGE_KEY = "micr-omega:game-settings";
@@ -93,10 +97,16 @@ const parseStoredSettings = (): GameSettings => {
       DEFAULT_SETTINGS.showTouchControls,
     );
 
+    const showMinimap = parseBoolean(
+      parsed.showMinimap,
+      DEFAULT_SETTINGS.showMinimap,
+    );
+
     return {
       audioEnabled,
       visualDensity,
       showTouchControls,
+      showMinimap,
     };
   } catch (error) {
     console.warn("Não foi possível ler as configurações do jogo salvas", error);
