@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useId, useMemo, useState } from 'react';
 import HudBar from './HudBar';
 import BossHealthBar from './BossHealthBar';
 import SkillWheel from './SkillWheel';
@@ -65,7 +65,7 @@ const GameHud = ({
 
   const currentSkill = skillData?.currentSkill ?? null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const sidebarId = 'game-hud-sidebar';
+  const sidebarId = useId();
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
