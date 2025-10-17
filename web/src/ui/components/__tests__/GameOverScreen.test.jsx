@@ -21,13 +21,42 @@ describe('GameOverScreen', () => {
   });
 
   it('foca automaticamente o botão Jogar Novamente ao montar', async () => {
-    render(<GameOverScreen score={0} level={0} maxCombo={0} onRestart={() => {}} />);
+    render(
+      <GameOverScreen
+        score={0}
+        level={0}
+        maxCombo={0}
+        onRestart={() => {}}
+        onQuit={() => {}}
+      />
+    );
 
     const restartButton = screen.getByRole('button', { name: /jogar novamente/i });
 
     await waitFor(() => {
       expect(restartButton).toHaveFocus();
     });
+  });
+
+  it('exibe o botão Sair da sala quando onQuit é fornecido e aciona o callback', async () => {
+    const handleQuit = vi.fn();
+
+    render(
+      <GameOverScreen
+        score={12345}
+        level={12}
+        maxCombo={8}
+        onRestart={() => {}}
+        onQuit={handleQuit}
+      />
+    );
+
+    const quitButton = screen.getByRole('button', { name: /sair da sala/i });
+    expect(quitButton).toBeInTheDocument();
+
+    fireEvent.click(quitButton);
+
+    expect(handleQuit).toHaveBeenCalledTimes(1);
   });
 
   it('formata pontuação, nível e combo usando formatação pt-BR', () => {

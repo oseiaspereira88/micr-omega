@@ -55,6 +55,18 @@
   margin-top: 6px;
 }
 
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(360px, 100%);
+  align-items: center;
+}
+
+.actions > button {
+  width: 100%;
+}
+
 .restartButton {
   background: linear-gradient(135deg, #00ff88, #00d9ff);
   border: none;
@@ -65,6 +77,40 @@
   color: #000;
   cursor: pointer;
   box-shadow: 0 0 40px rgba(0, 217, 255, 0.6);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.restartButton:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 4px;
+}
+
+.restartButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 45px rgba(0, 217, 255, 0.8);
+}
+
+.quitButton {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  padding: 16px 42px;
+  border-radius: 45px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.quitButton:hover,
+.quitButton:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 8px 30px rgba(255, 77, 148, 0.4);
+  transform: translateY(-1px);
+  outline: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
