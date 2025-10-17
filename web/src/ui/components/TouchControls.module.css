@@ -187,11 +187,23 @@
 .evolveReady {
   background: linear-gradient(135deg, #00ff88, #00d9ff);
   box-shadow: 0 0 25px rgba(0, 255, 136, 0.8);
-  animation: pulse 1s infinite;
+  transform: scale(1);
 }
 
 .evolveLocked {
   background: rgba(100, 100, 100, 0.3);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .evolveReady {
+    animation: pulse 1s infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evolveReady {
+    transform: scale(1.05);
+  }
 }
 
 @keyframes pulse {
