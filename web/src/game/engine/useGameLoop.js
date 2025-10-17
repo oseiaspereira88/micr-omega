@@ -37,7 +37,13 @@ const DEFAULT_SETTINGS = {
 };
 
 const EVOLUTION_STAT_KEYS = ['attack', 'defense', 'speed', 'range'];
-const EVOLUTION_HISTORY_TIERS = ['small', 'medium', 'large'];
+const EVOLUTION_HISTORY_TIERS = ['small', 'medium', 'large', 'macro'];
+
+const createEmptyEvolutionMenuOptions = () =>
+  EVOLUTION_HISTORY_TIERS.reduce((acc, tier) => {
+    acc[tier] = [];
+    return acc;
+  }, {});
 
 const snapshotEvolutionState = (organism) => {
   const persistentPassives = organism?.persistentPassives || {};
@@ -48,11 +54,10 @@ const snapshotEvolutionState = (organism) => {
     bases[stat] = value;
   });
 
-  const history = {
-    small: { ...(organism?.evolutionHistory?.small || {}) },
-    medium: { ...(organism?.evolutionHistory?.medium || {}) },
-    large: { ...(organism?.evolutionHistory?.large || {}) },
-  };
+  const history = EVOLUTION_HISTORY_TIERS.reduce((acc, tier) => {
+    acc[tier] = { ...(organism?.evolutionHistory?.[tier] || {}) };
+    return acc;
+  }, {});
 
   const traits = new Set(
     Array.isArray(organism?.traits)
@@ -400,11 +405,27 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     const opponents = safeArray(state.enemies ?? state.opponents);
     const progressionQueue = safeArray(state.progressionQueue);
 
-    const evolutionMenu =
-      state.evolutionMenu ?? {
-        activeTier: 'small',
-        options: { small: [], medium: [], large: [] },
-      };
+    const rawEvolutionMenu = state.evolutionMenu ?? {};
+    const normalizedActiveTierRaw =
+      typeof rawEvolutionMenu.activeTier === 'string'
+        ? rawEvolutionMenu.activeTier.trim().toLowerCase()
+        : 'small';
+    const normalizedActiveTier = EVOLUTION_HISTORY_TIERS.includes(normalizedActiveTierRaw)
+      ? normalizedActiveTierRaw
+      : 'small';
+
+    const normalizedOptions = createEmptyEvolutionMenuOptions();
+    const rawOptions = rawEvolutionMenu.options ?? {};
+    EVOLUTION_HISTORY_TIERS.forEach((tier) => {
+      const optionList = rawOptions?.[tier];
+      normalizedOptions[tier] = Array.isArray(optionList) ? optionList : [];
+    });
+
+    const evolutionMenu = {
+      ...rawEvolutionMenu,
+      activeTier: normalizedActiveTier,
+      options: normalizedOptions,
+    };
 
     dispatchRef.current?.({
       type: 'SYNC_STATE',
@@ -496,23 +517,22 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
       const currentMenu =
         state.evolutionMenu ?? {
           activeTier: 'small',
-          options: { small: [], medium: [], large: [] },
+          options: createEmptyEvolutionMenuOptions(),
         };
 
       if (currentMenu.activeTier === normalizedTier) {
         return;
       }
 
-      const safeOptions = currentMenu.options ?? { small: [], medium: [], large: [] };
+      const safeOptions = { ...createEmptyEvolutionMenuOptions(), ...(currentMenu.options ?? {}) };
 
       state.evolutionMenu = {
         ...currentMenu,
         activeTier: normalizedTier,
-        options: {
-          small: Array.isArray(safeOptions.small) ? safeOptions.small : [],
-          medium: Array.isArray(safeOptions.medium) ? safeOptions.medium : [],
-          large: Array.isArray(safeOptions.large) ? safeOptions.large : [],
-        },
+        options: EVOLUTION_HISTORY_TIERS.reduce((acc, tier) => {
+          acc[tier] = Array.isArray(safeOptions[tier]) ? safeOptions[tier] : [];
+          return acc;
+        }, {}),
       };
 
       syncHudState(state);
