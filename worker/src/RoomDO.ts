@@ -948,6 +948,7 @@ export class RoomDO {
   private microorganismStatusEffects = new Map<string, StatusCollection>();
   private lastWorldTickAt: number | null = null;
   private pendingStatusEffects: StatusEffectEvent[] = [];
+  private pendingPlayerDeaths: Array<{ playerId: string; socket: WebSocket | null }> = [];
 
   private alarmSchedule: Map<AlarmType, number> = new Map();
   private alarmsDirty = false;
@@ -2620,12 +2621,12 @@ export class RoomDO {
       });
 
       updatedPlayers.set(player.id, player);
-      updatedPlayers.set(target.id, target);
 
       let outcome: CombatLogEntry["outcome"] = "hit";
       let scoreAwarded = 0;
       if (appliedDamage <= 0) {
         outcome = "blocked";
+        updatedPlayers.set(target.id, target);
       } else if (nextHealth === 0) {
         outcome = "defeated";
         scoreAwarded = 150;
@@ -2633,11 +2634,13 @@ export class RoomDO {
         scoresChanged = true;
         this.markRankingDirty();
         target.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
+        this.queuePlayerDeath(target, now);
       } else {
         scoreAwarded = 10;
         player.score = Math.max(0, player.score + scoreAwarded);
         scoresChanged = true;
         this.markRankingDirty();
+        updatedPlayers.set(target.id, target);
       }
 
       combatLog.push({
@@ -2701,6 +2704,31 @@ export class RoomDO {
     }
 
     return this.finalizeAttackResolution({ worldChanged, scoresChanged }, worldDiff);
+  }
+
+  private queuePlayerDeath(player: PlayerInternal, now: number): void {
+    if (this.pendingPlayerDeaths.some((entry) => entry.playerId === player.id)) {
+      return;
+    }
+
+    const socket = this.socketsByPlayer.get(player.id) ?? null;
+    if (socket) {
+      const mappedId = this.clientsBySocket.get(socket);
+      if (mappedId === player.id) {
+        this.clientsBySocket.delete(socket);
+      }
+      this.activeSockets.delete(socket);
+    }
+
+    this.socketsByPlayer.delete(player.id);
+
+    player.connected = false;
+    player.movementVector = createVector();
+    player.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
+    player.lastSeenAt = now;
+    player.lastActiveAt = now;
+
+    this.pendingPlayerDeaths.push({ playerId: player.id, socket });
   }
 
   private updateMicroorganismsDuringTick(
@@ -2789,11 +2817,13 @@ export class RoomDO {
         current: nextHealth,
         max: closest.player.health.max,
       };
-      updatedPlayers.set(closest.player.id, closest.player);
       this.microorganismBehavior.set(microorganism.id, { lastAttackAt: now });
 
       if (nextHealth === 0) {
         closest.player.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
+        this.queuePlayerDeath(closest.player, now);
+      } else {
+        updatedPlayers.set(closest.player.id, closest.player);
       }
 
       combatLog.push({
@@ -2808,6 +2838,52 @@ export class RoomDO {
     }
 
     return { worldChanged, scoresChanged };
+  }
+
+  private async flushPendingPlayerDeaths(): Promise<void> {
+    if (this.pendingPlayerDeaths.length === 0) {
+      return;
+    }
+
+    const queued = this.pendingPlayerDeaths;
+    this.pendingPlayerDeaths = [];
+
+    for (const entry of queued) {
+      const { playerId, socket } = entry;
+      const player = this.players.get(playerId);
+      if (!player) {
+        if (socket && socket.readyState !== WebSocket.CLOSED && socket.readyState !== WebSocket.CLOSING) {
+          try {
+            socket.close(1000, "player_removed");
+          } catch (error) {
+            this.observability.log("warn", "close_dead_socket_failed", {
+              playerId,
+              error: serializeError(error),
+            });
+          }
+        }
+        continue;
+      }
+
+      try {
+        await this.handlePlayerDeath(player, socket);
+      } catch (error) {
+        this.observability.logError("queued_player_death_failed", error, {
+          playerId,
+        });
+      }
+
+      if (socket && socket.readyState !== WebSocket.CLOSED && socket.readyState !== WebSocket.CLOSING) {
+        try {
+          socket.close(1000, "player_dead");
+        } catch (error) {
+          this.observability.log("warn", "close_dead_socket_failed", {
+            playerId,
+            error: serializeError(error),
+          });
+        }
+      }
+    }
   }
 
   private async setupSession(socket: WebSocket): Promise<void> {
@@ -3831,6 +3907,8 @@ export class RoomDO {
       scoresChanged = true;
     }
 
+    await this.flushPendingPlayerDeaths();
+
     if (this.pendingStatusEffects.length > 0) {
       worldDiff.statusEffects = [
         ...(worldDiff.statusEffects ?? []),
@@ -4311,7 +4389,7 @@ export class RoomDO {
     await this.scheduleCleanupAlarm();
   }
 
-  private async handlePlayerDeath(player: PlayerInternal, socket: WebSocket): Promise<void> {
+  private async handlePlayerDeath(player: PlayerInternal, socket: WebSocket | null): Promise<void> {
     const now = Date.now();
     let sessionDurationMs: number | null = null;
 
@@ -4336,11 +4414,15 @@ export class RoomDO {
     }
     const stateMessage: StateDiffMessage = { type: "state", mode: "diff", state: diff };
     this.broadcast(stateMessage);
-    this.send(socket, stateMessage);
+    if (socket) {
+      this.send(socket, stateMessage);
+    }
 
     const rankingMessage: RankingMessage = { type: "ranking", ranking: this.getRanking() };
     this.broadcast(rankingMessage);
-    this.send(socket, rankingMessage);
+    if (socket) {
+      this.send(socket, rankingMessage);
+    }
 
     const connectedPlayers = this.countConnectedPlayers();
     this.observability.log("info", "player_removed", {
