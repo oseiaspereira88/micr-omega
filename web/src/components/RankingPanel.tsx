@@ -37,10 +37,14 @@ const PLACEHOLDER_MESSAGE: Record<ConnectionStatus | "default", string> = {
 };
 
 const RankingPanel = () => {
-  const ranking = useGameStore((state) => state.ranking);
-  const players = useGameStore((state) => state.players);
-  const localPlayerId = useGameStore((state) => state.playerId);
-  const connectionStatus = useGameStore((state) => state.connectionStatus);
+  const { ranking, players, playerId: localPlayerId, connectionStatus } = useGameStore(
+    (state) => ({
+      ranking: state.ranking,
+      players: state.players,
+      playerId: state.playerId,
+      connectionStatus: state.connectionStatus,
+    }),
+  );
 
   const rows: RankingRow[] = useMemo(() => {
     if (!ranking.length) {
