@@ -17,6 +17,7 @@ const ArchetypeSelection = ({
   const allowed = Array.isArray(selection?.options)
     ? selection.options.filter((option) => typeof option === 'string' && option.trim().length > 0)
     : null;
+  const allowedKeys = allowed && allowed.length > 0 ? allowed : null;
 
   const dialogRef = useRef(null);
   const overlayRef = useRef(null);
@@ -101,10 +102,10 @@ const ArchetypeSelection = ({
 
   const options = useMemo(() => {
     return archetypeList.filter((entry) => {
-      if (!allowed) return true;
-      return allowed.includes(entry.key);
+      if (!allowedKeys) return true;
+      return allowedKeys.includes(entry.key);
     });
-  }, [allowed]);
+  }, [allowedKeys]);
 
   if (!pending) {
     return null;
