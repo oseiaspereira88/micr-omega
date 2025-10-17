@@ -13,6 +13,7 @@ const DEFAULT_EVOLUTION_MENU = Object.freeze({
     small: Object.freeze([]),
     medium: Object.freeze([]),
     large: Object.freeze([]),
+    macro: Object.freeze([]),
   }),
 });
 
@@ -32,9 +33,14 @@ const TIER_METADATA = Object.freeze({
     icon: '🌌',
     description: 'Formas e mutações poderosas com Genes estáveis.',
   },
+  macro: {
+    label: 'Macro',
+    icon: '🪐',
+    description: 'Transformações épicas que remodelam todo o organismo.',
+  },
 });
 
-const EVOLUTION_TIER_KEYS = Object.freeze(['small', 'medium', 'large']);
+const EVOLUTION_TIER_KEYS = Object.freeze(['small', 'medium', 'large', 'macro']);
 const EVOLUTION_OPTIONS_PANEL_ID = 'evolution-options-panel';
 
 const formatEvolutionCost = (cost = {}) => {

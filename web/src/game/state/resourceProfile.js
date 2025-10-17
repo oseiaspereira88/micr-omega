@@ -64,6 +64,7 @@ const createDefaultProfile = () => {
       small: { used: 0, max: 2 },
       medium: { used: 0, max: 0 },
       large: { used: 0, max: 0 },
+      macro: { used: 0, max: 0 },
     },
     reroll: {
       baseCost: 25,

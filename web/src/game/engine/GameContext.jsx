@@ -43,6 +43,7 @@ const initialState = {
       small: [],
       medium: [],
       large: [],
+      macro: [],
     },
   },
   currentForm: null,
