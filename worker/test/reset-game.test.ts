@@ -127,6 +127,12 @@ describe("RoomDO resetGame", () => {
       connectedAt: null,
       totalSessionDurationMs: 0,
       sessionCount: 0,
+      pendingAttack: { kind: "basic", targetPlayerId: "player-b" },
+      statusEffects: [
+        { status: "BURNING", stacks: 2, expiresAt: Date.now() + 5_000 },
+        { status: "SLOWED", stacks: 1, expiresAt: null },
+      ],
+      invulnerableUntil: Date.now() + 1_000,
     };
 
     const playerB = {
@@ -151,10 +157,28 @@ describe("RoomDO resetGame", () => {
       lastSeenAt: 0,
       totalSessionDurationMs: 0,
       sessionCount: 0,
+      pendingAttack: { kind: "basic", targetObjectId: "object-3" },
+      statusEffects: [{ status: "SHIELDED", stacks: 3, expiresAt: Date.now() + 2_000 }],
+      invulnerableUntil: Date.now() + 2_000,
     };
 
     players.set(playerA.id, playerA);
     players.set(playerB.id, playerB);
+
+    roomAny.playersPendingRemoval.add(playerA.id);
+    roomAny.playersPendingRemoval.add(playerB.id);
+    roomAny.pendingStatusEffects = [
+      {
+        targetKind: "player",
+        targetPlayerId: playerA.id,
+        status: "BURNING",
+        stacks: 1,
+        durationMs: 1_000,
+      },
+    ];
+    roomAny.microorganismStatusEffects.set("micro-1", [
+      { status: "POISON", stacks: 1, expiresAt: Date.now() + 1_000 },
+    ]);
 
     const snapshotBefore = roomAny.serializeGameState();
 
@@ -200,6 +224,9 @@ describe("RoomDO resetGame", () => {
       targetObjectId: null,
       lastAttackAt: null,
     });
+    expect(updatedPlayerA.statusEffects).toEqual([]);
+    expect(updatedPlayerA.pendingAttack).toBeNull();
+    expect(updatedPlayerA.invulnerableUntil).toBeNull();
 
     expect(updatedPlayerB.combo).toBe(1);
     expect(updatedPlayerB.lastActiveAt).not.toBe(0);
@@ -213,5 +240,12 @@ describe("RoomDO resetGame", () => {
       targetObjectId: null,
       lastAttackAt: null,
     });
+    expect(updatedPlayerB.statusEffects).toEqual([]);
+    expect(updatedPlayerB.pendingAttack).toBeNull();
+    expect(updatedPlayerB.invulnerableUntil).toBeNull();
+
+    expect(roomAny.playersPendingRemoval.size).toBe(0);
+    expect(roomAny.pendingStatusEffects).toEqual([]);
+    expect(roomAny.microorganismStatusEffects.size).toBe(0);
   });
 });
