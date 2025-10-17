@@ -4552,8 +4552,41 @@ export class RoomDO {
   }
 
   private send(socket: WebSocket, message: ServerMessage, payload?: string): void {
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send(payload ?? JSON.stringify(message));
+    if (socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const serialized = payload ?? JSON.stringify(message);
+
+    try {
+      socket.send(serialized);
+    } catch (error) {
+      const playerId = this.clientsBySocket.get(socket);
+      this.observability.logError("socket_send_failed", error, {
+        ...(playerId ? { playerId } : {}),
+        messageType: message.type
+      });
+
+      this.clientsBySocket.delete(socket);
+      this.activeSockets.delete(socket);
+      if (playerId && this.socketsByPlayer.get(playerId) === socket) {
+        this.socketsByPlayer.delete(playerId);
+      }
+
+      const closingState = (WebSocket as unknown as { CLOSING?: number }).CLOSING;
+      if (
+        socket.readyState === WebSocket.OPEN ||
+        (typeof closingState === "number" && socket.readyState === closingState)
+      ) {
+        try {
+          socket.close(1011, "send_failed");
+        } catch (closeError) {
+          this.observability.logError("socket_close_failed", closeError, {
+            ...(playerId ? { playerId } : {}),
+            messageType: message.type
+          });
+        }
+      }
     }
   }
 }
