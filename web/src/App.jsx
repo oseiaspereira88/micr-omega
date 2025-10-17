@@ -15,6 +15,26 @@ const TOAST_DURATION = 5000;
 // Maximum number of toast notifications shown at once to prevent overflow.
 const MAX_TOASTS = 5;
 
+const createToastIdGenerator = () => {
+  let fallbackCounter = 0;
+
+  return () => {
+    const cryptoApi = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined;
+    if (cryptoApi && typeof cryptoApi.randomUUID === 'function') {
+      try {
+        return cryptoApi.randomUUID();
+      } catch (error) {
+        // ignore and fallback to counter-based IDs
+      }
+    }
+
+    fallbackCounter += 1;
+    return `toast-${fallbackCounter}`;
+  };
+};
+
+const generateToastId = createToastIdGenerator();
+
 const App = () => {
   const [isAutoJoinRequested, setIsAutoJoinRequested] = useState(false);
   const { connect, disconnect, sendMovement, sendAttack, send } = useGameSocket({
@@ -287,10 +307,12 @@ const App = () => {
 
       const prepareAdjustments = (adjustments) => {
         if (!adjustments || typeof adjustments !== 'object') return undefined;
-        const entries = Object.entries(adjustments).filter(([, value]) => Number.isFinite(value) && value !== 0);
+        const entries = Object.entries(adjustments)
+          .map(([key, value]) => [key, Number(value)])
+          .filter(([, numericValue]) => Number.isFinite(numericValue) && numericValue !== 0);
         if (entries.length === 0) return undefined;
-        return entries.reduce((acc, [key, value]) => {
-          acc[key] = Number(value);
+        return entries.reduce((acc, [key, numericValue]) => {
+          acc[key] = numericValue;
           return acc;
         }, {});
       };
@@ -497,7 +519,7 @@ const App = () => {
         return;
       }
 
-      const id = Date.now() + Math.floor(Math.random() * 1000);
+      const id = generateToastId();
       setToasts((prev) => {
         const nextToasts = [...prev, { id, message }];
 
@@ -508,19 +530,13 @@ const App = () => {
         const overflowCount = nextToasts.length - MAX_TOASTS;
         const removedToasts = nextToasts.slice(0, overflowCount);
 
-        if (typeof window !== 'undefined') {
-          removedToasts.forEach((toast) => {
-            const timerId = timersRef.current.get(toast.id);
-            if (timerId) {
-              window.clearTimeout(timerId);
-              timersRef.current.delete(toast.id);
-            }
-          });
-        } else {
-          removedToasts.forEach((toast) => {
-            timersRef.current.delete(toast.id);
-          });
-        }
+        removedToasts.forEach((toast) => {
+          const timerId = timersRef.current.get(toast.id);
+          if (typeof window !== 'undefined' && timerId) {
+            window.clearTimeout(timerId);
+          }
+          timersRef.current.delete(toast.id);
+        });
 
         return nextToasts.slice(overflowCount);
       });
