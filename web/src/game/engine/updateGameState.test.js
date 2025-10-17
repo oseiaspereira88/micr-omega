@@ -497,7 +497,10 @@ describe('updateGameState', () => {
       },
       reroll: { baseCost: 30, cost: 45, count: 2, pity: 1 },
       dropPity: { fragment: 2, stableGene: 3 },
-      evolutionMenu: { activeTier: 'medium', options: { small: ['a'], medium: ['b'], large: [] } },
+      evolutionMenu: {
+        activeTier: 'macro',
+        options: { small: ['a'], medium: ['b'], large: [], macro: ['c'] },
+      },
       archetypeSelection: { activeTier: 'medium', options: { small: ['a'], medium: ['b'], large: [] } },
       selectedArchetype: 'guardian',
       statusEffects: [{ type: 'shield', stacks: 1 }],

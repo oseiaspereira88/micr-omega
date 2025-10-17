@@ -1169,13 +1169,17 @@ const buildHudSnapshot = (
     resourceBag.evolutionMenu ??
     safePreviousHud.evolutionMenu ?? {
       activeTier: 'small',
-      options: { small: [], medium: [], large: [] },
+      options: { small: [], medium: [], large: [], macro: [] },
     };
   const previousEvolutionMenu =
     safePreviousHud.evolutionMenu ?? evolutionMenuSource ?? {};
+  const previousActiveTier = previousEvolutionMenu.activeTier;
+  const activeTier =
+    evolutionMenuSource.activeTier ??
+    (previousActiveTier === 'macro' ? 'macro' : previousActiveTier) ??
+    'small';
   const evolutionMenu = {
-    activeTier:
-      evolutionMenuSource.activeTier ?? previousEvolutionMenu.activeTier ?? 'small',
+    activeTier,
     options: {
       small: Array.isArray(evolutionMenuSource.options?.small)
         ? [...evolutionMenuSource.options.small]
@@ -1191,6 +1195,11 @@ const buildHudSnapshot = (
         ? [...evolutionMenuSource.options.large]
         : Array.isArray(previousEvolutionMenu.options?.large)
         ? [...previousEvolutionMenu.options.large]
+        : [],
+      macro: Array.isArray(evolutionMenuSource.options?.macro)
+        ? [...evolutionMenuSource.options.macro]
+        : Array.isArray(previousEvolutionMenu.options?.macro)
+        ? [...previousEvolutionMenu.options.macro]
         : [],
     },
   };
