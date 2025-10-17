@@ -473,6 +473,12 @@ const App = () => {
             entry.id === playerId ? nextPlayer : entry
           );
           const nextIndexById = new Map(prev.remotePlayers.indexById);
+          const recalculatedIndex = nextAll.findIndex((entry) => entry?.id === playerId);
+          if (recalculatedIndex >= 0) {
+            nextIndexById.set(playerId, recalculatedIndex);
+          } else {
+            nextIndexById.delete(playerId);
+          }
           nextRemotePlayers = {
             byId: nextById,
             all: nextAll,

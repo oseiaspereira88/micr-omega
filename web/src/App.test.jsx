@@ -272,6 +272,43 @@ describe('App archetype actions', () => {
     expect(updated.players['player-1'].archetype).toBe('virus');
     expect(updated.players['player-1'].archetypeKey).toBe('virus');
   });
+
+  it('rebuilds remote player index map when missing', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockSettingsRef.current).toBeTruthy();
+    });
+
+    await act(async () => {
+      gameStore.setState((state) => {
+        const player = state.players['player-1'];
+        return {
+          ...state,
+          remotePlayers: {
+            ...state.remotePlayers,
+            byId: { ...state.remotePlayers.byId, 'player-1': player },
+            all: state.remotePlayers.all.map((entry) =>
+              entry.id === 'player-1' ? player : entry
+            ),
+            indexById: new Map(),
+          },
+        };
+      });
+    });
+
+    const settings = mockSettingsRef.current;
+    expect(typeof settings.onArchetypeSelect).toBe('function');
+
+    await act(async () => {
+      settings.onArchetypeSelect('virus');
+    });
+
+    const updated = gameStore.getState();
+    expect(updated.remotePlayers.byId['player-1'].archetype).toBe('virus');
+    expect(updated.remotePlayers.indexById.get('player-1')).toBe(0);
+    expect(updated.remotePlayers.all[0].archetype).toBe('virus');
+  });
 });
 
 describe('App command batch handling', () => {
