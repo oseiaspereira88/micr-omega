@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import GameHud from '../../ui/components/GameHud';
 import GameOverScreen from '../../ui/components/GameOverScreen';
 import ArchetypeSelection from '../../ui/components/ArchetypeSelection';
@@ -87,6 +87,7 @@ const GameCanvas = ({ settings, onQuit }) => {
     inputActions,
     chooseEvolution,
     requestEvolutionReroll,
+    cancelEvolutionChoice,
     restartGame,
     selectArchetype,
     setCameraZoom,
@@ -231,6 +232,118 @@ const GameCanvas = ({ settings, onQuit }) => {
     requestEvolutionReroll?.();
   }, [rerollAvailable, requestEvolutionReroll]);
 
+  const evolutionOverlayRef = useRef(null);
+  const rerollButtonRef = useRef(null);
+  const firstTierButtonRef = useRef(null);
+  const previousFocusRef = useRef(null);
+  const wasEvolutionOpenRef = useRef(false);
+  const evolutionDialogTitleId = useId();
+
+  const getFocusableEvolutionElements = useCallback(() => {
+    const overlay = evolutionOverlayRef.current;
+    if (!overlay) return [];
+
+    const selectors = [
+      'button:not([disabled])',
+      'a[href]',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ];
+
+    return Array.from(overlay.querySelectorAll(selectors.join(','))).filter((element) => {
+      if (element.getAttribute('aria-hidden') === 'true') {
+        return false;
+      }
+      if (element.hasAttribute('disabled')) {
+        return false;
+      }
+      const htmlElement = element;
+      return htmlElement instanceof HTMLElement && htmlElement.offsetParent !== null;
+    });
+  }, []);
+
+  const releaseEvolutionFocus = useCallback(() => {
+    const previous = previousFocusRef.current;
+    previousFocusRef.current = null;
+    if (previous && typeof previous.focus === 'function') {
+      previous.focus();
+    }
+  }, []);
+
+  const handleEvolutionCancel = useCallback(() => {
+    releaseEvolutionFocus();
+    cancelEvolutionChoice?.();
+  }, [cancelEvolutionChoice, releaseEvolutionFocus]);
+
+  const handleEvolutionOverlayKeyDown = useCallback(
+    (event) => {
+      if (event.key === 'Tab') {
+        const focusableElements = getFocusableEvolutionElements();
+        if (focusableElements.length === 0) {
+          event.preventDefault();
+          return;
+        }
+
+        const activeElement = document.activeElement;
+        const currentIndex = focusableElements.indexOf(activeElement);
+
+        if (event.shiftKey) {
+          if (currentIndex <= 0) {
+            event.preventDefault();
+            focusableElements[focusableElements.length - 1]?.focus();
+          }
+        } else if (currentIndex === -1 || currentIndex === focusableElements.length - 1) {
+          event.preventDefault();
+          focusableElements[0]?.focus();
+        }
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        handleEvolutionCancel();
+      }
+    },
+    [getFocusableEvolutionElements, handleEvolutionCancel]
+  );
+
+  const handleEvolutionOverlayClick = useCallback(
+    (event) => {
+      if (event.target === event.currentTarget) {
+        handleEvolutionCancel();
+      }
+    },
+    [handleEvolutionCancel]
+  );
+
+  useEffect(() => {
+    if (showEvolutionChoice) {
+      if (!wasEvolutionOpenRef.current) {
+        wasEvolutionOpenRef.current = true;
+        const activeElement = document.activeElement;
+        previousFocusRef.current =
+          activeElement instanceof HTMLElement ? activeElement : null;
+
+        let initialFocus = null;
+        const rerollButton = rerollButtonRef.current;
+        if (rerollButton && !rerollButton.disabled) {
+          initialFocus = rerollButton;
+        } else if (firstTierButtonRef.current) {
+          initialFocus = firstTierButtonRef.current;
+        } else {
+          const focusableElements = getFocusableEvolutionElements();
+          initialFocus = focusableElements[0] ?? null;
+        }
+
+        if (initialFocus && typeof initialFocus.focus === 'function') {
+          initialFocus.focus();
+        }
+      }
+    } else if (wasEvolutionOpenRef.current) {
+      wasEvolutionOpenRef.current = false;
+      releaseEvolutionFocus();
+    }
+  }, [showEvolutionChoice, getFocusableEvolutionElements, releaseEvolutionFocus]);
+
   return (
     <div className={styles.container}>
       <canvas ref={canvasRef} className={styles.canvas} />
@@ -285,9 +398,21 @@ const GameCanvas = ({ settings, onQuit }) => {
       />
 
       {showEvolutionChoice && (
-        <div className={styles.evolutionOverlay}>
-          <div className={styles.evolutionCard}>
-            <h2 className={styles.evolutionTitle}>🧬 Evolução Nível {level}</h2>
+        <div
+          className={styles.evolutionOverlay}
+          ref={evolutionOverlayRef}
+          onClick={handleEvolutionOverlayClick}
+        >
+          <div
+            className={styles.evolutionCard}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={evolutionDialogTitleId}
+            onKeyDown={handleEvolutionOverlayKeyDown}
+          >
+            <h2 id={evolutionDialogTitleId} className={styles.evolutionTitle}>
+              🧬 Evolução Nível {level}
+            </h2>
 
             <div className={styles.rerollControls}>
               <button
@@ -298,6 +423,7 @@ const GameCanvas = ({ settings, onQuit }) => {
                 onClick={handleEvolutionReroll}
                 disabled={!rerollAvailable}
                 aria-disabled={!rerollAvailable}
+                ref={rerollButtonRef}
               >
                 🔁 Rerrolar opções
               </button>
@@ -317,7 +443,7 @@ const GameCanvas = ({ settings, onQuit }) => {
             </div>
 
             <div className={styles.evolutionTabs}>
-              {EVOLUTION_TIER_KEYS.map((tierKey) => {
+              {EVOLUTION_TIER_KEYS.map((tierKey, index) => {
                 const metadata = TIER_METADATA[tierKey];
                 const isActive = evolutionMenu.activeTier === tierKey;
                 const slots = evolutionSlots?.[tierKey] || { used: 0, max: 0 };
@@ -334,6 +460,8 @@ const GameCanvas = ({ settings, onQuit }) => {
                     onClick={handleActivateTier}
                     aria-pressed={isActive}
                     aria-controls={EVOLUTION_OPTIONS_PANEL_ID}
+                    ref={index === 0 ? firstTierButtonRef : null}
+                    data-evolution-tier-tab="true"
                   >
                     <div className={styles.evolutionTabHeader}>
                       <span>{metadata.icon}</span>
@@ -364,6 +492,7 @@ const GameCanvas = ({ settings, onQuit }) => {
 
                 const handleSelect = () => {
                   if (disabled) return;
+                  releaseEvolutionFocus();
                   chooseEvolution(option.key, option.tier);
                 };
 

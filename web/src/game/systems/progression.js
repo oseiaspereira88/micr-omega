@@ -605,6 +605,41 @@ export const requestEvolutionReroll = (state, helpers = {}) => {
   return state;
 };
 
+export const cancelEvolutionChoice = (state, helpers = {}) => {
+  if (!state || !state.showEvolutionChoice) return state;
+
+  ensureResourceReferences(state);
+
+  const queue = ensureQueue(state);
+  const tier =
+    state.evolutionContext?.tier ||
+    state.evolutionMenu?.activeTier ||
+    (queue.length > 0 ? queue[0] : null) ||
+    'small';
+
+  if (tier) {
+    queue.unshift(tier);
+  }
+
+  state.showEvolutionChoice = false;
+  state.evolutionContext = null;
+  state.evolutionMenu = {
+    activeTier: tier,
+    options: {
+      small: [],
+      medium: [],
+      large: [],
+      macro: [],
+    },
+  };
+  state.currentForm = state.organism?.form ?? null;
+  state.canEvolve = queue.length > 0;
+  state.uiSyncTimer = 0;
+
+  helpers.syncState?.(state);
+  return state;
+};
+
 export const restartGame = (state, helpers = {}) => {
   if (!state) return state;
 
