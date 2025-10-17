@@ -83,6 +83,7 @@ const GameHud = ({
       const ratio = opponent.maxHealth
         ? Math.max(0, Math.min(1, opponent.health / opponent.maxHealth))
         : 0;
+      const percent = Math.round(ratio * 100);
 
       return {
         id: opponent.id,
@@ -90,6 +91,8 @@ const GameHud = ({
         elementLabel: opponent.elementLabel ?? opponent.element ?? '—',
         affinityLabel: opponent.affinityLabel ?? opponent.affinity ?? '—',
         combatState: opponent.combatState,
+        healthRatio: ratio,
+        healthPercent: percent,
         barStyle: {
           width: `${ratio * 100}%`,
           background: opponent.palette?.base ?? '#47c2ff',
@@ -184,8 +187,20 @@ const GameHud = ({
                         {opponent.affinityLabel}
                       </span>
                     </div>
-                    <div className={styles.opponentHealthBar}>
-                      <div className={styles.opponentHealthFill} style={opponent.barStyle} />
+                    <div className={styles.opponentHealthMeter}>
+                      <div
+                        className={styles.opponentHealthBar}
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={opponent.healthPercent}
+                        aria-valuetext={`${opponent.healthPercent}%`}
+                      >
+                        <div className={styles.opponentHealthFill} style={opponent.barStyle} />
+                      </div>
+                      <span className={styles.opponentHealthValue}>
+                        {opponent.healthPercent}%
+                      </span>
                     </div>
                     <div className={styles.opponentStatus}>{opponent.combatState}</div>
                   </li>
