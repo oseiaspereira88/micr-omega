@@ -70,6 +70,15 @@
   color: #000;
 }
 
+.cycleSkillButton {
+  bottom: 175px;
+  right: 95px;
+  width: 55px;
+  height: 55px;
+  font-size: 1.4rem;
+  background: rgba(100, 100, 100, 0.35);
+}
+
 .skillLabel {
   position: absolute;
   bottom: 6px;
@@ -107,6 +116,11 @@
 .skillDisabled {
   background: rgba(100, 100, 100, 0.35);
   color: rgba(255, 255, 255, 0.75);
+}
+
+.cycleSkillReady {
+  background: linear-gradient(135deg, #ffcc00, #ff8800);
+  box-shadow: 0 0 18px rgba(255, 204, 0, 0.55);
 }
 
 .evolveReady {

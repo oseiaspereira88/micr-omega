@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import GameHud from '../GameHud';
@@ -101,6 +101,38 @@ describe('GameHud connection status overlay', () => {
     expect(
       screen.queryByRole('status', { name: /estado da conexão/i })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('GameHud touch controls', () => {
+  it('forward cycle skill handler to touch controls', () => {
+    const onCycleSkill = vi.fn();
+
+    render(
+      <GameHud
+        {...BASE_PROPS}
+        showTouchControls
+        joystick={{ isTouchActive: false, position: { x: 0, y: 0 } }}
+        skillData={{
+          ...BASE_PROPS.skillData,
+          currentSkill: { icon: '🔥' },
+          skillDisabled: false,
+          skillCoolingDown: false,
+          skillCooldownLabel: 'Pronto',
+          skillCooldownPercent: 0,
+          costLabel: '5⚡',
+        }}
+        onCycleSkill={onCycleSkill}
+      />
+    );
+
+    const cycleButton = screen.getByRole('button', {
+      name: 'Trocar habilidade equipada',
+    });
+
+    fireEvent.click(cycleButton);
+
+    expect(onCycleSkill).toHaveBeenCalledTimes(1);
   });
 });
 
