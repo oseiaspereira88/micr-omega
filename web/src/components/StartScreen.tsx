@@ -189,9 +189,15 @@ const StartScreen = ({
               maxLength={MAX_NAME_LENGTH}
               autoComplete="name"
               autoFocus
+              aria-invalid={Boolean(errorMessage)}
+              aria-describedby={errorMessage ? "player-name-error" : undefined}
             />
             {errorMessage ? (
-              <p className={styles.errorMessage} role="alert">
+              <p
+                id="player-name-error"
+                className={styles.errorMessage}
+                role="alert"
+              >
                 {errorMessage}
               </p>
             ) : null}
