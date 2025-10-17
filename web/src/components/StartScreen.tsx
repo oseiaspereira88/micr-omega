@@ -260,6 +260,11 @@ const StartScreen = ({
 
   const dialogTitleId = "start-screen-title";
   const dialogDescriptionId = "start-screen-description";
+  const playerNameHelperId = "player-name-helper";
+  const playerNameErrorId = "player-name-error";
+  const playerNameDescribedBy = errorMessage
+    ? `${playerNameHelperId} ${playerNameErrorId}`
+    : playerNameHelperId;
   const audioToggleId = "audio-enabled";
   const touchToggleId = "show-touch-controls";
 
@@ -344,6 +349,10 @@ const StartScreen = ({
             <label className={styles.label} htmlFor="player-name">
               Nome do jogador
             </label>
+            <p id={playerNameHelperId} className={styles.helperText}>
+              Use entre {MIN_NAME_LENGTH} e {MAX_NAME_LENGTH} caracteres válidos:
+              letras (incluindo acentos), números, espaços, hífens ou sublinhados.
+            </p>
             <input
               id="player-name"
               name="player-name"
@@ -355,11 +364,11 @@ const StartScreen = ({
               maxLength={MAX_NAME_LENGTH}
               autoComplete="name"
               aria-invalid={Boolean(errorMessage)}
-              aria-describedby={errorMessage ? "player-name-error" : undefined}
+              aria-describedby={playerNameDescribedBy}
             />
             {errorMessage ? (
               <p
-                id="player-name-error"
+                id={playerNameErrorId}
                 className={styles.errorMessage}
                 role="alert"
               >

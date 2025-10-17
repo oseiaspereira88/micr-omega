@@ -120,6 +120,12 @@
   color: #ff6f91;
 }
 
+.helperText {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(245, 247, 255, 0.7);
+}
+
 .options {
   display: grid;
   gap: 1rem;
