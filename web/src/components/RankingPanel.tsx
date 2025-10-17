@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useGameStore, type ConnectionStatus } from "../store/gameStore";
+import { shallowEqual, useGameStore, type ConnectionStatus } from "../store/gameStore";
 import styles from "./RankingPanel.module.css";
 
 const DISCONNECTED_ICON = "\u26A0\uFE0F"; // ⚠️
@@ -44,6 +44,7 @@ const RankingPanel = () => {
       playerId: state.playerId,
       connectionStatus: state.connectionStatus,
     }),
+    shallowEqual,
   );
 
   const rows: RankingRow[] = useMemo(() => {

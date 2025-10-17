@@ -11,6 +11,7 @@ import {
 import {
   ConnectionStatus,
   gameStore,
+  shallowEqual,
   useGameStore,
 } from "../store/gameStore";
 import {
@@ -49,17 +50,15 @@ const StartScreen = ({
   connectionStatus: connectionStatusProp,
   joinError: joinErrorProp,
 }: StartScreenProps) => {
-  const {
-    connectionStatus,
-    joinError,
-    storedName,
-    playerId,
-  } = useGameStore((state) => ({
-    connectionStatus: state.connectionStatus,
-    joinError: state.joinError,
-    storedName: state.playerName,
-    playerId: state.playerId,
-  }));
+  const { connectionStatus, joinError, storedName, playerId } = useGameStore(
+    (state) => ({
+      connectionStatus: state.connectionStatus,
+      joinError: state.joinError,
+      storedName: state.playerName,
+      playerId: state.playerId,
+    }),
+    shallowEqual,
+  );
   const effectiveStatus = connectionStatusProp ?? connectionStatus;
   const effectiveJoinError = joinErrorProp ?? joinError;
 

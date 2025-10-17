@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useGameStore, type ConnectionStatus } from "../store/gameStore";
+import { shallowEqual, useGameStore, type ConnectionStatus } from "../store/gameStore";
 import styles from "./ConnectionStatusOverlay.module.css";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -25,13 +25,16 @@ const LATENCY_FORMATTER = new Intl.NumberFormat(undefined, {
 const formatLatency = (value: number) => LATENCY_FORMATTER.format(Math.round(value));
 
 const ConnectionStatusOverlay = () => {
-  const connectionState = useGameStore((state) => ({
-    connectionStatus: state.connectionStatus,
-    lastPingAt: state.lastPingAt,
-    lastPongAt: state.lastPongAt,
-    reconnectAttempts: state.reconnectAttempts,
-    joinError: state.joinError,
-  }));
+  const connectionState = useGameStore(
+    (state) => ({
+      connectionStatus: state.connectionStatus,
+      lastPingAt: state.lastPingAt,
+      lastPongAt: state.lastPongAt,
+      reconnectAttempts: state.reconnectAttempts,
+      joinError: state.joinError,
+    }),
+    shallowEqual,
+  );
 
   const latency = useMemo(() => {
     if (connectionState.lastPingAt == null || connectionState.lastPongAt == null) {
