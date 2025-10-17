@@ -8,8 +8,11 @@ const Notifications = ({ notifications = [] }) => {
 
   return (
     <div className={styles.container}>
-      {notifications.map(notification => (
-        <div key={notification.id} className={styles.notification}>
+      {notifications.map((notification, index) => (
+        <div
+          key={notification.id ?? `${notification.text ?? ''}-${index}`}
+          className={styles.notification}
+        >
           {notification.text}
         </div>
       ))}

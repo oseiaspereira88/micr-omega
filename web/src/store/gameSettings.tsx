@@ -34,6 +34,37 @@ const GameSettingsContext = createContext<GameSettingsContextValue | undefined>(
   undefined
 );
 
+const parseBoolean = (value: unknown, fallback: boolean): boolean => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+    if (normalized === "false") {
+      return false;
+    }
+  }
+
+  return fallback;
+};
+
+const parseVisualDensity = (value: unknown, fallback: VisualDensity): VisualDensity => {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "low" || normalized === "medium" || normalized === "high") {
+    return normalized;
+  }
+
+  return fallback;
+};
+
 const parseStoredSettings = (): GameSettings => {
   if (typeof window === "undefined") {
     return { ...DEFAULT_SETTINGS };
@@ -50,18 +81,17 @@ const parseStoredSettings = (): GameSettings => {
       return { ...DEFAULT_SETTINGS };
     }
 
-    const audioEnabled = typeof parsed.audioEnabled === "boolean"
-      ? parsed.audioEnabled
-      : DEFAULT_SETTINGS.audioEnabled;
+    const audioEnabled = parseBoolean(parsed.audioEnabled, DEFAULT_SETTINGS.audioEnabled);
 
-    const density = parsed.visualDensity;
-    const visualDensity: VisualDensity = density === "low" || density === "high"
-      ? density
-      : DEFAULT_SETTINGS.visualDensity;
+    const visualDensity = parseVisualDensity(
+      parsed.visualDensity,
+      DEFAULT_SETTINGS.visualDensity,
+    );
 
-    const showTouchControls = typeof parsed.showTouchControls === "boolean"
-      ? parsed.showTouchControls
-      : DEFAULT_SETTINGS.showTouchControls;
+    const showTouchControls = parseBoolean(
+      parsed.showTouchControls,
+      DEFAULT_SETTINGS.showTouchControls,
+    );
 
     return {
       audioEnabled,

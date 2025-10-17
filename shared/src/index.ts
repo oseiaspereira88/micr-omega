@@ -459,13 +459,16 @@ export const aggregateDrops = (
     initialPity?: { fragment?: number; stableGene?: number } | null;
   } = {}
 ) => {
+  const clampCounter = (value: number | undefined) =>
+    Math.max(0, Number.isFinite(value) ? Number(value) : 0);
+
   const counters = {
     geneticMaterial: 0,
     fragments: createGeneCounter(),
     stableGenes: createGeneCounter(),
     pity: {
-      fragment: Number.isFinite(initialPity?.fragment) ? Number(initialPity?.fragment) : 0,
-      stableGene: Number.isFinite(initialPity?.stableGene) ? Number(initialPity?.stableGene) : 0
+      fragment: clampCounter(initialPity?.fragment),
+      stableGene: clampCounter(initialPity?.stableGene)
     }
   };
 

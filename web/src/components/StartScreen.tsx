@@ -135,6 +135,8 @@ const StartScreen = ({
     gameStore.actions.setJoinError(null);
     gameStore.actions.setPlayerName(null);
     gameStore.actions.setPlayerId(null);
+    gameStore.actions.setConnectionStatus("idle");
+    gameStore.actions.setReconnectUntil(null);
     gameStore.actions.resetGameState();
   }, [onQuit]);
 
