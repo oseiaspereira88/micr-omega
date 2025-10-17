@@ -1,0 +1,242 @@
+import type { Microorganism, Vector2 } from "./messageTypes";
+
+const coerceFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+type PositionTuple = readonly [unknown, unknown];
+
+type PositionSource =
+  | Vector2
+  | PositionTuple
+  | {
+      x?: unknown;
+      y?: unknown;
+      position?: Vector2 | PositionTuple | { x?: unknown; y?: unknown };
+    };
+
+const isVectorLike = (value: unknown): value is PositionSource =>
+  typeof value === "object" && value !== null;
+
+const extractFromTuple = (value: PositionTuple): Vector2 | null => {
+  const [rawX, rawY] = value;
+  const x = coerceFiniteNumber(rawX);
+  const y = coerceFiniteNumber(rawY);
+
+  if (x === null || y === null) {
+    return null;
+  }
+
+  return { x, y };
+};
+
+export const extractPosition = (entity: unknown): Vector2 | null => {
+  if (!isVectorLike(entity)) {
+    return null;
+  }
+
+  if (Array.isArray(entity) && entity.length >= 2) {
+    return extractFromTuple(entity as PositionTuple);
+  }
+
+  if ("x" in entity || "y" in entity) {
+    const x = coerceFiniteNumber((entity as { x?: unknown }).x);
+    const y = coerceFiniteNumber((entity as { y?: unknown }).y);
+
+    if (x !== null && y !== null) {
+      return { x, y };
+    }
+  }
+
+  if ("position" in entity) {
+    return extractPosition((entity as { position?: unknown }).position);
+  }
+
+  return null;
+};
+
+const dist2 = (a: Vector2, b: Vector2) => {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return dx * dx + dy * dy;
+};
+
+type MicroorganismLike = Pick<Microorganism, "id" | "aggression" | "health" | "position"> & {
+  x?: unknown;
+  y?: unknown;
+};
+
+const isHostileAndAlive = (entity: MicroorganismLike | null | undefined): entity is MicroorganismLike => {
+  if (!entity || typeof entity.id !== "string" || entity.id.length === 0) {
+    return false;
+  }
+
+  if (entity.aggression !== "hostile") {
+    return false;
+  }
+
+  const health = entity.health;
+  if (!health || typeof health.current !== "number" || !Number.isFinite(health.current)) {
+    return false;
+  }
+
+  return health.current > 0;
+};
+
+type IterableLike<T> = readonly T[] | Iterable<T> | null | undefined;
+
+type FindNearestOptions = {
+  playerPosition?: Vector2 | null;
+  renderMicroorganisms?: IterableLike<MicroorganismLike>;
+  sharedMicroorganisms?: IterableLike<MicroorganismLike>;
+  excludeIds?: Iterable<string> | null;
+};
+
+const iterateMicroorganisms = (
+  ...collections: IterableLike<MicroorganismLike>[]
+): Generator<MicroorganismLike, void, void> => {
+  function* iterateCollection(collection?: IterableLike<MicroorganismLike>) {
+    if (!collection) {
+      return;
+    }
+
+    if (Array.isArray(collection)) {
+      for (const entry of collection) {
+        if (entry) {
+          yield entry;
+        }
+      }
+      return;
+    }
+
+    if (typeof (collection as Iterable<MicroorganismLike>)[Symbol.iterator] === "function") {
+      for (const entry of collection as Iterable<MicroorganismLike>) {
+        if (entry) {
+          yield entry;
+        }
+      }
+    }
+  }
+
+  return (function* () {
+    for (const collection of collections) {
+      yield* iterateCollection(collection);
+    }
+  })();
+};
+
+const normalizePlayerPosition = (position?: Vector2 | null): Vector2 | null => {
+  if (!position) {
+    return null;
+  }
+
+  const normalized = extractPosition(position);
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized;
+};
+
+const buildExcludeSet = (excludeIds?: Iterable<string> | null) => {
+  if (!excludeIds) {
+    return null;
+  }
+
+  const set = new Set<string>();
+  for (const id of excludeIds) {
+    if (typeof id === "string" && id) {
+      set.add(id);
+    }
+  }
+
+  return set.size > 0 ? set : null;
+};
+
+export const findNearestHostileMicroorganismId = ({
+  playerPosition,
+  renderMicroorganisms,
+  sharedMicroorganisms,
+  excludeIds,
+}: FindNearestOptions = {}): string | null => {
+  const origin = normalizePlayerPosition(playerPosition);
+  if (!origin) {
+    return null;
+  }
+
+  const excludeSet = buildExcludeSet(excludeIds);
+  let nearestId: string | null = null;
+  let nearestDistance = Infinity;
+  const evaluated = new Set<string>();
+
+  for (const entity of iterateMicroorganisms(renderMicroorganisms, sharedMicroorganisms)) {
+    if (!isHostileAndAlive(entity)) {
+      continue;
+    }
+
+    if (excludeSet?.has(entity.id) || evaluated.has(entity.id)) {
+      continue;
+    }
+
+    const position = extractPosition(entity);
+    if (!position) {
+      continue;
+    }
+
+    evaluated.add(entity.id);
+
+    const distance = dist2(origin, position);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestId = entity.id;
+    }
+  }
+
+  return nearestId;
+};
+
+export const resolvePlayerPosition = ({
+  renderPlayer,
+  sharedPlayer,
+}: {
+  renderPlayer?: unknown;
+  sharedPlayer?: unknown;
+} = {}): Vector2 | null => {
+  const renderSources: unknown[] = [
+    (renderPlayer as { renderPosition?: unknown })?.renderPosition,
+    (renderPlayer as { position?: unknown })?.position,
+    renderPlayer,
+  ];
+
+  for (const source of renderSources) {
+    const position = extractPosition(source);
+    if (position) {
+      return position;
+    }
+  }
+
+  const sharedSources: unknown[] = [
+    (sharedPlayer as { position?: unknown })?.position,
+    sharedPlayer,
+  ];
+
+  for (const source of sharedSources) {
+    const position = extractPosition(source);
+    if (position) {
+      return position;
+    }
+  }
+
+  return null;
+};
+
+export default findNearestHostileMicroorganismId;

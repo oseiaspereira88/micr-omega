@@ -266,12 +266,16 @@ describe('useGameLoop timing safeguards', () => {
       {
         id: 'micro-1',
         kind: 'microorganism',
+        aggression: 'hostile',
         position: { x: 220, y: 240 },
+        health: { current: 8, max: 10 },
       },
       {
         id: 'micro-2',
         kind: 'microorganism',
+        aggression: 'hostile',
         position: { x: 80, y: 84 },
+        health: { current: 5, max: 10 },
       },
     ];
 
@@ -290,8 +294,8 @@ describe('useGameLoop timing safeguards', () => {
     };
 
     const renderMicroorganisms = [
-      { id: 'micro-1', x: 220, y: 240 },
-      { id: 'micro-2', x: 80, y: 84 },
+      { id: 'micro-1', x: 220, y: 240, aggression: 'hostile', health: { current: 8, max: 10 } },
+      { id: 'micro-2', x: 80, y: 84, aggression: 'hostile', health: { current: 5, max: 10 } },
     ];
 
     let capturedActionBuffer = null;

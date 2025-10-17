@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useGameStore } from "../store/gameStore";
+import { useGameStore, type ConnectionStatus } from "../store/gameStore";
 import styles from "./ConnectionStatusOverlay.module.css";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -9,6 +9,20 @@ const STATUS_LABEL: Record<string, string> = {
   reconnecting: "Reconectando…",
   disconnected: "Desconectado",
 };
+
+const STATUS_CLASS: Partial<Record<ConnectionStatus, string>> = {
+  connected: styles.statusConnected,
+  connecting: styles.statusConnecting,
+  reconnecting: styles.statusReconnecting,
+  disconnected: styles.statusDisconnected,
+  idle: styles.statusIdle,
+};
+
+const LATENCY_FORMATTER = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 0,
+});
+
+const formatLatency = (value: number) => LATENCY_FORMATTER.format(Math.round(value));
 
 const ConnectionStatusOverlay = () => {
   const connectionStatus = useGameStore((state) => state.connectionStatus);
@@ -32,21 +46,15 @@ const ConnectionStatusOverlay = () => {
 
   const statusLabel = STATUS_LABEL[connectionStatus as string] ?? connectionStatus;
 
-  const statusClassName = `${styles.statusDot} ${
-    connectionStatus === "connected"
-      ? styles.statusConnected
-      : connectionStatus === "connecting"
-      ? styles.statusConnecting
-      : connectionStatus === "reconnecting"
-      ? styles.statusReconnecting
-      : connectionStatus === "disconnected"
-      ? styles.statusDisconnected
-      : styles.statusIdle
-  }`;
+  const statusClassName = useMemo(() => {
+    const className = STATUS_CLASS[connectionStatus] ?? styles.statusIdle;
+    return `${styles.statusDot} ${className}`;
+  }, [connectionStatus]);
 
   const showLatency = connectionStatus === "connected" && latency !== null;
   const showAttempts = reconnectAttempts > 0 && connectionStatus !== "connected";
   const hasMetrics = showLatency || showAttempts;
+  const formattedLatency = showLatency && latency !== null ? formatLatency(latency) : null;
 
   return (
     <div className={styles.container} role="status" aria-live="polite">
@@ -59,7 +67,7 @@ const ConnectionStatusOverlay = () => {
           {showLatency ? (
             <div className={styles.metric}>
               <span>Latência</span>
-              <strong>{latency} ms</strong>
+              <strong>{formattedLatency} ms</strong>
             </div>
           ) : null}
           {showAttempts ? (
