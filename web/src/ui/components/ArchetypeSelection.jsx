@@ -14,8 +14,8 @@ const ArchetypeSelection = ({
   onSelect,
 }) => {
   const pending = selection?.pending;
-  const allowed = Array.isArray(selection?.options) && selection.options.length > 0
-    ? selection.options
+  const allowed = Array.isArray(selection?.options)
+    ? selection.options.filter((option) => typeof option === 'string' && option.trim().length > 0)
     : null;
 
   const options = useMemo(() => {

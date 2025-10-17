@@ -605,9 +605,17 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
         if (stream) {
           updatedPlayers[playerId] = cloneProgressionStream(stream);
           progressionChanged = true;
+          continue;
+        }
+
+        if (stream === null && updatedPlayers[playerId] !== undefined) {
+          delete updatedPlayers[playerId];
+          progressionChanged = true;
         }
       }
-      nextProgression = { players: updatedPlayers };
+      if (progressionChanged) {
+        nextProgression = { players: updatedPlayers };
+      }
     }
 
     if (diff.removedPlayerIds && diff.removedPlayerIds.length > 0) {
