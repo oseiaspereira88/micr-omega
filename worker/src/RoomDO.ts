@@ -2269,10 +2269,11 @@ export class RoomDO {
     });
 
     socket.addEventListener("close", () => {
-      if (playerId) {
-        void this.handleDisconnect(socket, playerId).catch((error) => {
+      const disconnectPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
+      if (disconnectPlayerId) {
+        void this.handleDisconnect(socket, disconnectPlayerId).catch((error) => {
           this.observability.logError("player_disconnect_failed", error, {
-            playerId
+            playerId: disconnectPlayerId
           });
         });
       }
@@ -2405,6 +2406,10 @@ export class RoomDO {
     }
 
     this.ensureProgressionState(player.id);
+
+    if (socket.readyState !== WebSocket.OPEN) {
+      return null;
+    }
 
     if (previousSocket && previousSocket !== socket) {
       this.closePlayerSocketIfCurrent(
