@@ -272,6 +272,7 @@ export interface GameStoreState {
   reconnectUntil: number | null;
   playerId: string | null;
   playerName: string | null;
+  reconnectToken: string | null;
   joinError: string | null;
   lastPingAt: number | null;
   lastPongAt: number | null;
@@ -413,6 +414,7 @@ const initialState: GameStoreState = {
   reconnectUntil: null,
   playerId: null,
   playerName: null,
+  reconnectToken: null,
   joinError: null,
   lastPingAt: null,
   lastPongAt: null,
@@ -543,12 +545,37 @@ const setPlayerName = (name: string | null) => {
 const setPlayerId = (playerId: string | null) => {
   applyState((prev) => {
     if (prev.playerId === playerId) {
+      if (playerId === null && prev.reconnectToken !== null) {
+        return {
+          ...prev,
+          reconnectToken: null,
+        };
+      }
+      return prev;
+    }
+
+    const next: GameStoreState = {
+      ...prev,
+      playerId,
+    };
+
+    if (playerId === null) {
+      next.reconnectToken = null;
+    }
+
+    return next;
+  });
+};
+
+const setReconnectToken = (token: string | null) => {
+  applyState((prev) => {
+    if (prev.reconnectToken === token) {
       return prev;
     }
 
     return {
       ...prev,
-      playerId,
+      reconnectToken: token,
     };
   });
 };
@@ -785,6 +812,7 @@ const resetGameState = () => {
   const preservedId = currentState.playerId;
   const preservedStatus = currentState.connectionStatus;
   const preservedReconnectUntil = currentState.reconnectUntil;
+  const preservedReconnectToken = currentState.reconnectToken;
   applyState(() => {
     const emptyState = createEmptySynchronizedState();
     return {
@@ -793,6 +821,7 @@ const resetGameState = () => {
       playerId: preservedId,
       connectionStatus: preservedStatus,
       reconnectUntil: preservedReconnectUntil,
+      reconnectToken: preservedReconnectToken,
       players: emptyState.remotePlayers.byId,
       remotePlayers: emptyState.remotePlayers,
       microorganisms: emptyState.microorganisms,
@@ -809,12 +838,14 @@ const applyJoinedSnapshot = ({
   playerId,
   playerName,
   reconnectUntil,
+  reconnectToken,
   state,
   ranking,
 }: {
   playerId: string;
   playerName: string;
   reconnectUntil: number | null;
+  reconnectToken: string;
   state: SharedGameState;
   ranking: RankingEntry[];
 }) => {
@@ -825,6 +856,7 @@ const applyJoinedSnapshot = ({
     reconnectUntil,
     playerId,
     playerName,
+    reconnectToken,
     joinError: null,
     lastPingAt: null,
     lastPongAt: null,
@@ -853,6 +885,7 @@ export const gameStore = {
     setConnectionStatus,
     setPlayerName,
     setPlayerId,
+    setReconnectToken,
     setJoinError,
     incrementReconnectAttempts,
     setReconnectUntil,

@@ -82,6 +82,7 @@ const createFreshState = (): GameStoreState => {
     reconnectUntil: null,
     playerId: null,
     playerName: null,
+    reconnectToken: null,
     joinError: null,
     lastPingAt: null,
     lastPongAt: null,
@@ -290,6 +291,7 @@ describe("gameStore", () => {
       playerId: "p-new",
       playerName: "Rookie",
       reconnectUntil: 9999,
+      reconnectToken: "token-new",
       state: newState,
       ranking: newRanking,
     });
@@ -302,6 +304,7 @@ describe("gameStore", () => {
     expect(afterJoined.ranking).toEqual(newRanking);
     expect(afterJoined.joinError).toBeNull();
     expect(afterJoined.reconnectAttempts).toBe(0);
+    expect(afterJoined.reconnectToken).toBe("token-new");
   });
 
   it("clears round metadata when diffs reset values", () => {

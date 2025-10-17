@@ -211,6 +211,7 @@ type StoredPlayer = {
   skillState?: StoredPlayerSkillState;
   totalSessionDurationMs?: number;
   sessionCount?: number;
+  reconnectToken?: string;
 };
 
 type StoredPlayerSnapshot = Omit<
@@ -232,7 +233,7 @@ type StoredPlayerSnapshot = Omit<
     >
   >;
 
-type PlayerInternal = Omit<StoredPlayer, "skillState"> & {
+type PlayerInternal = Omit<StoredPlayer, "skillState" | "reconnectToken"> & {
   connected: boolean;
   lastActiveAt: number;
   lastSeenAt: number;
@@ -241,6 +242,7 @@ type PlayerInternal = Omit<StoredPlayer, "skillState"> & {
   pendingAttack: PendingAttack | null;
   statusEffects: StatusCollection;
   invulnerableUntil: number | null;
+  reconnectToken: string;
 };
 
 type ApplyPlayerActionResult = {
@@ -364,6 +366,15 @@ const clonePlayerSkillState = (state: PlayerSkillState): StoredPlayerSkillState 
 const normalizePlayerSkillState = (
   state: PlayerSkillState | StoredPlayerSkillState | undefined,
 ): PlayerSkillState => createPlayerSkillState(state as StoredPlayerSkillState | undefined);
+
+const generateReconnectToken = (): string => crypto.randomUUID();
+
+const normalizeStoredReconnectToken = (token?: string): string => {
+  if (typeof token === "string" && token.trim().length > 0) {
+    return token;
+  }
+  return generateReconnectToken();
+};
 
 type ArchetypeDefinition = {
   key: ArchetypeKey;
@@ -1202,6 +1213,7 @@ export class RoomDO {
           ? sanitizeArchetypeKey(stored.archetypeKey)
           : null;
         const skillState = createPlayerSkillState(stored.skillState);
+        const reconnectToken = normalizeStoredReconnectToken(stored.reconnectToken);
 
         const normalized: StoredPlayer = {
           id: stored.id,
@@ -1225,7 +1237,8 @@ export class RoomDO {
           archetypeKey: archetypeKey ?? null,
           skillState: clonePlayerSkillState(skillState),
           totalSessionDurationMs: stored.totalSessionDurationMs ?? 0,
-          sessionCount: stored.sessionCount ?? 0
+          sessionCount: stored.sessionCount ?? 0,
+          reconnectToken,
         };
         const player: PlayerInternal = {
           ...normalized,
@@ -3101,6 +3114,15 @@ export class RoomDO {
       }
     }
 
+    if (player) {
+      const providedToken = payload.reconnectToken;
+      if (!providedToken || providedToken !== player.reconnectToken) {
+        this.send(socket, { type: "error", reason: "invalid_reconnect_token" });
+        socket.close(1008, "invalid_reconnect_token");
+        return null;
+      }
+    }
+
     const previousSocket = player ? this.socketsByPlayer.get(player.id) : undefined;
 
     let rankingShouldUpdate = false;
@@ -3110,6 +3132,7 @@ export class RoomDO {
       const spawnPosition = this.clampPosition(getSpawnPositionForPlayer(id));
       const evolutionState = createEvolutionState();
       const skillState = createPlayerSkillState();
+      const reconnectToken = generateReconnectToken();
       player = {
         id,
         name: normalizedName,
@@ -3136,12 +3159,14 @@ export class RoomDO {
         pendingAttack: null,
         statusEffects: [],
         invulnerableUntil: null,
+        reconnectToken,
       };
       player.combatAttributes = this.computePlayerCombatAttributes(player);
       this.players.set(id, player);
       this.nameToPlayerId.set(nameKey, id);
       rankingShouldUpdate = true;
     } else {
+      player.reconnectToken = generateReconnectToken();
       const previousName = player.name;
       const previousKey = player.name.toLowerCase();
       if (previousKey !== nameKey && this.nameToPlayerId.get(previousKey) === player.id) {
@@ -3210,6 +3235,7 @@ export class RoomDO {
       type: "joined",
       playerId: player.id,
       reconnectUntil,
+      reconnectToken: player.reconnectToken,
       state: sharedState,
       ranking
     };
@@ -4445,7 +4471,8 @@ export class RoomDO {
         archetypeKey: player.archetypeKey ?? null,
         skillState: clonePlayerSkillState(skillState),
         totalSessionDurationMs: player.totalSessionDurationMs ?? 0,
-        sessionCount: player.sessionCount ?? 0
+        sessionCount: player.sessionCount ?? 0,
+        reconnectToken: player.reconnectToken,
       };
     });
     await this.state.storage.put(PLAYERS_KEY, snapshot);

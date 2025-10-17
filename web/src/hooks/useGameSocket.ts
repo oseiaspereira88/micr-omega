@@ -212,6 +212,8 @@ const errorReasonToMessage = (error: ErrorMessage): string => {
       }
       return "Você está enviando mensagens muito rápido. Tente novamente em instantes.";
     }
+    case "invalid_reconnect_token":
+      return "Token de reconexão inválido. Recarregue a página e tente novamente.";
     case "invalid_payload":
     default:
       return "Erro ao comunicar com o servidor. Tente novamente.";
@@ -284,11 +286,13 @@ export const useGameSocket = (
 
   const playerName = useGameStore((state) => state.playerName);
   const playerId = useGameStore((state) => state.playerId);
+  const reconnectToken = useGameStore((state) => state.reconnectToken);
   const connectionStatus = useGameStore((state) => state.connectionStatus);
   const joinError = useGameStore((state) => state.joinError);
 
   const playerNameRef = useStableLatest(playerName);
   const playerIdRef = useStableLatest(playerId);
+  const reconnectTokenRef = useStableLatest(reconnectToken);
 
   const effectiveUrl = useMemo(() => resolveWebSocketUrl(url), [url]);
 
@@ -520,6 +524,7 @@ export const useGameSocket = (
           playerId: message.playerId,
           playerName: normalizedName,
           reconnectUntil: message.reconnectUntil,
+          reconnectToken: message.reconnectToken,
           state: message.state,
           ranking: message.ranking,
         });
@@ -683,6 +688,10 @@ export const useGameSocket = (
               console.error("Identificador de jogador inválido descartado antes do envio");
             } else {
               joinMessage.playerId = sanitizedId;
+              const knownToken = reconnectTokenRef.current;
+              if (knownToken) {
+                joinMessage.reconnectToken = knownToken;
+              }
             }
           }
 
@@ -778,6 +787,7 @@ export const useGameSocket = (
       startHeartbeat,
       stopSocket,
       playerIdRef,
+      reconnectTokenRef,
       version,
       sendMessage,
       clearJoinErrorTimer,

@@ -328,6 +328,7 @@ describe("useGameSocket", () => {
       reconnectUntil: null,
       playerId: null,
       playerName: null,
+      reconnectToken: null,
       joinError: null,
     });
 
@@ -387,6 +388,7 @@ describe("useGameSocket", () => {
       playerName: "Tester",
       reconnectAttempts: 0,
       connectionStatus: "idle",
+      reconnectToken: null,
       joinError: null,
     });
 
@@ -659,6 +661,7 @@ describe("useGameSocket", () => {
       reconnectUntil: null,
       playerId: null,
       playerName: null,
+      reconnectToken: null,
       joinError: null,
     });
 
@@ -704,6 +707,7 @@ describe("useGameSocket", () => {
       expect(firstSocket.close).toHaveBeenCalledTimes(1);
       expect(setPlayerIdSpy).toHaveBeenCalledWith(null);
       expect(gameStore.getState().playerId).toBeNull();
+      expect(gameStore.getState().reconnectToken).toBeNull();
       expect(gameStore.getState().joinError).toBeNull();
       expect(gameStore.getState().connectionStatus).toBe("reconnecting");
       expect(statusSpy).toHaveBeenCalledWith("reconnecting");
