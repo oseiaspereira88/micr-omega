@@ -12,8 +12,6 @@ const Notifications = ({ notifications = [] }) => {
         <div
           key={notification.id ?? `${notification.text ?? ''}-${index}`}
           className={styles.notification}
-          role="status"
-          aria-atomic="true"
         >
           {notification.text}
         </div>
