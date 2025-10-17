@@ -93,6 +93,7 @@ describe("player evolution synchronization", () => {
 
     player.combatAttributes = roomAny.computePlayerCombatAttributes(player);
     roomAny.players.set(playerId, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const initialAttack = player.combatAttributes.attack;
     const initialSpeed = player.combatAttributes.speed;

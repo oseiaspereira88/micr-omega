@@ -49,6 +49,7 @@ describe("RoomDO disconnect behavior", () => {
 
       roomAny.players.set(player.id, player);
       roomAny.nameToPlayerId.set(player.name.toLowerCase(), player.id);
+      roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
       const socket = {
         readyState: websocketMock.OPEN,
@@ -74,6 +75,8 @@ describe("RoomDO disconnect behavior", () => {
         targetObjectId: null,
         lastAttackAt: null,
       });
+
+      expect(roomAny.getConnectedPlayersCount()).toBe(0);
 
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -162,6 +165,7 @@ describe("RoomDO disconnect behavior", () => {
 
       roomAny.players.set(disconnected.id, disconnected);
       roomAny.players.set(victim.id, victim);
+      roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
       roomAny.nameToPlayerId.set(disconnected.name.toLowerCase(), disconnected.id);
       roomAny.nameToPlayerId.set(victim.name.toLowerCase(), victim.id);
 

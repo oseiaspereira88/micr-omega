@@ -52,11 +52,15 @@ describe("RoomDO removePlayer cleanup", () => {
     const player = createTestPlayer("player-1");
     roomAny.players.set(player.id, player);
     roomAny.nameToPlayerId.set(player.name.toLowerCase(), player.id);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
     roomAny.broadcast = vi.fn();
+
+    expect(roomAny.getConnectedPlayersCount()).toBe(1);
 
     const now = Date.now();
     roomAny.queuePlayerDeath(player, now);
 
+    expect(roomAny.getConnectedPlayersCount()).toBe(0);
     expect(roomAny.playersPendingRemoval.has(player.id)).toBe(true);
     expect(roomAny.pendingPlayerDeaths.some((entry: any) => entry.playerId === player.id)).toBe(true);
 
@@ -65,5 +69,6 @@ describe("RoomDO removePlayer cleanup", () => {
     expect(roomAny.playersPendingRemoval.has(player.id)).toBe(false);
     expect(roomAny.pendingPlayerDeaths.some((entry: any) => entry.playerId === player.id)).toBe(false);
     expect(roomAny.pendingPlayerDeaths.length).toBe(0);
+    expect(roomAny.getConnectedPlayersCount()).toBe(0);
   });
 });

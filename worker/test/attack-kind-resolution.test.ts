@@ -60,6 +60,7 @@ describe("RoomDO attack kind resolution", () => {
     const { roomAny } = await createRoom();
     const player = createTestPlayer("runner");
     roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const microorganism: Microorganism = {
       id: "micro-1",
@@ -109,6 +110,7 @@ describe("RoomDO attack kind resolution", () => {
     const player = createTestPlayer("caster");
     player.skillState.current = "pulse";
     roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const weakMicro: Microorganism = {
       id: "weak", 
@@ -173,6 +175,7 @@ describe("RoomDO attack kind resolution", () => {
     player.skillState.current = "pulse";
     player.energy = 0;
     roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const applied = roomAny.applyPlayerAction(player, {
       type: "attack",

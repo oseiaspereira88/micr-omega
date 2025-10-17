@@ -70,6 +70,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
 
     const player: TestPlayer = createTestPlayer("collector");
     roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const nearMatter: OrganicMatter = {
       id: "matter-near",
@@ -141,6 +142,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
 
     const player: TestPlayer = createTestPlayer("collector");
     roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const matters: OrganicMatter[] = [
       {
@@ -218,6 +220,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
 
     roomAny.players.set(attacker.id, attacker);
     roomAny.players.set(defender.id, defender);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const worldDiff: SharedWorldStateDiff = {};
     const combatLog: CombatLogEntry[] = [];
@@ -258,6 +261,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
 
     roomAny.players.set(attacker.id, attacker);
     roomAny.players.set(defender.id, defender);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const worldDiff: SharedWorldStateDiff = {};
     const combatLog: CombatLogEntry[] = [];
@@ -293,6 +297,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
 
     roomAny.players.set(playerNear.id, playerNear);
     roomAny.players.set(playerFar.id, playerFar);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const microorganism: Microorganism = {
       id: "hostile-1",
@@ -339,6 +344,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
 
     roomAny.players.set(disconnected.id, disconnected);
     roomAny.players.set(connected.id, connected);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const microorganism: Microorganism = {
       id: "hostile-2",
@@ -384,6 +390,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
 
     roomAny.players.set(defeated.id, defeated);
     roomAny.players.set(active.id, active);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const microorganism: Microorganism = {
       id: "hostile-3",
@@ -429,6 +436,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
 
     roomAny.players.set(pendingRemoval.id, pendingRemoval);
     roomAny.players.set(eligible.id, eligible);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const microorganism: Microorganism = {
       id: "hostile-4",
@@ -470,6 +478,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
     });
 
     roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const initialPosition = { ...player.position };
 

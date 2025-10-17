@@ -50,6 +50,7 @@ describe("RoomDO alarms", () => {
       connectedAt: null,
     };
     roomAny.players.set(stalePlayer.id, stalePlayer);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     mockState.storageImpl.resetCounts();
 

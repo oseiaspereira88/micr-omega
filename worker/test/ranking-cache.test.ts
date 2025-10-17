@@ -67,6 +67,7 @@ describe("RoomDO ranking cache", () => {
     roomAny.players.set(playerB.id, playerB);
     roomAny.nameToPlayerId.set(playerA.name.toLowerCase(), playerA.id);
     roomAny.nameToPlayerId.set(playerB.name.toLowerCase(), playerB.id);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const initialRanking = roomAny.getRanking();
     expect(Array.isArray(initialRanking)).toBe(true);
@@ -112,6 +113,7 @@ describe("RoomDO ranking cache", () => {
     roomAny.players.set(playerB.id, playerB);
     roomAny.nameToPlayerId.set(playerA.name.toLowerCase(), playerA.id);
     roomAny.nameToPlayerId.set(playerB.name.toLowerCase(), playerB.id);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const initialRanking = roomAny.getRanking();
     expect(roomAny.rankingDirty).toBe(false);
@@ -181,6 +183,7 @@ describe("RoomDO ranking cache", () => {
     roomAny.players.set(playerOne.id, playerOne);
     roomAny.players.set(playerTwo.id, playerTwo);
     roomAny.players.set(playerThree.id, playerThree);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const ranking = roomAny.getRanking();
 
