@@ -949,6 +949,8 @@ export class RoomDO {
   private microorganismStatusEffects = new Map<string, StatusCollection>();
   private lastWorldTickAt: number | null = null;
   private pendingStatusEffects: StatusEffectEvent[] = [];
+  private pendingPlayerDeaths: Array<{ playerId: string; socket: WebSocket | null }> = [];
+  private playersPendingRemoval = new Set<string>();
 
   private alarmSchedule: Map<AlarmType, number> = new Map();
   private alarmsDirty = false;
@@ -2634,6 +2636,7 @@ export class RoomDO {
         scoresChanged = true;
         this.markRankingDirty();
         target.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
+        this.queuePlayerDeath(target, now, updatedPlayers);
       } else {
         scoreAwarded = 10;
         player.score = Math.max(0, player.score + scoreAwarded);
@@ -2800,6 +2803,7 @@ export class RoomDO {
 
       if (nextHealth === 0) {
         closest.player.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
+        this.queuePlayerDeath(closest.player, now, updatedPlayers);
       }
 
       combatLog.push({
@@ -2817,10 +2821,6 @@ export class RoomDO {
   }
 
   private getMicroorganismTargetCandidates(): PlayerInternal[] {
-    const playersPendingRemoval = (
-      this as unknown as { playersPendingRemoval?: Set<string> }
-    ).playersPendingRemoval;
-
     const candidates: PlayerInternal[] = [];
     for (const player of this.players.values()) {
       if (!player.connected) {
@@ -2829,16 +2829,66 @@ export class RoomDO {
       if (player.health.current <= 0) {
         continue;
       }
-      if ((player as PlayerInternal & { pendingRemoval?: boolean }).pendingRemoval) {
+      if (player.pendingRemoval) {
         continue;
       }
-      if (playersPendingRemoval?.has(player.id)) {
+      if (this.playersPendingRemoval.has(player.id)) {
         continue;
       }
       candidates.push(player);
     }
 
     return candidates;
+  }
+
+  private queuePlayerDeath(
+    player: PlayerInternal,
+    now: number,
+    updatedPlayers?: Map<string, PlayerInternal>,
+  ): void {
+    if (this.playersPendingRemoval.has(player.id)) {
+      return;
+    }
+
+    this.playersPendingRemoval.add(player.id);
+    player.pendingRemoval = true;
+    player.connected = false;
+    player.lastSeenAt = now;
+    player.lastActiveAt = now;
+    player.movementVector = createVector();
+    player.pendingAttack = null;
+    player.invulnerableUntil = null;
+
+    if (updatedPlayers) {
+      updatedPlayers.delete(player.id);
+    }
+
+    const socket = this.socketsByPlayer.get(player.id) ?? null;
+    if (socket) {
+      this.socketsByPlayer.delete(player.id);
+      this.clientsBySocket.delete(socket);
+      this.activeSockets.delete(socket);
+    }
+
+    this.pendingPlayerDeaths.push({ playerId: player.id, socket });
+  }
+
+  private async flushPendingPlayerDeaths(): Promise<void> {
+    if (this.pendingPlayerDeaths.length === 0) {
+      return;
+    }
+
+    const pending = this.pendingPlayerDeaths.splice(0);
+    for (const { playerId, socket } of pending) {
+      this.playersPendingRemoval.delete(playerId);
+      const player = this.players.get(playerId);
+      if (!player) {
+        continue;
+      }
+
+      player.pendingRemoval = false;
+      await this.handlePlayerDeath(player, socket);
+    }
   }
 
   private async setupSession(socket: WebSocket): Promise<void> {
@@ -3299,6 +3349,10 @@ export class RoomDO {
     const player = this.players.get(payload.playerId);
     if (!player) {
       this.send(socket, { type: "error", reason: "unknown_player" });
+      return;
+    }
+
+    if (player.pendingRemoval) {
       return;
     }
 
@@ -3916,7 +3970,10 @@ export class RoomDO {
       this.broadcast(stateMessage);
     }
 
-    if (scoresChanged) {
+    const hadQueuedDeaths = this.pendingPlayerDeaths.length > 0;
+    await this.flushPendingPlayerDeaths();
+
+    if (scoresChanged && !hadQueuedDeaths) {
       this.markRankingDirty();
       const rankingMessage: RankingMessage = {
         type: "ranking",
@@ -4342,7 +4399,10 @@ export class RoomDO {
     await this.scheduleCleanupAlarm();
   }
 
-  private async handlePlayerDeath(player: PlayerInternal, socket: WebSocket): Promise<void> {
+  private async handlePlayerDeath(
+    player: PlayerInternal,
+    socket: WebSocket | null,
+  ): Promise<void> {
     const now = Date.now();
     let sessionDurationMs: number | null = null;
 
@@ -4367,11 +4427,15 @@ export class RoomDO {
     }
     const stateMessage: StateDiffMessage = { type: "state", mode: "diff", state: diff };
     this.broadcast(stateMessage);
-    this.send(socket, stateMessage);
+    if (socket) {
+      this.send(socket, stateMessage);
+    }
 
     const rankingMessage: RankingMessage = { type: "ranking", ranking: this.getRanking() };
     this.broadcast(rankingMessage);
-    this.send(socket, rankingMessage);
+    if (socket) {
+      this.send(socket, rankingMessage);
+    }
 
     const connectedPlayers = this.countConnectedPlayers();
     this.observability.log("info", "player_removed", {
