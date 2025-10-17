@@ -2,13 +2,13 @@ import { memo } from "react";
 import styles from "./ToastStack.module.css";
 
 type Toast = {
-  id: number;
+  id: string;
   message: string;
 };
 
 type ToastStackProps = {
   toasts: Toast[];
-  onDismiss: (id: number) => void;
+  onDismiss: (id: string) => void;
 };
 
 const ToastStack = ({ toasts, onDismiss }: ToastStackProps) => {
