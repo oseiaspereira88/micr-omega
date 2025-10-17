@@ -22,6 +22,19 @@ export const reportClientError = (error: unknown): void => {
   if (error instanceof Error) {
     Sentry.captureException(error);
   } else {
-    Sentry.captureMessage(typeof error === "string" ? error : JSON.stringify(error));
+    if (typeof error === "string") {
+      Sentry.captureMessage(error);
+      return;
+    }
+
+    let serialized = "[unserializable error]";
+
+    try {
+      serialized = JSON.stringify(error);
+    } catch (serializationError) {
+      // The fallback value defined above is used when serialization fails.
+    }
+
+    Sentry.captureMessage(serialized);
   }
 };
