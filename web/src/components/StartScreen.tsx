@@ -49,10 +49,17 @@ const StartScreen = ({
   connectionStatus: connectionStatusProp,
   joinError: joinErrorProp,
 }: StartScreenProps) => {
-  const connectionStatus = useGameStore((state) => state.connectionStatus);
-  const joinError = useGameStore((state) => state.joinError);
-  const storedName = useGameStore((state) => state.playerName);
-  const playerId = useGameStore((state) => state.playerId);
+  const {
+    connectionStatus,
+    joinError,
+    storedName,
+    playerId,
+  } = useGameStore((state) => ({
+    connectionStatus: state.connectionStatus,
+    joinError: state.joinError,
+    storedName: state.playerName,
+    playerId: state.playerId,
+  }));
   const effectiveStatus = connectionStatusProp ?? connectionStatus;
   const effectiveJoinError = joinErrorProp ?? joinError;
 
