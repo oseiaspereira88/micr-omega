@@ -1,6 +1,7 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 
 import GameHud from '../GameHud';
 import { gameStore } from '../../../store/gameStore';
@@ -148,6 +149,61 @@ describe('GameHud touch controls', () => {
     fireEvent.click(cycleButton);
 
     expect(onCycleSkill).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('GameHud sidebar accessibility', () => {
+  it('focuses the sidebar when it is opened', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>,
+    );
+
+    const toggleButton = screen.getByRole('button', { name: /mostrar painel/i });
+
+    await user.click(toggleButton);
+
+    const sidebar = await screen.findByRole('complementary', {
+      name: /painel lateral do jogo/i,
+    });
+
+    await waitFor(() => {
+      const activeElement = document.activeElement;
+      expect(activeElement).not.toBe(toggleButton);
+      expect(sidebar.contains(activeElement)).toBe(true);
+    });
+  });
+
+  it('closes when Escape is pressed and restores focus to the toggle button', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>,
+    );
+
+    const toggleButton = screen.getByRole('button', { name: /mostrar painel/i });
+
+    await user.click(toggleButton);
+
+    const sidebar = await screen.findByRole('complementary', {
+      name: /painel lateral do jogo/i,
+    });
+
+    await waitFor(() => {
+      const activeElement = document.activeElement;
+      expect(activeElement).not.toBe(toggleButton);
+      expect(sidebar.contains(activeElement)).toBe(true);
+    });
+
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(toggleButton).toHaveFocus());
+    expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
   });
 });
 
