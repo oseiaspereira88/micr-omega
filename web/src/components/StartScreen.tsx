@@ -67,7 +67,10 @@ const StartScreen = ({
 
   const [inputValue, setInputValue] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
 
   const focusInput = useCallback(() => {
     inputRef.current?.focus({ preventScroll: true });
@@ -84,6 +87,78 @@ const StartScreen = ({
       setInputValue(persisted);
     }
   }, [storedName]);
+
+  useEffect(() => {
+    previouslyFocusedElementRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    focusInput();
+
+    return () => {
+      const target = previouslyFocusedElementRef.current;
+      if (target && typeof target.focus === "function") {
+        target.focus({ preventScroll: true });
+      } else if (closeButtonRef.current) {
+        closeButtonRef.current.blur();
+      }
+      previouslyFocusedElementRef.current = null;
+    };
+  }, [closeButtonRef, focusInput]);
+
+  const getFocusableElements = useCallback(() => {
+    const container = panelRef.current;
+    if (!container) {
+      return [] as HTMLElement[];
+    }
+
+    const focusableSelectors = [
+      "a[href]",
+      "button:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "[tabindex]:not([tabindex='-1'])",
+    ].join(",");
+
+    return Array.from(
+      container.querySelectorAll<HTMLElement>(focusableSelectors)
+    ).filter((element) => {
+      if (element.getAttribute("aria-hidden") === "true") {
+        return false;
+      }
+      if (element.tabIndex < 0) {
+        return false;
+      }
+      const elementWithDisabled = element as HTMLElement & { disabled?: boolean };
+      if (elementWithDisabled.disabled) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [panelRef]);
+
+  const focusFirstFocusable = useCallback(() => {
+    if (inputRef.current && !inputRef.current.disabled) {
+      focusInput();
+      return;
+    }
+
+    const focusableElements = getFocusableElements();
+    if (focusableElements.length > 0) {
+      focusableElements[0].focus({ preventScroll: true });
+    }
+  }, [focusInput, getFocusableElements]);
+
+  const focusLastFocusable = useCallback(() => {
+    const focusableElements = getFocusableElements();
+    if (focusableElements.length > 0) {
+      focusableElements[focusableElements.length - 1].focus({
+        preventScroll: true,
+      });
+    }
+  }, [getFocusableElements]);
 
   const errorMessage = useMemo(
     () => localError ?? effectiveJoinError ?? null,
@@ -141,6 +216,13 @@ const StartScreen = ({
   );
 
   const handleQuit = useCallback(() => {
+    const target = previouslyFocusedElementRef.current;
+    if (target && typeof target.focus === "function") {
+      target.focus({ preventScroll: true });
+    }
+    closeButtonRef.current?.blur();
+    previouslyFocusedElementRef.current = null;
+
     onQuit();
     setInputValue("");
     setLocalError(null);
@@ -150,7 +232,7 @@ const StartScreen = ({
     gameStore.actions.setConnectionStatus("idle");
     gameStore.actions.setReconnectUntil(null);
     gameStore.actions.resetGameState();
-  }, [onQuit]);
+  }, [closeButtonRef, onQuit]);
 
   const handleAudioToggle = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -187,15 +269,39 @@ const StartScreen = ({
     ? "Reconectar"
     : "Entrar na partida";
 
+  const handleFocusTrapStart = useCallback(() => {
+    focusLastFocusable();
+  }, [focusLastFocusable]);
+
+  const handleFocusTrapEnd = useCallback(() => {
+    focusFirstFocusable();
+  }, [focusFirstFocusable]);
+
   return (
     <div className={styles.root}>
+      <span
+        tabIndex={0}
+        className={styles.focusSentinel}
+        onFocus={handleFocusTrapStart}
+        aria-hidden="true"
+      />
       <div
         className={styles.panel}
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={dialogTitleId}
         aria-describedby={dialogDescriptionId}
       >
+        <button
+          type="button"
+          className={styles.closeButton}
+          onClick={handleQuit}
+          ref={closeButtonRef}
+          aria-label="Fechar"
+        >
+          ×
+        </button>
         <header className={styles.header}>
           <h1 id={dialogTitleId} className={styles.title}>
             Micro Ωmega
@@ -221,7 +327,6 @@ const StartScreen = ({
               disabled={isConnecting}
               maxLength={MAX_NAME_LENGTH}
               autoComplete="name"
-              autoFocus
               aria-invalid={Boolean(errorMessage)}
               aria-describedby={errorMessage ? "player-name-error" : undefined}
             />
@@ -343,6 +448,12 @@ const StartScreen = ({
           </div>
         </form>
       </div>
+      <span
+        tabIndex={0}
+        className={styles.focusSentinel}
+        onFocus={handleFocusTrapEnd}
+        aria-hidden="true"
+      />
     </div>
   );
 };
