@@ -2223,8 +2223,9 @@ export class RoomDO {
     });
 
     socket.addEventListener("close", () => {
-      if (playerId) {
-        void this.handleDisconnect(socket, playerId);
+      const knownPlayerId = playerId ?? this.clientsBySocket.get(socket);
+      if (knownPlayerId) {
+        void this.handleDisconnect(socket, knownPlayerId);
       }
       this.clientsBySocket.delete(socket);
       this.activeSockets.delete(socket);
@@ -2248,6 +2249,9 @@ export class RoomDO {
     const payload = validation.data;
     const now = Date.now();
     await this.cleanupInactivePlayers(now);
+    if (socket.readyState !== WebSocket.OPEN) {
+      return null;
+    }
 
     const normalizedName = this.normalizeName(payload.name);
     if (!normalizedName) {
@@ -2268,6 +2272,9 @@ export class RoomDO {
       await this.removePlayer(player.id, "expired");
       expiredPlayerRemoved = true;
       player = undefined;
+      if (socket.readyState !== WebSocket.OPEN) {
+        return null;
+      }
     }
 
     if (expiredPlayerRemoved) {
@@ -2277,6 +2284,9 @@ export class RoomDO {
       };
       this.broadcast(rankingMessage, socket);
       await this.scheduleCleanupAlarm();
+      if (socket.readyState !== WebSocket.OPEN) {
+        return null;
+      }
     }
 
     const nameKey = normalizedName.toLowerCase();
@@ -2296,6 +2306,9 @@ export class RoomDO {
         } else {
           await this.removePlayer(existing.id, "expired");
           expiredPlayerRemoved = true;
+          if (socket.readyState !== WebSocket.OPEN) {
+            return null;
+          }
         }
       } else {
         this.nameToPlayerId.delete(nameKey);
@@ -2305,6 +2318,10 @@ export class RoomDO {
     const previousSocket = player ? this.socketsByPlayer.get(player.id) : undefined;
 
     let rankingShouldUpdate = false;
+
+    if (socket.readyState !== WebSocket.OPEN) {
+      return null;
+    }
 
     if (!player) {
       const id = crypto.randomUUID();
@@ -2369,6 +2386,10 @@ export class RoomDO {
       this.socketsByPlayer.delete(player.id);
     }
 
+    if (socket.readyState !== WebSocket.OPEN) {
+      return null;
+    }
+
     this.clientsBySocket.set(socket, player.id);
     this.socketsByPlayer.set(player.id, socket);
 
@@ -2402,6 +2423,10 @@ export class RoomDO {
       state: sharedState,
       ranking
     };
+
+    if (socket.readyState !== WebSocket.OPEN) {
+      return null;
+    }
 
     this.send(socket, joinedMessage);
 
