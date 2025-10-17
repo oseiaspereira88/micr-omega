@@ -92,6 +92,12 @@
   visibility: hidden;
 }
 
+.sidebarSectionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .sidebarToggle {
   position: absolute;
   top: 16px;
