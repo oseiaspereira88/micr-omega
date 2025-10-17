@@ -49,6 +49,10 @@ const CameraControls = ({ zoom = 1, onChange }) => {
           value={safeZoom}
           onChange={handleChange}
           aria-label="Controle de zoom da câmera"
+          aria-valuemin={60}
+          aria-valuemax={120}
+          aria-valuenow={Math.round(safeZoom * 100)}
+          aria-valuetext={formatZoomLabel(safeZoom)}
         />
       </label>
 

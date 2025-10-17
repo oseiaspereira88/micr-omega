@@ -46,6 +46,9 @@ const SkillWheel = ({
     return parts.length > 0 ? parts.join(' · ') : '0⚡';
   };
 
+  const readinessPercent = Math.max(0, Math.min(100, Math.round(skillReadyPercent)));
+  const readinessStatus = readinessPercent >= 100 ? 'Pronta' : `${readinessPercent}% recarregada`;
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -73,13 +76,20 @@ const SkillWheel = ({
 
       <div className={styles.progress}>
         <div
+          role="progressbar"
+          aria-label="Recarga da habilidade"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={readinessPercent}
+          aria-valuetext={readinessStatus}
+          className={styles.progressFill}
           style={{
-            width: `${skillReadyPercent}%`,
-            height: '100%',
+            width: `${readinessPercent}%`,
             background: 'linear-gradient(90deg, #00D9FF, #7B2FFF)',
           }}
         />
       </div>
+      <span className={styles.visuallyHidden}>Estado da habilidade: {readinessStatus}</span>
 
       {currentSkill?.applies?.length ? (
         <div className={styles.statusList}>

@@ -308,6 +308,8 @@ const GameCanvas = ({ settings, onQuit }) => {
                   className={`${styles.rerollStatus} ${
                     rerollAvailable ? styles.rerollStatusAvailable : styles.rerollStatusBlocked
                   }`.trim()}
+                  role="status"
+                  aria-live="polite"
                 >
                   {rerollAvailable ? 'Disponível' : 'MG insuficiente'}
                 </span>

@@ -189,6 +189,20 @@
   gap: 0.5rem;
 }
 
+.toggleLabelText {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-weight: 500;
+  color: rgba(245, 247, 255, 0.9);
+}
+
+.toggleStatus {
+  font-size: 0.8rem;
+  text-transform: lowercase;
+  color: rgba(245, 247, 255, 0.65);
+}
+
 @media (max-width: 520px) {
   .panel {
     gap: 1.5rem;

@@ -143,6 +143,8 @@ const TouchControls = ({
         <span
           className={styles.skillLabel}
           style={{ color: skillDisabled ? '#fff' : '#001' }}
+          aria-live="polite"
+          aria-atomic="true"
         >
           {hasCurrentSkill ? (skillCoolingDown ? skillCooldownLabel : currentSkillCost) : '--'}
         </span>
