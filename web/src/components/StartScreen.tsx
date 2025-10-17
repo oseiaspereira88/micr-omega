@@ -256,6 +256,14 @@ const StartScreen = ({
     [updateSettings]
   );
 
+  const handleTouchLayoutChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      const value = event.target.value as GameSettings["touchLayout"];
+      updateSettings({ touchLayout: value });
+    },
+    [updateSettings]
+  );
+
   const isConnected = effectiveStatus === "connected" && Boolean(playerId);
 
   const dialogTitleId = "start-screen-title";
@@ -267,6 +275,7 @@ const StartScreen = ({
     : playerNameHelperId;
   const audioToggleId = "audio-enabled";
   const touchToggleId = "show-touch-controls";
+  const touchLayoutSelectId = "touch-layout";
 
   const audioLabel = settings.audioEnabled ? "Som ligado" : "Som desligado";
 
@@ -468,6 +477,32 @@ const StartScreen = ({
                     </span>
                   </span>
                 </label>
+              </div>
+
+              <div className={styles.optionRow}>
+                <div className={styles.optionContent}>
+                  <label
+                    className={styles.optionTitle}
+                    htmlFor={touchLayoutSelectId}
+                  >
+                    Layout dos controles touch
+                  </label>
+                  <span className={styles.optionDescription}>
+                    Escolha o lado onde os botões de ação ficam posicionados.
+                  </span>
+                </div>
+                <select
+                  id={touchLayoutSelectId}
+                  name="touch-layout"
+                  className={`${styles.select} ${styles.input}`.trim()}
+                  value={settings.touchLayout}
+                  onChange={handleTouchLayoutChange}
+                  disabled={isConnecting}
+                  aria-label="Layout dos controles touch"
+                >
+                  <option value="right">Botões à direita</option>
+                  <option value="left">Botões à esquerda</option>
+                </select>
               </div>
             </div>
           </div>

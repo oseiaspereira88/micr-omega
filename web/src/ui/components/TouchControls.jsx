@@ -33,6 +33,7 @@ const TouchControls = ({
   hasCurrentSkill,
   onOpenEvolutionMenu,
   canEvolve,
+  touchLayout = 'right',
 }) => {
   const dashStatusId = useId();
   const skillStatusId = useId();
@@ -93,8 +94,10 @@ const TouchControls = ({
     event.preventDefault();
   };
 
+  const layoutClass = touchLayout === 'left' ? styles.layoutLeft : styles.layoutRight;
+
   return (
-    <div className={styles.touchLayer}>
+    <div className={joinClassNames(styles.touchLayer, layoutClass)}>
       <div
         className={styles.joystickZone}
         onTouchStart={onJoystickStart}

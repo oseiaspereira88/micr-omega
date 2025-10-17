@@ -3,6 +3,7 @@ import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import TouchControls from '../TouchControls';
+import styles from '../TouchControls.module.css';
 
 describe('TouchControls', () => {
   const joystick = { isTouchActive: false, position: { x: 0, y: 0 } };
@@ -28,6 +29,18 @@ describe('TouchControls', () => {
     onOpenEvolutionMenu: vi.fn(),
     canEvolve: false,
   };
+
+  it('aplica o layout informado', () => {
+    const { container, rerender } = render(
+      <TouchControls {...baseProps} touchLayout="left" />
+    );
+
+    expect(container.firstChild).toHaveClass(styles.layoutLeft);
+
+    rerender(<TouchControls {...baseProps} touchLayout="right" />);
+
+    expect(container.firstChild).toHaveClass(styles.layoutRight);
+  });
 
   it('triggers attack release when touch is cancelled', () => {
     const onAttackRelease = vi.fn();
