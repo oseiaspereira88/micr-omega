@@ -6,6 +6,7 @@ import { getDefaultSkillList } from "../src/skills";
 import type { Env } from "../src";
 import type { CombatLogEntry, OrganicMatter, SharedWorldStateDiff } from "../src/types";
 import { MockDurableObjectState } from "./utils/mock-state";
+import { createMockSocket } from "./utils/mock-socket";
 
 type TestPlayer = ReturnType<typeof createTestPlayer>;
 
@@ -53,24 +54,6 @@ function createTestPlayer(id: string, overrides: Partial<Record<string, unknown>
   };
 
   return { ...base, ...overrides };
-}
-
-function createMockSocket(sent: string[] = []): WebSocket {
-  return {
-    readyState: (globalThis as any).WebSocket?.OPEN ?? 1,
-    send(payload: string) {
-      sent.push(typeof payload === "string" ? payload : String(payload));
-    },
-    close() {
-      /* noop */
-    },
-    addEventListener() {
-      /* noop */
-    },
-    removeEventListener() {
-      /* noop */
-    },
-  } as unknown as WebSocket;
 }
 
 describe("RoomDO ranking cache", () => {

@@ -74,6 +74,7 @@ const ROUND_DURATION_MS = 120_000;
 const RESET_DELAY_MS = 10_000;
 const RECONNECT_WINDOW_MS = 30_000;
 const INACTIVE_TIMEOUT_MS = 45_000;
+export const MAX_PLAYERS = 100;
 
 const MAX_COMBO_MULTIPLIER = 50;
 
@@ -3222,6 +3223,12 @@ export class RoomDO {
     const previousSocket = player ? this.socketsByPlayer.get(player.id) : undefined;
 
     let rankingShouldUpdate = false;
+
+    if (!player && this.countConnectedPlayers() >= MAX_PLAYERS) {
+      this.send(socket, { type: "error", reason: "room_full" });
+      socket.close(1008, "room_full");
+      return null;
+    }
 
     if (!player) {
       const id = crypto.randomUUID();
