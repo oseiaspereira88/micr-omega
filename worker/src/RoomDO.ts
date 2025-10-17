@@ -2151,13 +2151,51 @@ export class RoomDO {
 
       const parsed = validation.data;
 
+      const handleActionFailure = (error: unknown, source: string): void => {
+        const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
+        this.observability.logError("action_message_failed", error, {
+          category: "protocol_error",
+          source,
+          playerId: knownPlayerId,
+        });
+        this.observability.recordMetric("protocol_errors", 1, {
+          type: "action_processing_failed",
+          source,
+        });
+        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CLOSING) {
+          try {
+            socket.close(1011, "error");
+          } catch (closeError) {
+            this.observability.logError("action_socket_close_failed", closeError, {
+              category: "protocol_error",
+              source,
+              playerId: knownPlayerId,
+            });
+          }
+        }
+      };
+
       switch (parsed.type) {
         case "join":
-          void this.handleJoin(socket, parsed).then((result) => {
-            if (result) {
-              playerId = result;
-            }
-          });
+          void this.handleJoin(socket, parsed)
+            .then((result) => {
+              if (result) {
+                playerId = result;
+              }
+            })
+            .catch((error) => {
+              this.observability.logError("join_failed", error);
+              try {
+                if (
+                  socket.readyState === WebSocket.CONNECTING ||
+                  socket.readyState === WebSocket.OPEN
+                ) {
+                  socket.close(1011, "internal_error");
+                }
+              } catch (closeError) {
+                this.observability.logError("join_close_failed", closeError);
+              }
+            });
           break;
         case "action": {
           const knownId = playerId ?? this.clientsBySocket.get(socket);
@@ -2165,7 +2203,9 @@ export class RoomDO {
             this.send(socket, { type: "error", reason: "unknown_player" });
             return;
           }
-          void this.handleActionMessage(parsed, socket);
+          void this.handleActionMessage(parsed, socket).catch((error) =>
+            handleActionFailure(error, "action")
+          );
           break;
         }
         case "movement": {
@@ -2181,7 +2221,9 @@ export class RoomDO {
             ...(clientTime !== undefined ? { clientTime } : {}),
             action: movement as PlayerMovementAction,
           };
-          void this.handleActionMessage(normalized, socket);
+          void this.handleActionMessage(normalized, socket).catch((error) =>
+            handleActionFailure(error, "movement")
+          );
           break;
         }
         case "attack": {
@@ -2197,7 +2239,9 @@ export class RoomDO {
             ...(clientTime !== undefined ? { clientTime } : {}),
             action: attack as PlayerAttackAction,
           };
-          void this.handleActionMessage(normalized, socket);
+          void this.handleActionMessage(normalized, socket).catch((error) =>
+            handleActionFailure(error, "attack")
+          );
           break;
         }
         case "collect": {
@@ -2213,7 +2257,9 @@ export class RoomDO {
             ...(clientTime !== undefined ? { clientTime } : {}),
             action: collect as PlayerCollectAction,
           };
-          void this.handleActionMessage(normalized, socket);
+          void this.handleActionMessage(normalized, socket).catch((error) =>
+            handleActionFailure(error, "collect")
+          );
           break;
         }
         case "ping":
@@ -2225,7 +2271,11 @@ export class RoomDO {
     socket.addEventListener("close", () => {
       const knownPlayerId = playerId ?? this.clientsBySocket.get(socket);
       if (knownPlayerId) {
-        void this.handleDisconnect(socket, knownPlayerId);
+        void this.handleDisconnect(socket, knownPlayerId).catch((error) => {
+          this.observability.logError("player_disconnect_failed", error, {
+            playerId: knownPlayerId
+          });
+        });
       }
       this.clientsBySocket.delete(socket);
       this.activeSockets.delete(socket);

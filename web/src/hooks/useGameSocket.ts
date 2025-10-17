@@ -294,6 +294,8 @@ export const useGameSocket = (
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const pingTimerRef = useRef<number | null>(null);
+  const rateLimitRetryAfterRef = useRef<number | null>(null);
+  const rateLimitRecordedAtRef = useRef<number | null>(null);
   const shouldReconnectRef = useRef(false);
   const lastRequestedNameRef = useRef<string | null>(null);
   const connectInternalRef = useRef<(name: string, isReconnect: boolean) => void>();
@@ -480,6 +482,11 @@ export const useGameSocket = (
       }
     }
 
+    if (closeConnection) {
+      rateLimitRetryAfterRef.current = null;
+      rateLimitRecordedAtRef.current = null;
+    }
+
     socketRef.current = null;
   }, [clearJoinErrorTimer, clearPingTimer, clearReconnectTimer]);
 
@@ -545,6 +552,18 @@ export const useGameSocket = (
       }
       case "error": {
         const { reason } = message;
+        if (reason === "rate_limited") {
+          if (typeof message.retryAfterMs === "number") {
+            rateLimitRetryAfterRef.current = message.retryAfterMs;
+            rateLimitRecordedAtRef.current = Date.now();
+          } else {
+            rateLimitRetryAfterRef.current = null;
+            rateLimitRecordedAtRef.current = null;
+          }
+        } else {
+          rateLimitRetryAfterRef.current = null;
+          rateLimitRecordedAtRef.current = null;
+        }
         const isUnknownPlayer = reason === "unknown_player";
         if (!isUnknownPlayer) {
           gameStore.actions.setJoinError(errorReasonToMessage(message));
@@ -608,6 +627,18 @@ export const useGameSocket = (
     stopSocket,
   ]);
 
+  const isWithinReconnectWindow = useCallback(() => {
+    const { reconnectUntil } = gameStore.getState();
+    if (typeof reconnectUntil === "number" && Date.now() >= reconnectUntil) {
+      shouldReconnectRef.current = false;
+      lastRequestedNameRef.current = null;
+      gameStore.actions.setConnectionStatus("disconnected");
+      return false;
+    }
+
+    return true;
+  }, []);
+
   const connectInternal = useCallback(
     (name: string, isReconnect: boolean) => {
       if (typeof window === "undefined" || !effectiveUrl) {
@@ -669,14 +700,32 @@ export const useGameSocket = (
         socket.onmessage = handleServerMessage as (event: MessageEvent) => void;
 
         socket.onclose = () => {
+          const recordedAt = rateLimitRecordedAtRef.current;
+          const storedRetryAfter = rateLimitRetryAfterRef.current;
+          let retryAfterDelay = 0;
+          if (typeof storedRetryAfter === "number") {
+            const retryUntil =
+              (recordedAt ?? Date.now()) + Math.max(storedRetryAfter, 0);
+            retryAfterDelay = Math.max(0, retryUntil - Date.now());
+          }
+          rateLimitRetryAfterRef.current = null;
+          rateLimitRecordedAtRef.current = null;
+
           stopSocket(false);
-          if (shouldReconnectRef.current && lastRequestedNameRef.current) {
+          if (
+            shouldReconnectRef.current &&
+            lastRequestedNameRef.current &&
+            isWithinReconnectWindow()
+          ) {
             const scheduledName = lastRequestedNameRef.current;
             const attempts = gameStore.actions.incrementReconnectAttempts();
-            const delay = computeReconnectDelay(
-              attempts,
-              reconnectBaseDelay,
-              reconnectMaxDelay
+            const delay = Math.max(
+              retryAfterDelay,
+              computeReconnectDelay(
+                attempts,
+                reconnectBaseDelay,
+                reconnectMaxDelay
+              )
             );
 
             if (typeof window !== "undefined") {
@@ -698,7 +747,7 @@ export const useGameSocket = (
         };
       } catch (err) {
         console.error("Não foi possível abrir WebSocket", err);
-        if (shouldReconnectRef.current) {
+        if (shouldReconnectRef.current && isWithinReconnectWindow()) {
           const attempts = gameStore.actions.incrementReconnectAttempts();
           const delay = computeReconnectDelay(
             attempts,
@@ -731,6 +780,7 @@ export const useGameSocket = (
       version,
       sendMessage,
       clearJoinErrorTimer,
+      isWithinReconnectWindow,
     ]
   );
 
