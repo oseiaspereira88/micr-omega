@@ -10,8 +10,8 @@ import {
 } from '../../shared/combat';
 
 const summarizeSlot = (slot) => {
-  const used = Math.floor(slot?.used ?? 0);
-  const max = Math.floor(slot?.max ?? 0);
+  const used = Math.max(0, Math.floor(slot?.used ?? 0));
+  const max = Math.max(0, Math.floor(slot?.max ?? 0));
   return `${used}/${max}`;
 };
 
@@ -41,19 +41,46 @@ const HudBar = ({
   affinityLabel,
   resistances,
 }) => {
+  const safeLevel = Math.max(0, Math.floor(level ?? 0));
+  const safeScore = Math.max(0, Math.floor(score ?? 0));
+  const safeEnergy = Math.max(0, Math.floor(energy ?? 0));
+  const safeHealth = Math.max(0, Math.floor(health ?? 0));
+  const safeMaxHealth = Math.max(0, Math.floor(maxHealth ?? safeHealth));
+  const safeDashCharge = Math.max(0, Math.min(100, Math.floor(dashCharge ?? 0)));
+  const safeCombo = Math.max(0, Math.floor(combo ?? 0));
+  const safeMaxCombo = Math.max(0, Math.floor(maxCombo ?? 0));
+
   const xpCurrent = Math.max(0, Math.floor(xp?.current ?? 0));
   const xpNext = Math.max(1, Math.floor(xp?.next ?? 1));
   const xpPercent = Math.max(0, Math.min(1, xpCurrent / xpNext));
 
-  const mgCurrent = Math.floor(geneticMaterial?.current ?? 0);
-  const pcAvailable = Math.floor(characteristicPoints?.available ?? 0);
-  const pcTotal = Math.floor(characteristicPoints?.total ?? pcAvailable);
+  const mgCurrent = Math.max(0, Math.floor(geneticMaterial?.current ?? 0));
+  const pcAvailable = Math.max(0, Math.floor(characteristicPoints?.available ?? 0));
+  const pcTotal = Math.max(pcAvailable, Math.floor(characteristicPoints?.total ?? pcAvailable));
 
-  const rerollCost = Math.floor(reroll?.cost ?? reroll?.baseCost ?? 25);
-  const rerollCount = Math.floor(reroll?.count ?? 0);
+  const rerollCost = Math.max(0, Math.floor(reroll?.cost ?? reroll?.baseCost ?? 25));
+  const rerollCount = Math.max(0, Math.floor(reroll?.count ?? 0));
 
-  const fragmentCounters = geneFragments || {};
-  const stableCounters = stableGenes || {};
+  const fragmentCounters = {
+    minor: Math.max(0, Math.floor(geneFragments?.minor ?? 0)),
+    major: Math.max(0, Math.floor(geneFragments?.major ?? 0)),
+    apex: Math.max(0, Math.floor(geneFragments?.apex ?? 0)),
+  };
+  const stableCounters = {
+    minor: Math.max(0, Math.floor(stableGenes?.minor ?? 0)),
+    major: Math.max(0, Math.floor(stableGenes?.major ?? 0)),
+    apex: Math.max(0, Math.floor(stableGenes?.apex ?? 0)),
+  };
+
+  const dropPityFragment = Math.max(0, Math.floor(dropPity?.fragment ?? 0));
+  const dropPityStableGene = Math.max(0, Math.floor(dropPity?.stableGene ?? 0));
+
+  const recentRewardsSummary = {
+    xp: Math.max(0, Math.floor(recentRewards?.xp ?? 0)),
+    geneticMaterial: Math.max(0, Math.floor(recentRewards?.geneticMaterial ?? 0)),
+    fragments: Math.max(0, Math.floor(recentRewards?.fragments ?? 0)),
+    stableGenes: Math.max(0, Math.floor(recentRewards?.stableGenes ?? 0)),
+  };
 
   const normalizedElement = element ?? ELEMENT_TYPES.BIO;
   const normalizedAffinity = affinity ?? AFFINITY_TYPES.NEUTRAL;
@@ -78,7 +105,7 @@ const HudBar = ({
           icon: entry.icon,
           color: entry.color,
           stacks: entry.stacks,
-          remaining: entry.remaining,
+          remaining: Math.max(0, Math.ceil(entry.remaining ?? 0)),
         }))
         .slice(0, 4),
     [statusEffects]
@@ -87,7 +114,10 @@ const HudBar = ({
     () =>
       (activePowerUps || []).map((power) => {
         const percent = power.duration
-          ? Math.max(0, Math.min(100, (power.remaining / power.duration) * 100))
+          ? Math.max(
+              0,
+              Math.min(100, (((power.remaining ?? 0) / power.duration) * 100) || 0)
+            )
           : 0;
 
         return {
@@ -104,7 +134,7 @@ const HudBar = ({
   return (
     <>
       <div className={styles.header}>
-        <div className={styles.title}>MicrΩ • Nv.{level} • {score} pts</div>
+        <div className={styles.title}>MicrΩ • Nv.{safeLevel} • {safeScore} pts</div>
         <div className={styles.combatProfile}>
           <span className={styles.combatTag} title={`Elemento ${elementName}`}>
             {elementIcon} {elementName}
@@ -120,13 +150,13 @@ const HudBar = ({
 
       <div className={styles.stats}>
         <div className={styles.badge} style={{ background: 'rgba(0, 217, 255, 0.2)' }}>
-          ⚡ {Math.floor(energy)}
+          ⚡ {safeEnergy}
         </div>
         <div className={styles.badge} style={{ background: 'rgba(255, 100, 100, 0.2)' }}>
-          ❤️ {Math.floor(health)}/{maxHealth}
+          ❤️ {safeHealth}/{safeMaxHealth}
         </div>
         <div className={styles.badge} style={{ background: 'rgba(255, 200, 0, 0.2)' }}>
-          💨 {Math.floor(dashCharge)}%
+          💨 {safeDashCharge}%
         </div>
         <div className={styles.badge} style={{ background: 'rgba(0, 255, 170, 0.18)' }}>
           🧬 MG {mgCurrent}
@@ -134,14 +164,14 @@ const HudBar = ({
         <div className={styles.badge} style={{ background: 'rgba(90, 130, 255, 0.18)' }}>
           🧠 PC {pcAvailable}/{pcTotal}
         </div>
-        {combo > 1 && (
+        {safeCombo > 1 && (
           <div className={`${styles.badge} ${styles.comboBadge}`} style={{ background: 'rgba(255, 80, 0, 0.25)' }}>
-            🔥 Combo x{combo}
+            🔥 Combo x{safeCombo}
           </div>
         )}
-        {maxCombo > 0 && (
+        {safeMaxCombo > 0 && (
           <div className={`${styles.badge} ${styles.maxComboBadge}`} style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
-            🏅 Máx x{maxCombo}
+            🏅 Máx x{safeMaxCombo}
           </div>
         )}
         {resistanceEntries.length > 0 && (
@@ -175,7 +205,7 @@ const HudBar = ({
                 style={{ background: `${status.color}22`, borderColor: `${status.color}55` }}
                 title={`x${status.stacks} • ${status.label}`}
               >
-                {status.icon} {Math.ceil(status.remaining)}s
+                {status.icon} {status.remaining}s
               </span>
             ))}
           </div>
@@ -207,17 +237,17 @@ const HudBar = ({
           <div className={styles.resourceCard}>
             <div className={styles.resourceTitle}>Fragmentos</div>
             <div className={styles.resourceValues}>
-              <span>Menor {fragmentCounters.minor ?? 0}</span>
-              <span>Maior {fragmentCounters.major ?? 0}</span>
-              <span>Ápice {fragmentCounters.apex ?? 0}</span>
+              <span>Menor {fragmentCounters.minor}</span>
+              <span>Maior {fragmentCounters.major}</span>
+              <span>Ápice {fragmentCounters.apex}</span>
             </div>
           </div>
           <div className={styles.resourceCard}>
             <div className={styles.resourceTitle}>Genes estáveis</div>
             <div className={styles.resourceValues}>
-              <span>Menor {stableCounters.minor ?? 0}</span>
-              <span>Maior {stableCounters.major ?? 0}</span>
-              <span>Ápice {stableCounters.apex ?? 0}</span>
+              <span>Menor {stableCounters.minor}</span>
+              <span>Maior {stableCounters.major}</span>
+              <span>Ápice {stableCounters.apex}</span>
             </div>
           </div>
           <div className={styles.resourceCard}>
@@ -225,16 +255,16 @@ const HudBar = ({
             <div className={styles.resourceValues}>
               <span>Custo {rerollCost} MG</span>
               <span>Usado {rerollCount}x</span>
-              <span>Piedade {dropPity?.fragment ?? 0}/{dropPity?.stableGene ?? 0}</span>
+              <span>Piedade {dropPityFragment}/{dropPityStableGene}</span>
             </div>
           </div>
           <div className={styles.resourceCard}>
             <div className={styles.resourceTitle}>Últimos ganhos</div>
             <div className={styles.resourceValues}>
-              <span>XP +{Math.floor(recentRewards?.xp ?? 0)}</span>
-              <span>MG +{Math.floor(recentRewards?.geneticMaterial ?? 0)}</span>
-              <span>Frags +{Math.floor(recentRewards?.fragments ?? 0)}</span>
-              <span>Genes +{Math.floor(recentRewards?.stableGenes ?? 0)}</span>
+              <span>XP +{recentRewardsSummary.xp}</span>
+              <span>MG +{recentRewardsSummary.geneticMaterial}</span>
+              <span>Frags +{recentRewardsSummary.fragments}</span>
+              <span>Genes +{recentRewardsSummary.stableGenes}</span>
             </div>
           </div>
         </div>
