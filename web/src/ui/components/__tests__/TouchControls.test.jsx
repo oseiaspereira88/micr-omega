@@ -43,6 +43,48 @@ describe('TouchControls', () => {
     expect(onAttackRelease).toHaveBeenCalledTimes(1);
   });
 
+  it('triggers attack release when pointer is cancelled', () => {
+    const onAttackRelease = vi.fn();
+
+    const { getByRole } = render(
+      <TouchControls {...baseProps} onAttackRelease={onAttackRelease} />
+    );
+
+    const attackButton = getByRole('button', { name: 'Executar ataque básico' });
+
+    fireEvent.pointerCancel(attackButton);
+
+    expect(onAttackRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('triggers attack release on pointer up', () => {
+    const onAttackRelease = vi.fn();
+
+    const { getByRole } = render(
+      <TouchControls {...baseProps} onAttackRelease={onAttackRelease} />
+    );
+
+    const attackButton = getByRole('button', { name: 'Executar ataque básico' });
+
+    fireEvent.pointerUp(attackButton);
+
+    expect(onAttackRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('triggers attack release when pointer leaves the button', () => {
+    const onAttackRelease = vi.fn();
+
+    const { getByRole } = render(
+      <TouchControls {...baseProps} onAttackRelease={onAttackRelease} />
+    );
+
+    const attackButton = getByRole('button', { name: 'Executar ataque básico' });
+
+    fireEvent.mouseLeave(attackButton);
+
+    expect(onAttackRelease).toHaveBeenCalledTimes(1);
+  });
+
   it('permite trocar de habilidade quando uma habilidade está equipada', () => {
     const onCycleSkill = vi.fn();
 
