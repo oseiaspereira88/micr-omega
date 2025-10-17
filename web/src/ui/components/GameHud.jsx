@@ -163,6 +163,8 @@ const GameHud = ({
           role="complementary"
           aria-label="Painel lateral do jogo"
           aria-hidden={isSidebarOpen ? undefined : true}
+          hidden={!isSidebarOpen}
+          tabIndex={isSidebarOpen ? undefined : -1}
         >
           <RankingPanel />
           <ConnectionStatusOverlay />
