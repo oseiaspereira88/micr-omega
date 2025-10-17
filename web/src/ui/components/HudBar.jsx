@@ -76,6 +76,14 @@ const HudBar = ({
     Math.floor(sanitizeNumber(characteristicPoints?.total ?? pcAvailable, pcAvailable))
   );
 
+  const energyDisplay = formatNumber(safeEnergy);
+  const healthDisplay = `${formatNumber(safeHealth)}/${formatNumber(safeMaxHealth)}`;
+  const dashDisplay = `${formatNumber(safeDashCharge)}%`;
+  const mgDisplay = formatNumber(mgCurrent);
+  const pcDisplay = `${formatNumber(pcAvailable)}/${formatNumber(pcTotal)}`;
+  const comboDisplay = `x${formatNumber(safeCombo)}`;
+  const maxComboDisplay = `x${formatNumber(safeMaxCombo)}`;
+
   const rerollBaseCost = sanitizeNumber(reroll?.baseCost ?? 25, 25);
   const rerollCost = Math.max(
     0,
@@ -159,6 +167,69 @@ const HudBar = ({
     ? `${styles.stats} ${styles.statsCompact}`.trim()
     : styles.stats;
 
+  const renderBadge = ({ key, icon, label, value, style, className, ariaLabel }) => (
+    <div
+      key={key}
+      className={[styles.badge, className].filter(Boolean).join(' ')}
+      style={style}
+      aria-label={ariaLabel}
+      title={ariaLabel}
+    >
+      <span className={styles.badgeIcon} aria-hidden="true">
+        {icon}
+      </span>
+      <span className={styles.badgeContent}>
+        <span className={styles.badgeLabel}>{label}</span>
+        <span className={styles.badgeValue}>{value}</span>
+      </span>
+    </div>
+  );
+
+  const primaryBadges = [
+    {
+      key: 'energy',
+      icon: '⚡',
+      label: 'Energia',
+      value: energyDisplay,
+      style: { background: 'rgba(0, 217, 255, 0.2)' },
+      ariaLabel: `Energia atual: ${energyDisplay}`,
+    },
+    {
+      key: 'health',
+      icon: '❤️',
+      label: 'Vida',
+      value: healthDisplay,
+      style: { background: 'rgba(255, 100, 100, 0.2)' },
+      ariaLabel: `Vida atual: ${formatNumber(safeHealth)} de ${formatNumber(safeMaxHealth)}`,
+    },
+    {
+      key: 'dash',
+      icon: '💨',
+      label: 'Dash',
+      value: dashDisplay,
+      style: { background: 'rgba(255, 200, 0, 0.2)' },
+      ariaLabel: `Carga de dash disponível: ${dashDisplay}`,
+    },
+    {
+      key: 'geneticMaterial',
+      icon: '🧬',
+      label: 'MG',
+      value: mgDisplay,
+      style: { background: 'rgba(0, 255, 170, 0.18)' },
+      ariaLabel: `Material genético disponível: ${mgDisplay}`,
+    },
+    {
+      key: 'characteristicPoints',
+      icon: '🧠',
+      label: 'PC',
+      value: pcDisplay,
+      style: { background: 'rgba(90, 130, 255, 0.18)' },
+      ariaLabel: `Pontos de característica disponíveis: ${formatNumber(
+        pcAvailable
+      )} de ${formatNumber(pcTotal)}`,
+    },
+  ];
+
   return (
     <>
       <div className={styles.header}>
@@ -177,30 +248,28 @@ const HudBar = ({
       </div>
 
       <div className={statsClassName}>
-        <div className={styles.badge} style={{ background: 'rgba(0, 217, 255, 0.2)' }}>
-          ⚡ {formatNumber(safeEnergy)}
-        </div>
-        <div className={styles.badge} style={{ background: 'rgba(255, 100, 100, 0.2)' }}>
-          ❤️ {formatNumber(safeHealth)}/{formatNumber(safeMaxHealth)}
-        </div>
-        <div className={styles.badge} style={{ background: 'rgba(255, 200, 0, 0.2)' }}>
-          💨 {formatNumber(safeDashCharge)}%
-        </div>
-        <div className={styles.badge} style={{ background: 'rgba(0, 255, 170, 0.18)' }}>
-          🧬 MG {formatNumber(mgCurrent)}
-        </div>
-        <div className={styles.badge} style={{ background: 'rgba(90, 130, 255, 0.18)' }}>
-          🧠 PC {formatNumber(pcAvailable)}/{formatNumber(pcTotal)}
-        </div>
+        {primaryBadges.map(renderBadge)}
         {safeCombo > 1 && (
-          <div className={`${styles.badge} ${styles.comboBadge}`} style={{ background: 'rgba(255, 80, 0, 0.25)' }}>
-            🔥 Combo x{formatNumber(safeCombo)}
-          </div>
+          renderBadge({
+            key: 'combo',
+            icon: '🔥',
+            label: 'Combo',
+            value: comboDisplay,
+            style: { background: 'rgba(255, 80, 0, 0.25)' },
+            className: styles.comboBadge,
+            ariaLabel: `Combo atual: ${comboDisplay}`,
+          })
         )}
         {safeMaxCombo > 0 && (
-          <div className={`${styles.badge} ${styles.maxComboBadge}`} style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
-            🏅 Máx x{formatNumber(safeMaxCombo)}
-          </div>
+          renderBadge({
+            key: 'maxCombo',
+            icon: '🏅',
+            label: 'Combo máx.',
+            value: maxComboDisplay,
+            style: { background: 'rgba(255, 255, 255, 0.1)' },
+            className: styles.maxComboBadge,
+            ariaLabel: `Melhor combo: ${maxComboDisplay}`,
+          })
         )}
         {resistanceEntries.length > 0 && !minimized && (
           <div className={styles.resistanceRow}>

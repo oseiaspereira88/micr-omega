@@ -67,11 +67,38 @@
   backdrop-filter: blur(8px);
   padding: 4px 8px;
   border-radius: 6px;
-  font-size: 0.7rem;
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  align-items: flex-start;
+  gap: 6px;
   color: #fff;
+  min-width: 0;
+}
+
+.badgeIcon {
+  font-size: 0.85rem;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.badgeContent {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+  gap: 1px;
+}
+
+.badgeLabel {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+.badgeValue {
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .progressRow {
@@ -143,13 +170,21 @@
   gap: 2px;
 }
 
-.comboBadge {
+.comboBadge .badgeLabel {
+  color: rgba(255, 208, 160, 0.85);
+}
+
+.comboBadge .badgeValue {
   color: #ffaa55;
 }
 
-.maxComboBadge {
-  font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.7);
+.maxComboBadge .badgeLabel {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.maxComboBadge .badgeValue {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .resistanceRow {
