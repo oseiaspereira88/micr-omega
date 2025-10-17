@@ -36,6 +36,7 @@ import {
   type Microorganism,
   type OrganicMatter,
   type Obstacle,
+  type RoomObject,
   type StateDiffMessage,
   type StateFullMessage,
   type Vector2,
@@ -862,6 +863,7 @@ export class RoomDO {
   private organicMatterCells = new Map<string, Set<string>>();
   private organicMatterCellById = new Map<string, string>();
   private organicMatterOrder = new Map<string, number>();
+  private roomObjects = new Map<string, RoomObject>();
   private entitySequence = 0;
   private organicMatterRespawnRng: () => number = Math.random;
   private obstacles = new Map<string, Obstacle>();
@@ -1237,6 +1239,7 @@ export class RoomDO {
     this.organicMatterCellById = new Map();
     this.organicMatterOrder = new Map();
     this.obstacles = new Map(this.world.obstacles.map((obstacle) => [obstacle.id, obstacle]));
+    this.roomObjects = new Map(this.world.roomObjects.map((object) => [object.id, object]));
 
     this.world.organicMatter.forEach((matter, index) => {
       this.organicMatter.set(matter.id, matter);
@@ -2629,7 +2632,8 @@ export class RoomDO {
           if (
             !this.microorganisms.has(objectId) &&
             !this.organicMatter.has(objectId) &&
-            !this.obstacles.has(objectId)
+            !this.obstacles.has(objectId) &&
+            !this.roomObjects.has(objectId)
           ) {
             return null;
           }

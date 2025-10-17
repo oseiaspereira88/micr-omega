@@ -3,7 +3,7 @@ import type { DurableObjectState } from "@cloudflare/workers-types";
 
 import { RoomDO } from "../src/RoomDO";
 import type { Env } from "../src";
-import type { CombatLogEntry, SharedWorldStateDiff } from "../src/types";
+import type { CombatLogEntry, RoomObject, SharedWorldStateDiff } from "../src/types";
 import { MockDurableObjectState } from "./utils/mock-state";
 
 async function createRoom() {
@@ -114,5 +114,34 @@ describe("RoomDO player attacks", () => {
     expect(result).not.toBeNull();
     expect(attacker.health.max).toBe(100);
     expect(attacker.health.current).toBe(90);
+  });
+
+  it("accepts attack actions targeting known room objects", async () => {
+    const { roomAny } = await createRoom();
+
+    const attacker = createTestPlayer("attacker");
+    roomAny.players.set(attacker.id, attacker);
+
+    const controlPanel: RoomObject = {
+      id: "room-console",
+      kind: "room_object",
+      type: "control_panel",
+      position: { x: 10, y: -5 },
+      state: { status: "online" },
+    };
+
+    roomAny.world.roomObjects = [controlPanel];
+    roomAny.roomObjects = new Map([[controlPanel.id, controlPanel]]);
+
+    const result = roomAny.applyPlayerAction(attacker, {
+      type: "attack",
+      targetPlayerId: null,
+      targetObjectId: controlPanel.id,
+      state: "engaged",
+    });
+
+    expect(result).not.toBeNull();
+    expect(attacker.combatStatus.targetObjectId).toBe(controlPanel.id);
+    expect(attacker.combatStatus.state).toBe("engaged");
   });
 });
