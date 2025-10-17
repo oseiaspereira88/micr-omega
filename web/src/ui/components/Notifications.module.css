@@ -20,24 +20,39 @@
   color: #fff;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(10px);
-  animation: notificationFade 2s ease forwards;
+  opacity: 1;
+  transform: none;
 }
 
-@keyframes notificationFade {
-  0% {
-    opacity: 0;
-    transform: translateY(10px);
+@media (prefers-reduced-motion: no-preference) {
+  .notification {
+    animation: notificationFade 2s ease forwards;
   }
-  20% {
+
+  @keyframes notificationFade {
+    0% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    20% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    80% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification {
+    animation: none;
     opacity: 1;
-    transform: translateY(0);
-  }
-  80% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-10px);
+    transform: none;
   }
 }

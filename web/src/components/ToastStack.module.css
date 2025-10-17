@@ -75,12 +75,23 @@
   margin: 0;
   line-height: 1;
   opacity: 0.75;
-  transition: opacity 0.2s ease;
 }
 
 .closeButton:hover,
 .closeButton:focus-visible {
   opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .closeButton {
+    transition: opacity 0.2s ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .closeButton {
+    transition: none;
+  }
 }
 
 @media (max-width: 640px) {
