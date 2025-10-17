@@ -233,6 +233,7 @@ const GameCanvas = ({ settings, onQuit }) => {
   }, [rerollAvailable, requestEvolutionReroll]);
 
   const evolutionOverlayRef = useRef(null);
+  const evolutionDialogRef = useRef(null);
   const rerollButtonRef = useRef(null);
   const firstTierButtonRef = useRef(null);
   const previousFocusRef = useRef(null);
@@ -240,8 +241,8 @@ const GameCanvas = ({ settings, onQuit }) => {
   const evolutionDialogTitleId = useId();
 
   const getFocusableEvolutionElements = useCallback(() => {
-    const overlay = evolutionOverlayRef.current;
-    if (!overlay) return [];
+    const dialog = evolutionDialogRef.current;
+    if (!dialog) return [];
 
     const selectors = [
       'button:not([disabled])',
@@ -252,11 +253,14 @@ const GameCanvas = ({ settings, onQuit }) => {
       '[tabindex]:not([tabindex="-1"])',
     ];
 
-    return Array.from(overlay.querySelectorAll(selectors.join(','))).filter((element) => {
+    return Array.from(dialog.querySelectorAll(selectors.join(','))).filter((element) => {
       if (element.getAttribute('aria-hidden') === 'true') {
         return false;
       }
       if (element.hasAttribute('disabled')) {
+        return false;
+      }
+      if (element.dataset?.focusSentinel === 'true') {
         return false;
       }
       const htmlElement = element;
@@ -276,6 +280,16 @@ const GameCanvas = ({ settings, onQuit }) => {
     releaseEvolutionFocus();
     cancelEvolutionChoice?.();
   }, [cancelEvolutionChoice, releaseEvolutionFocus]);
+
+  const focusFirstEvolutionElement = useCallback(() => {
+    const focusableElements = getFocusableEvolutionElements();
+    focusableElements[0]?.focus();
+  }, [getFocusableEvolutionElements]);
+
+  const focusLastEvolutionElement = useCallback(() => {
+    const focusableElements = getFocusableEvolutionElements();
+    focusableElements[focusableElements.length - 1]?.focus();
+  }, [getFocusableEvolutionElements]);
 
   const handleEvolutionOverlayKeyDown = useCallback(
     (event) => {
@@ -317,6 +331,7 @@ const GameCanvas = ({ settings, onQuit }) => {
 
   useEffect(() => {
     if (showEvolutionChoice) {
+      const dialog = evolutionDialogRef.current;
       if (!wasEvolutionOpenRef.current) {
         wasEvolutionOpenRef.current = true;
         const activeElement = document.activeElement;
@@ -336,13 +351,25 @@ const GameCanvas = ({ settings, onQuit }) => {
 
         if (initialFocus && typeof initialFocus.focus === 'function') {
           initialFocus.focus();
+        } else if (dialog && typeof dialog.focus === 'function') {
+          dialog.focus();
         }
+      } else if (
+        dialog &&
+        typeof dialog.contains === 'function' &&
+        !dialog.contains(document.activeElement)
+      ) {
+        dialog.focus();
       }
     } else if (wasEvolutionOpenRef.current) {
       wasEvolutionOpenRef.current = false;
       releaseEvolutionFocus();
     }
-  }, [showEvolutionChoice, getFocusableEvolutionElements, releaseEvolutionFocus]);
+  }, [
+    showEvolutionChoice,
+    getFocusableEvolutionElements,
+    releaseEvolutionFocus,
+  ]);
 
   return (
     <div className={styles.container}>
@@ -404,138 +431,158 @@ const GameCanvas = ({ settings, onQuit }) => {
           onClick={handleEvolutionOverlayClick}
         >
           <div
-            className={styles.evolutionCard}
+            className={styles.evolutionDialog}
             role="dialog"
             aria-modal="true"
             aria-labelledby={evolutionDialogTitleId}
             onKeyDown={handleEvolutionOverlayKeyDown}
+            ref={evolutionDialogRef}
+            tabIndex={-1}
           >
-            <h2 id={evolutionDialogTitleId} className={styles.evolutionTitle}>
-              🧬 Evolução Nível {level}
-            </h2>
+            <span
+              tabIndex={0}
+              data-focus-sentinel="true"
+              className={styles.focusSentinel}
+              onFocus={focusLastEvolutionElement}
+            />
 
-            <div className={styles.rerollControls}>
-              <button
-                type="button"
-                className={`${styles.rerollButton} ${
-                  rerollAvailable ? '' : styles.rerollButtonDisabled
-                }`.trim()}
-                onClick={handleEvolutionReroll}
-                disabled={!rerollAvailable}
-                aria-disabled={!rerollAvailable}
-                ref={rerollButtonRef}
-              >
-                🔁 Rerrolar opções
-              </button>
-              <div className={styles.rerollInfo}>
-                <span className={styles.rerollCost}>Custo {rerollCost} MG</span>
-                <span className={styles.rerollCount}>Usado {rerollCount}x</span>
-                <span
-                  className={`${styles.rerollStatus} ${
-                    rerollAvailable ? styles.rerollStatusAvailable : styles.rerollStatusBlocked
+            <div className={styles.evolutionCard}>
+              <h2 id={evolutionDialogTitleId} className={styles.evolutionTitle}>
+                🧬 Evolução Nível {level}
+              </h2>
+
+              <div className={styles.rerollControls}>
+                <button
+                  type="button"
+                  className={`${styles.rerollButton} ${
+                    rerollAvailable ? '' : styles.rerollButtonDisabled
                   }`.trim()}
-                  role="status"
-                  aria-live="polite"
+                  onClick={handleEvolutionReroll}
+                  disabled={!rerollAvailable}
+                  aria-disabled={!rerollAvailable}
+                  ref={rerollButtonRef}
                 >
-                  {rerollAvailable ? 'Disponível' : 'MG insuficiente'}
-                </span>
+                  🔁 Rerrolar opções
+                </button>
+                <div className={styles.rerollInfo}>
+                  <span className={styles.rerollCost}>Custo {rerollCost} MG</span>
+                  <span className={styles.rerollCount}>Usado {rerollCount}x</span>
+                  <span
+                    className={`${styles.rerollStatus} ${
+                      rerollAvailable ? styles.rerollStatusAvailable : styles.rerollStatusBlocked
+                    }`.trim()}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {rerollAvailable ? 'Disponível' : 'MG insuficiente'}
+                  </span>
+                </div>
+              </div>
+
+              <div className={styles.evolutionTabs}>
+                {EVOLUTION_TIER_KEYS.map((tierKey, index) => {
+                  const metadata = TIER_METADATA[tierKey];
+                  const isActive = evolutionMenu.activeTier === tierKey;
+                  const slots = evolutionSlots?.[tierKey] || { used: 0, max: 0 };
+                  const handleActivateTier = () => {
+                    if (!isActive) {
+                      setActiveEvolutionTier?.(tierKey);
+                    }
+                  };
+                  return (
+                    <button
+                      type="button"
+                      key={tierKey}
+                      className={`${styles.evolutionTab} ${
+                        isActive ? styles.evolutionTabActive : styles.evolutionTabDisabled
+                      }`.trim()}
+                      onClick={handleActivateTier}
+                      aria-pressed={isActive}
+                      aria-controls={EVOLUTION_OPTIONS_PANEL_ID}
+                      ref={index === 0 ? firstTierButtonRef : null}
+                      data-evolution-tier-tab="true"
+                    >
+                      <div className={styles.evolutionTabHeader}>
+                        <span>{metadata.icon}</span>
+                        <span>{metadata.label}</span>
+                      </div>
+                      <small className={styles.evolutionTabHint}>{metadata.description}</small>
+                      <small className={styles.evolutionTabSlots}>
+                        Slots {slots.used}/{slots.max}
+                      </small>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className={styles.optionHeading}>
+                {TIER_METADATA[evolutionMenu.activeTier]?.label || 'Evoluções'} disponíveis
+              </div>
+              <div className={styles.optionList} id={EVOLUTION_OPTIONS_PANEL_ID}>
+                {(evolutionMenu.options?.[evolutionMenu.activeTier] || []).map((option) => {
+                  const disabled = !option.available;
+                  const multiplierPercent = Math.round((option.nextBonusMultiplier ?? 0) * 100);
+                  const className = [
+                    styles.evolutionOption,
+                    disabled ? styles.evolutionOptionDisabled : '',
+                  ]
+                    .join(' ')
+                    .trim();
+
+                  const handleSelect = () => {
+                    if (disabled) return;
+                    releaseEvolutionFocus();
+                    chooseEvolution(option.key, option.tier);
+                  };
+
+                  return (
+                    <button
+                      type="button"
+                      key={option.key}
+                      className={className}
+                      onClick={handleSelect}
+                      disabled={disabled}
+                    >
+                      <div className={styles.evolutionOptionHeader}>
+                        <span className={styles.evolutionOptionTitle} style={{ color: option.color }}>
+                          {option.icon} {option.name}
+                        </span>
+                        <span className={styles.evolutionOptionRepeat}>
+                          Aquisições: {option.purchases}
+                        </span>
+                      </div>
+                      <div className={styles.evolutionOptionRow}>
+                        <span className={styles.evolutionOptionLabel}>Custo</span>
+                        <span>{formatEvolutionCost(option.cost)}</span>
+                      </div>
+                      <div className={styles.evolutionOptionRow}>
+                        <span className={styles.evolutionOptionLabel}>Requisitos</span>
+                        <span>{formatEvolutionRequirements(option.requirements)}</span>
+                      </div>
+                      <div className={styles.evolutionOptionRow}>
+                        <span className={styles.evolutionOptionLabel}>Próximo bônus</span>
+                        <span>{multiplierPercent}%</span>
+                      </div>
+                      {!option.available && option.reason && (
+                        <div className={styles.evolutionOptionNotice}>{option.reason}</div>
+                      )}
+                      {option.tier === 'large' && option.key === currentForm && (
+                        <div className={styles.evolutionOptionNotice}>
+                          Forma atual — benefício reduzido
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className={styles.evolutionTabs}>
-              {EVOLUTION_TIER_KEYS.map((tierKey, index) => {
-                const metadata = TIER_METADATA[tierKey];
-                const isActive = evolutionMenu.activeTier === tierKey;
-                const slots = evolutionSlots?.[tierKey] || { used: 0, max: 0 };
-                const handleActivateTier = () => {
-                  if (!isActive) {
-                    setActiveEvolutionTier?.(tierKey);
-                  }
-                };
-                return (
-                  <button
-                    type="button"
-                    key={tierKey}
-                    className={`${styles.evolutionTab} ${isActive ? styles.evolutionTabActive : styles.evolutionTabDisabled}`.trim()}
-                    onClick={handleActivateTier}
-                    aria-pressed={isActive}
-                    aria-controls={EVOLUTION_OPTIONS_PANEL_ID}
-                    ref={index === 0 ? firstTierButtonRef : null}
-                    data-evolution-tier-tab="true"
-                  >
-                    <div className={styles.evolutionTabHeader}>
-                      <span>{metadata.icon}</span>
-                      <span>{metadata.label}</span>
-                    </div>
-                    <small className={styles.evolutionTabHint}>{metadata.description}</small>
-                    <small className={styles.evolutionTabSlots}>
-                      Slots {slots.used}/{slots.max}
-                    </small>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className={styles.optionHeading}>
-              {TIER_METADATA[evolutionMenu.activeTier]?.label || 'Evoluções'} disponíveis
-            </div>
-            <div className={styles.optionList} id={EVOLUTION_OPTIONS_PANEL_ID}>
-              {(evolutionMenu.options?.[evolutionMenu.activeTier] || []).map((option) => {
-                const disabled = !option.available;
-                const multiplierPercent = Math.round((option.nextBonusMultiplier ?? 0) * 100);
-                const className = [
-                  styles.evolutionOption,
-                  disabled ? styles.evolutionOptionDisabled : '',
-                ]
-                  .join(' ')
-                  .trim();
-
-                const handleSelect = () => {
-                  if (disabled) return;
-                  releaseEvolutionFocus();
-                  chooseEvolution(option.key, option.tier);
-                };
-
-                return (
-                  <button
-                    type="button"
-                    key={option.key}
-                    className={className}
-                    onClick={handleSelect}
-                    disabled={disabled}
-                  >
-                    <div className={styles.evolutionOptionHeader}>
-                      <span className={styles.evolutionOptionTitle} style={{ color: option.color }}>
-                        {option.icon} {option.name}
-                      </span>
-                      <span className={styles.evolutionOptionRepeat}>
-                        Aquisições: {option.purchases}
-                      </span>
-                    </div>
-                    <div className={styles.evolutionOptionRow}>
-                      <span className={styles.evolutionOptionLabel}>Custo</span>
-                      <span>{formatEvolutionCost(option.cost)}</span>
-                    </div>
-                    <div className={styles.evolutionOptionRow}>
-                      <span className={styles.evolutionOptionLabel}>Requisitos</span>
-                      <span>{formatEvolutionRequirements(option.requirements)}</span>
-                    </div>
-                    <div className={styles.evolutionOptionRow}>
-                      <span className={styles.evolutionOptionLabel}>Próximo bônus</span>
-                      <span>{multiplierPercent}%</span>
-                    </div>
-                    {!option.available && option.reason && (
-                      <div className={styles.evolutionOptionNotice}>{option.reason}</div>
-                    )}
-                    {option.tier === 'large' && option.key === currentForm && (
-                      <div className={styles.evolutionOptionNotice}>
-                        Forma atual — benefício reduzido
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            <span
+              tabIndex={0}
+              data-focus-sentinel="true"
+              className={styles.focusSentinel}
+              onFocus={focusFirstEvolutionElement}
+            />
           </div>
         </div>
       )}

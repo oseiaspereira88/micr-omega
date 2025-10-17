@@ -28,6 +28,16 @@
   padding: 15px;
 }
 
+.evolutionDialog {
+  position: relative;
+  max-width: 450px;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+
 .evolutionCard {
   background: linear-gradient(135deg, #0a0a2a 0%, #1a0a3a 100%);
   padding: 20px;
@@ -38,6 +48,18 @@
   box-shadow: 0 0 60px rgba(0, 217, 255, 0.4);
   max-height: 85vh;
   overflow: auto;
+}
+
+.focusSentinel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  overflow: hidden;
 }
 
 .evolutionTitle {
