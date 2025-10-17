@@ -103,6 +103,7 @@ describe("StartScreen", () => {
 
     const audioToggle = screen.getByLabelText(/som ligado/i);
     fireEvent.click(audioToggle); // desativa áudio
+    expect(audioToggle).toHaveAccessibleName(/som desligado/i);
 
     const densitySelect = screen.getByRole("combobox");
     fireEvent.change(densitySelect, { target: { value: "high" } });
@@ -181,6 +182,7 @@ describe("StartScreen", () => {
 
     const audioToggle = screen.getByLabelText(/som ligado/i);
     fireEvent.click(audioToggle);
+    expect(audioToggle).toHaveAccessibleName(/som desligado/i);
 
     const densitySelect = screen.getByRole("combobox");
     fireEvent.change(densitySelect, { target: { value: "low" } });
