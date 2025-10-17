@@ -18,8 +18,10 @@ const App = () => {
   const { connect, disconnect, sendMovement, sendAttack, send } = useGameSocket({
     autoConnect: isAutoJoinRequested,
   });
-  const joinError = useGameStore((state) => state.joinError);
-  const connectionStatus = useGameStore((state) => state.connectionStatus);
+  const { joinError, connectionStatus } = useGameStore((state) => ({
+    joinError: state.joinError,
+    connectionStatus: state.connectionStatus,
+  }));
   const { settings } = useGameSettings();
   const [toasts, setToasts] = useState([]);
   const timersRef = useRef(new Map());
