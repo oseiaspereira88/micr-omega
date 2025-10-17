@@ -31,6 +31,9 @@ const CameraControls = ({ zoom = 1, onChange }) => {
     [onChange]
   );
 
+  const isDefaultPresetActive = safeZoom >= 0.95;
+  const isMacroPresetActive = safeZoom <= 0.75;
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -59,15 +62,17 @@ const CameraControls = ({ zoom = 1, onChange }) => {
       <div className={styles.presets}>
         <button
           type="button"
-          className={`${styles.presetButton} ${safeZoom >= 0.95 ? styles.active : ''}`}
+          className={`${styles.presetButton} ${isDefaultPresetActive ? styles.active : ''}`}
           onClick={handlePreset(1)}
+          aria-pressed={isDefaultPresetActive}
         >
           Padrão
         </button>
         <button
           type="button"
-          className={`${styles.presetButton} ${safeZoom <= 0.75 ? styles.active : ''}`}
+          className={`${styles.presetButton} ${isMacroPresetActive ? styles.active : ''}`}
           onClick={handlePreset(0.7)}
+          aria-pressed={isMacroPresetActive}
         >
           Macro
         </button>
