@@ -3426,30 +3426,35 @@ export class RoomDO {
           targetObjectId: action.targetObjectId ?? null,
         };
 
-        let updatedHealth = false;
+        const currentHealthMax = player.health.max;
+        const previousHealthCurrent = player.health.current;
+        const hasDamage = typeof action.damage === "number";
+        const normalizedDamage = hasDamage ? Math.max(0, action.damage) : 0;
+        const expectedCurrent = hasDamage
+          ? clamp(previousHealthCurrent - normalizedDamage, 0, currentHealthMax)
+          : previousHealthCurrent;
+
         if (action.resultingHealth) {
           const { current, max } = action.resultingHealth;
-          const currentHealthMax = player.health.max;
           const isCurrentFinite = typeof current === "number" && Number.isFinite(current);
           const maxMatches = max === undefined || max === currentHealthMax;
 
-          if (isCurrentFinite && maxMatches) {
+          if (hasDamage && isCurrentFinite && maxMatches) {
             const normalizedCurrent = clamp(current, 0, currentHealthMax);
-            if (normalizedCurrent === current && current <= currentHealthMax) {
-              player.health = {
-                current: normalizedCurrent,
-                max: currentHealthMax,
-              };
-              updatedHealth = true;
+            if (normalizedCurrent !== expectedCurrent) {
+              this.observability.recordMetric("player_attack_resulting_health_mismatch", 1, {
+                expected: expectedCurrent,
+                reported: normalizedCurrent,
+                damage: normalizedDamage,
+              });
             }
           }
         }
 
-        if (!updatedHealth && typeof action.damage === "number") {
-          const next = Math.max(0, player.health.current - Math.max(0, action.damage));
+        if (hasDamage) {
           player.health = {
-            current: Math.max(0, Math.min(player.health.max, next)),
-            max: player.health.max,
+            current: expectedCurrent,
+            max: currentHealthMax,
           };
         }
 
