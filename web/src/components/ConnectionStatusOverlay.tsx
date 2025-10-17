@@ -25,34 +25,42 @@ const LATENCY_FORMATTER = new Intl.NumberFormat(undefined, {
 const formatLatency = (value: number) => LATENCY_FORMATTER.format(Math.round(value));
 
 const ConnectionStatusOverlay = () => {
-  const connectionStatus = useGameStore((state) => state.connectionStatus);
-  const lastPingAt = useGameStore((state) => state.lastPingAt);
-  const lastPongAt = useGameStore((state) => state.lastPongAt);
-  const reconnectAttempts = useGameStore((state) => state.reconnectAttempts);
-  const joinError = useGameStore((state) => state.joinError);
+  const connectionState = useGameStore((state) => ({
+    connectionStatus: state.connectionStatus,
+    lastPingAt: state.lastPingAt,
+    lastPongAt: state.lastPongAt,
+    reconnectAttempts: state.reconnectAttempts,
+    joinError: state.joinError,
+  }));
 
   const latency = useMemo(() => {
-    if (lastPingAt == null || lastPongAt == null) {
+    if (connectionState.lastPingAt == null || connectionState.lastPongAt == null) {
       return null;
     }
 
-    const delta = lastPongAt - lastPingAt;
+    const delta = connectionState.lastPongAt - connectionState.lastPingAt;
     if (delta < 0) {
       return null;
     }
 
     return delta;
-  }, [lastPingAt, lastPongAt]);
+  }, [connectionState.lastPingAt, connectionState.lastPongAt]);
 
-  const statusLabel = STATUS_LABEL[connectionStatus as string] ?? connectionStatus;
+  const statusLabel =
+    STATUS_LABEL[connectionState.connectionStatus as string] ??
+    connectionState.connectionStatus;
 
   const statusClassName = useMemo(() => {
-    const className = STATUS_CLASS[connectionStatus] ?? styles.statusIdle;
+    const className =
+      STATUS_CLASS[connectionState.connectionStatus] ?? styles.statusIdle;
     return `${styles.statusDot} ${className}`;
-  }, [connectionStatus]);
+  }, [connectionState.connectionStatus]);
 
-  const showLatency = connectionStatus === "connected" && latency !== null;
-  const showAttempts = reconnectAttempts > 0 && connectionStatus !== "connected";
+  const showLatency =
+    connectionState.connectionStatus === "connected" && latency !== null;
+  const showAttempts =
+    connectionState.reconnectAttempts > 0 &&
+    connectionState.connectionStatus !== "connected";
   const hasMetrics = showLatency || showAttempts;
   const formattedLatency = showLatency && latency !== null ? formatLatency(latency) : null;
 
@@ -73,12 +81,14 @@ const ConnectionStatusOverlay = () => {
           {showAttempts ? (
             <div className={styles.metric}>
               <span>Tentativas</span>
-              <strong>{reconnectAttempts}</strong>
+              <strong>{connectionState.reconnectAttempts}</strong>
             </div>
           ) : null}
         </div>
       ) : null}
-      {joinError ? <div className={styles.alert}>{joinError}</div> : null}
+      {connectionState.joinError ? (
+        <div className={styles.alert}>{connectionState.joinError}</div>
+      ) : null}
     </div>
   );
 };
