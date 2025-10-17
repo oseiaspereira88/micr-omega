@@ -350,7 +350,8 @@ const StartScreen = ({
               Nome do jogador
             </label>
             <p id={playerNameHelperId} className={styles.helperText}>
-              Use entre {MIN_NAME_LENGTH} e {MAX_NAME_LENGTH} caracteres válidos:
+              {`Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos:`}
+              {" "}
               letras (incluindo acentos), números, espaços, hífens ou sublinhados.
             </p>
             <input
