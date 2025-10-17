@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
 import { RoomDO, WORLD_TICK_INTERVAL_MS } from "../src/RoomDO";
+import { getDefaultSkillList } from "../src/skills";
 import type { Env } from "../src";
 import type {
   CombatLogEntry,
@@ -26,6 +27,8 @@ function createTestPlayer(
   overrides: Partial<Record<string, unknown>> = {},
 ): any {
   const now = Date.now();
+  const skillList = getDefaultSkillList();
+
   const base: any = {
     id,
     name: id,
@@ -44,6 +47,14 @@ function createTestPlayer(
     connectedAt: now,
     totalSessionDurationMs: 0,
     sessionCount: 0,
+    skillState: {
+      available: skillList,
+      current: skillList[0]!,
+      cooldowns: {},
+    },
+    pendingAttack: null,
+    statusEffects: [],
+    invulnerableUntil: null,
   };
 
   return { ...base, ...overrides };

@@ -112,6 +112,23 @@ export const evolutionActionSchema = z.object({
   baseDelta: combatStatAdjustmentSchema.optional()
 });
 
+const statusKeySchema = z.string().trim().min(1).max(64);
+
+export const statusEffectEventSchema = z.object({
+  targetKind: z.union([
+    z.literal("player"),
+    z.literal("microorganism"),
+    z.literal("organic_matter"),
+    z.literal("obstacle")
+  ]),
+  targetPlayerId: playerIdSchema.optional(),
+  targetObjectId: worldObjectIdSchema.optional(),
+  status: statusKeySchema,
+  stacks: z.number().int().nonnegative().default(1),
+  durationMs: z.number().finite().nonnegative().optional(),
+  sourcePlayerId: playerIdSchema.optional()
+});
+
 export const sharedPlayerStateSchema = z.object({
   id: playerIdSchema,
   name: playerNameSchema,
@@ -126,7 +143,13 @@ export const sharedPlayerStateSchema = z.object({
   combatStatus: combatStatusSchema,
   combatAttributes: combatAttributesSchema,
   archetype: archetypeKeySchema.nullable().optional().default(null),
-  archetypeKey: archetypeKeySchema.nullable().optional().default(null)
+  archetypeKey: archetypeKeySchema.nullable().optional().default(null),
+  skillList: z.array(z.string().trim().min(1).max(64)).optional().default([]),
+  currentSkill: z.string().trim().min(1).max(64).nullable().optional().default(null),
+  skillCooldowns: z
+    .record(z.string().trim().min(1).max(64), z.number().finite().nonnegative())
+    .optional()
+    .default({})
 });
 
 export const microorganismSchema = z.object({
@@ -194,7 +217,8 @@ export const sharedWorldStateDiffSchema = z.object({
   upsertObstacles: z.array(obstacleSchema).optional(),
   removeObstacleIds: z.array(worldObjectIdSchema).optional(),
   upsertRoomObjects: z.array(roomObjectSchema).optional(),
-  removeRoomObjectIds: z.array(worldObjectIdSchema).optional()
+  removeRoomObjectIds: z.array(worldObjectIdSchema).optional(),
+  statusEffects: z.array(statusEffectEventSchema).optional()
 });
 
 const progressionPitySchema = z.object({
@@ -774,6 +798,7 @@ export type SharedGameState = z.infer<typeof sharedGameStateSchema>;
 export type SharedGameStateDiff = z.infer<typeof sharedGameStateDiffSchema>;
 export type SharedWorldState = z.infer<typeof sharedWorldStateSchema>;
 export type SharedWorldStateDiff = z.infer<typeof sharedWorldStateDiffSchema>;
+export type StatusEffectEvent = z.infer<typeof statusEffectEventSchema>;
 export type CombatLogEntry = z.infer<typeof combatLogEntrySchema>;
 export type Microorganism = z.infer<typeof microorganismSchema>;
 export type OrganicMatter = z.infer<typeof organicMatterSchema>;
