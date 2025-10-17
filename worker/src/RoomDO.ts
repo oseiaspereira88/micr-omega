@@ -4492,6 +4492,7 @@ export class RoomDO {
     }
 
     this.rankingCache = Array.from(this.players.values())
+      .filter((player) => player.connected)
       .map<RankingEntry>((player) => ({
         playerId: player.id,
         name: player.name,
