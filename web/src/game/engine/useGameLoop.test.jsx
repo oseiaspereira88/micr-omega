@@ -344,6 +344,7 @@ describe('useGameLoop timing safeguards', () => {
     expect(capturedActionBuffer).toBeTruthy();
     expect(capturedActionBuffer.attacks).toHaveLength(1);
     expect(capturedActionBuffer.attacks[0].targetObjectId).toBe('micro-2');
+    expect(capturedActionBuffer.attacks[0]).not.toHaveProperty('state');
 
     mocks.updateGameState.mockImplementation(() => ({
       commands: [],

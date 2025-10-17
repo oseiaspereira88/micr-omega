@@ -1039,7 +1039,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
         payload.targetObjectId = combatSnapshot.targetObjectId;
       }
 
-      if (combatSnapshot?.state) {
+      if (combatSnapshot?.state && combatSnapshot.state !== 'idle') {
         payload.state = combatSnapshot.state;
       }
 
