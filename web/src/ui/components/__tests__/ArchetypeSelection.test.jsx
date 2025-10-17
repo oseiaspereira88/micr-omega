@@ -21,6 +21,19 @@ describe('ArchetypeSelection', () => {
     expect(screen.getByRole('button', { name: /vírus/i })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('associa o título ao diálogo para acessibilidade', () => {
+    render(
+      <ArchetypeSelection
+        selection={{ pending: true, options: ['virus'] }}
+        selected="virus"
+        onSelect={() => {}}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Escolha seu arquétipo inicial' });
+    expect(dialog).toBeInTheDocument();
+  });
+
   it('permite navegar pelos cartões com as setas mantendo o destaque visual', () => {
     const handleSelect = vi.fn();
 
