@@ -1,4 +1,11 @@
-import React, { useCallback, useId, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import HudBar from './HudBar';
 import BossHealthBar from './BossHealthBar';
 import SkillWheel from './SkillWheel';
@@ -69,12 +76,65 @@ const GameHud = ({
 
   const currentSkill = skillData?.currentSkill ?? null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const sidebarRef = useRef(null);
+  const toggleButtonRef = useRef(null);
   const sidebarId = useId();
   const minimapToggleId = useId();
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
   }, []);
+
+  useEffect(() => {
+    if (isSidebarOpen) {
+      const sidebar = sidebarRef.current;
+      if (!sidebar) {
+        return;
+      }
+
+      const focusableSelectors = [
+        'a[href]',
+        'button:not([disabled])',
+        'input:not([disabled])',
+        'select:not([disabled])',
+        'textarea:not([disabled])',
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(', ');
+
+      const focusableElements = sidebar.querySelectorAll(focusableSelectors);
+      const focusTarget = focusableElements.length
+        ? focusableElements[0]
+        : sidebar;
+
+      if (typeof focusTarget.focus === 'function') {
+        focusTarget.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    if (toggleButtonRef.current) {
+      toggleButtonRef.current.focus({ preventScroll: true });
+    }
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    if (!isSidebarOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        event.preventDefault();
+        setIsSidebarOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isSidebarOpen]);
 
   const { settings, updateSettings } = useGameSettings();
   const isMinimapEnabled = Boolean(settings?.showMinimap);
@@ -143,6 +203,7 @@ const GameHud = ({
         onClick={handleToggleSidebar}
         aria-expanded={isSidebarOpen}
         aria-controls={sidebarId}
+        ref={toggleButtonRef}
       >
         {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
       </button>
@@ -178,8 +239,9 @@ const GameHud = ({
           role="complementary"
           aria-label="Painel lateral do jogo"
           aria-hidden={isSidebarOpen ? undefined : true}
-          tabIndex={isSidebarOpen ? undefined : -1}
+          tabIndex={-1}
           inert={isSidebarOpen ? undefined : true}
+          ref={sidebarRef}
         >
           <RankingPanel />
           <ConnectionStatusOverlay />
