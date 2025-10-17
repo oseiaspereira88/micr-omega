@@ -3341,6 +3341,8 @@ export class RoomDO {
         }
       }
       player.evolutionState = createEvolutionState(player.evolutionState);
+      player.pendingAttack = null;
+      this.playersPendingRemoval.delete(player.id);
       if (player.invulnerableUntil) {
         if (player.invulnerableUntil <= now) {
           player.invulnerableUntil = null;

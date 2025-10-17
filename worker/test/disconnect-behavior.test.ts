@@ -3,7 +3,9 @@ import type { DurableObjectState } from "@cloudflare/workers-types";
 
 import { RoomDO } from "../src/RoomDO";
 import type { Env } from "../src";
+import type { CombatLogEntry, SharedWorldStateDiff } from "../src/types";
 import { MockDurableObjectState } from "./utils/mock-state";
+import { createMockSocket } from "./utils/mock-socket";
 
 describe("RoomDO disconnect behavior", () => {
   it("clears movement and combat state and broadcasts immediately on disconnect", async () => {
@@ -242,6 +244,92 @@ describe("RoomDO disconnect behavior", () => {
 
       expect(firstSocket.close).toHaveBeenCalledWith(1000, "reconnected");
     } finally {
+      (globalThis as any).WebSocket = originalWebSocket;
+    }
+  });
+
+  it("clears pending attacks when reconnecting mid-attack", async () => {
+    const originalWebSocket = globalThis.WebSocket;
+    const websocketMock = { OPEN: 1, CLOSING: 2, CLOSED: 3 } as const;
+    (globalThis as any).WebSocket = websocketMock;
+
+    vi.useFakeTimers();
+
+    try {
+      const initialTime = 5_000_000;
+      vi.setSystemTime(initialTime);
+
+      const mockState = new MockDurableObjectState();
+      const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+      const roomAny = room as any;
+      await roomAny.ready;
+
+      roomAny.broadcast = vi.fn();
+      roomAny.send = vi.fn();
+
+      const attackerSocket = createMockSocket();
+      const attackerId = await roomAny.handleJoin(attackerSocket, { type: "join", name: "Attacker" });
+      expect(typeof attackerId).toBe("string");
+
+      const targetSocket = createMockSocket();
+      const targetId = await roomAny.handleJoin(targetSocket, { type: "join", name: "Target" });
+      expect(typeof targetId).toBe("string");
+
+      const attacker = roomAny.players.get(attackerId!);
+      const target = roomAny.players.get(targetId!);
+      expect(attacker).toBeDefined();
+      expect(target).toBeDefined();
+      if (!attacker || !target) {
+        throw new Error("players not created");
+      }
+
+      const actionResult = roomAny.applyPlayerAction(attacker, {
+        type: "attack",
+        kind: "basic",
+        targetPlayerId: target.id,
+        state: "engaged",
+      });
+      expect(actionResult).not.toBeNull();
+      expect(attacker.pendingAttack).not.toBeNull();
+      expect(attacker.combatStatus.state).toBe("engaged");
+
+      await roomAny.handleDisconnect(attackerSocket, attacker.id);
+      expect(attacker.connected).toBe(false);
+      expect(attacker.pendingAttack).not.toBeNull();
+
+      roomAny.playersPendingRemoval.add(attacker.id);
+
+      const reconnectTime = initialTime + 3_000;
+      vi.setSystemTime(reconnectTime);
+
+      const reconnectSocket = createMockSocket();
+      const reconnectResult = await roomAny.handleJoin(reconnectSocket, {
+        type: "join",
+        name: "Attacker",
+        playerId: attacker.id,
+        reconnectToken: attacker.reconnectToken,
+      });
+
+      expect(reconnectResult).toBe(attacker.id);
+      expect(attacker.pendingAttack).toBeNull();
+      expect(roomAny.playersPendingRemoval.has(attacker.id)).toBe(false);
+
+      const worldDiff: SharedWorldStateDiff = {};
+      const combatLog: CombatLogEntry[] = [];
+      const updatedPlayers = new Map<string, typeof attacker>();
+      const resolution = roomAny.resolvePlayerAttackDuringTick(
+        attacker,
+        reconnectTime + 1_000,
+        worldDiff,
+        combatLog,
+        updatedPlayers,
+      );
+
+      expect(resolution.worldChanged).toBe(false);
+      expect(combatLog).toHaveLength(0);
+      expect(target.health.current).toBe(target.health.max);
+    } finally {
+      vi.useRealTimers();
       (globalThis as any).WebSocket = originalWebSocket;
     }
   });
