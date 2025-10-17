@@ -4713,11 +4713,31 @@ export class RoomDO {
     }
 
     if (nextCleanup === null) {
-      this.alarmSchedule.delete("cleanup");
-    } else {
-      this.alarmSchedule.set("cleanup", nextCleanup);
+      const removed = this.alarmSchedule.delete("cleanup");
+      if (!removed) {
+        this.observability.log("debug", "cleanup_alarm_unchanged", {
+          nextCleanup: null
+        });
+        return;
+      }
+
+      this.observability.log("debug", "cleanup_alarm_cleared");
+      await this.persistAndSyncAlarms();
+      return;
     }
 
+    const currentCleanup = this.alarmSchedule.get("cleanup");
+    if (typeof currentCleanup === "number" && currentCleanup === nextCleanup) {
+      this.observability.log("debug", "cleanup_alarm_unchanged", {
+        nextCleanup
+      });
+      return;
+    }
+
+    this.alarmSchedule.set("cleanup", nextCleanup);
+    this.observability.log("debug", "cleanup_alarm_scheduled", {
+      nextCleanup
+    });
     await this.persistAndSyncAlarms();
   }
 

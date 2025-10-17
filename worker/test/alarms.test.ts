@@ -60,6 +60,40 @@ describe("RoomDO alarms", () => {
     expect(stored).toMatchObject({ cleanup: expect.any(Number) });
   });
 
+  it("does not persist cleanup alarm when unchanged", async () => {
+    const { room, mockState } = await createRoom();
+    const roomAny = room as any;
+
+    const reconnectingPlayer = {
+      id: "p1",
+      name: "Player One",
+      score: 0,
+      combo: 1,
+      energy: 100,
+      xp: 0,
+      geneticMaterial: 0,
+      position: { x: 0, y: 0 },
+      movementVector: { x: 0, y: 0 },
+      orientation: { angle: 0 },
+      health: { current: 100, max: 100 },
+      combatStatus: { state: "idle" },
+      combatAttributes: { attack: 0, defense: 0, speed: 0, range: 0 },
+      connected: false,
+      lastActiveAt: Date.now() - 10_000,
+      lastSeenAt: Date.now() - 10_000,
+      connectedAt: null,
+    };
+    roomAny.players.set(reconnectingPlayer.id, reconnectingPlayer);
+
+    await roomAny.scheduleCleanupAlarm();
+
+    mockState.storageImpl.resetCounts();
+
+    await roomAny.scheduleCleanupAlarm();
+
+    expect(mockState.storageImpl.getPutCount("alarms")).toBe(0);
+  });
+
   it("pauses world ticks when everyone disconnects until a new player joins", async () => {
     const { room } = await createRoom();
     const roomAny = room as any;
