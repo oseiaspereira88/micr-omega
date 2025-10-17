@@ -45,6 +45,7 @@ const HudBar = ({
   elementLabel,
   affinityLabel,
   resistances,
+  isMinimized = false,
 }) => {
   const numberFormatter = useMemo(() => new Intl.NumberFormat('pt-BR'), []);
   const formatNumber = useCallback((value) => numberFormatter.format(value), [numberFormatter]);
@@ -153,6 +154,11 @@ const HudBar = ({
     [activePowerUps]
   );
 
+  const minimized = Boolean(isMinimized);
+  const statsClassName = minimized
+    ? `${styles.stats} ${styles.statsCompact}`.trim()
+    : styles.stats;
+
   return (
     <>
       <div className={styles.header}>
@@ -170,7 +176,7 @@ const HudBar = ({
         </div>
       </div>
 
-      <div className={styles.stats}>
+      <div className={statsClassName}>
         <div className={styles.badge} style={{ background: 'rgba(0, 217, 255, 0.2)' }}>
           ⚡ {formatNumber(safeEnergy)}
         </div>
@@ -196,7 +202,7 @@ const HudBar = ({
             🏅 Máx x{formatNumber(safeMaxCombo)}
           </div>
         )}
-        {resistanceEntries.length > 0 && (
+        {resistanceEntries.length > 0 && !minimized && (
           <div className={styles.resistanceRow}>
             {resistanceEntries.map(([key, value]) => {
               const label = ELEMENT_LABELS[key] ?? key;
@@ -218,7 +224,7 @@ const HudBar = ({
             })}
           </div>
         )}
-        {statusBadges.length > 0 && (
+        {statusBadges.length > 0 && !minimized && (
           <div className={styles.statusRow}>
             {statusBadges.map((status) => (
               <span
@@ -232,81 +238,85 @@ const HudBar = ({
             ))}
           </div>
         )}
-        <div className={styles.progressRow}>
-          <div className={styles.xpPanel}>
-            <div className={styles.xpHeader}>XP {formatNumber(xpCurrent)} / {formatNumber(xpNext)}</div>
-            <div
-              className={styles.xpBar}
-              role="progressbar"
-              aria-label="Progresso de XP"
-              aria-valuenow={Math.round(xpPercent * 100)}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
-              <div className={styles.xpFill} style={{ width: `${xpPercent * 100}%` }} />
-            </div>
-          </div>
-          <div className={styles.slotSummary}>
-            <span>Pequena: {summarizeSlot(evolutionSlots?.small, formatNumber)}</span>
-            <span>Média: {summarizeSlot(evolutionSlots?.medium, formatNumber)}</span>
-            <span>Grande: {summarizeSlot(evolutionSlots?.large, formatNumber)}</span>
-            {evolutionSlots?.macro && (
-              <span>Macro: {summarizeSlot(evolutionSlots?.macro, formatNumber)}</span>
-            )}
-          </div>
-        </div>
-        <div className={styles.resourceGrid}>
-          <div className={styles.resourceCard}>
-            <div className={styles.resourceTitle}>Fragmentos</div>
-            <div className={styles.resourceValues}>
-              <span>Menor {formatNumber(fragmentCounters.minor)}</span>
-              <span>Maior {formatNumber(fragmentCounters.major)}</span>
-              <span>Ápice {formatNumber(fragmentCounters.apex)}</span>
-            </div>
-          </div>
-          <div className={styles.resourceCard}>
-            <div className={styles.resourceTitle}>Genes estáveis</div>
-            <div className={styles.resourceValues}>
-              <span>Menor {formatNumber(stableCounters.minor)}</span>
-              <span>Maior {formatNumber(stableCounters.major)}</span>
-              <span>Ápice {formatNumber(stableCounters.apex)}</span>
-            </div>
-          </div>
-          <div className={styles.resourceCard}>
-            <div className={styles.resourceTitle}>Reroll</div>
-            <div className={styles.resourceValues}>
-              <span>Custo {formatNumber(rerollCost)} MG</span>
-              <span>Usado {formatNumber(rerollCount)}x</span>
-              <span>Piedade {formatNumber(dropPityFragment)}/{formatNumber(dropPityStableGene)}</span>
-            </div>
-          </div>
-          <div className={styles.resourceCard}>
-            <div className={styles.resourceTitle}>Últimos ganhos</div>
-            <div className={styles.resourceValues}>
-              <span>XP +{formatNumber(recentRewardsSummary.xp)}</span>
-              <span>MG +{formatNumber(recentRewardsSummary.geneticMaterial)}</span>
-              <span>Frags +{formatNumber(recentRewardsSummary.fragments)}</span>
-              <span>Genes +{formatNumber(recentRewardsSummary.stableGenes)}</span>
-            </div>
-          </div>
-        </div>
-        {powerUpSummaries.length > 0 && (
-          <div className={styles.powerUps}>
-            {powerUpSummaries.map((power) => (
-              <div
-                key={power.key}
-                className={styles.powerUpCard}
-                style={{ background: `${power.color}22`, border: `1px solid ${power.color}` }}
-              >
-                <div className={styles.powerUpTitle} style={{ color: power.color }}>
-                  {power.icon} {power.name}
-                </div>
-                <div className={styles.powerUpBar}>
-                  <div style={{ width: `${power.percent}%`, height: '100%', background: power.color }} />
+        {!minimized && (
+          <>
+            <div className={styles.progressRow}>
+              <div className={styles.xpPanel}>
+                <div className={styles.xpHeader}>XP {formatNumber(xpCurrent)} / {formatNumber(xpNext)}</div>
+                <div
+                  className={styles.xpBar}
+                  role="progressbar"
+                  aria-label="Progresso de XP"
+                  aria-valuenow={Math.round(xpPercent * 100)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div className={styles.xpFill} style={{ width: `${xpPercent * 100}%` }} />
                 </div>
               </div>
-            ))}
-          </div>
+              <div className={styles.slotSummary}>
+                <span>Pequena: {summarizeSlot(evolutionSlots?.small, formatNumber)}</span>
+                <span>Média: {summarizeSlot(evolutionSlots?.medium, formatNumber)}</span>
+                <span>Grande: {summarizeSlot(evolutionSlots?.large, formatNumber)}</span>
+                {evolutionSlots?.macro && (
+                  <span>Macro: {summarizeSlot(evolutionSlots?.macro, formatNumber)}</span>
+                )}
+              </div>
+            </div>
+            <div className={styles.resourceGrid}>
+              <div className={styles.resourceCard}>
+                <div className={styles.resourceTitle}>Fragmentos</div>
+                <div className={styles.resourceValues}>
+                  <span>Menor {formatNumber(fragmentCounters.minor)}</span>
+                  <span>Maior {formatNumber(fragmentCounters.major)}</span>
+                  <span>Ápice {formatNumber(fragmentCounters.apex)}</span>
+                </div>
+              </div>
+              <div className={styles.resourceCard}>
+                <div className={styles.resourceTitle}>Genes estáveis</div>
+                <div className={styles.resourceValues}>
+                  <span>Menor {formatNumber(stableCounters.minor)}</span>
+                  <span>Maior {formatNumber(stableCounters.major)}</span>
+                  <span>Ápice {formatNumber(stableCounters.apex)}</span>
+                </div>
+              </div>
+              <div className={styles.resourceCard}>
+                <div className={styles.resourceTitle}>Reroll</div>
+                <div className={styles.resourceValues}>
+                  <span>Custo {formatNumber(rerollCost)} MG</span>
+                  <span>Usado {formatNumber(rerollCount)}x</span>
+                  <span>Piedade {formatNumber(dropPityFragment)}/{formatNumber(dropPityStableGene)}</span>
+                </div>
+              </div>
+              <div className={styles.resourceCard}>
+                <div className={styles.resourceTitle}>Últimos ganhos</div>
+                <div className={styles.resourceValues}>
+                  <span>XP +{formatNumber(recentRewardsSummary.xp)}</span>
+                  <span>MG +{formatNumber(recentRewardsSummary.geneticMaterial)}</span>
+                  <span>Frags +{formatNumber(recentRewardsSummary.fragments)}</span>
+                  <span>Genes +{formatNumber(recentRewardsSummary.stableGenes)}</span>
+                </div>
+              </div>
+            </div>
+            {powerUpSummaries.length > 0 && (
+              <div className={styles.powerUps}>
+                {powerUpSummaries.map((power) => (
+                  <div
+                    key={power.key}
+                    className={styles.powerUpCard}
+                    style={{ background: `${power.color}22`, border: `1px solid ${power.color}` }}
+                  >
+                    <div className={styles.powerUpTitle} style={{ color: power.color }}>
+                      {power.icon} {power.name}
+                    </div>
+                    <div className={styles.powerUpBar}>
+                      <div style={{ width: `${power.percent}%`, height: '100%', background: power.color }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </>

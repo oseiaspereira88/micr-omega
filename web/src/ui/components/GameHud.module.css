@@ -131,6 +131,103 @@
   box-shadow: 0 12px 24px rgba(5, 12, 24, 0.3);
 }
 
+.settingsPanel {
+  pointer-events: auto;
+  background: rgba(12, 18, 34, 0.82);
+  border-radius: 14px;
+  padding: 14px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 24px rgba(5, 12, 24, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settingsHeading {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.settingsToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.settingsToggleText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settingsToggleTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.settingsToggleDescription {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.72);
+  max-width: 220px;
+}
+
+.settingsToggleControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.toggleInput {
+  appearance: none;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.12);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.toggleInput::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease;
+}
+
+.toggleInput:checked {
+  background: linear-gradient(90deg, rgba(0, 217, 255, 0.85), rgba(123, 47, 255, 0.8));
+  border-color: rgba(0, 217, 255, 0.65);
+}
+
+.toggleInput:checked::after {
+  transform: translateX(20px);
+}
+
+.toggleInput:focus-visible {
+  outline: 2px solid rgba(0, 217, 255, 0.75);
+  outline-offset: 2px;
+}
+
+.toggleStatusText {
+  min-width: 72px;
+  text-align: right;
+}
+
 .opponentHeading {
   margin: 0 0 8px;
   font-size: 0.95rem;

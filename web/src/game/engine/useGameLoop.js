@@ -30,11 +30,13 @@ import {
   findNearestHostileMicroorganismId,
   resolvePlayerPosition,
 } from '../../utils/targeting';
+import { featureToggles } from '../../config/featureToggles.js';
 
 const DEFAULT_SETTINGS = {
   audioEnabled: true,
   visualDensity: 'medium',
   showTouchControls: false,
+  showMinimap: featureToggles.minimap,
 };
 
 const EVOLUTION_STAT_KEYS = ['attack', 'defense', 'speed', 'range'];
@@ -277,6 +279,12 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     }),
     [settings]
   );
+
+  const renderSettingsRef = useRef(resolvedSettings);
+
+  useEffect(() => {
+    renderSettingsRef.current = resolvedSettings;
+  }, [resolvedSettings]);
 
   const densityScale = useMemo(
     () => DENSITY_SCALE[resolvedSettings.visualDensity] ?? DENSITY_SCALE.medium,
@@ -1428,6 +1436,8 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
         height: canvasHeight,
       };
 
+      const settingsSnapshot = renderSettingsRef.current;
+
       const frameResult = renderFrame(
         ctx,
         {
@@ -1448,6 +1458,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
             width: canvasWidth,
             height: canvasHeight,
           },
+          settings: settingsSnapshot,
         }
       );
 

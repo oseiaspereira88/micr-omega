@@ -6,6 +6,7 @@ import { gameStore, type GameStoreState } from "../../store/gameStore";
 import { MIN_NAME_LENGTH } from "../../utils/messageTypes";
 import { INVALID_PLAYER_NAME_MESSAGE } from "../../utils/playerNameStorage";
 import React, { useEffect } from "react";
+import { featureToggles } from "../../config/featureToggles.js";
 
 const baseState = gameStore.getState();
 
@@ -121,6 +122,7 @@ describe("StartScreen", () => {
         audioEnabled: false,
         visualDensity: "high",
         showTouchControls: true,
+        showMinimap: featureToggles.minimap,
       },
       autoJoinRequested: true,
     });
@@ -197,6 +199,7 @@ describe("StartScreen", () => {
         audioEnabled: false,
         visualDensity: "low",
         showTouchControls: true,
+        showMinimap: featureToggles.minimap,
       });
     });
   });

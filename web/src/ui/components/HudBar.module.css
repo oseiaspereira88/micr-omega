@@ -55,6 +55,14 @@
   z-index: 11;
 }
 
+.statsCompact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: clamp(220px, 36vw, 340px);
+  align-items: flex-start;
+}
+
 .badge {
   backdrop-filter: blur(8px);
   padding: 4px 8px;

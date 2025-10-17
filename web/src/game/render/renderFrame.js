@@ -1,3 +1,5 @@
+import { WORLD_SIZE } from '@micr-omega/shared';
+
 import { backgroundRenderer } from './backgroundRenderer.js';
 import { organismRenderer } from './organismRenderer.js';
 import { effectsRenderer } from './effectsRenderer.js';
@@ -106,6 +108,147 @@ const renderWorldEntities = (ctx, worldView, camera) => {
   });
 };
 
+const clampValue = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const drawMinimap = (ctx, state, camera, options = {}) => {
+  const { settings, viewport: viewportOverride, worldSize = WORLD_SIZE } = options;
+  if (!ctx || !state || !camera) return;
+  if (!settings?.showMinimap) return;
+
+  const viewport = camera.viewport || viewportOverride || {};
+  const width = viewport.width ?? 0;
+  const height = viewport.height ?? 0;
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return;
+  }
+
+  const size = options.size ?? 160;
+  const padding = options.padding ?? 18;
+  const originX = Math.max(8, width - size - padding);
+  const originY = Math.max(8, padding);
+
+  const safeWorldSize = Number.isFinite(worldSize) && worldSize > 0 ? worldSize : WORLD_SIZE;
+  const scale = size / safeWorldSize;
+
+  const projectCoordinate = (value) => clampValue(value ?? 0, 0, safeWorldSize) * scale;
+
+  const worldView = state.worldView || {};
+  const microorganisms = Array.isArray(worldView.microorganisms) ? worldView.microorganisms : [];
+  const organicMatter = Array.isArray(worldView.organicMatter) ? worldView.organicMatter : [];
+  const obstacles = Array.isArray(worldView.obstacles) ? worldView.obstacles : [];
+  const roomObjects = Array.isArray(worldView.roomObjects) ? worldView.roomObjects : [];
+
+  const players = Array.isArray(state.players) ? state.players : [];
+  const localPlayerId = state.localPlayerId;
+
+  ctx.save();
+  ctx.translate(originX, originY);
+
+  ctx.fillStyle = 'rgba(8, 12, 24, 0.82)';
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = 'rgba(0, 217, 255, 0.45)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, 0, size, size);
+
+  const drawCircle = (x, y, radius, color, alpha = 1) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return;
+    }
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalAlpha = clampValue(alpha, 0, 1);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.max(1.5, radius), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  obstacles.forEach((obstacle) => {
+    const centerX = projectCoordinate(obstacle?.x);
+    const centerY = projectCoordinate(obstacle?.y);
+    const widthWorld = Number.isFinite(obstacle?.width) ? obstacle.width : 40;
+    const heightWorld = Number.isFinite(obstacle?.height) ? obstacle.height : 40;
+    const drawWidth = Math.max(3, widthWorld * scale);
+    const drawHeight = Math.max(3, heightWorld * scale);
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(Number.isFinite(obstacle?.orientation) ? obstacle.orientation : 0);
+    ctx.fillStyle = obstacle?.impassable ? 'rgba(120, 60, 180, 0.85)' : 'rgba(70, 140, 220, 0.7)';
+    ctx.fillRect(-drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+    ctx.restore();
+  });
+
+  organicMatter.forEach((entity) => {
+    const x = projectCoordinate(entity?.x);
+    const y = projectCoordinate(entity?.y);
+    const magnitude = Number.isFinite(entity?.quantity) ? entity.quantity : 0;
+    const radius = Math.max(1.5, Math.min(4, (magnitude / 6) * scale));
+    drawCircle(x, y, radius, 'rgba(255, 214, 94, 0.9)', 0.9);
+  });
+
+  roomObjects.forEach((object) => {
+    const x = projectCoordinate(object?.x);
+    const y = projectCoordinate(object?.y);
+    drawCircle(x, y, 3, 'rgba(91, 142, 255, 0.9)', 0.85);
+  });
+
+  microorganisms.forEach((micro) => {
+    const x = projectCoordinate(micro?.x);
+    const y = projectCoordinate(micro?.y);
+    const isBoss = Boolean(micro?.boss);
+    const color = isBoss ? 'rgba(255, 85, 119, 0.95)' : 'rgba(255, 170, 51, 0.9)';
+    const radius = isBoss ? 3.5 : 2;
+    drawCircle(x, y, radius, color, isBoss ? 1 : 0.85);
+  });
+
+  players
+    .filter((player) => player && player.id !== localPlayerId)
+    .forEach((player) => {
+      const position = player.renderPosition || player.position || {};
+      const x = projectCoordinate(position.x);
+      const y = projectCoordinate(position.y);
+      const palette = player.palette || {};
+      const color = palette.base || 'rgba(180, 200, 255, 0.85)';
+      drawCircle(x, y, 3, color, 0.85);
+    });
+
+  const localPlayer = players.find((player) => player?.id === localPlayerId) || null;
+  if (localPlayer) {
+    const position = localPlayer.renderPosition || localPlayer.position || {};
+    const x = projectCoordinate(position.x);
+    const y = projectCoordinate(position.y);
+    drawCircle(x, y, 4, 'rgba(0, 217, 255, 1)', 1);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = 'rgba(0, 217, 255, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  const zoom = Number.isFinite(camera.zoom) && camera.zoom > 0 ? camera.zoom : 1;
+  const viewportWidthWorld = (camera.viewport?.width ?? width) / zoom;
+  const viewportHeightWorld = (camera.viewport?.height ?? height) / zoom;
+  const cameraX = Number.isFinite(camera.x) ? camera.x : viewportWidthWorld / 2;
+  const cameraY = Number.isFinite(camera.y) ? camera.y : viewportHeightWorld / 2;
+  const viewLeft = clampValue(cameraX - viewportWidthWorld / 2, 0, safeWorldSize);
+  const viewTop = clampValue(cameraY - viewportHeightWorld / 2, 0, safeWorldSize);
+  const viewWidth = Math.min(viewportWidthWorld, safeWorldSize);
+  const viewHeight = Math.min(viewportHeightWorld, safeWorldSize);
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(viewLeft * scale, viewTop * scale, viewWidth * scale, viewHeight * scale);
+  ctx.restore();
+
+  ctx.restore();
+};
+
 export const renderFrame = (ctx, state, camera, assets = {}) => {
   if (!ctx || !state || !camera) return;
 
@@ -145,6 +288,12 @@ export const renderFrame = (ctx, state, camera, assets = {}) => {
     extendedCamera,
     { delta, viewport }
   );
+
+  drawMinimap(ctx, state, extendedCamera, {
+    settings: assets.settings,
+    viewport,
+    worldSize: state.worldSize ?? WORLD_SIZE,
+  });
 
   if (effectsResult) {
     state.effects = effectsResult.effects;
