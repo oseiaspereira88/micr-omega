@@ -12,6 +12,8 @@ import {
 } from './utils/targeting';
 
 const TOAST_DURATION = 5000;
+// Limit the number of simultaneously displayed toasts to avoid overwhelming the UI.
+const MAX_TOASTS = 5;
 
 const createToastIdGenerator = () => {
   let fallbackCounter = 0;
@@ -518,7 +520,13 @@ const App = () => {
       }
 
       const id = generateToastId();
-      setToasts((prev) => [...prev, { id, message }]);
+      setToasts((prev) => {
+        const nextToasts = [...prev, { id, message }];
+        if (nextToasts.length > MAX_TOASTS) {
+          nextToasts.splice(0, nextToasts.length - MAX_TOASTS);
+        }
+        return nextToasts;
+      });
 
       if (typeof window !== 'undefined') {
         const timerId = window.setTimeout(() => {
