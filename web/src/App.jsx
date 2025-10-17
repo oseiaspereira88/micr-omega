@@ -119,17 +119,17 @@ const App = () => {
             return null;
           };
 
+          const collections = [
+            state?.microorganisms?.byId,
+            state?.organicMatter?.byId,
+            state?.obstacles?.byId,
+            state?.roomObjects?.byId,
+          ];
+
           const validateObjectTarget = (candidate) => {
             if (typeof candidate !== 'string' || !candidate) {
               return null;
             }
-
-            const collections = [
-              state?.microorganisms?.byId,
-              state?.organicMatter?.byId,
-              state?.obstacles?.byId,
-              state?.roomObjects?.byId,
-            ];
 
             for (const collection of collections) {
               if (collection && collection[candidate]) {
