@@ -360,7 +360,7 @@ describe("useGameSocket", () => {
   });
 
   it.each<{
-    reason: "invalid_payload" | "game_not_active" | "rate_limited" | "unknown_player";
+    reason: "invalid_payload" | "game_not_active" | "rate_limited";
     payload?: Partial<Extract<ReturnType<typeof serverMessageSchema["parse"]>, { type: "error" }>>;
     expectedMessage: string;
   }>([
@@ -377,10 +377,6 @@ describe("useGameSocket", () => {
       payload: { retryAfterMs: 3500 },
       expectedMessage:
         "Muitas mensagens enviadas. Aguarde 4s e tente novamente.",
-    },
-    {
-      reason: "unknown_player",
-      expectedMessage: "Jogador desconhecido. Tente reconectar.",
     },
   ])(
     "keeps the socket open for recoverable error reason %s",
@@ -460,6 +456,100 @@ describe("useGameSocket", () => {
     } finally {
       statusSpy.mockRestore();
       incrementSpy.mockRestore();
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      unmount();
+    }
+  });
+
+  it("reconnects automatically when receiving an unknown_player error", () => {
+    MockWebSocket.instances = [];
+
+    const setTimeoutSpy = vi
+      .spyOn(window, "setTimeout")
+      .mockImplementation((() => 1) as unknown as typeof window.setTimeout);
+    const clearTimeoutSpy = vi
+      .spyOn(window, "clearTimeout")
+      .mockImplementation(() => {});
+    const setIntervalSpy = vi
+      .spyOn(window, "setInterval")
+      .mockImplementation((() => 1) as unknown as typeof window.setInterval);
+    const clearIntervalSpy = vi
+      .spyOn(window, "clearInterval")
+      .mockImplementation(() => {});
+
+    vi.stubGlobal("WebSocket", MockWebSocket as unknown as typeof WebSocket);
+
+    gameStore.setPartial({
+      connectionStatus: "idle",
+      reconnectAttempts: 0,
+      reconnectUntil: null,
+      playerId: null,
+      playerName: null,
+      joinError: null,
+    });
+
+    const statusSpy = vi.spyOn(gameStore.actions, "setConnectionStatus");
+    const setPlayerIdSpy = vi.spyOn(gameStore.actions, "setPlayerId");
+
+    const { result, unmount } = renderHook(() =>
+      useGameSocket({ autoConnect: false, url: "ws://example.test" })
+    );
+
+    try {
+      act(() => {
+        result.current.connect("Tester");
+      });
+
+      const firstSocket = MockWebSocket.instances.at(-1);
+      if (!firstSocket) {
+        throw new Error("Expected initial WebSocket instance");
+      }
+
+      act(() => {
+        gameStore.actions.setPlayerId("stale-player");
+      });
+
+      act(() => {
+        firstSocket.onopen?.();
+      });
+
+      statusSpy.mockClear();
+      setPlayerIdSpy.mockClear();
+
+      act(() => {
+        firstSocket.onmessage?.({
+          data: JSON.stringify({ type: "error", reason: "unknown_player" }),
+        } as MessageEvent<string>);
+      });
+
+      const secondSocket = MockWebSocket.instances.at(-1);
+      if (!secondSocket || secondSocket === firstSocket) {
+        throw new Error("Expected a new WebSocket instance for reconnection");
+      }
+
+      expect(firstSocket.close).toHaveBeenCalledTimes(1);
+      expect(setPlayerIdSpy).toHaveBeenCalledWith(null);
+      expect(gameStore.getState().playerId).toBeNull();
+      expect(gameStore.getState().joinError).toBeNull();
+      expect(gameStore.getState().connectionStatus).toBe("reconnecting");
+      expect(statusSpy).toHaveBeenCalledWith("reconnecting");
+
+      secondSocket.send.mockClear();
+
+      act(() => {
+        secondSocket.onopen?.();
+      });
+
+      expect(secondSocket.send).toHaveBeenCalled();
+      const joinPayload = JSON.parse(secondSocket.send.mock.calls[0]![0]);
+      expect(joinPayload).toMatchObject({ type: "join", name: "Tester" });
+      expect(joinPayload).not.toHaveProperty("playerId");
+    } finally {
+      statusSpy.mockRestore();
+      setPlayerIdSpy.mockRestore();
       setTimeoutSpy.mockRestore();
       clearTimeoutSpy.mockRestore();
       setIntervalSpy.mockRestore();

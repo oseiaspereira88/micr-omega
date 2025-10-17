@@ -220,7 +220,6 @@ const RECOVERABLE_ERROR_REASONS: ReadonlySet<ErrorMessage["reason"]> = new Set([
   "invalid_payload",
   "game_not_active",
   "rate_limited",
-  "unknown_player",
 ]);
 
 type UseGameSocketOptions = {
@@ -510,8 +509,35 @@ export const useGameSocket = (
         break;
       }
       case "error": {
-        const isRecoverable = RECOVERABLE_ERROR_REASONS.has(message.reason);
-        gameStore.actions.setJoinError(errorReasonToMessage(message));
+        const { reason } = message;
+        const isUnknownPlayer = reason === "unknown_player";
+        if (!isUnknownPlayer) {
+          gameStore.actions.setJoinError(errorReasonToMessage(message));
+        }
+
+        if (isUnknownPlayer) {
+          const reconnectName =
+            lastRequestedNameRef.current ?? playerNameRef.current ?? null;
+          const connector = connectInternalRef.current;
+
+          gameStore.actions.setJoinError(null);
+          gameStore.actions.setPlayerId(null);
+          shouldReconnectRef.current = true;
+          lastRequestedNameRef.current = null;
+
+          if (reconnectName && connector) {
+            stopSocket();
+            connector(reconnectName, true);
+            break;
+          }
+
+          shouldReconnectRef.current = false;
+          gameStore.actions.setConnectionStatus("disconnected");
+          stopSocket();
+          break;
+        }
+
+        const isRecoverable = RECOVERABLE_ERROR_REASONS.has(reason);
         if (isRecoverable) {
           break;
         }
