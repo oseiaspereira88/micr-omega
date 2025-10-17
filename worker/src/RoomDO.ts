@@ -241,6 +241,7 @@ type PlayerInternal = Omit<StoredPlayer, "skillState"> & {
   pendingAttack: PendingAttack | null;
   statusEffects: StatusCollection;
   invulnerableUntil: number | null;
+  pendingRemoval?: boolean;
 };
 
 type ApplyPlayerActionResult = {
@@ -2757,8 +2758,13 @@ export class RoomDO {
         continue;
       }
 
+      const candidates = this.getMicroorganismTargetCandidates();
+      if (candidates.length === 0) {
+        continue;
+      }
+
       let closest: { player: PlayerInternal; distanceSquared: number } | null = null;
-      for (const player of this.players.values()) {
+      for (const player of candidates) {
         const distanceSquared = this.distanceSquared(player.position, microorganism.position);
         if (!closest || distanceSquared < closest.distanceSquared) {
           closest = { player, distanceSquared };
@@ -2808,6 +2814,31 @@ export class RoomDO {
     }
 
     return { worldChanged, scoresChanged };
+  }
+
+  private getMicroorganismTargetCandidates(): PlayerInternal[] {
+    const playersPendingRemoval = (
+      this as unknown as { playersPendingRemoval?: Set<string> }
+    ).playersPendingRemoval;
+
+    const candidates: PlayerInternal[] = [];
+    for (const player of this.players.values()) {
+      if (!player.connected) {
+        continue;
+      }
+      if (player.health.current <= 0) {
+        continue;
+      }
+      if ((player as PlayerInternal & { pendingRemoval?: boolean }).pendingRemoval) {
+        continue;
+      }
+      if (playersPendingRemoval?.has(player.id)) {
+        continue;
+      }
+      candidates.push(player);
+    }
+
+    return candidates;
   }
 
   private async setupSession(socket: WebSocket): Promise<void> {
