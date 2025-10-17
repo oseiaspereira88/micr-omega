@@ -282,7 +282,43 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     [resolvedSettings.visualDensity]
   );
 
-  const { playSound } = useMemo(() => createSoundEffects(() => audioCtxRef.current), []);
+  const soundEffects = useMemo(() => createSoundEffects(() => audioCtxRef.current), []);
+
+  const resumeAudioContextIfSuspended = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || typeof ctx.state !== 'string' || ctx.state !== 'suspended') {
+      return;
+    }
+
+    try {
+      const resumeResult = ctx.resume?.();
+      if (resumeResult && typeof resumeResult.catch === 'function') {
+        resumeResult.catch((error) => {
+          if (!audioWarningLoggedRef.current) {
+            console.warn('Failed to resume Web Audio context; audio may be unavailable.', error);
+            audioWarningLoggedRef.current = true;
+          }
+        });
+      }
+    } catch (error) {
+      if (!audioWarningLoggedRef.current) {
+        console.warn('Failed to resume Web Audio context; audio may be unavailable.', error);
+        audioWarningLoggedRef.current = true;
+      }
+    }
+  }, []);
+
+  const playSound = useCallback(
+    (...args) => {
+      resumeAudioContextIfSuspended();
+      if (typeof soundEffects?.playSound !== 'function') {
+        return undefined;
+      }
+      return soundEffects.playSound(...args);
+    },
+    [resumeAudioContextIfSuspended, soundEffects]
+  );
+
   const skills = useMemo(() => createSkills({ playSound }), [playSound]);
 
   const createParticle = useCallback((x, y, color, size = 3) => {
