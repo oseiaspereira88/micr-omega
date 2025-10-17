@@ -3,10 +3,15 @@ import styles from './GameOverScreen.module.css';
 
 const numberFormatter = new Intl.NumberFormat('pt-BR');
 
+const normalizeNumber = (value) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+};
+
 const GameOverScreen = ({ score, level, maxCombo, onRestart }) => {
-  const formattedScore = numberFormatter.format(score ?? 0);
-  const formattedLevel = numberFormatter.format(level ?? 0);
-  const formattedMaxCombo = numberFormatter.format(maxCombo ?? 0);
+  const formattedScore = numberFormatter.format(normalizeNumber(score));
+  const formattedLevel = numberFormatter.format(normalizeNumber(level));
+  const formattedMaxCombo = numberFormatter.format(normalizeNumber(maxCombo));
 
   return (
     <div className={styles.container}>
