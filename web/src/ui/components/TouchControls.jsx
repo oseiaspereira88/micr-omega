@@ -25,6 +25,22 @@ const TouchControls = ({
   canEvolve,
 }) => {
   const dashReady = dashCharge >= 30;
+  const dashAriaLabel = dashReady ? 'Usar dash — pronto' : 'Usar dash — carregando';
+
+  let skillAriaLabel = 'Usar habilidade';
+  if (!hasCurrentSkill) {
+    skillAriaLabel = 'Usar habilidade — nenhuma habilidade equipada';
+  } else if (skillDisabled) {
+    skillAriaLabel = skillCoolingDown
+      ? 'Usar habilidade — em recarga'
+      : 'Usar habilidade — indisponível';
+  } else {
+    skillAriaLabel = 'Usar habilidade — pronta';
+  }
+
+  const evolveAriaLabel = canEvolve
+    ? 'Abrir menu de evolução'
+    : 'Abrir menu de evolução — indisponível';
 
   return (
     <div className={styles.touchLayer}>
@@ -49,6 +65,7 @@ const TouchControls = ({
       <button
         type="button"
         className={joinClassNames(styles.button, styles.attackButton)}
+        aria-label="Executar ataque básico"
         onTouchStart={event => {
           event.preventDefault();
           onAttackPress?.();
@@ -76,6 +93,8 @@ const TouchControls = ({
           dashReady ? null : styles.disabled,
         )}
         onClick={onDash}
+        aria-label={dashAriaLabel}
+        aria-disabled={!dashReady}
         onTouchStart={event => {
           event.preventDefault();
           if (dashReady) {
@@ -96,6 +115,8 @@ const TouchControls = ({
           skillDisabled ? styles.disabled : null,
         )}
         onClick={onUseSkill}
+        aria-label={skillAriaLabel}
+        aria-disabled={skillDisabled}
         onTouchStart={event => {
           event.preventDefault();
           onUseSkill?.();
@@ -135,6 +156,8 @@ const TouchControls = ({
           canEvolve ? null : styles.disabled,
         )}
         onClick={onOpenEvolutionMenu}
+        aria-label={evolveAriaLabel}
+        aria-disabled={!canEvolve}
         disabled={!canEvolve}
       >
         🧬
