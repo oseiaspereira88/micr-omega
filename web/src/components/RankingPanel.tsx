@@ -49,6 +49,11 @@ const RankingPanel = () => {
     shallowEqual,
   );
 
+  const collator = useMemo(
+    () => new Intl.Collator(RANKING_SORT_LOCALE, RANKING_SORT_OPTIONS),
+    [RANKING_SORT_LOCALE, RANKING_SORT_OPTIONS],
+  );
+
   const rows: RankingRow[] = useMemo(() => {
     if (!ranking.length) {
       return [];
@@ -59,11 +64,7 @@ const RankingPanel = () => {
         if (a.score !== b.score) {
           return b.score - a.score;
         }
-        const nameComparison = a.name.localeCompare(
-          b.name,
-          RANKING_SORT_LOCALE,
-          RANKING_SORT_OPTIONS,
-        );
+        const nameComparison = collator.compare(a.name, b.name);
         if (nameComparison !== 0) {
           return nameComparison;
         }
@@ -79,7 +80,7 @@ const RankingPanel = () => {
           isLocal: entry.playerId === localPlayerId,
         };
       });
-  }, [ranking, players, localPlayerId]);
+  }, [ranking, players, localPlayerId, collator]);
 
   const statusLabel = STATUS_LABEL[connectionStatus] ?? connectionStatus;
   const statusClass = STATUS_CLASS[connectionStatus] ?? "";
