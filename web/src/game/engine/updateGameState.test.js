@@ -588,6 +588,27 @@ describe('updateGameState', () => {
     expect(renderState.worldView.microorganisms[0].color).toBe('#00ff00');
   });
 
+  it('preserves archetype selection arrays when carrying HUD data forward', () => {
+    const renderState = createRenderState();
+    const previousHud = {
+      archetypeSelection: { pending: true, options: ['virus', 'bacteria'] },
+    };
+    renderState.hudSnapshot = previousHud;
+
+    const sharedState = createSharedState();
+
+    const { hudSnapshot } = updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    expect(Array.isArray(hudSnapshot.archetypeSelection.options)).toBe(true);
+    expect(hudSnapshot.archetypeSelection.options).toEqual(['virus', 'bacteria']);
+  });
+
   it('maps microorganisms into renderer-friendly descriptors', () => {
     const renderState = createRenderState();
     const sharedState = createSharedState({

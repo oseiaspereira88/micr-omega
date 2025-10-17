@@ -1293,11 +1293,18 @@ const buildHudSnapshot = (
   };
 
   if (safePreviousHud.archetypeSelection) {
+    const previousSelection = safePreviousHud.archetypeSelection;
+    let selectionOptions = previousSelection.options;
+
+    if (Array.isArray(selectionOptions)) {
+      selectionOptions = [...selectionOptions];
+    } else if (selectionOptions && typeof selectionOptions === 'object') {
+      selectionOptions = { ...selectionOptions };
+    }
+
     snapshot.archetypeSelection = {
-      ...safePreviousHud.archetypeSelection,
-      options: safePreviousHud.archetypeSelection.options
-        ? { ...safePreviousHud.archetypeSelection.options }
-        : safePreviousHud.archetypeSelection.options,
+      ...previousSelection,
+      options: selectionOptions,
     };
   }
 
