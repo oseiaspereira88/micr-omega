@@ -2153,11 +2153,25 @@ export class RoomDO {
 
       switch (parsed.type) {
         case "join":
-          void this.handleJoin(socket, parsed).then((result) => {
-            if (result) {
-              playerId = result;
-            }
-          });
+          void this.handleJoin(socket, parsed)
+            .then((result) => {
+              if (result) {
+                playerId = result;
+              }
+            })
+            .catch((error) => {
+              this.observability.logError("join_failed", error);
+              try {
+                if (
+                  socket.readyState === WebSocket.CONNECTING ||
+                  socket.readyState === WebSocket.OPEN
+                ) {
+                  socket.close(1011, "internal_error");
+                }
+              } catch (closeError) {
+                this.observability.logError("join_close_failed", closeError);
+              }
+            });
           break;
         case "action": {
           const knownId = playerId ?? this.clientsBySocket.get(socket);
