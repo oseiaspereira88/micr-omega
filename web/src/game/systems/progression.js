@@ -356,12 +356,33 @@ const buildEvolutionOptions = (state, helpers = {}, tier = 'small') => {
     const purchases = getHistoryCount(state, tier, key);
     const requirementCheck = meetsRequirements(state, entry?.requirements);
     const affordable = hasCost(state, entry?.cost);
-    const available = requirementCheck.met && affordable;
-    const reason = requirementCheck.met
-      ? affordable
-        ? null
-        : 'Recursos insuficientes'
-      : requirementCheck.reason;
+    const slotState = entry?.macro
+      ? state.macroEvolutionSlots
+      : state.evolutionSlots?.[tier];
+    const maxSlots = Number.isFinite(slotState?.max)
+      ? slotState.max
+      : entry?.macro
+        ? 0
+        : Infinity;
+    const usedSlots = Number.isFinite(slotState?.used) ? slotState.used : 0;
+    const slotsAvailable = usedSlots < maxSlots;
+    const slotReason = entry?.macro
+      ? 'Sem espaços macro disponíveis'
+      : 'Sem espaços de evolução disponíveis';
+
+    let available = true;
+    let reason = null;
+
+    if (!slotsAvailable) {
+      available = false;
+      reason = slotReason;
+    } else if (!requirementCheck.met) {
+      available = false;
+      reason = requirementCheck.reason;
+    } else if (!affordable) {
+      available = false;
+      reason = 'Recursos insuficientes';
+    }
 
     return {
       key,
