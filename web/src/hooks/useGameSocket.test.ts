@@ -1,12 +1,13 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { serverMessageSchema } from "../utils/messageTypes";
-import type { ClientMessage } from "../utils/messageTypes";
+import type { ClientMessage, SharedGameState } from "../utils/messageTypes";
 import {
   computeReconnectDelay,
   prepareClientMessagePayload,
   resolveWebSocketUrl,
-  useGameSocket
+  useGameSocket,
+  RECOVERABLE_ERROR_CLEAR_TIMEOUT_MS,
 } from "./useGameSocket";
 import { gameStore } from "../store/gameStore";
 afterEach(() => {
@@ -244,27 +245,68 @@ describe("useGameSocket", () => {
     }
   }
 
-  const setupSocketConnection = () => {
+  const createFullState = (): SharedGameState => ({
+    phase: "waiting",
+    roundId: null,
+    roundStartedAt: null,
+    roundEndsAt: null,
+    players: [
+      {
+        id: "player-1",
+        name: "Tester",
+        connected: true,
+        score: 0,
+        combo: 0,
+        lastActiveAt: 0,
+        position: { x: 0, y: 0 },
+        movementVector: { x: 0, y: 0 },
+        orientation: { angle: 0 },
+        health: { current: 100, max: 100 },
+        combatStatus: {
+          state: "idle",
+          targetPlayerId: null,
+          targetObjectId: null,
+          lastAttackAt: null,
+        },
+        combatAttributes: { attack: 1, defense: 1, speed: 1, range: 1 },
+        archetype: null,
+        archetypeKey: null,
+      },
+    ],
+    world: {
+      microorganisms: [],
+      organicMatter: [],
+      obstacles: [],
+      roomObjects: [],
+    },
+  });
+
+  const setupSocketConnection = (options: { stubTimers?: boolean } = {}) => {
+    const { stubTimers = true } = options;
     MockWebSocket.instances = [];
 
-    const setTimeoutSpy = vi
-      .spyOn(window, "setTimeout")
-      .mockImplementation(
+    const setTimeoutSpy = vi.spyOn(window, "setTimeout");
+    if (stubTimers) {
+      setTimeoutSpy.mockImplementation(
         ((_callback: Parameters<typeof window.setTimeout>[0]) =>
           1) as unknown as typeof window.setTimeout
       );
-    const clearTimeoutSpy = vi
-      .spyOn(window, "clearTimeout")
-      .mockImplementation(() => {});
-    const setIntervalSpy = vi
-      .spyOn(window, "setInterval")
-      .mockImplementation(
+    }
+    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+    if (stubTimers) {
+      clearTimeoutSpy.mockImplementation(() => {});
+    }
+    const setIntervalSpy = vi.spyOn(window, "setInterval");
+    if (stubTimers) {
+      setIntervalSpy.mockImplementation(
         ((_callback: Parameters<typeof window.setInterval>[0]) =>
           1) as unknown as typeof window.setInterval
       );
-    const clearIntervalSpy = vi
-      .spyOn(window, "clearInterval")
-      .mockImplementation(() => {});
+    }
+    const clearIntervalSpy = vi.spyOn(window, "clearInterval");
+    if (stubTimers) {
+      clearIntervalSpy.mockImplementation(() => {});
+    }
 
     vi.stubGlobal("WebSocket", MockWebSocket as unknown as typeof WebSocket);
 
@@ -412,7 +454,8 @@ describe("useGameSocket", () => {
         expect(incrementSpy).toHaveBeenCalledTimes(1);
         expect(statusSpy).toHaveBeenCalledTimes(1);
         expect(statusSpy).toHaveBeenCalledWith("reconnecting");
-        expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+        const expectedTimeoutCalls = reason === "invalid_payload" ? 1 : 2;
+        expect(setTimeoutSpy).toHaveBeenCalledTimes(expectedTimeoutCalls);
       } finally {
         statusSpy.mockRestore();
         incrementSpy.mockRestore();
@@ -424,6 +467,93 @@ describe("useGameSocket", () => {
       }
     }
   );
+
+  it("clears recoverable join errors when a valid state message is received", () => {
+    vi.useFakeTimers();
+
+    const {
+      socket,
+      setTimeoutSpy,
+      clearTimeoutSpy,
+      setIntervalSpy,
+      clearIntervalSpy,
+      unmount,
+    } = setupSocketConnection({ stubTimers: false });
+
+    try {
+      act(() => {
+        socket.onmessage?.({
+          data: JSON.stringify({ type: "error", reason: "game_not_active" }),
+        } as MessageEvent<string>);
+      });
+
+      expect(gameStore.getState().joinError).toBe("A sala não está ativa no momento.");
+      expect(setTimeoutSpy).toHaveBeenCalledWith(
+        expect.any(Function),
+        RECOVERABLE_ERROR_CLEAR_TIMEOUT_MS,
+      );
+
+      act(() => {
+        socket.onmessage?.({
+          data: JSON.stringify({ type: "state", mode: "full", state: createFullState() }),
+        } as MessageEvent<string>);
+      });
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      expect(gameStore.getState().joinError).toBeNull();
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      unmount();
+    }
+  });
+
+  it("removes transient join errors after the recovery timeout elapses", () => {
+    vi.useFakeTimers();
+
+    const {
+      socket,
+      setTimeoutSpy,
+      clearTimeoutSpy,
+      setIntervalSpy,
+      clearIntervalSpy,
+      unmount,
+    } = setupSocketConnection({ stubTimers: false });
+
+    try {
+      act(() => {
+        socket.onmessage?.({
+          data: JSON.stringify({ type: "error", reason: "rate_limited" }),
+        } as MessageEvent<string>);
+      });
+
+      expect(gameStore.getState().joinError).toBe(
+        "Você está enviando mensagens muito rápido. Tente novamente em instantes.",
+      );
+      expect(setTimeoutSpy).toHaveBeenCalledWith(
+        expect.any(Function),
+        RECOVERABLE_ERROR_CLEAR_TIMEOUT_MS,
+      );
+
+      act(() => {
+        vi.advanceTimersByTime(RECOVERABLE_ERROR_CLEAR_TIMEOUT_MS);
+      });
+
+      expect(gameStore.getState().joinError).toBeNull();
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      unmount();
+    }
+  });
 
   it("closes the socket for invalid_name errors", () => {
     const {
