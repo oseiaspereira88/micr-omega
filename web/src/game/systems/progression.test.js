@@ -102,6 +102,19 @@ describe('openEvolutionMenu and chooseEvolution', () => {
     expect(state.organism.evolutionHistory.small[option.key]).toBe(1);
   });
 
+  it('marks options unavailable when tier slots are full', () => {
+    const state = createState();
+    state.progressionQueue.push('small');
+    state.evolutionSlots.small.used = state.evolutionSlots.small.max;
+
+    openEvolutionMenu(state, helpers);
+
+    state.evolutionMenu.options.small.forEach((option) => {
+      expect(option.available).toBe(false);
+      expect(option.reason).toBe('Sem espaços de evolução disponíveis');
+    });
+  });
+
   it('requires MG and fragments for medium evolutions', () => {
     const state = createState();
     state.level = 6;
@@ -172,6 +185,28 @@ describe('major evolutions', () => {
     expect(Array.isArray(state.organism.hybridForms)).toBe(true);
     expect(state.organism.hybridForms.length).toBeGreaterThan(0);
     expect(state.organism.macroEvolutions).toContain(option?.key ?? '');
+  });
+
+  it('marks macro evolution options unavailable when macro slots are full', () => {
+    const state = createState();
+    state.progressionQueue.push('large');
+    state.level = 10;
+    state.xp.level = 10;
+    const macroMax = Math.max(
+      state.macroEvolutionSlots.max,
+      Math.floor(state.level / 5)
+    );
+    state.macroEvolutionSlots.max = macroMax;
+    state.macroEvolutionSlots.used = macroMax;
+
+    openEvolutionMenu(state, helpers);
+
+    const macroOptions = state.evolutionMenu.options.large.filter((option) => option.macro);
+    expect(macroOptions.length).toBeGreaterThan(0);
+    macroOptions.forEach((option) => {
+      expect(option.available).toBe(false);
+      expect(option.reason).toBe('Sem espaços macro disponíveis');
+    });
   });
 
   it('applies diminishing returns on repeated purchases', () => {
