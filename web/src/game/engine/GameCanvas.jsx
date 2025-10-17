@@ -218,8 +218,12 @@ const GameCanvas = ({ settings, onQuit }) => {
   const evolutionMenu = evolutionMenuState || DEFAULT_EVOLUTION_MENU;
 
   const handleEvolutionReroll = useCallback(() => {
+    if (!rerollAvailable) {
+      return;
+    }
+
     requestEvolutionReroll?.();
-  }, [requestEvolutionReroll]);
+  }, [rerollAvailable, requestEvolutionReroll]);
 
   return (
     <div className={styles.container}>
@@ -286,6 +290,7 @@ const GameCanvas = ({ settings, onQuit }) => {
                   rerollAvailable ? '' : styles.rerollButtonDisabled
                 }`.trim()}
                 onClick={handleEvolutionReroll}
+                disabled={!rerollAvailable}
                 aria-disabled={!rerollAvailable}
               >
                 🔁 Rerrolar opções
