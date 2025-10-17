@@ -7,6 +7,7 @@ import type { Env } from "../src";
 import type {
   CombatLogEntry,
   Microorganism,
+  Obstacle,
   OrganicMatter,
   SharedWorldStateDiff,
 } from "../src/types";
@@ -493,6 +494,49 @@ describe("RoomDO distance-sensitive behaviour", () => {
     const expectedDistance = (player.combatAttributes.speed * WORLD_TICK_INTERVAL_MS) / 1000;
     expect(player.position.x - initialPosition.x).toBeCloseTo(expectedDistance);
     expect(player.position.y).toBeCloseTo(initialPosition.y);
+  });
+
+  it("does not emit microorganism diffs when movement is blocked", async () => {
+    const { roomAny } = await createRoom();
+
+    const obstacle: Obstacle = {
+      id: "blocker",
+      kind: "obstacle",
+      position: { x: 0, y: 0 },
+      size: { x: 160, y: 120 },
+      impassable: true,
+    };
+
+    const microorganism: Microorganism = {
+      id: "micro-blocked",
+      kind: "microorganism",
+      species: "amoeba",
+      position: { x: -100, y: 0 },
+      movementVector: { x: 1, y: 0 },
+      orientation: { angle: 0 },
+      health: { current: 10, max: 10 },
+      aggression: "neutral",
+      attributes: { speed: 50, damage: 0, resilience: 0 },
+    };
+
+    roomAny.obstacles.clear();
+    roomAny.obstacles.set(obstacle.id, obstacle);
+    roomAny.world.obstacles = [obstacle];
+
+    roomAny.microorganisms.clear();
+    roomAny.microorganisms.set(microorganism.id, microorganism);
+    roomAny.world.microorganisms = [microorganism];
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, TestPlayer>();
+    const now = Date.now();
+
+    const result = roomAny.updateMicroorganismsDuringTick(1_000, now, worldDiff, combatLog, updatedPlayers);
+
+    expect(result.worldChanged).toBe(false);
+    expect(worldDiff.upsertMicroorganisms).toBeUndefined();
+    expect(microorganism.position).toEqual({ x: -100, y: 0 });
   });
 });
 
