@@ -24,36 +24,6 @@
   gap: 1.75rem;
 }
 
-.closeButton {
-  position: absolute;
-  top: clamp(0.75rem, 2vw, 1.25rem);
-  right: clamp(0.75rem, 2vw, 1.25rem);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(9, 11, 20, 0.65);
-  color: rgba(245, 247, 255, 0.9);
-  font-size: 1.25rem;
-  line-height: 1;
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border 0.2s ease;
-}
-
-.closeButton:hover {
-  background: rgba(15, 18, 32, 0.95);
-  color: rgba(255, 255, 255, 0.95);
-}
-
-.closeButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(111, 137, 255, 0.4);
-  border-color: rgba(111, 137, 255, 0.65);
-}
-
 .header {
   display: flex;
   flex-direction: column;

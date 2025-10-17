@@ -155,17 +155,27 @@ describe("StartScreen", () => {
 
     act(() => {
       gameStore.actions.setPlayerName("Carol");
+      gameStore.actions.setPlayerId("player-1");
+      gameStore.actions.setConnectionStatus("connected");
     });
 
     window.localStorage.setItem("micr-omega:player-name", "Carol");
 
     renderWithProviders(<StartScreen onStart={() => {}} onQuit={onQuit} />);
 
-    const quitButton = screen.getByRole("button", { name: /sair da sala/i });
+    const quitButton = screen.getByRole("button", { name: /desconectar/i });
     fireEvent.click(quitButton);
 
     expect(onQuit).toHaveBeenCalledTimes(1);
     expect(window.localStorage.getItem("micr-omega:player-name")).toBe("Carol");
+  });
+
+  it("não exibe o controle de desconexão quando não há sessão ativa", () => {
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+    expect(
+      screen.queryByRole("button", { name: /desconectar/i })
+    ).not.toBeInTheDocument();
   });
 
   it("atualiza o store de configurações quando os toggles mudam", async () => {
