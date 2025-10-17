@@ -183,4 +183,66 @@ describe("RoomDO disconnect behavior", () => {
       (globalThis as any).WebSocket = originalWebSocket;
     }
   });
+
+  it("restores pending players that reconnect immediately after death", async () => {
+    const originalWebSocket = globalThis.WebSocket;
+    const websocketMock = { OPEN: 1, CLOSING: 2, CLOSED: 3 } as const;
+    (globalThis as any).WebSocket = websocketMock;
+
+    try {
+      const mockState = new MockDurableObjectState();
+      const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+      const roomAny = room as any;
+      await roomAny.ready;
+
+      const firstSocket = {
+        readyState: websocketMock.OPEN,
+        send: vi.fn(),
+        close: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      } as unknown as WebSocket;
+
+      const playerId = await roomAny.handleJoin(firstSocket, { type: "join", name: "Alice" });
+      expect(typeof playerId).toBe("string");
+
+      const player = roomAny.players.get(playerId)!;
+      const reconnectToken = player.reconnectToken;
+
+      const now = Date.now();
+      roomAny.queuePlayerDeath(player, now, new Map());
+
+      expect(player.pendingRemoval).toBe(true);
+      expect(roomAny.playersPendingRemoval.has(playerId)).toBe(true);
+      expect(roomAny.pendingPlayerDeaths.some((entry: any) => entry.playerId === playerId)).toBe(true);
+
+      const secondSocket = {
+        readyState: websocketMock.OPEN,
+        send: vi.fn(),
+        close: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      } as unknown as WebSocket;
+
+      const rejoinedId = await roomAny.handleJoin(secondSocket, {
+        type: "join",
+        name: "Alice",
+        playerId,
+        reconnectToken,
+      });
+
+      expect(rejoinedId).toBe(playerId);
+      expect(player.pendingRemoval).toBe(false);
+      expect(roomAny.playersPendingRemoval.has(playerId)).toBe(false);
+      expect(roomAny.pendingPlayerDeaths.some((entry: any) => entry.playerId === playerId)).toBe(false);
+      expect(roomAny.socketsByPlayer.get(playerId)).toBe(secondSocket);
+
+      const candidates = roomAny.getMicroorganismTargetCandidates();
+      expect(candidates.some((candidate: any) => candidate.id === playerId)).toBe(true);
+
+      expect(firstSocket.close).toHaveBeenCalledWith(1000, "reconnected");
+    } finally {
+      (globalThis as any).WebSocket = originalWebSocket;
+    }
+  });
 });

@@ -2917,6 +2917,26 @@ export class RoomDO {
     }
   }
 
+  private cancelPendingPlayerRemoval(player: PlayerInternal): WebSocket[] {
+    const sockets: WebSocket[] = [];
+
+    player.pendingRemoval = false;
+    this.playersPendingRemoval.delete(player.id);
+
+    for (let index = this.pendingPlayerDeaths.length - 1; index >= 0; index--) {
+      const pending = this.pendingPlayerDeaths[index];
+      if (pending.playerId !== player.id) {
+        continue;
+      }
+      this.pendingPlayerDeaths.splice(index, 1);
+      if (pending.socket) {
+        sockets.push(pending.socket);
+      }
+    }
+
+    return sockets;
+  }
+
   private async setupSession(socket: WebSocket): Promise<void> {
     let playerId: string | null = null;
 
@@ -3226,6 +3246,7 @@ export class RoomDO {
       }
     }
 
+    const pendingSockets = player ? this.cancelPendingPlayerRemoval(player) : [];
     const previousSocket = player ? this.socketsByPlayer.get(player.id) : undefined;
 
     let rankingShouldUpdate = false;
@@ -3275,6 +3296,12 @@ export class RoomDO {
       this.nameToPlayerId.set(nameKey, id);
       rankingShouldUpdate = true;
     } else {
+      for (const pendingSocket of pendingSockets) {
+        this.discardSocket(pendingSocket, 1000, "reconnected", "discard_pending_socket_failed");
+      }
+      if (pendingSockets.length > 0) {
+        this.socketsByPlayer.delete(player.id);
+      }
       const previousName = player.name;
       const previousKey = player.name.toLowerCase();
       if (previousKey !== nameKey && this.nameToPlayerId.get(previousKey) === player.id) {
@@ -4743,6 +4770,26 @@ export class RoomDO {
         });
       }
     }
+  }
+
+  private discardSocket(
+    socket: WebSocket,
+    code: number,
+    reason: string,
+    logEvent: string
+  ): void {
+    if (socket.readyState !== WebSocket.CLOSING && socket.readyState !== WebSocket.CLOSED) {
+      try {
+        socket.close(code, reason);
+      } catch (error) {
+        this.observability.log("warn", logEvent, {
+          error: serializeError(error),
+        });
+      }
+    }
+
+    this.clientsBySocket.delete(socket);
+    this.activeSockets.delete(socket);
   }
 
   private send(socket: WebSocket, message: ServerMessage, payload?: string): void {
