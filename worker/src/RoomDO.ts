@@ -2270,7 +2270,11 @@ export class RoomDO {
 
     socket.addEventListener("close", () => {
       if (playerId) {
-        void this.handleDisconnect(socket, playerId);
+        void this.handleDisconnect(socket, playerId).catch((error) => {
+          this.observability.logError("player_disconnect_failed", error, {
+            playerId
+          });
+        });
       }
       this.clientsBySocket.delete(socket);
       this.activeSockets.delete(socket);
