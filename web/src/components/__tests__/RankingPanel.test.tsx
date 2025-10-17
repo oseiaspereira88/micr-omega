@@ -235,6 +235,64 @@ describe("RankingPanel", () => {
     expect(within(second!).getByText("Carla")).toBeVisible();
     expect(within(third!).getByText("Ana")).toBeVisible();
   });
+
+  it("ignores accents when comparing names and falls back to playerId", () => {
+    render(<RankingPanel />);
+
+    act(() => {
+      const players: GameStoreState["players"] = {
+        one: createPlayer({
+          id: "one",
+          name: "Ágata",
+          connected: true,
+          score: 4_000,
+          combo: 1,
+          lastActiveAt: 4_000,
+        }),
+        two: createPlayer({
+          id: "two",
+          name: "Agata",
+          connected: true,
+          score: 4_000,
+          combo: 1,
+          lastActiveAt: 5_000,
+        }),
+        three: createPlayer({
+          id: "three",
+          name: "Bruno",
+          connected: true,
+          score: 4_000,
+          combo: 1,
+          lastActiveAt: 6_000,
+        }),
+      };
+
+      const remotePlayers = {
+        byId: players,
+        all: Object.values(players),
+      };
+
+      gameStore.setState(() => ({
+        ...snapshot(),
+        connectionStatus: "connected",
+        players,
+        remotePlayers,
+        ranking: [
+          { playerId: "three", name: "Bruno", score: 4_000 },
+          { playerId: "two", name: "Agata", score: 4_000 },
+          { playerId: "one", name: "Ágata", score: 4_000 },
+        ],
+      }));
+    });
+
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+
+    const [first, second, third] = items;
+    expect(within(first!).getByText("Ágata")).toBeVisible();
+    expect(within(second!).getByText("Agata")).toBeVisible();
+    expect(within(third!).getByText("Bruno")).toBeVisible();
+  });
 });
 const createPlayer = (
   overrides: Partial<SharedPlayerState> & Pick<SharedPlayerState, "id" | "name">

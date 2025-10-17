@@ -2,6 +2,9 @@ import { z } from "zod";
 
 export const PROTOCOL_VERSION = "1.1.0" as const;
 
+export const RANKING_SORT_LOCALE = "pt-BR" as const;
+export const RANKING_SORT_OPTIONS = { sensitivity: "base" } as const;
+
 export const WORLD_SIZE = 4000;
 export const WORLD_RADIUS = WORLD_SIZE / 2;
 
