@@ -128,9 +128,11 @@ const drawMinimap = (ctx, state, camera, options = {}) => {
   const originY = Math.max(8, padding);
 
   const safeWorldSize = Number.isFinite(worldSize) && worldSize > 0 ? worldSize : WORLD_SIZE;
+  const worldRadius = safeWorldSize / 2;
   const scale = size / safeWorldSize;
 
-  const projectCoordinate = (value) => clampValue(value ?? 0, 0, safeWorldSize) * scale;
+  const projectCoordinate = (value) =>
+    clampValue((value ?? 0) + worldRadius, 0, safeWorldSize) * scale;
 
   const worldView = state.worldView || {};
   const microorganisms = Array.isArray(worldView.microorganisms) ? worldView.microorganisms : [];
@@ -233,10 +235,10 @@ const drawMinimap = (ctx, state, camera, options = {}) => {
   const zoom = Number.isFinite(camera.zoom) && camera.zoom > 0 ? camera.zoom : 1;
   const viewportWidthWorld = (camera.viewport?.width ?? width) / zoom;
   const viewportHeightWorld = (camera.viewport?.height ?? height) / zoom;
-  const cameraX = Number.isFinite(camera.x) ? camera.x : viewportWidthWorld / 2;
-  const cameraY = Number.isFinite(camera.y) ? camera.y : viewportHeightWorld / 2;
-  const viewLeft = clampValue(cameraX - viewportWidthWorld / 2, 0, safeWorldSize);
-  const viewTop = clampValue(cameraY - viewportHeightWorld / 2, 0, safeWorldSize);
+  const cameraX = Number.isFinite(camera.x) ? camera.x : 0;
+  const cameraY = Number.isFinite(camera.y) ? camera.y : 0;
+  const viewLeft = clampValue(cameraX - viewportWidthWorld / 2 + worldRadius, 0, safeWorldSize);
+  const viewTop = clampValue(cameraY - viewportHeightWorld / 2 + worldRadius, 0, safeWorldSize);
   const viewWidth = Math.min(viewportWidthWorld, safeWorldSize);
   const viewHeight = Math.min(viewportHeightWorld, safeWorldSize);
 
