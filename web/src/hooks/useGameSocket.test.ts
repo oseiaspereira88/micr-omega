@@ -77,6 +77,18 @@ describe("resolveWebSocketUrl", () => {
     expect(resolveWebSocketUrl()).toBe("wss://my-app.pages.dev");
   });
 
+  it("keeps original host for Cloudflare Workers", () => {
+    vi.stubGlobal("window", {
+      location: {
+        hostname: "my-app.account-name.workers.dev",
+        protocol: "https:",
+        port: ""
+      }
+    } as Window);
+
+    expect(resolveWebSocketUrl()).toBe("wss://my-app.account-name.workers.dev");
+  });
+
   it("keeps registrable domain for multi-level ccTLDs", () => {
     vi.stubGlobal("window", {
       location: { hostname: "arena.example.com.br", protocol: "https:", port: "" }

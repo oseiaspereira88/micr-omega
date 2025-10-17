@@ -103,7 +103,8 @@ const MULTI_TENANT_HOST_SUFFIXES = new Set([
   "vercel.app",
   "netlify.app",
   "surge.sh",
-  "cloudflareapps.com"
+  "cloudflareapps.com",
+  "workers.dev"
 ]);
 
 const formatHostnameForWebSocket = (hostname: string) => {
