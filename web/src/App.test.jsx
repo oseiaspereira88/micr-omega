@@ -9,6 +9,7 @@ const sendMock = vi.fn();
 const sendAttackMock = vi.fn();
 const sendMovementMock = vi.fn();
 const mockSettingsRef = { current: null };
+const toastStackPropsRef = { current: null };
 
 vi.mock('./hooks/useGameSocket', () => ({
   useGameSocket: () => ({
@@ -40,7 +41,10 @@ vi.mock('./components/StartScreen', () => ({
 
 vi.mock('./components/ToastStack', () => ({
   __esModule: true,
-  default: () => null,
+  default: (props) => {
+    toastStackPropsRef.current = props;
+    return null;
+  },
 }));
 
 vi.mock('./store/gameSettings', () => ({
@@ -79,6 +83,111 @@ const createPlayer = () => ({
   skillCooldowns: {},
 });
 
+describe('App toast handling', () => {
+  let setTimeoutSpy;
+  let clearTimeoutSpy;
+  let timers;
+
+  beforeEach(() => {
+    sendMock.mockReset();
+    sendAttackMock.mockReset();
+    sendMovementMock.mockReset();
+    sendAttackMock.mockReturnValue(true);
+    mockSettingsRef.current = null;
+    toastStackPropsRef.current = null;
+    timers = new Map();
+    initializeStoreWithPlayer();
+  });
+
+  afterEach(() => {
+    act(() => {
+      gameStore.setState(() => baseState);
+    });
+    mockSettingsRef.current = null;
+    toastStackPropsRef.current = null;
+    sendMock.mockReset();
+    sendAttackMock.mockReset();
+    sendMovementMock.mockReset();
+    if (setTimeoutSpy) {
+      setTimeoutSpy.mockRestore();
+      setTimeoutSpy = undefined;
+    }
+    if (clearTimeoutSpy) {
+      clearTimeoutSpy.mockRestore();
+      clearTimeoutSpy = undefined;
+    }
+    if (timers) {
+      timers.clear();
+      timers = undefined;
+    }
+  });
+
+  it('clears timers for truncated toasts and avoids redundant dismissals', async () => {
+    const TOAST_LIMIT = 5;
+    let nextTimerId = 1;
+    const executedTimers = [];
+
+    setTimeoutSpy = vi
+      .spyOn(window, 'setTimeout')
+      .mockImplementation((callback, delay, ...args) => {
+        const id = nextTimerId++;
+        const wrapped = () => {
+          callback(...args);
+        };
+        timers.set(id, wrapped);
+        return id;
+      });
+
+    clearTimeoutSpy = vi.spyOn(window, 'clearTimeout').mockImplementation((id) => {
+      timers.delete(id);
+    });
+
+    render(<App />);
+
+    expect(toastStackPropsRef.current).toBeTruthy();
+
+    for (let index = 0; index < TOAST_LIMIT + 2; index += 1) {
+      const message = `Error ${index + 1}`;
+
+      await act(async () => {
+        gameStore.setState((state) => ({
+          ...state,
+          joinError: message,
+        }));
+      });
+
+      const toasts = toastStackPropsRef.current?.toasts ?? [];
+      expect(toasts.length).toBe(Math.min(index + 1, TOAST_LIMIT));
+    }
+
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(TOAST_LIMIT + 2);
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(2);
+
+    expect(timers.size).toBe(TOAST_LIMIT);
+    const activeTimerIds = Array.from(timers.keys());
+    expect(activeTimerIds).not.toContain(1);
+    expect(activeTimerIds).not.toContain(2);
+
+    const pendingTimers = Array.from(timers.entries());
+
+    await act(async () => {
+      pendingTimers.forEach(([id, callback]) => {
+        executedTimers.push(id);
+        callback();
+      });
+    });
+
+    expect(executedTimers).toHaveLength(TOAST_LIMIT);
+    expect(executedTimers).not.toContain(1);
+    expect(executedTimers).not.toContain(2);
+
+    const remainingToasts = toastStackPropsRef.current?.toasts ?? [];
+    expect(remainingToasts.length).toBe(0);
+
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(TOAST_LIMIT + 2);
+  });
+});
+
 const initializeStoreWithPlayer = () => {
   const player = createPlayer();
   const remotePlayers = {
@@ -110,6 +219,7 @@ describe('App archetype actions', () => {
     sendMovementMock.mockReset();
     sendAttackMock.mockReturnValue(true);
     mockSettingsRef.current = null;
+    toastStackPropsRef.current = null;
     initializeStoreWithPlayer();
   });
 
@@ -118,6 +228,7 @@ describe('App archetype actions', () => {
       gameStore.setState(() => baseState);
     });
     mockSettingsRef.current = null;
+    toastStackPropsRef.current = null;
     sendMock.mockReset();
     sendAttackMock.mockReset();
     sendMovementMock.mockReset();
@@ -170,6 +281,7 @@ describe('App command batch handling', () => {
     sendMovementMock.mockReset();
     sendAttackMock.mockReturnValue(true);
     mockSettingsRef.current = null;
+    toastStackPropsRef.current = null;
     initializeStoreWithPlayer();
   });
 
@@ -178,6 +290,7 @@ describe('App command batch handling', () => {
       gameStore.setState(() => baseState);
     });
     mockSettingsRef.current = null;
+    toastStackPropsRef.current = null;
     sendMock.mockReset();
     sendAttackMock.mockReset();
     sendMovementMock.mockReset();

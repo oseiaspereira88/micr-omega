@@ -521,11 +521,21 @@ const App = () => {
 
       const id = generateToastId();
       setToasts((prev) => {
-        const nextToasts = [...prev, { id, message }];
-        if (nextToasts.length > MAX_TOASTS) {
-          nextToasts.splice(0, nextToasts.length - MAX_TOASTS);
+        const overflow = Math.max(prev.length + 1 - MAX_TOASTS, 0);
+        if (overflow > 0) {
+          const discarded = prev.slice(0, overflow);
+          const hasWindow = typeof window !== 'undefined';
+          discarded.forEach(({ id: discardedId }) => {
+            const timerId = timersRef.current.get(discardedId);
+            if (hasWindow && typeof timerId !== 'undefined') {
+              window.clearTimeout(timerId);
+            }
+            timersRef.current.delete(discardedId);
+          });
         }
-        return nextToasts;
+
+        const retained = overflow > 0 ? prev.slice(overflow) : prev;
+        return [...retained, { id, message }];
       });
 
       if (typeof window !== 'undefined') {
