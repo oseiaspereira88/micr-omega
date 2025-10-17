@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   AFFINITY_LABELS,
   ELEMENT_LABELS,
@@ -18,6 +18,87 @@ const ArchetypeSelection = ({
     ? selection.options.filter((option) => typeof option === 'string' && option.trim().length > 0)
     : null;
 
+  const dialogRef = useRef(null);
+  const overlayRef = useRef(null);
+  const previousFocusRef = useRef(null);
+
+  useEffect(() => {
+    if (!pending) {
+      return undefined;
+    }
+
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const focusableSelectors =
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const dialogNode = dialogRef.current;
+    const focusable = dialogNode
+      ? Array.from(dialogNode.querySelectorAll(focusableSelectors)).filter(
+          (element) =>
+            element instanceof HTMLElement &&
+            !element.hasAttribute('disabled') &&
+            element.getAttribute('aria-hidden') !== 'true',
+        )
+      : [];
+
+    if (focusable.length > 0) {
+      focusable[0].focus();
+    } else if (dialogNode instanceof HTMLElement) {
+      dialogNode.focus();
+    } else if (overlayRef.current instanceof HTMLElement) {
+      overlayRef.current.focus();
+    }
+
+    return () => {
+      if (previousFocusRef.current instanceof HTMLElement) {
+        previousFocusRef.current.focus();
+      }
+    };
+  }, [pending]);
+
+  const handleKeyDown = (event) => {
+    if (!dialogRef.current) {
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const focusableSelectors = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const focusable = Array.from(dialogRef.current.querySelectorAll(focusableSelectors)).filter(
+      (element) =>
+        element instanceof HTMLElement &&
+        !element.hasAttribute('disabled') &&
+        element.getAttribute('aria-hidden') !== 'true',
+    );
+
+    if (focusable.length === 0) {
+      event.preventDefault();
+      return;
+    }
+
+    const firstElement = focusable[0];
+    const lastElement = focusable[focusable.length - 1];
+    const active = document.activeElement;
+
+    if (event.shiftKey) {
+      if (active === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      }
+    } else if (active === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  };
+
   const options = useMemo(() => {
     return archetypeList.filter((entry) => {
       if (!allowed) return true;
@@ -30,8 +111,19 @@ const ArchetypeSelection = ({
   }
 
   return (
-    <div className={styles.overlay}>
-      <div className={styles.dialog}>
+    <div
+      className={styles.overlay}
+      tabIndex={-1}
+      ref={overlayRef}
+      onKeyDown={handleKeyDown}
+    >
+      <div
+        className={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
+        ref={dialogRef}
+      >
         <h2 className={styles.title}>Escolha seu arquétipo inicial</h2>
         <p className={styles.subtitle}>
           Cada arquétipo define afinidades elementares, passivas únicas e habilidades
