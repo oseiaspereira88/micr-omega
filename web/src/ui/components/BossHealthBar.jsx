@@ -1,12 +1,20 @@
 import React from 'react';
 import styles from './BossHealthBar.module.css';
 
+const toSafeNumber = (value, fallback) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+
 const BossHealthBar = ({ active, health, maxHealth }) => {
   if (!active) {
     return null;
   }
 
-  const percent = Math.max(0, Math.min(100, (health / (maxHealth || 1)) * 100));
+  const safeHealth = Math.max(0, toSafeNumber(health, 0));
+  const safeMaxHealth = Math.max(1, toSafeNumber(maxHealth, Math.max(1, safeHealth || 1)));
+  const rawPercent = (safeHealth / safeMaxHealth) * 100;
+  const percent = Math.max(0, Math.min(100, Number.isFinite(rawPercent) ? rawPercent : 0));
   const bossName = 'Mega-organismo';
 
   return (
