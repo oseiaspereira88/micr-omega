@@ -125,6 +125,25 @@ describe("RoomDO ranking cache", () => {
     expect(updatedRanking.some((entry: { playerId: string }) => entry.playerId === playerA.id)).toBe(false);
   });
 
+  it("excludes disconnected players from the ranking", async () => {
+    const { roomAny } = await createRoom();
+
+    const connectedPlayer: TestPlayer = createTestPlayer("connected", { name: "Alice", score: 10 });
+    const disconnectedPlayer: TestPlayer = createTestPlayer("disconnected", {
+      name: "Bob",
+      score: 20,
+      connected: false,
+    });
+
+    roomAny.players.set(connectedPlayer.id, connectedPlayer);
+    roomAny.players.set(disconnectedPlayer.id, disconnectedPlayer);
+
+    const ranking = roomAny.getRanking();
+
+    expect(ranking.map((entry: { name: string }) => entry.name)).toEqual(["Alice"]);
+    expect(ranking.every((entry: { name: string }) => entry.name !== "Bob")).toBe(true);
+  });
+
   it("rebuilds the cached ranking when a new player joins", async () => {
     const originalWebSocket = (globalThis as any).WebSocket;
     const websocketMock = { OPEN: 1, CLOSING: 2, CLOSED: 3 };
