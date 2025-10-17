@@ -6,7 +6,7 @@
   font-family: system-ui, sans-serif;
 }
 
-.canvasOverlay {
+.canvasOverlay { 
   position: absolute;
   inset: 0;
   display: flex;
@@ -17,6 +17,14 @@
   opacity: 0;
   transition: opacity 0.25s ease;
   z-index: 40;
+}
+
+.disabledSurface {
+  pointer-events: none;
+}
+
+.controlDisabled {
+  pointer-events: none;
 }
 
 .canvasOverlayVisible {

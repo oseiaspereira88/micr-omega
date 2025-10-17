@@ -192,6 +192,7 @@ const GameHud = ({
   );
 
   const showStatusOverlay = connectionStatus !== 'connected';
+  const hudDisabled = showStatusOverlay;
   const statusTitle = statusMessages[connectionStatus] ?? 'Problemas de conexão';
   const statusHint = statusHints[connectionStatus];
 
@@ -199,11 +200,18 @@ const GameHud = ({
     <>
       <button
         type="button"
-        className={styles.sidebarToggle}
+        className={`${styles.sidebarToggle} ${
+          hudDisabled ? styles.controlDisabled : ''
+        }`}
         onClick={handleToggleSidebar}
         aria-expanded={isSidebarOpen}
         aria-controls={sidebarId}
         ref={toggleButtonRef}
+        inert={hudDisabled ? '' : undefined}
+        aria-hidden={hudDisabled ? true : undefined}
+        disabled={hudDisabled}
+        aria-disabled={hudDisabled}
+        tabIndex={hudDisabled ? -1 : undefined}
       >
         {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
       </button>
@@ -235,12 +243,12 @@ const GameHud = ({
           id={sidebarId}
           className={`${styles.sidebar} ${
             isSidebarOpen ? styles.sidebarOpen : styles.sidebarClosed
-          }`}
+          } ${hudDisabled ? styles.disabledSurface : ''}`}
           role="complementary"
           aria-label="Painel lateral do jogo"
-          aria-hidden={isSidebarOpen ? undefined : true}
+          aria-hidden={hudDisabled || !isSidebarOpen ? true : undefined}
           tabIndex={-1}
-          inert={isSidebarOpen ? undefined : true}
+          inert={hudDisabled || !isSidebarOpen ? '' : undefined}
           ref={sidebarRef}
         >
           <RankingPanel />
@@ -311,7 +319,11 @@ const GameHud = ({
           ) : null}
         </div>
 
-        <div className={styles.mainHud}>
+        <div
+          className={`${styles.mainHud} ${hudDisabled ? styles.disabledSurface : ''}`}
+          aria-hidden={hudDisabled ? true : undefined}
+          inert={hudDisabled ? '' : undefined}
+        >
           <HudBar
             level={level}
             score={score}
@@ -357,6 +369,9 @@ const GameHud = ({
 
         {showTouchControls ? (
           <TouchControls
+            aria-hidden={hudDisabled ? true : undefined}
+            inert={hudDisabled ? '' : undefined}
+            className={hudDisabled ? styles.disabledSurface : undefined}
             joystick={joystick}
             onJoystickStart={onJoystickStart}
             onJoystickMove={onJoystickMove}
