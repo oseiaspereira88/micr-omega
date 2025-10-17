@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import styles from './HudBar.module.css';
 import {
   AFFINITY_ICONS,
@@ -14,10 +14,10 @@ const sanitizeNumber = (value, fallback = 0) => {
   return Number.isFinite(numeric) ? numeric : fallback;
 };
 
-const summarizeSlot = (slot) => {
+const summarizeSlot = (slot, formatValue = (value) => value) => {
   const used = Math.max(0, Math.floor(sanitizeNumber(slot?.used)));
   const max = Math.max(0, Math.floor(sanitizeNumber(slot?.max)));
-  return `${used}/${max}`;
+  return `${formatValue(used)}/${formatValue(max)}`;
 };
 
 const HudBar = ({
@@ -46,6 +46,9 @@ const HudBar = ({
   affinityLabel,
   resistances,
 }) => {
+  const numberFormatter = useMemo(() => new Intl.NumberFormat('pt-BR'), []);
+  const formatNumber = useCallback((value) => numberFormatter.format(value), [numberFormatter]);
+
   const safeLevel = Math.max(0, Math.floor(sanitizeNumber(level)));
   const safeScore = Math.max(0, Math.floor(sanitizeNumber(score)));
   const safeEnergy = Math.max(0, Math.floor(sanitizeNumber(energy)));
@@ -153,7 +156,7 @@ const HudBar = ({
   return (
     <>
       <div className={styles.header}>
-        <div className={styles.title}>MicrΩ • Nv.{safeLevel} • {safeScore} pts</div>
+        <div className={styles.title}>MicrΩ • Nv.{safeLevel} • {formatNumber(safeScore)} pts</div>
         <div className={styles.combatProfile}>
           <span className={styles.combatTag} title={`Elemento ${elementName}`}>
             {elementIcon} {elementName}
@@ -169,28 +172,28 @@ const HudBar = ({
 
       <div className={styles.stats}>
         <div className={styles.badge} style={{ background: 'rgba(0, 217, 255, 0.2)' }}>
-          ⚡ {safeEnergy}
+          ⚡ {formatNumber(safeEnergy)}
         </div>
         <div className={styles.badge} style={{ background: 'rgba(255, 100, 100, 0.2)' }}>
-          ❤️ {safeHealth}/{safeMaxHealth}
+          ❤️ {formatNumber(safeHealth)}/{formatNumber(safeMaxHealth)}
         </div>
         <div className={styles.badge} style={{ background: 'rgba(255, 200, 0, 0.2)' }}>
-          💨 {safeDashCharge}%
+          💨 {formatNumber(safeDashCharge)}%
         </div>
         <div className={styles.badge} style={{ background: 'rgba(0, 255, 170, 0.18)' }}>
-          🧬 MG {mgCurrent}
+          🧬 MG {formatNumber(mgCurrent)}
         </div>
         <div className={styles.badge} style={{ background: 'rgba(90, 130, 255, 0.18)' }}>
-          🧠 PC {pcAvailable}/{pcTotal}
+          🧠 PC {formatNumber(pcAvailable)}/{formatNumber(pcTotal)}
         </div>
         {safeCombo > 1 && (
           <div className={`${styles.badge} ${styles.comboBadge}`} style={{ background: 'rgba(255, 80, 0, 0.25)' }}>
-            🔥 Combo x{safeCombo}
+            🔥 Combo x{formatNumber(safeCombo)}
           </div>
         )}
         {safeMaxCombo > 0 && (
           <div className={`${styles.badge} ${styles.maxComboBadge}`} style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
-            🏅 Máx x{safeMaxCombo}
+            🏅 Máx x{formatNumber(safeMaxCombo)}
           </div>
         )}
         {resistanceEntries.length > 0 && (
@@ -231,7 +234,7 @@ const HudBar = ({
         )}
         <div className={styles.progressRow}>
           <div className={styles.xpPanel}>
-            <div className={styles.xpHeader}>XP {xpCurrent} / {xpNext}</div>
+            <div className={styles.xpHeader}>XP {formatNumber(xpCurrent)} / {formatNumber(xpNext)}</div>
             <div
               className={styles.xpBar}
               role="progressbar"
@@ -244,11 +247,11 @@ const HudBar = ({
             </div>
           </div>
           <div className={styles.slotSummary}>
-            <span>Pequena: {summarizeSlot(evolutionSlots?.small)}</span>
-            <span>Média: {summarizeSlot(evolutionSlots?.medium)}</span>
-            <span>Grande: {summarizeSlot(evolutionSlots?.large)}</span>
+            <span>Pequena: {summarizeSlot(evolutionSlots?.small, formatNumber)}</span>
+            <span>Média: {summarizeSlot(evolutionSlots?.medium, formatNumber)}</span>
+            <span>Grande: {summarizeSlot(evolutionSlots?.large, formatNumber)}</span>
             {evolutionSlots?.macro && (
-              <span>Macro: {summarizeSlot(evolutionSlots?.macro)}</span>
+              <span>Macro: {summarizeSlot(evolutionSlots?.macro, formatNumber)}</span>
             )}
           </div>
         </div>
@@ -256,34 +259,34 @@ const HudBar = ({
           <div className={styles.resourceCard}>
             <div className={styles.resourceTitle}>Fragmentos</div>
             <div className={styles.resourceValues}>
-              <span>Menor {fragmentCounters.minor}</span>
-              <span>Maior {fragmentCounters.major}</span>
-              <span>Ápice {fragmentCounters.apex}</span>
+              <span>Menor {formatNumber(fragmentCounters.minor)}</span>
+              <span>Maior {formatNumber(fragmentCounters.major)}</span>
+              <span>Ápice {formatNumber(fragmentCounters.apex)}</span>
             </div>
           </div>
           <div className={styles.resourceCard}>
             <div className={styles.resourceTitle}>Genes estáveis</div>
             <div className={styles.resourceValues}>
-              <span>Menor {stableCounters.minor}</span>
-              <span>Maior {stableCounters.major}</span>
-              <span>Ápice {stableCounters.apex}</span>
+              <span>Menor {formatNumber(stableCounters.minor)}</span>
+              <span>Maior {formatNumber(stableCounters.major)}</span>
+              <span>Ápice {formatNumber(stableCounters.apex)}</span>
             </div>
           </div>
           <div className={styles.resourceCard}>
             <div className={styles.resourceTitle}>Reroll</div>
             <div className={styles.resourceValues}>
-              <span>Custo {rerollCost} MG</span>
-              <span>Usado {rerollCount}x</span>
-              <span>Piedade {dropPityFragment}/{dropPityStableGene}</span>
+              <span>Custo {formatNumber(rerollCost)} MG</span>
+              <span>Usado {formatNumber(rerollCount)}x</span>
+              <span>Piedade {formatNumber(dropPityFragment)}/{formatNumber(dropPityStableGene)}</span>
             </div>
           </div>
           <div className={styles.resourceCard}>
             <div className={styles.resourceTitle}>Últimos ganhos</div>
             <div className={styles.resourceValues}>
-              <span>XP +{recentRewardsSummary.xp}</span>
-              <span>MG +{recentRewardsSummary.geneticMaterial}</span>
-              <span>Frags +{recentRewardsSummary.fragments}</span>
-              <span>Genes +{recentRewardsSummary.stableGenes}</span>
+              <span>XP +{formatNumber(recentRewardsSummary.xp)}</span>
+              <span>MG +{formatNumber(recentRewardsSummary.geneticMaterial)}</span>
+              <span>Frags +{formatNumber(recentRewardsSummary.fragments)}</span>
+              <span>Genes +{formatNumber(recentRewardsSummary.stableGenes)}</span>
             </div>
           </div>
         </div>
