@@ -32,7 +32,7 @@ vi.mock('./components/StartScreen', () => ({
   __esModule: true,
   default: ({ onStart }) => {
     React.useEffect(() => {
-      onStart({ name: 'Tester' });
+      onStart({ name: 'Tester', autoJoinRequested: true });
     }, [onStart]);
     return null;
   },

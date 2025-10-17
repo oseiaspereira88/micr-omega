@@ -121,10 +121,26 @@ describe("StartScreen", () => {
         visualDensity: "high",
         showTouchControls: true,
       },
+      autoJoinRequested: true,
     });
 
     expect(gameStore.getState().playerName).toBe("Alice");
     expect(window.localStorage.getItem("micr-omega:player-name")).toBe("Alice");
+  });
+
+  it("preenche o campo com o nome persistido sem atualizar o store", async () => {
+    const persistedName = "Persistido";
+    window.localStorage.setItem("micr-omega:player-name", persistedName);
+
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+    const input = screen.getByLabelText(/nome do jogador/i);
+
+    await waitFor(() => {
+      expect(input).toHaveValue(persistedName);
+    });
+
+    expect(gameStore.getState().playerName).toBeNull();
   });
 
   it("mantém o nome persistido ao sair", () => {

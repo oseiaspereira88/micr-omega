@@ -14,7 +14,10 @@ import {
 const TOAST_DURATION = 5000;
 
 const App = () => {
-  const { connect, disconnect, sendMovement, sendAttack, send } = useGameSocket();
+  const [isAutoJoinRequested, setIsAutoJoinRequested] = useState(false);
+  const { connect, disconnect, sendMovement, sendAttack, send } = useGameSocket({
+    autoConnect: isAutoJoinRequested,
+  });
   const joinError = useGameStore((state) => state.joinError);
   const connectionStatus = useGameStore((state) => state.connectionStatus);
   const { settings } = useGameSettings();
@@ -522,17 +525,22 @@ const App = () => {
   }, []);
 
   const handleStart = useCallback(
-    ({ name }) => {
+    ({ name, autoJoinRequested }) => {
+      if (autoJoinRequested) {
+        setIsAutoJoinRequested(true);
+      }
+
       connect(name);
       setIsGameActive(true);
     },
-    [connect]
+    [connect, setIsAutoJoinRequested]
   );
 
   const handleQuit = useCallback(() => {
     setIsGameActive(false);
+    setIsAutoJoinRequested(false);
     disconnect();
-  }, [disconnect]);
+  }, [disconnect, setIsAutoJoinRequested]);
 
   useEffect(() => {
     if (connectionStatus === 'disconnected') {

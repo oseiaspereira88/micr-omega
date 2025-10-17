@@ -31,7 +31,13 @@ import {
 import styles from "./StartScreen.module.css";
 
 type StartScreenProps = {
-  onStart: (payload: { name: string; settings: GameSettings }) => void;
+  onStart: (
+    payload: {
+      name: string;
+      settings: GameSettings;
+      autoJoinRequested?: boolean;
+    }
+  ) => void;
   onQuit: () => void;
   connectionStatus?: ConnectionStatus;
   joinError?: string | null;
@@ -69,7 +75,6 @@ const StartScreen = ({
     const persisted = readStoredName();
     if (persisted) {
       setInputValue(persisted);
-      gameStore.actions.setPlayerName(persisted);
     }
   }, [storedName]);
 
@@ -110,7 +115,7 @@ const StartScreen = ({
       gameStore.actions.setPlayerName(sanitized);
       gameStore.actions.setJoinError(null);
 
-      onStart({ name: sanitized, settings });
+      onStart({ name: sanitized, settings, autoJoinRequested: true });
     },
     [focusInput, inputValue, onStart, settings, storedName]
   );
