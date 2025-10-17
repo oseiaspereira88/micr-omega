@@ -4,6 +4,7 @@ import type { DurableObjectState } from "@cloudflare/workers-types";
 import { RoomDO } from "../src/RoomDO";
 import type { Env } from "../src";
 import { MockDurableObjectState } from "./utils/mock-state";
+import { createMockSocket } from "./utils/mock-socket";
 
 describe("RoomDO disconnect behavior", () => {
   it("clears movement and combat state and broadcasts immediately on disconnect", async () => {
@@ -179,6 +180,83 @@ describe("RoomDO disconnect behavior", () => {
       expect(moveSpy.mock.calls.some(([player]) => player === disconnected)).toBe(false);
       expect(collectionSpy.mock.calls.some(([player]) => player === disconnected)).toBe(false);
       expect(attackSpy.mock.calls.some(([player]) => player === disconnected)).toBe(false);
+    } finally {
+      (globalThis as any).WebSocket = originalWebSocket;
+    }
+  });
+
+  it("prevents pending attacks from reprocessing after reconnect", async () => {
+    const originalWebSocket = globalThis.WebSocket;
+    const websocketMock = { OPEN: 1, CLOSING: 2, CLOSED: 3 } as const;
+    (globalThis as any).WebSocket = websocketMock;
+
+    try {
+      const mockState = new MockDurableObjectState();
+      const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+      const roomAny = room as any;
+      await roomAny.ready;
+
+      const attackerSocket = createMockSocket();
+      const attackerId = await roomAny.handleJoin(attackerSocket, { type: "join", name: "Attacker" });
+      const targetSocket = createMockSocket();
+      const targetId = await roomAny.handleJoin(targetSocket, { type: "join", name: "Target" });
+
+      const attacker = roomAny.players.get(attackerId)!;
+      const target = roomAny.players.get(targetId)!;
+
+      attacker.position = { x: 0, y: 0 };
+      target.position = { x: 0, y: 0 };
+      attacker.combatAttributes.range = 100;
+      attacker.combatAttributes.attack = 25;
+      target.combatAttributes.defense = 0;
+
+      const attackTime = Date.now();
+      await roomAny.handleActionMessage(
+        {
+          type: "action",
+          playerId: attackerId,
+          clientTime: attackTime,
+          action: {
+            type: "attack",
+            kind: "basic",
+            targetPlayerId: targetId,
+          },
+        },
+        attackerSocket,
+      );
+
+      expect(attacker.pendingAttack).not.toBeNull();
+
+      const initialTargetHealth = target.health.current;
+
+      roomAny.playersPendingRemoval.add(attackerId);
+      attacker.pendingRemoval = true;
+
+      await roomAny.handleDisconnect(attackerSocket, attackerId);
+
+      const reconnectToken = attacker.reconnectToken;
+      const reconnectSocket = createMockSocket();
+      const reconnectResult = await roomAny.handleJoin(reconnectSocket, {
+        type: "join",
+        name: "Attacker",
+        playerId: attackerId,
+        reconnectToken,
+      });
+
+      expect(reconnectResult).toBe(attackerId);
+      expect(attacker.pendingAttack).toBeNull();
+      expect(attacker.pendingRemoval).toBe(false);
+      expect(roomAny.playersPendingRemoval.has(attackerId)).toBe(false);
+
+      roomAny.phase = "active";
+      const tickTime = attackTime + 2_000;
+      roomAny.alarmSchedule.set("world_tick", tickTime);
+      roomAny.lastWorldTickAt = attackTime;
+      roomAny.broadcast = vi.fn();
+
+      await roomAny.handleWorldTickAlarm(tickTime);
+
+      expect(target.health.current).toBe(initialTargetHealth);
     } finally {
       (globalThis as any).WebSocket = originalWebSocket;
     }

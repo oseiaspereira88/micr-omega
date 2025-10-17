@@ -3286,6 +3286,9 @@ export class RoomDO {
       player.lastActiveAt = now;
       player.connectedAt = now;
       player.evolutionState = createEvolutionState(player.evolutionState);
+      player.pendingAttack = null;
+      player.pendingRemoval = false;
+      this.playersPendingRemoval.delete(player.id);
       this.updatePlayerCombatAttributes(player);
       this.players.set(player.id, player);
       this.nameToPlayerId.set(nameKey, player.id);
