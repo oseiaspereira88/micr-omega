@@ -253,6 +253,7 @@ const GameHud = ({
             skillCooldownLabel={skillData?.skillCooldownLabel ?? 'Sem habilidade'}
             skillReadyPercent={skillData?.skillReadyPercent ?? 0}
             onCycleSkill={onCycleSkill}
+            touchControlsActive={showTouchControls}
           />
 
           <Notifications notifications={notifications} />

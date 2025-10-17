@@ -14,6 +14,7 @@ const SkillWheel = ({
   skillCooldownLabel,
   skillReadyPercent,
   onCycleSkill,
+  touchControlsActive = false,
 }) => {
   const shouldRender = currentSkill || skillList.length > 0;
 
@@ -48,6 +49,14 @@ const SkillWheel = ({
 
   const readinessPercent = Math.max(0, Math.min(100, Math.round(skillReadyPercent)));
   const readinessStatus = readinessPercent >= 100 ? 'Pronta' : `${readinessPercent}% recarregada`;
+
+  const cycleButtonLabel = touchControlsActive
+    ? '🔁 Trocar habilidade'
+    : '🔁 Trocar habilidade (R)';
+
+  const hintContent = touchControlsActive
+    ? 'Toque no botão de habilidade para usar.'
+    : 'Q: usar habilidade • Shift: dash';
 
   return (
     <div className={styles.container}>
@@ -144,11 +153,11 @@ const SkillWheel = ({
           onClick={handleCycleClick}
           onPointerDown={handleCyclePointerDown}
         >
-          🔁 Trocar habilidade (R)
+          {cycleButtonLabel}
         </button>
       )}
 
-      <div className={styles.hint}>Q: usar habilidade • Shift: dash</div>
+      {hintContent ? <div className={styles.hint}>{hintContent}</div> : null}
     </div>
   );
 };
