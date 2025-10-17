@@ -118,6 +118,93 @@ const GameHud = ({
   }, [isSidebarOpen]);
 
   useEffect(() => {
+    const sidebar = sidebarRef.current;
+    if (!sidebar) {
+      return undefined;
+    }
+
+    const focusableSelectors = [
+      '[data-sidebar-focus]',
+      'a[href]',
+      'button',
+      'input',
+      'select',
+      'textarea',
+      '[tabindex]',
+    ].join(', ');
+
+    const focusableElements = Array.from(
+      sidebar.querySelectorAll(focusableSelectors),
+    );
+
+    const applyHiddenAttributes = (element) => {
+      if (!element.hasAttribute('data-sidebar-orig-tabindex')) {
+        const existingTabIndex = element.getAttribute('tabindex');
+        if (existingTabIndex !== null) {
+          element.setAttribute('data-sidebar-orig-tabindex', existingTabIndex);
+        } else {
+          element.setAttribute('data-sidebar-orig-tabindex', '');
+        }
+      }
+
+      if (!element.hasAttribute('data-sidebar-orig-aria-hidden')) {
+        const existingAriaHidden = element.getAttribute('aria-hidden');
+        if (existingAriaHidden !== null) {
+          element.setAttribute(
+            'data-sidebar-orig-aria-hidden',
+            existingAriaHidden,
+          );
+        } else {
+          element.setAttribute('data-sidebar-orig-aria-hidden', '');
+        }
+      }
+
+      element.setAttribute('tabindex', '-1');
+      element.setAttribute('aria-hidden', 'true');
+    };
+
+    const restoreHiddenAttributes = (element) => {
+      const originalTabIndex = element.getAttribute('data-sidebar-orig-tabindex');
+      if (originalTabIndex !== null) {
+        element.removeAttribute('data-sidebar-orig-tabindex');
+        if (originalTabIndex === '') {
+          element.removeAttribute('tabindex');
+        } else {
+          element.setAttribute('tabindex', originalTabIndex);
+        }
+      } else if (element.getAttribute('tabindex') === '-1') {
+        element.removeAttribute('tabindex');
+      }
+
+      const originalAriaHidden = element.getAttribute(
+        'data-sidebar-orig-aria-hidden',
+      );
+      if (originalAriaHidden !== null) {
+        element.removeAttribute('data-sidebar-orig-aria-hidden');
+        if (originalAriaHidden === '') {
+          element.removeAttribute('aria-hidden');
+        } else {
+          element.setAttribute('aria-hidden', originalAriaHidden);
+        }
+      } else if (element.getAttribute('aria-hidden') === 'true') {
+        element.removeAttribute('aria-hidden');
+      }
+    };
+
+    if (!isSidebarOpen) {
+      focusableElements.forEach(applyHiddenAttributes);
+
+      return () => {
+        focusableElements.forEach(restoreHiddenAttributes);
+      };
+    }
+
+    focusableElements.forEach(restoreHiddenAttributes);
+
+    return undefined;
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
     if (!isSidebarOpen) {
       return;
     }
@@ -204,6 +291,8 @@ const GameHud = ({
         aria-expanded={isSidebarOpen}
         aria-controls={sidebarId}
         ref={toggleButtonRef}
+        tabIndex={isSidebarOpen ? undefined : -1}
+        aria-hidden={isSidebarOpen ? undefined : true}
       >
         {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
       </button>
@@ -243,43 +332,50 @@ const GameHud = ({
           inert={isSidebarOpen ? undefined : true}
           ref={sidebarRef}
         >
-          <RankingPanel />
-          <ConnectionStatusOverlay />
-          {hasOpponents ? (
-            <div className={styles.opponentPanel}>
-              <h3 className={styles.opponentHeading}>Oponentes</h3>
-              <ul className={styles.opponentList}>
-                {opponentSummaries.map((opponent) => (
-                  <li key={opponent.id} className={styles.opponentItem}>
-                    <div className={styles.opponentName}>{opponent.name}</div>
-                    <div className={styles.opponentMeta}>
-                      <span className={styles.opponentTag}>{opponent.elementLabel}</span>
-                      <span className={`${styles.opponentTag} ${styles.opponentAffinity}`}>
-                        {opponent.affinityLabel}
-                      </span>
-                    </div>
-                    <div className={styles.opponentHealthMeter}>
-                      <div
-                        className={styles.opponentHealthBar}
-                        role="progressbar"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={opponent.healthPercent}
-                        aria-valuetext={`${opponent.healthPercent}%`}
-                      >
-                        <div className={styles.opponentHealthFill} style={opponent.barStyle} />
+          <div className={styles.sidebarSectionGroup} data-sidebar-focus>
+            <RankingPanel />
+            <ConnectionStatusOverlay />
+            {hasOpponents ? (
+              <div className={styles.opponentPanel}>
+                <h3 className={styles.opponentHeading}>Oponentes</h3>
+                <ul className={styles.opponentList}>
+                  {opponentSummaries.map((opponent) => (
+                    <li key={opponent.id} className={styles.opponentItem}>
+                      <div className={styles.opponentName}>{opponent.name}</div>
+                      <div className={styles.opponentMeta}>
+                        <span className={styles.opponentTag}>{opponent.elementLabel}</span>
+                        <span className={`${styles.opponentTag} ${styles.opponentAffinity}`}>
+                          {opponent.affinityLabel}
+                        </span>
                       </div>
-                      <span className={styles.opponentHealthValue}>
-                        {opponent.healthPercent}%
-                      </span>
-                    </div>
-                    <div className={styles.opponentStatus}>{opponent.combatState}</div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          <CameraControls zoom={cameraZoom} onChange={onCameraZoomChange} />
+                      <div className={styles.opponentHealthMeter}>
+                        <div
+                          className={styles.opponentHealthBar}
+                          role="progressbar"
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={opponent.healthPercent}
+                          aria-valuetext={`${opponent.healthPercent}%`}
+                        >
+                          <div className={styles.opponentHealthFill} style={opponent.barStyle} />
+                        </div>
+                        <span className={styles.opponentHealthValue}>
+                          {opponent.healthPercent}%
+                        </span>
+                      </div>
+                      <div className={styles.opponentStatus}>{opponent.combatState}</div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <CameraControls zoom={cameraZoom} onChange={onCameraZoomChange} />
+            {onQuit ? (
+              <button type="button" className={styles.leaveButton} onClick={onQuit}>
+                Sair da sala
+              </button>
+            ) : null}
+          </div>
           <div className={styles.settingsPanel}>
             <h3 className={styles.settingsHeading}>Exibição</h3>
             <label className={styles.settingsToggle} htmlFor={minimapToggleId}>
@@ -304,11 +400,6 @@ const GameHud = ({
               </div>
             </label>
           </div>
-          {onQuit ? (
-            <button type="button" className={styles.leaveButton} onClick={onQuit}>
-              Sair da sala
-            </button>
-          ) : null}
         </div>
 
         <div className={styles.mainHud}>
