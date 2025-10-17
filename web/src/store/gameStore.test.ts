@@ -80,6 +80,7 @@ const createFreshState = (): GameStoreState => {
     connectionStatus: "idle",
     reconnectAttempts: 0,
     reconnectUntil: null,
+    reconnectToken: null,
     playerId: null,
     playerName: null,
     joinError: null,
@@ -289,6 +290,7 @@ describe("gameStore", () => {
     gameStore.actions.applyJoinedSnapshot({
       playerId: "p-new",
       playerName: "Rookie",
+      reconnectToken: "secure-token",
       reconnectUntil: 9999,
       state: newState,
       ranking: newRanking,
@@ -302,6 +304,7 @@ describe("gameStore", () => {
     expect(afterJoined.ranking).toEqual(newRanking);
     expect(afterJoined.joinError).toBeNull();
     expect(afterJoined.reconnectAttempts).toBe(0);
+    expect(afterJoined.reconnectToken).toBe("secure-token");
   });
 
   it("clears round metadata when diffs reset values", () => {

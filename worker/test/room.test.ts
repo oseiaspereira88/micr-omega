@@ -190,6 +190,7 @@ describe("RoomDO", () => {
       const joinedPromise = onceMessage<{
         type: string;
         playerId: string;
+        reconnectToken: string;
       }>(firstSocket, "joined");
 
       firstSocket.send(
@@ -205,6 +206,7 @@ describe("RoomDO", () => {
       const secondJoinedPromise = onceMessage<{
         type: string;
         playerId: string;
+        reconnectToken: string;
       }>(secondSocket, "joined");
 
       secondSocket.send(
@@ -212,6 +214,7 @@ describe("RoomDO", () => {
           type: "join",
           name: "Alice",
           playerId: joined.playerId,
+          reconnectToken: joined.reconnectToken,
         })
       );
 
@@ -262,13 +265,14 @@ describe("RoomDO", () => {
     }
   });
 
-  it("allows reconnecting by name within the reconnect window without a playerId", async () => {
+  it("rejects reconnecting by name within the reconnect window without a token", async () => {
     const mf = await createMiniflare();
     try {
       const firstSocket = await openSocket(mf);
       const firstJoinedPromise = onceMessage<{
         type: string;
         playerId: string;
+        reconnectToken: string;
       }>(firstSocket, "joined");
 
       firstSocket.send(
@@ -284,10 +288,7 @@ describe("RoomDO", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       const secondSocket = await openSocket(mf);
-      const secondJoinedPromise = onceMessage<{
-        type: string;
-        playerId: string;
-      }>(secondSocket, "joined");
+      const errorPromise = onceMessage<{ type: string; reason: string }>(secondSocket, "error");
 
       secondSocket.send(
         JSON.stringify({
@@ -296,9 +297,10 @@ describe("RoomDO", () => {
         }),
       );
 
-      const secondJoined = await secondJoinedPromise;
+      const error = await errorPromise;
 
-      expect(secondJoined.playerId).toBe(firstJoined.playerId);
+      expect(error.type).toBe("error");
+      expect(error.reason).toBe("invalid_token");
 
       secondSocket.close();
     } finally {
@@ -313,6 +315,7 @@ describe("RoomDO", () => {
       const firstJoinedPromise = onceMessage<{
         type: string;
         playerId: string;
+        reconnectToken: string;
       }>(firstSocket, "joined");
 
       firstSocket.send(
@@ -336,6 +339,7 @@ describe("RoomDO", () => {
       const secondJoinedPromise = onceMessage<{
         type: string;
         playerId: string;
+        reconnectToken: string;
       }>(secondSocket, "joined");
 
       secondSocket.send(
@@ -343,6 +347,7 @@ describe("RoomDO", () => {
           type: "join",
           name: "Alice",
           playerId: firstJoined.playerId,
+          reconnectToken: firstJoined.reconnectToken,
         }),
       );
 
@@ -353,6 +358,60 @@ describe("RoomDO", () => {
       expect(firstClose.reason).toBe("session_taken");
 
       secondSocket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("rejects reconnection attempts with invalid tokens without closing the active session", async () => {
+    const mf = await createMiniflare();
+    try {
+      const firstSocket = await openSocket(mf);
+      const firstJoinedPromise = onceMessage<{
+        type: string;
+        playerId: string;
+        reconnectToken: string;
+      }>(firstSocket, "joined");
+
+      firstSocket.send(
+        JSON.stringify({
+          type: "join",
+          name: "Alice",
+        }),
+      );
+
+      const firstJoined = await firstJoinedPromise;
+
+      let closed = false;
+      firstSocket.addEventListener(
+        "close",
+        () => {
+          closed = true;
+        },
+        { once: true },
+      );
+
+      const secondSocket = await openSocket(mf);
+      const errorPromise = onceMessage<{ type: string; reason: string }>(secondSocket, "error");
+
+      secondSocket.send(
+        JSON.stringify({
+          type: "join",
+          name: "Alice",
+          playerId: firstJoined.playerId,
+          reconnectToken: "invalid-token",
+        }),
+      );
+
+      const error = await errorPromise;
+      expect(error.type).toBe("error");
+      expect(error.reason).toBe("invalid_token");
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(closed).toBe(false);
+
+      secondSocket.close();
+      firstSocket.close();
     } finally {
       await mf.dispose();
     }

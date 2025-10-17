@@ -572,10 +572,13 @@ export const rankingMessageSchema = z.object({
   ranking: z.array(rankingEntrySchema)
 });
 
+const reconnectTokenSchema = z.string().trim().min(1).max(128);
+
 export const joinMessageSchema = z.object({
   type: z.literal("join"),
   name: playerNameSchema,
   playerId: playerIdSchema.optional(),
+  reconnectToken: reconnectTokenSchema.optional(),
   version: z.string().trim().min(1).max(MAX_VERSION_LENGTH).optional()
 });
 
@@ -729,6 +732,7 @@ export const clientMessageSchema = z
 export const joinedMessageSchema = z.object({
   type: z.literal("joined"),
   playerId: playerIdSchema,
+  reconnectToken: reconnectTokenSchema,
   reconnectUntil: z.number().finite(),
   state: sharedGameStateSchema,
   ranking: z.array(rankingEntrySchema)
@@ -774,6 +778,7 @@ export const errorMessageSchema = z.object({
     z.literal("name_taken"),
     z.literal("room_full"),
     z.literal("unknown_player"),
+    z.literal("invalid_token"),
     z.literal("game_not_active"),
     z.literal("rate_limited")
   ]),

@@ -201,6 +201,8 @@ const errorReasonToMessage = (error: ErrorMessage): string => {
       return "Este nome já está em uso. Digite outro nome ou saia da sala atual.";
     case "unknown_player":
       return "Jogador desconhecido. Tente reconectar.";
+    case "invalid_token":
+      return "Não foi possível validar a sessão. Tente entrar novamente.";
     case "game_not_active":
       return "A sala não está ativa no momento.";
     case "room_full":
@@ -284,11 +286,13 @@ export const useGameSocket = (
 
   const playerName = useGameStore((state) => state.playerName);
   const playerId = useGameStore((state) => state.playerId);
+  const reconnectToken = useGameStore((state) => state.reconnectToken);
   const connectionStatus = useGameStore((state) => state.connectionStatus);
   const joinError = useGameStore((state) => state.joinError);
 
   const playerNameRef = useStableLatest(playerName);
   const playerIdRef = useStableLatest(playerId);
+  const reconnectTokenRef = useStableLatest(reconnectToken);
 
   const effectiveUrl = useMemo(() => resolveWebSocketUrl(url), [url]);
 
@@ -519,6 +523,7 @@ export const useGameSocket = (
         gameStore.actions.applyJoinedSnapshot({
           playerId: message.playerId,
           playerName: normalizedName,
+          reconnectToken: message.reconnectToken,
           reconnectUntil: message.reconnectUntil,
           state: message.state,
           ranking: message.ranking,
@@ -566,6 +571,7 @@ export const useGameSocket = (
           rateLimitRecordedAtRef.current = null;
         }
         const isUnknownPlayer = reason === "unknown_player";
+        const isInvalidToken = reason === "invalid_token";
         if (!isUnknownPlayer) {
           gameStore.actions.setJoinError(errorReasonToMessage(message));
           if (reason === "game_not_active" || reason === "rate_limited") {
@@ -593,6 +599,16 @@ export const useGameSocket = (
           }
 
           shouldReconnectRef.current = false;
+          gameStore.actions.setConnectionStatus("disconnected");
+          stopSocket();
+          break;
+        }
+
+        if (isInvalidToken) {
+          clearJoinErrorTimer();
+          shouldReconnectRef.current = false;
+          lastRequestedNameRef.current = null;
+          gameStore.actions.setPlayerId(null);
           gameStore.actions.setConnectionStatus("disconnected");
           stopSocket();
           break;
@@ -682,7 +698,13 @@ export const useGameSocket = (
             if (!sanitizedId) {
               console.error("Identificador de jogador inválido descartado antes do envio");
             } else {
-              joinMessage.playerId = sanitizedId;
+              const token = reconnectTokenRef.current;
+              if (!token) {
+                console.warn("Token de reconexão ausente para jogador conhecido");
+              } else {
+                joinMessage.playerId = sanitizedId;
+                joinMessage.reconnectToken = token;
+              }
             }
           }
 

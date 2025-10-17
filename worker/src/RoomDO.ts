@@ -208,6 +208,7 @@ type StoredPlayer = {
   combatAttributes: CombatAttributes;
   evolutionState: PlayerEvolutionState;
   archetypeKey: string | null;
+  reconnectToken: string;
   skillState?: StoredPlayerSkillState;
   totalSessionDurationMs?: number;
   sessionCount?: number;
@@ -299,6 +300,21 @@ const createHealthState = (health?: HealthState): HealthState => {
     max,
   };
 };
+
+const sanitizeReconnectToken = (token: unknown): string | null => {
+  if (typeof token !== "string") {
+    return null;
+  }
+
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.slice(0, 128);
+};
+
+const generateReconnectToken = (): string => crypto.randomUUID();
 
 const cloneHealthState = (health: HealthState): HealthState => ({
   current: health.current,
@@ -1205,6 +1221,8 @@ export class RoomDO {
           ? sanitizeArchetypeKey(stored.archetypeKey)
           : null;
         const skillState = createPlayerSkillState(stored.skillState);
+        const reconnectToken =
+          sanitizeReconnectToken(stored.reconnectToken) ?? generateReconnectToken();
 
         const normalized: StoredPlayer = {
           id: stored.id,
@@ -1226,6 +1244,7 @@ export class RoomDO {
           combatAttributes: createCombatAttributes(stored.combatAttributes),
           evolutionState,
           archetypeKey: archetypeKey ?? null,
+          reconnectToken,
           skillState: clonePlayerSkillState(skillState),
           totalSessionDurationMs: stored.totalSessionDurationMs ?? 0,
           sessionCount: stored.sessionCount ?? 0
@@ -3126,6 +3145,7 @@ export class RoomDO {
     }
 
     const payload = validation.data;
+    const providedReconnectToken = sanitizeReconnectToken(payload.reconnectToken);
     const now = Date.now();
     await this.cleanupInactivePlayers(now);
 
@@ -3142,7 +3162,18 @@ export class RoomDO {
       return null;
     }
 
-    let player = payload.playerId ? this.players.get(payload.playerId) : undefined;
+    let player: PlayerInternal | undefined;
+    if (payload.playerId) {
+      const candidate = this.players.get(payload.playerId);
+      if (candidate) {
+        if (!providedReconnectToken || providedReconnectToken !== candidate.reconnectToken) {
+          this.send(socket, { type: "error", reason: "invalid_token" });
+          socket.close(1008, "invalid_token");
+          return null;
+        }
+        player = candidate;
+      }
+    }
     let expiredPlayerRemoved = false;
     if (player && now - player.lastSeenAt > RECONNECT_WINDOW_MS) {
       await this.removePlayer(player.id, "expired");
@@ -3165,6 +3196,7 @@ export class RoomDO {
       const existing = this.players.get(existingByName);
       if (existing) {
         const withinReconnectWindow = now - existing.lastSeenAt <= RECONNECT_WINDOW_MS;
+        const tokenMatches = providedReconnectToken === existing.reconnectToken;
         if (existing.connected) {
           this.send(socket, { type: "error", reason: "name_taken" });
           socket.close(1008, "name_taken");
@@ -3172,6 +3204,11 @@ export class RoomDO {
         }
 
         if (withinReconnectWindow) {
+          if (!tokenMatches) {
+            this.send(socket, { type: "error", reason: "invalid_token" });
+            socket.close(1008, "invalid_token");
+            return null;
+          }
           player = existing;
         } else {
           await this.removePlayer(existing.id, "expired");
@@ -3191,6 +3228,7 @@ export class RoomDO {
       const spawnPosition = this.clampPosition(getSpawnPositionForPlayer(id));
       const evolutionState = createEvolutionState();
       const skillState = createPlayerSkillState();
+      const reconnectToken = generateReconnectToken();
       player = {
         id,
         name: normalizedName,
@@ -3207,6 +3245,7 @@ export class RoomDO {
         combatAttributes: getDeterministicCombatAttributesForPlayer(id),
         evolutionState,
         archetypeKey: null,
+        reconnectToken,
         connected: true,
         lastActiveAt: now,
         lastSeenAt: now,
@@ -3264,6 +3303,9 @@ export class RoomDO {
     this.clientsBySocket.set(socket, player.id);
     this.socketsByPlayer.set(player.id, socket);
 
+    const reconnectToken = generateReconnectToken();
+    player.reconnectToken = reconnectToken;
+
     this.markPlayersDirty();
 
     const connectedPlayers = this.countConnectedPlayers();
@@ -3290,6 +3332,7 @@ export class RoomDO {
     const joinedMessage: JoinedMessage = {
       type: "joined",
       playerId: player.id,
+      reconnectToken,
       reconnectUntil,
       state: sharedState,
       ranking
@@ -4538,6 +4581,7 @@ export class RoomDO {
         combatAttributes: cloneCombatAttributes(player.combatAttributes),
         evolutionState: cloneEvolutionState(player.evolutionState),
         archetypeKey: player.archetypeKey ?? null,
+        reconnectToken: player.reconnectToken,
         skillState: clonePlayerSkillState(skillState),
         totalSessionDurationMs: player.totalSessionDurationMs ?? 0,
         sessionCount: player.sessionCount ?? 0
