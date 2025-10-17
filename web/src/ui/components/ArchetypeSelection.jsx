@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AFFINITY_LABELS,
   ELEMENT_LABELS,
@@ -33,9 +33,26 @@ const ArchetypeSelection = ({
   const dialogRef = useRef(null);
   const overlayRef = useRef(null);
   const previousFocusRef = useRef(null);
+  const optionRefs = useRef(new Map());
+  const [activeKey, setActiveKey] = useState(null);
+
+  const options = useMemo(() => {
+    return archetypeList.filter((entry) => !allowedSet || allowedSet.has(entry.key));
+  }, [allowedSet]);
+
+  const focusOptionElement = useCallback((key) => {
+    if (!key) return false;
+    const element = optionRefs.current.get(key);
+    if (element instanceof HTMLElement) {
+      element.focus();
+      return true;
+    }
+    return false;
+  }, []);
 
   useEffect(() => {
     if (!pending) {
+      setActiveKey(null);
       return undefined;
     }
 
@@ -53,12 +70,19 @@ const ArchetypeSelection = ({
         )
       : [];
 
-    if (focusable.length > 0) {
-      focusable[0].focus();
-    } else if (dialogNode instanceof HTMLElement) {
-      dialogNode.focus();
-    } else if (overlayRef.current instanceof HTMLElement) {
-      overlayRef.current.focus();
+    const hasSelected = options.some((entry) => entry.key === selected);
+    const targetKey = hasSelected ? selected : options[0]?.key;
+
+    setActiveKey(targetKey ?? null);
+
+    if (!focusOptionElement(targetKey)) {
+      if (focusable.length > 0) {
+        focusable[0].focus();
+      } else if (dialogNode instanceof HTMLElement) {
+        dialogNode.focus();
+      } else if (overlayRef.current instanceof HTMLElement) {
+        overlayRef.current.focus();
+      }
     }
 
     return () => {
@@ -66,7 +90,7 @@ const ArchetypeSelection = ({
         previousFocusRef.current.focus();
       }
     };
-  }, [pending]);
+  }, [focusOptionElement, options, pending, selected]);
 
   const handleKeyDown = (event) => {
     if (!dialogRef.current) {
@@ -111,9 +135,69 @@ const ArchetypeSelection = ({
     }
   };
 
-  const options = useMemo(() => {
-    return archetypeList.filter((entry) => !allowedSet || allowedSet.has(entry.key));
-  }, [allowedSet]);
+  const focusOptionByIndex = (index) => {
+    if (!Array.isArray(options) || options.length === 0) {
+      return;
+    }
+
+    const normalizedIndex = ((index % options.length) + options.length) % options.length;
+    const entry = options[normalizedIndex];
+    if (!entry) {
+      return;
+    }
+
+    setActiveKey(entry.key);
+    focusOptionElement(entry.key);
+
+    if (selected !== entry.key) {
+      onSelect?.(entry.key);
+    }
+  };
+
+  const handleCardKeyDown = (event, index) => {
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        event.preventDefault();
+        focusOptionByIndex(index + 1);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        event.preventDefault();
+        focusOptionByIndex(index - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        focusOptionByIndex(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        focusOptionByIndex(options.length - 1);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleCardSelect = (key) => {
+    setActiveKey(key);
+    focusOptionElement(key);
+    if (selected !== key) {
+      onSelect?.(key);
+    }
+  };
+
+  const setOptionRef = (key) => (element) => {
+    if (!optionRefs.current) {
+      optionRefs.current = new Map();
+    }
+
+    if (element) {
+      optionRefs.current.set(key, element);
+    } else {
+      optionRefs.current.delete(key);
+    }
+  };
 
   if (!pending) {
     return null;
@@ -140,9 +224,10 @@ const ArchetypeSelection = ({
           características.
         </p>
 
-        <div className={styles.grid} role="listbox" aria-label="Opções de arquétipo">
-          {options.map((entry) => {
+        <div className={styles.grid}>
+          {options.map((entry, index) => {
             const isSelected = selected === entry.key;
+            const isActive = activeKey === entry.key;
             const affinities = [
               ELEMENT_LABELS[entry.affinities.element] ?? entry.affinities.element,
               AFFINITY_LABELS[entry.affinities.affinity] ?? entry.affinities.affinity,
@@ -152,10 +237,12 @@ const ArchetypeSelection = ({
               <button
                 key={entry.key}
                 type="button"
-                className={`${styles.card} ${isSelected ? styles.cardSelected : ''}`}
-                onClick={() => onSelect?.(entry.key)}
-                role="option"
-                aria-selected={isSelected}
+                className={`${styles.card} ${isSelected || isActive ? styles.cardSelected : ''}`}
+                onClick={() => handleCardSelect(entry.key)}
+                aria-pressed={isSelected}
+                onKeyDown={(event) => handleCardKeyDown(event, index)}
+                onFocus={() => setActiveKey(entry.key)}
+                ref={setOptionRef(entry.key)}
               >
                 <div className={styles.cardHeader}>
                   <span className={styles.cardIcon}>{entry.icon}</span>
