@@ -69,7 +69,6 @@ const StartScreen = ({
   const [localError, setLocalError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
 
   const focusInput = useCallback(() => {
@@ -99,12 +98,10 @@ const StartScreen = ({
       const target = previouslyFocusedElementRef.current;
       if (target && typeof target.focus === "function") {
         target.focus({ preventScroll: true });
-      } else if (closeButtonRef.current) {
-        closeButtonRef.current.blur();
       }
       previouslyFocusedElementRef.current = null;
     };
-  }, [closeButtonRef, focusInput]);
+  }, [focusInput]);
 
   const getFocusableElements = useCallback(() => {
     const container = panelRef.current;
@@ -220,7 +217,6 @@ const StartScreen = ({
     if (target && typeof target.focus === "function") {
       target.focus({ preventScroll: true });
     }
-    closeButtonRef.current?.blur();
     previouslyFocusedElementRef.current = null;
 
     onQuit();
@@ -232,7 +228,7 @@ const StartScreen = ({
     gameStore.actions.setConnectionStatus("idle");
     gameStore.actions.setReconnectUntil(null);
     gameStore.actions.resetGameState();
-  }, [closeButtonRef, onQuit]);
+  }, [onQuit]);
 
   const handleAudioToggle = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -265,6 +261,10 @@ const StartScreen = ({
   );
 
   const isConnected = effectiveStatus === "connected" && Boolean(playerId);
+  const canQuit =
+    isConnected ||
+    effectiveStatus === "connecting" ||
+    effectiveStatus === "reconnecting";
 
   const dialogTitleId = "start-screen-title";
   const dialogDescriptionId = "start-screen-description";
@@ -334,15 +334,6 @@ const StartScreen = ({
         aria-describedby={dialogDescriptionId}
         onKeyDown={handleKeyDown}
       >
-        <button
-          type="button"
-          className={styles.closeButton}
-          onClick={handleQuit}
-          ref={closeButtonRef}
-          aria-label="Fechar"
-        >
-          ×
-        </button>
         <header className={styles.header}>
           <h1 id={dialogTitleId} className={styles.title}>
             Micro Ωmega
@@ -516,13 +507,15 @@ const StartScreen = ({
             >
               {startButtonLabel}
             </button>
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              onClick={handleQuit}
-            >
-              Sair da sala
-            </button>
+            {canQuit ? (
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleQuit}
+              >
+                Desconectar
+              </button>
+            ) : null}
           </div>
         </form>
       </div>
