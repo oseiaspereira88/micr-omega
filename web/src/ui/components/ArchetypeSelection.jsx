@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   AFFINITY_LABELS,
   ELEMENT_LABELS,
@@ -13,6 +13,8 @@ const ArchetypeSelection = ({
   selected,
   onSelect,
 }) => {
+  const titleId = useId();
+  const descriptionId = useId();
   const pending = selection?.pending;
   const allowedSet = useMemo(() => {
     if (!Array.isArray(selection?.options)) {
@@ -214,15 +216,15 @@ const ArchetypeSelection = ({
         className={styles.dialog}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="archetype-selection-title"
-        aria-describedby="archetype-selection-description"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         tabIndex={-1}
         ref={dialogRef}
       >
-        <h2 id="archetype-selection-title" className={styles.title}>
+        <h2 id={titleId} className={styles.title}>
           Escolha seu arquétipo inicial
         </h2>
-        <p id="archetype-selection-description" className={styles.subtitle}>
+        <p id={descriptionId} className={styles.subtitle}>
           Cada arquétipo define afinidades elementares, passivas únicas e habilidades
           iniciais. Escolha com sabedoria: evoluções futuras expandirão essas
           características.
