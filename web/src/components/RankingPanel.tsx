@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 
+import { RANKING_SORT_LOCALE, RANKING_SORT_OPTIONS } from "@micr-omega/shared";
+
 import { shallowEqual, useGameStore, type ConnectionStatus } from "../store/gameStore";
 import styles from "./RankingPanel.module.css";
 
@@ -57,7 +59,11 @@ const RankingPanel = () => {
         if (a.score !== b.score) {
           return b.score - a.score;
         }
-        const nameComparison = a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" });
+        const nameComparison = a.name.localeCompare(
+          b.name,
+          RANKING_SORT_LOCALE,
+          RANKING_SORT_OPTIONS,
+        );
         if (nameComparison !== 0) {
           return nameComparison;
         }
@@ -123,7 +129,7 @@ const RankingPanel = () => {
                 {row.isLocal ? <span className={styles.localTag}>Você</span> : null}
               </div>
               <span className={styles.score}>
-                {row.score.toLocaleString("pt-BR")}
+                {row.score.toLocaleString(RANKING_SORT_LOCALE)}
                 {!row.connected ? (
                   <span
                     className={styles.disconnected}

@@ -68,6 +68,13 @@ Scripts úteis adicionais:
 
 Consulte `docs/load-testing.md` para instruções de execução do teste de carga com k6 (50–100 conexões simultâneas).
 
+## Critério de ordenação do ranking
+
+O Worker e o cliente web compartilham a configuração de ordenação definida em `@micr-omega/shared` por meio das constantes
+`RANKING_SORT_LOCALE` e `RANKING_SORT_OPTIONS`. Atualmente adotamos a locale `pt-BR` com `sensitivity: "base"`, o que garante
+que nomes com e sem acentuação sejam considerados equivalentes e que empates sejam desempatados pelo `playerId`. Ajuste essas
+constantes caso seja necessário mudar o critério — ambos os lados consumirão automaticamente a nova configuração.
+
 ## Fluxo de publicação
 
 - **Front-end (`web/`)**: execute `npm run build` (ou `npm run build:web`) para gerar `web/dist/` e publique via Cloudflare Pages ou pipeline CI/CD. O README do projeto espera que a CI utilize `npm ci` na raiz seguido de `npm run build`.

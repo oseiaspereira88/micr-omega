@@ -168,4 +168,24 @@ describe("RoomDO ranking cache", () => {
       (globalThis as any).WebSocket = originalWebSocket;
     }
   });
+
+  it("orders players with equal scores using locale-aware comparison", async () => {
+    const { roomAny } = await createRoom();
+
+    const playerOne: TestPlayer = createTestPlayer("one", { name: "Ágata", score: 5_000 });
+    const playerTwo: TestPlayer = createTestPlayer("two", { name: "Agata", score: 5_000 });
+    const playerThree: TestPlayer = createTestPlayer("three", { name: "Bruno", score: 5_000 });
+
+    roomAny.players.set(playerOne.id, playerOne);
+    roomAny.players.set(playerTwo.id, playerTwo);
+    roomAny.players.set(playerThree.id, playerThree);
+
+    const ranking = roomAny.getRanking();
+
+    expect(ranking.map((entry: { name: string }) => entry.name)).toEqual([
+      "Ágata",
+      "Agata",
+      "Bruno",
+    ]);
+  });
 });

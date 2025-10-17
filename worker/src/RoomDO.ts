@@ -2,6 +2,8 @@ import type { Env } from "./index";
 import { createObservability, serializeError, type Observability } from "./observability";
 import {
   PROTOCOL_VERSION,
+  RANKING_SORT_LOCALE,
+  RANKING_SORT_OPTIONS,
   WORLD_RADIUS,
   clientMessageSchema,
   joinMessageSchema,
@@ -4380,10 +4382,18 @@ export class RoomDO {
         score: player.score,
       }))
       .sort((a, b) => {
-        if (b.score === a.score) {
-          return a.name.localeCompare(b.name);
+        if (b.score !== a.score) {
+          return b.score - a.score;
         }
-        return b.score - a.score;
+        const nameComparison = a.name.localeCompare(
+          b.name,
+          RANKING_SORT_LOCALE,
+          RANKING_SORT_OPTIONS,
+        );
+        if (nameComparison !== 0) {
+          return nameComparison;
+        }
+        return a.playerId.localeCompare(b.playerId);
       });
     this.rankingDirty = false;
     return this.rankingCache;
