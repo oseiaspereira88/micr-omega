@@ -255,6 +255,7 @@ const GameHud = ({
             onDash={onDash}
             dashCharge={dashCharge}
             onUseSkill={onUseSkill}
+            onCycleSkill={onCycleSkill}
             skillDisabled={skillData?.skillDisabled}
             skillCoolingDown={skillData?.skillCoolingDown}
             skillCooldownLabel={skillData?.skillCooldownLabel}

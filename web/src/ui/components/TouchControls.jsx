@@ -14,6 +14,7 @@ const TouchControls = ({
   onDash,
   dashCharge,
   onUseSkill,
+  onCycleSkill,
   skillDisabled,
   skillCoolingDown,
   skillCooldownLabel,
@@ -42,6 +43,10 @@ const TouchControls = ({
     ? 'Abrir menu de evolução'
     : 'Abrir menu de evolução — indisponível';
 
+  const cycleSkillAriaLabel = hasCurrentSkill
+    ? 'Trocar habilidade equipada'
+    : 'Trocar habilidade — nenhuma habilidade equipada';
+
   const handleAttackTouchEnd = event => {
     event.preventDefault();
     onAttackRelease?.();
@@ -52,6 +57,10 @@ const TouchControls = ({
   };
 
   const handleSkillTouchEnd = event => {
+    event.preventDefault();
+  };
+
+  const handleCycleSkillTouchEnd = event => {
     event.preventDefault();
   };
 
@@ -162,6 +171,33 @@ const TouchControls = ({
             }}
           />
         )}
+      </button>
+
+      <button
+        type="button"
+        className={joinClassNames(
+          styles.button,
+          styles.cycleSkillButton,
+          hasCurrentSkill ? styles.cycleSkillReady : styles.disabled,
+        )}
+        onClick={event => {
+          event.preventDefault();
+          onCycleSkill?.();
+        }}
+        aria-label={cycleSkillAriaLabel}
+        aria-disabled={!hasCurrentSkill}
+        onTouchStart={event => {
+          event.preventDefault();
+          if (hasCurrentSkill) {
+            onCycleSkill?.();
+          }
+        }}
+        onTouchEnd={handleCycleSkillTouchEnd}
+        onTouchCancel={handleCycleSkillTouchEnd}
+        disabled={!hasCurrentSkill}
+        title="E: trocar habilidade"
+      >
+        🔄
       </button>
 
       <button

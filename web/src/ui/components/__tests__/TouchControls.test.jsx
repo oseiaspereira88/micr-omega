@@ -17,6 +17,7 @@ describe('TouchControls', () => {
     onDash: vi.fn(),
     dashCharge: 0,
     onUseSkill: vi.fn(),
+    onCycleSkill: vi.fn(),
     skillDisabled: false,
     skillCoolingDown: false,
     skillCooldownLabel: '',
@@ -40,5 +41,24 @@ describe('TouchControls', () => {
     fireEvent.touchCancel(attackButton);
 
     expect(onAttackRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('permite trocar de habilidade quando uma habilidade está equipada', () => {
+    const onCycleSkill = vi.fn();
+
+    const { getByRole } = render(
+      <TouchControls
+        {...baseProps}
+        onCycleSkill={onCycleSkill}
+        hasCurrentSkill
+        currentSkillIcon="🔥"
+      />
+    );
+
+    const cycleButton = getByRole('button', { name: 'Trocar habilidade equipada' });
+
+    fireEvent.click(cycleButton);
+
+    expect(onCycleSkill).toHaveBeenCalledTimes(1);
   });
 });
