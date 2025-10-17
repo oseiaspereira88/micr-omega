@@ -522,12 +522,59 @@ const App = () => {
   }, []);
 
   const enqueueToast = useCallback(
-    (message) => {
+    (input) => {
+      if (!input) {
+        return;
+      }
+
+      let message = null;
+      let variant = 'error';
+      let providedId = null;
+
+      if (typeof input === 'string') {
+        const normalizedMessage = input.trim();
+        if (normalizedMessage.length > 0) {
+          message = normalizedMessage;
+        }
+      } else if (typeof input === 'object') {
+        if (typeof input.message === 'string') {
+          const normalizedMessage = input.message.trim();
+          if (normalizedMessage.length > 0) {
+            message = normalizedMessage;
+          }
+        }
+
+        if (
+          input.variant === 'error' ||
+          input.variant === 'warning' ||
+          input.variant === 'info' ||
+          input.variant === 'success'
+        ) {
+          variant = input.variant;
+        }
+
+        if (typeof input.id === 'string' && input.id) {
+          providedId = input.id;
+        }
+      }
+
       if (!message) {
         return;
       }
 
-      const id = generateToastId();
+      const id = providedId ?? generateToastId();
+
+      if (typeof window !== 'undefined') {
+        const existingTimerId = timersRef.current.get(id);
+        if (typeof existingTimerId !== 'undefined') {
+          window.clearTimeout(existingTimerId);
+          timersRef.current.delete(id);
+        }
+      } else {
+        timersRef.current.delete(id);
+      }
+
+      const normalizedToast = { id, message, variant };
       setToasts((prev) => {
         const overflow = Math.max(prev.length + 1 - MAX_TOASTS, 0);
         if (overflow > 0) {
@@ -543,7 +590,8 @@ const App = () => {
         }
 
         const retained = overflow > 0 ? prev.slice(overflow) : prev;
-        return [...retained, { id, message }];
+        const withoutDuplicate = retained.filter((toast) => toast.id !== id);
+        return [...withoutDuplicate, normalizedToast];
       });
 
       if (typeof window !== 'undefined') {
@@ -561,7 +609,7 @@ const App = () => {
       return;
     }
 
-    enqueueToast(joinError);
+    enqueueToast({ message: joinError, variant: 'error' });
   }, [enqueueToast, joinError]);
 
   useEffect(() => {

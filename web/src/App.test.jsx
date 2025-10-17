@@ -158,6 +158,12 @@ describe('App toast handling', () => {
 
       const toasts = toastStackPropsRef.current?.toasts ?? [];
       expect(toasts.length).toBe(Math.min(index + 1, TOAST_LIMIT));
+
+      if (toasts.length > 0) {
+        const lastToast = toasts[toasts.length - 1];
+        expect(lastToast?.variant).toBe('error');
+        expect(lastToast?.message).toBe(message);
+      }
     }
 
     expect(setTimeoutSpy).toHaveBeenCalledTimes(TOAST_LIMIT + 2);
