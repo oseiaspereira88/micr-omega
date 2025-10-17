@@ -63,11 +63,11 @@ describe("StartScreen", () => {
     }
   });
 
-  it("valida o nome antes de iniciar a partida", () => {
+  it("valida o nome antes de entrar na partida", () => {
     const onStart = vi.fn();
     renderWithProviders(<StartScreen onStart={onStart} onQuit={() => {}} />);
 
-    const startButton = screen.getByRole("button", { name: /iniciar partida/i });
+    const startButton = screen.getByRole("button", { name: /entrar na partida/i });
     fireEvent.click(startButton);
 
     expect(onStart).not.toHaveBeenCalled();
@@ -87,7 +87,7 @@ describe("StartScreen", () => {
     renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
 
     const input = screen.getByLabelText(/nome do jogador/i);
-    const startButton = screen.getByRole("button", { name: /iniciar partida/i });
+    const startButton = screen.getByRole("button", { name: /entrar na partida/i });
 
     fireEvent.click(startButton);
 
@@ -110,7 +110,7 @@ describe("StartScreen", () => {
     const touchToggle = screen.getByLabelText(/mostrar controles/i);
     fireEvent.click(touchToggle);
 
-    const startButton = screen.getByRole("button", { name: /iniciar partida/i });
+    const startButton = screen.getByRole("button", { name: /entrar na partida/i });
     fireEvent.click(startButton);
 
     expect(onStart).toHaveBeenCalledTimes(1);
