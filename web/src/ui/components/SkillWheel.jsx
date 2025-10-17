@@ -113,9 +113,31 @@ const SkillWheel = ({
       {skillList.length > 0 && (
         <div className={styles.skills}>
           {skillList.map(skill => {
-            const cooldownPercent = skill.maxCooldown
-              ? Math.max(0, Math.min(100, (skill.cooldown / skill.maxCooldown) * 100))
+            const cooldownValue = Number.isFinite(skill.cooldown) ? skill.cooldown : 0;
+            const maxCooldownValue = Number.isFinite(skill.maxCooldown) ? skill.maxCooldown : 0;
+
+            const cooldownFillPercent = maxCooldownValue
+              ? Math.max(0, Math.min(100, (cooldownValue / maxCooldownValue) * 100))
               : 0;
+
+            const readinessPercentForSkill = maxCooldownValue
+              ? Math.max(
+                  0,
+                  Math.min(
+                    100,
+                    Math.round(
+                      ((maxCooldownValue - cooldownValue) / maxCooldownValue) * 100 || 0,
+                    ),
+                  ),
+                )
+              : cooldownValue > 0
+                ? 0
+                : 100;
+
+            const cooldownStatusLabel =
+              readinessPercentForSkill >= 100
+                ? 'Pronta para uso'
+                : `${readinessPercentForSkill}% recarregada`;
 
             const itemClass = skill.isActive
               ? `${styles.skillItem} ${styles.skillItemActive}`
@@ -126,8 +148,12 @@ const SkillWheel = ({
                 key={skill.key}
                 className={itemClass}
                 title={`${skill.name} • ${ELEMENT_LABELS[skill.element] ?? skill.element ?? '—'} (${SKILL_TYPE_LABELS[skill.type] ?? skill.type ?? 'Ativa'})`}
+                aria-label={`${skill.name}. ${cooldownStatusLabel}`}
               >
                 <span>{skill.icon}</span>
+                <span className={styles.visuallyHidden}>
+                  {`${skill.name}: ${cooldownStatusLabel}`}
+                </span>
                 {skill.cooldown > 0 && (
                   <div
                     style={{
@@ -135,7 +161,7 @@ const SkillWheel = ({
                       bottom: 0,
                       left: 0,
                       right: 0,
-                      height: `${Math.max(0, Math.min(100, cooldownPercent))}%`,
+                      height: `${Math.max(0, Math.min(100, cooldownFillPercent))}%`,
                       background: 'rgba(0, 0, 0, 0.55)',
                     }}
                   />
