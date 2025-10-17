@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import styles from './TouchControls.module.css';
 
 const joinClassNames = (...classes) => classes.filter(Boolean).join(' ');
@@ -34,6 +34,8 @@ const TouchControls = ({
   onOpenEvolutionMenu,
   canEvolve,
 }) => {
+  const dashProgressId = useId();
+  const skillProgressId = useId();
   const dashReady = dashCharge >= 30;
   const dashChargePercent = clampProgress(dashCharge);
   const dashValueText = dashReady
@@ -147,10 +149,7 @@ const TouchControls = ({
         onClick={onDash}
         aria-label={dashAriaLabel}
         aria-disabled={!dashReady}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={dashChargePercent}
-        aria-valuetext={dashValueText}
+        aria-describedby={dashProgressId}
         onTouchStart={event => {
           event.preventDefault();
           if (dashReady) {
@@ -173,6 +172,21 @@ const TouchControls = ({
           {dashReady ? 'Pronto' : `${dashChargePercent}%`}
         </span>
       </button>
+      <div
+        id={dashProgressId}
+        className={styles.visuallyHidden}
+        aria-live="polite"
+      >
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={dashChargePercent}
+          aria-valuetext={dashValueText}
+        >
+          {dashValueText}
+        </div>
+      </div>
 
       <button
         type="button"
@@ -185,10 +199,7 @@ const TouchControls = ({
         onClick={onUseSkill}
         aria-label={skillAriaLabel}
         aria-disabled={skillDisabled}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={skillValueNow}
-        aria-valuetext={skillValueText}
+        aria-describedby={skillProgressId}
         onTouchStart={event => {
           event.preventDefault();
           onUseSkill?.();
@@ -227,6 +238,21 @@ const TouchControls = ({
           {hasCurrentSkill ? (showSkillCooldown ? '' : currentSkillCost) : '--'}
         </span>
       </button>
+      <div
+        id={skillProgressId}
+        className={styles.visuallyHidden}
+        aria-live="polite"
+      >
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={skillValueNow}
+          aria-valuetext={skillValueText}
+        >
+          {skillValueText}
+        </div>
+      </div>
 
       <button
         type="button"
