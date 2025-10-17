@@ -90,7 +90,9 @@ const ConnectionStatusOverlay = () => {
         </div>
       ) : null}
       {connectionState.joinError ? (
-        <div className={styles.alert}>{connectionState.joinError}</div>
+        <div className={styles.alert} role="alert">
+          {connectionState.joinError}
+        </div>
       ) : null}
     </div>
   );
