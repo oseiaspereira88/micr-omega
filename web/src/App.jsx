@@ -174,20 +174,21 @@ const App = () => {
 
             if (!targetPlayerId && !targetObjectId && !isTargetOptional) {
               const playerPosition = resolvePlayerPosition({ sharedPlayer: player });
-              const sharedMicroorganisms = [
-                ...(Array.isArray(state?.world?.microorganisms)
-                  ? state.world.microorganisms
-                  : []),
-                ...(Array.isArray(state?.microorganisms?.all)
-                  ? state.microorganisms.all
-                  : []),
-              ];
+              const renderMicroorganisms = Array.isArray(state?.microorganisms?.all)
+                ? state.microorganisms.all
+                : undefined;
+              const sharedMicroorganisms = Array.isArray(state?.world?.microorganisms)
+                ? state.world.microorganisms
+                : undefined;
 
-              const nearestId = findNearestHostileMicroorganismId({
-                playerPosition,
-                sharedMicroorganisms:
-                  sharedMicroorganisms.length > 0 ? sharedMicroorganisms : undefined,
-              });
+              const nearestId =
+                (renderMicroorganisms?.length ?? 0) > 0 || (sharedMicroorganisms?.length ?? 0) > 0
+                  ? findNearestHostileMicroorganismId({
+                      playerPosition,
+                      renderMicroorganisms,
+                      sharedMicroorganisms,
+                    })
+                  : null;
 
               if (nearestId) {
                 payload.targetObjectId = nearestId;
