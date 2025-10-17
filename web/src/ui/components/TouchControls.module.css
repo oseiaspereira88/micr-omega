@@ -14,68 +14,68 @@
 }
 
 .layoutRight .joystickZone {
-  left: 15px;
+  left: calc(15px + var(--safe-area-inset-left, 0px));
   right: auto;
 }
 
 .layoutLeft .joystickZone {
-  right: 15px;
+  right: calc(15px + var(--safe-area-inset-right, 0px));
   left: auto;
 }
 
 .layoutRight .attackButton {
-  right: 15px;
+  right: calc(15px + var(--safe-area-inset-right, 0px));
   left: auto;
 }
 
 .layoutLeft .attackButton {
-  left: 15px;
+  left: calc(15px + var(--safe-area-inset-left, 0px));
   right: auto;
 }
 
 .layoutRight .dashButton {
-  right: 15px;
+  right: calc(15px + var(--safe-area-inset-right, 0px));
   left: auto;
 }
 
 .layoutLeft .dashButton {
-  left: 15px;
+  left: calc(15px + var(--safe-area-inset-left, 0px));
   right: auto;
 }
 
 .layoutRight .skillButton {
-  right: 95px;
+  right: calc(95px + var(--safe-area-inset-right, 0px));
   left: auto;
 }
 
 .layoutLeft .skillButton {
-  left: 95px;
+  left: calc(95px + var(--safe-area-inset-left, 0px));
   right: auto;
 }
 
 .layoutRight .cycleSkillButton {
-  right: 95px;
+  right: calc(95px + var(--safe-area-inset-right, 0px));
   left: auto;
 }
 
 .layoutLeft .cycleSkillButton {
-  left: 95px;
+  left: calc(95px + var(--safe-area-inset-left, 0px));
   right: auto;
 }
 
 .layoutRight .evolveButton {
-  right: 95px;
+  right: calc(95px + var(--safe-area-inset-right, 0px));
   left: auto;
 }
 
 .layoutLeft .evolveButton {
-  left: 95px;
+  left: calc(95px + var(--safe-area-inset-left, 0px));
   right: auto;
 }
 
 .joystickZone {
   position: absolute;
-  bottom: 15px;
+  bottom: calc(15px + var(--safe-area-inset-bottom, 0px));
   width: 110px;
   height: 110px;
   border-radius: 50%;
@@ -112,7 +112,7 @@
 }
 
 .attackButton {
-  bottom: 15px;
+  bottom: calc(15px + var(--safe-area-inset-bottom, 0px));
   width: 70px;
   height: 70px;
   font-size: 1.8rem;
@@ -121,14 +121,14 @@
 }
 
 .dashButton {
-  bottom: 95px;
+  bottom: calc(95px + var(--safe-area-inset-bottom, 0px));
   width: 60px;
   height: 60px;
   font-size: 1.5rem;
 }
 
 .skillButton {
-  bottom: 95px;
+  bottom: calc(95px + var(--safe-area-inset-bottom, 0px));
   width: 65px;
   height: 65px;
   font-size: 1.6rem;
@@ -136,7 +136,7 @@
 }
 
 .cycleSkillButton {
-  bottom: 175px;
+  bottom: calc(175px + var(--safe-area-inset-bottom, 0px));
   width: 55px;
   height: 55px;
   font-size: 1.4rem;
@@ -211,7 +211,7 @@
 }
 
 .evolveButton {
-  bottom: 15px;
+  bottom: calc(15px + var(--safe-area-inset-bottom, 0px));
   width: 60px;
   height: 60px;
   font-size: 1.5rem;
