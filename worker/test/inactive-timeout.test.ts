@@ -66,6 +66,7 @@ describe("RoomDO inactivity handling", () => {
       roomAny.nameToPlayerId.set(player.name.toLowerCase(), player.id);
       roomAny.socketsByPlayer.set(player.id, socket);
       roomAny.clientsBySocket.set(socket, player.id);
+      roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
       player.lastSeenAt = tickTime - inactivityTimeoutMs - 100;
       player.lastActiveAt = player.lastSeenAt;
@@ -83,6 +84,7 @@ describe("RoomDO inactivity handling", () => {
       ]);
 
       expect(player.connected).toBe(false);
+      expect(roomAny.getConnectedPlayersCount()).toBe(0);
 
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({

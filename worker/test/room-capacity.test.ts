@@ -29,6 +29,8 @@ describe("RoomDO capacity limits", () => {
         expect(typeof playerId === "string").toBe(true);
       }
 
+      expect(roomAny.getConnectedPlayersCount()).toBe(MAX_PLAYERS);
+
       const sent: string[] = [];
       const closed: MockSocketCloseRecord[] = [];
       const overflowSocket = createMockSocket(sent, closed);
@@ -41,6 +43,7 @@ describe("RoomDO capacity limits", () => {
       expect(sent).toHaveLength(1);
       expect(JSON.parse(sent[0]!)).toEqual({ type: "error", reason: "room_full" });
       expect(closed).toContainEqual({ code: 1008, reason: "room_full" });
+      expect(roomAny.getConnectedPlayersCount()).toBe(MAX_PLAYERS);
     } finally {
       (globalThis as any).WebSocket = originalWebSocket;
     }
@@ -75,6 +78,8 @@ describe("RoomDO capacity limits", () => {
 
       await roomAny.handleDisconnect(sockets[0], playerIds[0]);
 
+      expect(roomAny.getConnectedPlayersCount()).toBe(MAX_PLAYERS - 1);
+
       const replacementSocket = createMockSocket();
       const replacementId = await roomAny.handleJoin(replacementSocket, {
         type: "join",
@@ -82,6 +87,7 @@ describe("RoomDO capacity limits", () => {
       });
 
       expect(typeof replacementId === "string").toBe(true);
+      expect(roomAny.getConnectedPlayersCount()).toBe(MAX_PLAYERS);
     } finally {
       (globalThis as any).WebSocket = originalWebSocket;
     }

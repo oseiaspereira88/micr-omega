@@ -982,6 +982,8 @@ export class RoomDO {
   private progressionState = new Map<string, PlayerProgressionState>();
   private pendingProgression = new Map<string, PendingProgressionStream>();
 
+  private connectedPlayers = 0;
+
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
     this.observability = createObservability(env, { component: "RoomDO" });
@@ -1278,6 +1280,8 @@ export class RoomDO {
         this.ensureProgressionState(player.id);
       }
     }
+
+    this.connectedPlayers = this.recalculateConnectedPlayers();
 
     const storedWorld = await this.state.storage.get<SharedWorldState>(WORLD_KEY);
     if (storedWorld) {
@@ -2878,7 +2882,7 @@ export class RoomDO {
 
     this.playersPendingRemoval.add(player.id);
     player.pendingRemoval = true;
-    player.connected = false;
+    this.setPlayerConnectionState(player, false);
     player.lastSeenAt = now;
     player.lastActiveAt = now;
     player.movementVector = createVector();
@@ -3251,7 +3255,7 @@ export class RoomDO {
 
     let rankingShouldUpdate = false;
 
-    if (!player && this.countConnectedPlayers() >= MAX_PLAYERS) {
+    if (!player && this.getConnectedPlayersCount() >= MAX_PLAYERS) {
       this.send(socket, { type: "error", reason: "room_full" });
       socket.close(1008, "room_full");
       return null;
@@ -3294,6 +3298,7 @@ export class RoomDO {
       player.combatAttributes = this.computePlayerCombatAttributes(player);
       this.players.set(id, player);
       this.nameToPlayerId.set(nameKey, id);
+      this.adjustConnectedPlayers(1);
       rankingShouldUpdate = true;
     } else {
       for (const pendingSocket of pendingSockets) {
@@ -3310,7 +3315,7 @@ export class RoomDO {
       }
       const offlineDuration = Math.max(0, now - (player.lastSeenAt ?? now));
       player.name = normalizedName;
-      player.connected = true;
+      this.setPlayerConnectionState(player, true);
       player.lastSeenAt = now;
       player.lastActiveAt = now;
       player.connectedAt = now;
@@ -3423,7 +3428,7 @@ export class RoomDO {
       return null;
     }
 
-    const connectedPlayers = this.countConnectedPlayers();
+    const connectedPlayers = this.getConnectedPlayersCount();
     const isReconnect = payload.playerId === player.id && !expiredPlayerRemoved;
     this.observability.log("info", "player_connected", {
       playerId: player.id,
@@ -3465,7 +3470,7 @@ export class RoomDO {
     };
 
     const willStartImmediately =
-      this.phase === "waiting" && this.countConnectedPlayers() >= MIN_PLAYERS_TO_START;
+      this.phase === "waiting" && this.getConnectedPlayersCount() >= MIN_PLAYERS_TO_START;
 
     if (!willStartImmediately) {
       this.broadcast(joinBroadcast, socket);
@@ -3519,7 +3524,7 @@ export class RoomDO {
     player.lastActiveAt = now;
 
     if (!player.connected) {
-      player.connected = true;
+      this.setPlayerConnectionState(player, true);
       player.connectedAt = now;
       const playerSocket = this.socketsByPlayer.get(player.id);
       if (playerSocket && playerSocket !== socket) {
@@ -3855,7 +3860,7 @@ export class RoomDO {
 
     this.socketsByPlayer.delete(playerId);
 
-    player.connected = false;
+    this.setPlayerConnectionState(player, false);
     player.movementVector = createVector();
     player.combatStatus = createCombatStatusState();
     player.lastSeenAt = Date.now();
@@ -3885,7 +3890,7 @@ export class RoomDO {
 
     this.broadcast(stateMessage, socket);
 
-    const connectedPlayers = this.countConnectedPlayers();
+    const connectedPlayers = this.getConnectedPlayersCount();
     this.observability.log("info", "player_disconnected", {
       playerId: player.id,
       name: player.name,
@@ -3909,7 +3914,7 @@ export class RoomDO {
       await this.maybeStartGame();
     }
 
-    if (this.phase === "active" && this.countConnectedPlayers() === 0) {
+    if (this.phase === "active" && this.getConnectedPlayersCount() === 0) {
       await this.endGame("timeout");
     }
   }
@@ -4176,7 +4181,7 @@ export class RoomDO {
   }
 
   private async startGame(): Promise<void> {
-    if (this.countConnectedPlayers() === 0) {
+    if (this.getConnectedPlayersCount() === 0) {
       this.phase = "waiting";
       this.roundId = null;
       this.roundStartedAt = null;
@@ -4220,7 +4225,7 @@ export class RoomDO {
     this.lastWorldTickAt = now;
     this.scheduleWorldTick(now);
 
-    const connectedPlayers = this.countConnectedPlayers();
+    const connectedPlayers = this.getConnectedPlayersCount();
     this.observability.log("info", "round_started", {
       roundId: this.roundId,
       roundEndsAt: this.roundEndsAt,
@@ -4270,7 +4275,7 @@ export class RoomDO {
       roundId: this.roundId,
       reason,
       durationMs: duration,
-      connectedPlayers: this.countConnectedPlayers()
+      connectedPlayers: this.getConnectedPlayersCount()
     });
     if (duration !== null) {
       this.observability.recordMetric("round_duration_ms", duration, { reason });
@@ -4521,6 +4526,10 @@ export class RoomDO {
       return null;
     }
 
+    if (player.connected) {
+      this.adjustConnectedPlayers(-1);
+    }
+
     this.players.delete(playerId);
     this.markRankingDirty();
 
@@ -4610,7 +4619,7 @@ export class RoomDO {
       this.send(socket, rankingMessage);
     }
 
-    const connectedPlayers = this.countConnectedPlayers();
+    const connectedPlayers = this.getConnectedPlayersCount();
     this.observability.log("info", "player_removed", {
       playerId: removed.id,
       name: removed.name,
@@ -4666,7 +4675,7 @@ export class RoomDO {
       sessionCount: removed.sessionCount ?? 0
     });
 
-    const connectedPlayers = this.countConnectedPlayers();
+    const connectedPlayers = this.getConnectedPlayersCount();
     this.observability.recordMetric("connected_players", connectedPlayers, {
       phase: this.phase
     });
@@ -4778,10 +4787,33 @@ export class RoomDO {
     if (this.phase === "ended") {
       return false;
     }
-    return this.countConnectedPlayers() > 0;
+    return this.getConnectedPlayersCount() > 0;
   }
 
-  private countConnectedPlayers(): number {
+  private getConnectedPlayersCount(): number {
+    if (this.connectedPlayers < 0 || this.connectedPlayers > this.players.size) {
+      this.connectedPlayers = this.recalculateConnectedPlayers();
+    }
+    return this.connectedPlayers;
+  }
+
+  private adjustConnectedPlayers(delta: number): void {
+    this.connectedPlayers += delta;
+    if (this.connectedPlayers < 0 || this.connectedPlayers > this.players.size) {
+      this.connectedPlayers = this.recalculateConnectedPlayers();
+    }
+  }
+
+  private setPlayerConnectionState(player: PlayerInternal, connected: boolean): void {
+    if (player.connected === connected) {
+      return;
+    }
+
+    player.connected = connected;
+    this.adjustConnectedPlayers(connected ? 1 : -1);
+  }
+
+  private recalculateConnectedPlayers(): number {
     let count = 0;
     for (const player of this.players.values()) {
       if (player.connected) {

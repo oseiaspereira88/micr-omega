@@ -55,6 +55,7 @@ describe("RoomDO archetype actions", () => {
     const { roomAny } = await createRoom();
     const player = createTestPlayer("alpha");
     roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const result = roomAny.applyPlayerAction(player, {
       type: "archetype",
@@ -76,6 +77,7 @@ describe("RoomDO archetype actions", () => {
     const { roomAny } = await createRoom();
     const player = createTestPlayer("beta");
     roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const result = roomAny.applyPlayerAction(player, {
       type: "archetype",

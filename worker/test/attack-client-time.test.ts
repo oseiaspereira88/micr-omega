@@ -71,6 +71,7 @@ describe("RoomDO player attacks", () => {
     const defender = createTestPlayer("defender");
     roomAny.players.set(attacker.id, attacker);
     roomAny.players.set(defender.id, defender);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const result = roomAny.applyPlayerAction(
       attacker,
@@ -112,6 +113,7 @@ describe("RoomDO player attacks", () => {
     const defender = createTestPlayer("defender");
     roomAny.players.set(attacker.id, attacker);
     roomAny.players.set(defender.id, defender);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const result = roomAny.applyPlayerAction(attacker, {
       type: "attack",
@@ -137,6 +139,7 @@ describe("RoomDO player attacks", () => {
     const defender = createTestPlayer("defender");
     roomAny.players.set(attacker.id, attacker);
     roomAny.players.set(defender.id, defender);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const result = roomAny.applyPlayerAction(attacker, {
       type: "attack",
@@ -160,6 +163,7 @@ describe("RoomDO player attacks", () => {
 
     const attacker = createTestPlayer("attacker");
     roomAny.players.set(attacker.id, attacker);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
     const controlPanel: RoomObject = {
       id: "room-console",
