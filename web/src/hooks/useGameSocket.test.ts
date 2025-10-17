@@ -293,8 +293,14 @@ describe("useGameSocket", () => {
     },
   });
 
-  const setupSocketConnection = (options: { stubTimers?: boolean } = {}) => {
-    const { stubTimers = true } = options;
+  const setupSocketConnection = (
+    options: {
+      stubTimers?: boolean;
+      autoOpen?: boolean;
+      initialState?: Partial<ReturnType<typeof gameStore.getState>>;
+    } = {}
+  ) => {
+    const { stubTimers = true, autoOpen = true, initialState } = options;
     MockWebSocket.instances = [];
 
     const setTimeoutSpy = vi.spyOn(window, "setTimeout");
@@ -326,9 +332,11 @@ describe("useGameSocket", () => {
       connectionStatus: "idle",
       reconnectAttempts: 0,
       reconnectUntil: null,
+      reconnectToken: null,
       playerId: null,
       playerName: null,
       joinError: null,
+      ...initialState,
     });
 
     const statusSpy = vi.spyOn(gameStore.actions, "setConnectionStatus");
@@ -347,9 +355,11 @@ describe("useGameSocket", () => {
       throw new Error("Expected WebSocket instance to be created");
     }
 
-    act(() => {
-      socket.onopen?.();
-    });
+    if (autoOpen) {
+      act(() => {
+        socket.onopen?.();
+      });
+    }
 
     statusSpy.mockClear();
     incrementSpy.mockClear();
@@ -363,8 +373,50 @@ describe("useGameSocket", () => {
       setIntervalSpy,
       clearIntervalSpy,
       unmount,
+      result,
     };
   };
+
+  it("envia playerId e token de reconexão quando disponíveis", () => {
+    const {
+      socket,
+      statusSpy,
+      incrementSpy,
+      setTimeoutSpy,
+      clearTimeoutSpy,
+      setIntervalSpy,
+      clearIntervalSpy,
+      unmount,
+    } = setupSocketConnection({
+      autoOpen: false,
+      initialState: { playerId: "player-1", reconnectToken: "token-abc" },
+    });
+
+    try {
+      socket.send.mockClear();
+
+      act(() => {
+        socket.onopen?.();
+      });
+
+      expect(socket.send).toHaveBeenCalled();
+      const joinPayload = JSON.parse(socket.send.mock.calls[0]![0]);
+      expect(joinPayload).toMatchObject({
+        type: "join",
+        name: "Tester",
+        playerId: "player-1",
+        reconnectToken: "token-abc",
+      });
+    } finally {
+      statusSpy.mockRestore();
+      incrementSpy.mockRestore();
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      unmount();
+    }
+  });
 
   it("sets status to reconnecting when the initial connection fails and reconnection is enabled", () => {
     const timeoutSpy = vi.spyOn(window, "setTimeout");
@@ -387,6 +439,7 @@ describe("useGameSocket", () => {
       playerName: "Tester",
       reconnectAttempts: 0,
       connectionStatus: "idle",
+      reconnectToken: null,
       joinError: null,
     });
 
@@ -553,6 +606,46 @@ describe("useGameSocket", () => {
     }
   });
 
+  it("clears stored session information when receiving an invalid_token error", () => {
+    const {
+      socket,
+      statusSpy,
+      incrementSpy,
+      setTimeoutSpy,
+      clearTimeoutSpy,
+      setIntervalSpy,
+      clearIntervalSpy,
+      unmount,
+    } = setupSocketConnection();
+
+    try {
+      act(() => {
+        gameStore.setPartial({ playerId: "player-1", reconnectToken: "token-abc" });
+      });
+
+      act(() => {
+        socket.onmessage?.({
+          data: JSON.stringify({ type: "error", reason: "invalid_token" }),
+        } as MessageEvent<string>);
+      });
+
+      expect(gameStore.getState().playerId).toBeNull();
+      expect(gameStore.getState().reconnectToken).toBeNull();
+      expect(gameStore.getState().connectionStatus).toBe("disconnected");
+      expect(statusSpy).toHaveBeenCalledWith("disconnected");
+      expect(incrementSpy).not.toHaveBeenCalled();
+      expect(socket.close).toHaveBeenCalledTimes(1);
+    } finally {
+      statusSpy.mockRestore();
+      incrementSpy.mockRestore();
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      unmount();
+    }
+  });
+
   it("removes transient join errors after the recovery timeout elapses", () => {
     vi.useFakeTimers();
 
@@ -650,6 +743,7 @@ describe("useGameSocket", () => {
     const clearIntervalSpy = vi
       .spyOn(window, "clearInterval")
       .mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     vi.stubGlobal("WebSocket", MockWebSocket as unknown as typeof WebSocket);
 
@@ -657,6 +751,7 @@ describe("useGameSocket", () => {
       connectionStatus: "idle",
       reconnectAttempts: 0,
       reconnectUntil: null,
+      reconnectToken: null,
       playerId: null,
       playerName: null,
       joinError: null,

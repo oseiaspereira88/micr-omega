@@ -270,6 +270,7 @@ export interface GameStoreState {
   connectionStatus: ConnectionStatus;
   reconnectAttempts: number;
   reconnectUntil: number | null;
+  reconnectToken: string | null;
   playerId: string | null;
   playerName: string | null;
   joinError: string | null;
@@ -411,6 +412,7 @@ const initialState: GameStoreState = {
   connectionStatus: "idle",
   reconnectAttempts: 0,
   reconnectUntil: null,
+  reconnectToken: null,
   playerId: null,
   playerName: null,
   joinError: null,
@@ -546,10 +548,15 @@ const setPlayerId = (playerId: string | null) => {
       return prev;
     }
 
-    return {
+    const next: GameStoreState = {
       ...prev,
       playerId,
     };
+    if (playerId === null) {
+      next.reconnectToken = null;
+    }
+
+    return next;
   });
 };
 
@@ -785,6 +792,7 @@ const resetGameState = () => {
   const preservedId = currentState.playerId;
   const preservedStatus = currentState.connectionStatus;
   const preservedReconnectUntil = currentState.reconnectUntil;
+  const preservedReconnectToken = currentState.reconnectToken;
   applyState(() => {
     const emptyState = createEmptySynchronizedState();
     return {
@@ -793,6 +801,7 @@ const resetGameState = () => {
       playerId: preservedId,
       connectionStatus: preservedStatus,
       reconnectUntil: preservedReconnectUntil,
+      reconnectToken: preservedReconnectToken,
       players: emptyState.remotePlayers.byId,
       remotePlayers: emptyState.remotePlayers,
       microorganisms: emptyState.microorganisms,
@@ -808,12 +817,14 @@ const resetGameState = () => {
 const applyJoinedSnapshot = ({
   playerId,
   playerName,
+  reconnectToken,
   reconnectUntil,
   state,
   ranking,
 }: {
   playerId: string;
   playerName: string;
+  reconnectToken: string;
   reconnectUntil: number | null;
   state: SharedGameState;
   ranking: RankingEntry[];
@@ -823,6 +834,7 @@ const applyJoinedSnapshot = ({
     connectionStatus: "connected",
     reconnectAttempts: 0,
     reconnectUntil,
+    reconnectToken,
     playerId,
     playerName,
     joinError: null,
