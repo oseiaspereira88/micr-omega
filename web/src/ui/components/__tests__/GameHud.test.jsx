@@ -207,3 +207,29 @@ describe('GameHud sidebar accessibility', () => {
   });
 });
 
+describe('GameHud opponent summaries', () => {
+  it('exibe uma descrição amigável para o estado de combate', () => {
+    render(
+      <GameSettingsProvider>
+        <GameHud
+          {...BASE_PROPS}
+          opponents={[
+            {
+              id: 'op-1',
+              name: 'Guardião',
+              elementLabel: 'Fogo',
+              affinityLabel: 'Água',
+              combatState: 'engaged',
+              health: 75,
+              maxHealth: 100,
+              palette: { base: '#ff0000' },
+            },
+          ]}
+        />
+      </GameSettingsProvider>,
+    );
+
+    expect(screen.getByText('Em combate')).toBeInTheDocument();
+  });
+});
+
