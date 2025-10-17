@@ -4524,6 +4524,15 @@ export class RoomDO {
     playerId: string,
     reason: "expired" | "inactive"
   ): Promise<void> {
+    this.playersPendingRemoval.delete(playerId);
+    if (this.pendingPlayerDeaths.length > 0) {
+      for (let index = this.pendingPlayerDeaths.length - 1; index >= 0; index--) {
+        if (this.pendingPlayerDeaths[index]?.playerId === playerId) {
+          this.pendingPlayerDeaths.splice(index, 1);
+        }
+      }
+    }
+
     const removed = this.detachPlayer(playerId);
     if (!removed) {
       return;
