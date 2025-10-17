@@ -18,6 +18,7 @@ const DEFAULT_RECONNECT_BASE = 1500;
 const DEFAULT_RECONNECT_MAX = 12000;
 const RECONNECT_JITTER_MIN = 0.5;
 const RECONNECT_JITTER_MAX = 1.5;
+export const RECOVERABLE_ERROR_CLEAR_TIMEOUT_MS = 3000;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -296,6 +297,31 @@ export const useGameSocket = (
   const shouldReconnectRef = useRef(false);
   const lastRequestedNameRef = useRef<string | null>(null);
   const connectInternalRef = useRef<(name: string, isReconnect: boolean) => void>();
+  const joinErrorClearTimerRef = useRef<number | null>(null);
+
+  const clearJoinErrorTimer = useCallback(() => {
+    if (typeof window === "undefined") {
+      joinErrorClearTimerRef.current = null;
+      return;
+    }
+
+    if (joinErrorClearTimerRef.current !== null) {
+      window.clearTimeout(joinErrorClearTimerRef.current);
+      joinErrorClearTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleJoinErrorClear = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    clearJoinErrorTimer();
+    joinErrorClearTimerRef.current = window.setTimeout(() => {
+      gameStore.actions.setJoinError(null);
+      joinErrorClearTimerRef.current = null;
+    }, RECOVERABLE_ERROR_CLEAR_TIMEOUT_MS);
+  }, [clearJoinErrorTimer]);
 
   const clearReconnectTimer = useCallback(() => {
     if (typeof window === "undefined") {
@@ -437,6 +463,7 @@ export const useGameSocket = (
   const stopSocket = useCallback((closeConnection = true) => {
     clearPingTimer();
     clearReconnectTimer();
+    clearJoinErrorTimer();
 
     const socket = socketRef.current;
     if (socket) {
@@ -454,7 +481,7 @@ export const useGameSocket = (
     }
 
     socketRef.current = null;
-  }, [clearPingTimer, clearReconnectTimer]);
+  }, [clearJoinErrorTimer, clearPingTimer, clearReconnectTimer]);
 
   const handleServerMessage = useCallback((raw: MessageEvent<string>) => {
     let message: ServerMessage;
@@ -473,6 +500,8 @@ export const useGameSocket = (
 
     switch (message.type) {
       case "joined": {
+        clearJoinErrorTimer();
+        gameStore.actions.setJoinError(null);
         const normalizedName =
           message.state.players.find((player) => player.id === message.playerId)?.name ??
           playerNameRef.current ??
@@ -489,6 +518,8 @@ export const useGameSocket = (
         break;
       }
       case "state": {
+        clearJoinErrorTimer();
+        gameStore.actions.setJoinError(null);
         if (message.mode === "full") {
           gameStore.actions.applyFullState(message.state);
         } else {
@@ -497,6 +528,8 @@ export const useGameSocket = (
         break;
       }
       case "ranking": {
+        clearJoinErrorTimer();
+        gameStore.actions.setJoinError(null);
         gameStore.actions.applyRanking(message.ranking);
         break;
       }
@@ -505,6 +538,8 @@ export const useGameSocket = (
         break;
       }
       case "reset": {
+        clearJoinErrorTimer();
+        gameStore.actions.setJoinError(null);
         gameStore.actions.applyFullState(message.state);
         break;
       }
@@ -513,9 +548,15 @@ export const useGameSocket = (
         const isUnknownPlayer = reason === "unknown_player";
         if (!isUnknownPlayer) {
           gameStore.actions.setJoinError(errorReasonToMessage(message));
+          if (reason === "game_not_active" || reason === "rate_limited") {
+            scheduleJoinErrorClear();
+          } else {
+            clearJoinErrorTimer();
+          }
         }
 
         if (isUnknownPlayer) {
+          clearJoinErrorTimer();
           const reconnectName =
             lastRequestedNameRef.current ?? playerNameRef.current ?? null;
           const connector = connectInternalRef.current;
@@ -560,7 +601,12 @@ export const useGameSocket = (
       default:
         break;
     }
-  }, [playerNameRef, stopSocket]);
+  }, [
+    clearJoinErrorTimer,
+    playerNameRef,
+    scheduleJoinErrorClear,
+    stopSocket,
+  ]);
 
   const connectInternal = useCallback(
     (name: string, isReconnect: boolean) => {
@@ -586,6 +632,7 @@ export const useGameSocket = (
           isReconnect ? "reconnecting" : "connecting"
         );
         gameStore.actions.setJoinError(null);
+        clearJoinErrorTimer();
         if (!isReconnect) {
           gameStore.actions.resetGameState();
         }
@@ -683,6 +730,7 @@ export const useGameSocket = (
       playerIdRef,
       version,
       sendMessage,
+      clearJoinErrorTimer,
     ]
   );
 
