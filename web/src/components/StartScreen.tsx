@@ -176,12 +176,31 @@ const StartScreen = ({
 
   const isConnected = effectiveStatus === "connected" && Boolean(playerId);
 
+  const dialogTitleId = "start-screen-title";
+  const dialogDescriptionId = "start-screen-description";
+  const audioToggleId = "audio-enabled";
+  const touchToggleId = "show-touch-controls";
+
+  const startButtonLabel = isConnecting
+    ? "Conectando…"
+    : isConnected
+    ? "Reconectar"
+    : "Iniciar partida";
+
   return (
     <div className={styles.root}>
-      <div className={styles.panel} role="dialog" aria-modal="true">
+      <div
+        className={styles.panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogTitleId}
+        aria-describedby={dialogDescriptionId}
+      >
         <header className={styles.header}>
-          <h1 className={styles.title}>Micro Ωmega</h1>
-          <p className={styles.subtitle}>
+          <h1 id={dialogTitleId} className={styles.title}>
+            Micro Ωmega
+          </h1>
+          <p id={dialogDescriptionId} className={styles.subtitle}>
             Entre na simulação pública, customize sua experiência e desafie outros
             microrganismos em tempo real.
           </p>
@@ -227,17 +246,24 @@ const StartScreen = ({
                     Ative os efeitos sonoros durante a partida.
                   </span>
                 </div>
-                <label className={styles.toggleWrapper}>
+                <label className={styles.toggleWrapper} htmlFor={audioToggleId}>
                   <input
                     type="checkbox"
-                    id="audio-enabled"
+                    id={audioToggleId}
                     name="audio-enabled"
                     className={styles.toggle}
                     checked={settings.audioEnabled}
                     onChange={handleAudioToggle}
                     disabled={isConnecting}
+                    aria-checked={settings.audioEnabled}
                   />
-                  Som ligado
+                  <span className={styles.toggleLabelText}>
+                    Som
+                    {' '}
+                    <span className={styles.toggleStatus} aria-live="polite" aria-atomic="true">
+                      {settings.audioEnabled ? 'ligado' : 'desligado'}
+                    </span>
+                  </span>
                 </label>
               </div>
 
@@ -275,17 +301,24 @@ const StartScreen = ({
                     Exibir botões virtuais para dispositivos sensíveis ao toque.
                   </span>
                 </div>
-                <label className={styles.toggleWrapper}>
+                <label className={styles.toggleWrapper} htmlFor={touchToggleId}>
                   <input
                     type="checkbox"
-                    id="show-touch-controls"
+                    id={touchToggleId}
                     name="show-touch-controls"
                     className={styles.checkbox}
                     checked={settings.showTouchControls}
                     onChange={handleTouchToggle}
                     disabled={isConnecting}
+                    aria-checked={settings.showTouchControls}
                   />
-                  Mostrar controles
+                  <span className={styles.toggleLabelText}>
+                    Mostrar controles
+                    {' '}
+                    <span className={styles.toggleStatus} aria-live="polite" aria-atomic="true">
+                      {settings.showTouchControls ? 'ativos' : 'ocultos'}
+                    </span>
+                  </span>
                 </label>
               </div>
             </div>
@@ -296,8 +329,9 @@ const StartScreen = ({
               type="submit"
               className={styles.primaryButton}
               disabled={isConnecting}
+              aria-busy={isConnecting}
             >
-              {isConnected ? "Reconectar" : "Iniciar partida"}
+              {startButtonLabel}
             </button>
             <button
               type="button"

@@ -65,6 +65,7 @@ const GameHud = ({
 
   const currentSkill = skillData?.currentSkill ?? null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const sidebarId = 'game-hud-sidebar';
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
@@ -126,6 +127,7 @@ const GameHud = ({
         className={styles.sidebarToggle}
         onClick={handleToggleSidebar}
         aria-expanded={isSidebarOpen}
+        aria-controls={sidebarId}
       >
         {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
       </button>
@@ -154,9 +156,13 @@ const GameHud = ({
         </div>
 
         <div
+          id={sidebarId}
           className={`${styles.sidebar} ${
             isSidebarOpen ? styles.sidebarOpen : styles.sidebarClosed
           }`}
+          role="complementary"
+          aria-label="Painel lateral do jogo"
+          aria-hidden={isSidebarOpen ? undefined : true}
         >
           <RankingPanel />
           <ConnectionStatusOverlay />

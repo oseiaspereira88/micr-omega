@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import {
   GamePhase,
   HealthState,
@@ -820,10 +820,38 @@ export const gameStore = {
   },
 };
 
-export function useGameStore<T>(selector: StateSelector<T>): T {
-  return useSyncExternalStore(
-    gameStore.subscribe,
-    () => selector(currentState),
-    () => selector(initialState)
-  );
+type EqualityChecker<T> = (a: T, b: T) => boolean;
+
+const defaultEquality: EqualityChecker<unknown> = (a, b) => Object.is(a, b);
+
+export function useGameStore<T>(
+  selector: StateSelector<T>,
+  isEqual: EqualityChecker<T> = defaultEquality as EqualityChecker<T>,
+): T {
+  const selectorRef = useRef(selector);
+  selectorRef.current = selector;
+
+  const lastStateRef = useRef<GameStoreState>(currentState);
+  const lastSelectionRef = useRef<T>(selector(currentState));
+
+  const getSnapshot = () => {
+    const nextState = currentState;
+    if (lastStateRef.current === nextState) {
+      return lastSelectionRef.current;
+    }
+
+    const nextSelection = selectorRef.current(nextState);
+    if (isEqual(nextSelection, lastSelectionRef.current)) {
+      lastStateRef.current = nextState;
+      return lastSelectionRef.current;
+    }
+
+    lastStateRef.current = nextState;
+    lastSelectionRef.current = nextSelection;
+    return nextSelection;
+  };
+
+  const getServerSnapshot = () => selectorRef.current(initialState);
+
+  return useSyncExternalStore(gameStore.subscribe, getSnapshot, getServerSnapshot);
 }
