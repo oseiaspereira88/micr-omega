@@ -227,6 +227,91 @@ describe("serverMessageSchema", () => {
 });
 
 describe("useGameSocket", () => {
+  class MockWebSocket {
+    static OPEN = 1;
+    static instances: MockWebSocket[] = [];
+
+    readyState = MockWebSocket.OPEN;
+    onopen: (() => void) | null = null;
+    onmessage: ((event: MessageEvent<string>) => void) | null = null;
+    onclose: (() => void) | null = null;
+    onerror: ((event: Event) => void) | null = null;
+    close = vi.fn();
+    send = vi.fn();
+
+    constructor(public url: string) {
+      MockWebSocket.instances.push(this);
+    }
+  }
+
+  const setupSocketConnection = () => {
+    MockWebSocket.instances = [];
+
+    const setTimeoutSpy = vi
+      .spyOn(window, "setTimeout")
+      .mockImplementation(
+        ((_callback: Parameters<typeof window.setTimeout>[0]) =>
+          1) as unknown as typeof window.setTimeout
+      );
+    const clearTimeoutSpy = vi
+      .spyOn(window, "clearTimeout")
+      .mockImplementation(() => {});
+    const setIntervalSpy = vi
+      .spyOn(window, "setInterval")
+      .mockImplementation(
+        ((_callback: Parameters<typeof window.setInterval>[0]) =>
+          1) as unknown as typeof window.setInterval
+      );
+    const clearIntervalSpy = vi
+      .spyOn(window, "clearInterval")
+      .mockImplementation(() => {});
+
+    vi.stubGlobal("WebSocket", MockWebSocket as unknown as typeof WebSocket);
+
+    gameStore.setPartial({
+      connectionStatus: "idle",
+      reconnectAttempts: 0,
+      reconnectUntil: null,
+      playerId: null,
+      playerName: null,
+      joinError: null,
+    });
+
+    const statusSpy = vi.spyOn(gameStore.actions, "setConnectionStatus");
+    const incrementSpy = vi.spyOn(gameStore.actions, "incrementReconnectAttempts");
+
+    const { result, unmount } = renderHook(() =>
+      useGameSocket({ autoConnect: false, url: "ws://example.test" })
+    );
+
+    act(() => {
+      result.current.connect("Tester");
+    });
+
+    const socket = MockWebSocket.instances.at(-1);
+    if (!socket) {
+      throw new Error("Expected WebSocket instance to be created");
+    }
+
+    act(() => {
+      socket.onopen?.();
+    });
+
+    statusSpy.mockClear();
+    incrementSpy.mockClear();
+
+    return {
+      socket,
+      statusSpy,
+      incrementSpy,
+      setTimeoutSpy,
+      clearTimeoutSpy,
+      setIntervalSpy,
+      clearIntervalSpy,
+      unmount,
+    };
+  };
+
   it("sets status to reconnecting when the initial connection fails and reconnection is enabled", () => {
     const timeoutSpy = vi.spyOn(window, "setTimeout");
     timeoutSpy.mockImplementation((() => 1) as unknown as Window["setTimeout"]);
@@ -271,6 +356,154 @@ describe("useGameSocket", () => {
       statusSpy.mockRestore();
       reconnectSpy.mockRestore();
       timeoutSpy.mockRestore();
+    }
+  });
+
+  it.each<{
+    reason: "invalid_payload" | "game_not_active" | "rate_limited" | "unknown_player";
+    payload?: Partial<Extract<ReturnType<typeof serverMessageSchema["parse"]>, { type: "error" }>>;
+    expectedMessage: string;
+  }>([
+    {
+      reason: "invalid_payload",
+      expectedMessage: "Erro ao comunicar com o servidor. Tente novamente.",
+    },
+    {
+      reason: "game_not_active",
+      expectedMessage: "A sala não está ativa no momento.",
+    },
+    {
+      reason: "rate_limited",
+      payload: { retryAfterMs: 3500 },
+      expectedMessage:
+        "Muitas mensagens enviadas. Aguarde 4s e tente novamente.",
+    },
+    {
+      reason: "unknown_player",
+      expectedMessage: "Jogador desconhecido. Tente reconectar.",
+    },
+  ])(
+    "keeps the socket open for recoverable error reason %s",
+    ({ reason, payload, expectedMessage }) => {
+      const {
+        socket,
+        statusSpy,
+        incrementSpy,
+        setTimeoutSpy,
+        clearTimeoutSpy,
+        setIntervalSpy,
+        clearIntervalSpy,
+        unmount,
+      } = setupSocketConnection();
+
+      try {
+        act(() => {
+          socket.onmessage?.({
+            data: JSON.stringify({ type: "error", reason, ...payload }),
+          } as MessageEvent<string>);
+        });
+
+        expect(gameStore.getState().joinError).toBe(expectedMessage);
+        expect(socket.close).not.toHaveBeenCalled();
+        expect(gameStore.getState().connectionStatus).toBe("connecting");
+        expect(statusSpy).not.toHaveBeenCalled();
+        expect(incrementSpy).not.toHaveBeenCalled();
+
+        act(() => {
+          socket.onclose?.();
+        });
+
+        expect(incrementSpy).toHaveBeenCalledTimes(1);
+        expect(statusSpy).toHaveBeenCalledTimes(1);
+        expect(statusSpy).toHaveBeenCalledWith("reconnecting");
+        expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        statusSpy.mockRestore();
+        incrementSpy.mockRestore();
+        setTimeoutSpy.mockRestore();
+        clearTimeoutSpy.mockRestore();
+        setIntervalSpy.mockRestore();
+        clearIntervalSpy.mockRestore();
+        unmount();
+      }
+    }
+  );
+
+  it("closes the socket for invalid_name errors", () => {
+    const {
+      socket,
+      statusSpy,
+      incrementSpy,
+      setTimeoutSpy,
+      clearTimeoutSpy,
+      setIntervalSpy,
+      clearIntervalSpy,
+      unmount,
+    } = setupSocketConnection();
+
+    try {
+      act(() => {
+        socket.onmessage?.({
+          data: JSON.stringify({ type: "error", reason: "invalid_name" }),
+        } as MessageEvent<string>);
+      });
+
+      expect(gameStore.getState().joinError).toBe(
+        "Nome inválido. Use entre 3 e 24 caracteres válidos."
+      );
+      expect(socket.close).toHaveBeenCalledTimes(1);
+      expect(statusSpy).toHaveBeenCalledTimes(1);
+      expect(statusSpy).toHaveBeenCalledWith("disconnected");
+      expect(incrementSpy).not.toHaveBeenCalled();
+      expect(gameStore.getState().connectionStatus).toBe("disconnected");
+      expect(setTimeoutSpy).not.toHaveBeenCalled();
+    } finally {
+      statusSpy.mockRestore();
+      incrementSpy.mockRestore();
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      unmount();
+    }
+  });
+
+  it("closes the socket when an upgrade is required", () => {
+    const {
+      socket,
+      statusSpy,
+      incrementSpy,
+      setTimeoutSpy,
+      clearTimeoutSpy,
+      setIntervalSpy,
+      clearIntervalSpy,
+      unmount,
+    } = setupSocketConnection();
+
+    try {
+      act(() => {
+        socket.onmessage?.({
+          data: JSON.stringify({ type: "upgrade_required", minVersion: "2.0.0" }),
+        } as MessageEvent<string>);
+      });
+
+      expect(gameStore.getState().joinError).toBe(
+        "Versão desatualizada. Atualize a página para continuar."
+      );
+      expect(socket.close).toHaveBeenCalledTimes(1);
+      expect(statusSpy).toHaveBeenCalledTimes(1);
+      expect(statusSpy).toHaveBeenCalledWith("disconnected");
+      expect(incrementSpy).not.toHaveBeenCalled();
+      expect(gameStore.getState().connectionStatus).toBe("disconnected");
+      expect(setTimeoutSpy).not.toHaveBeenCalled();
+    } finally {
+      statusSpy.mockRestore();
+      incrementSpy.mockRestore();
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      unmount();
     }
   });
 });
