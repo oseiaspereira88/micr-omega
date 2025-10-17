@@ -185,7 +185,7 @@ const StartScreen = ({
     ? "Conectando…"
     : isConnected
     ? "Reconectar"
-    : "Iniciar partida";
+    : "Entrar na partida";
 
   return (
     <div className={styles.root}>
