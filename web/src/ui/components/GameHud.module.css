@@ -69,7 +69,8 @@
   align-items: stretch;
   width: clamp(240px, 26vw, 320px);
   z-index: 20;
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  visibility: hidden;
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
 }
 
 .sidebar > * {
@@ -80,12 +81,15 @@
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
+  visibility: visible;
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0s;
 }
 
 .sidebarClosed {
   opacity: 0;
   transform: translateY(-12px);
   pointer-events: none;
+  visibility: hidden;
 }
 
 .sidebarToggle {
