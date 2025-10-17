@@ -24,7 +24,9 @@ exports[`RankingPanel > matches snapshot for a populated ranking 1`] = `
       class="_list_0f10a4"
     >
       <li
+        aria-label="1º lugar — Alice — 4.200 pontos — conectado"
         class="_item_0f10a4 _top1_0f10a4"
+        role="row"
       >
         <span
           class="_rankBadge_0f10a4"
@@ -48,7 +50,10 @@ exports[`RankingPanel > matches snapshot for a populated ranking 1`] = `
         </span>
       </li>
       <li
+        aria-current="true"
+        aria-label="2º lugar — Você — 3.150 pontos — desconectado"
         class="_item_0f10a4 _top2_0f10a4 _localPlayer_0f10a4"
+        role="row"
       >
         <span
           class="_rankBadge_0f10a4"
