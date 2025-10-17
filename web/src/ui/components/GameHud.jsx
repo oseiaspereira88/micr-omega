@@ -8,7 +8,7 @@ import CameraControls from './CameraControls';
 import styles from './GameHud.module.css';
 import RankingPanel from '../../components/RankingPanel';
 import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
-import { useGameStore } from '../../store/gameStore';
+import { shallowEqual, useGameStore } from '../../store/gameStore';
 
 const GameHud = ({
   level,
@@ -58,10 +58,13 @@ const GameHud = ({
   onQuit,
   opponents = [],
 }) => {
-  const { connectionStatus, joinError } = useGameStore((state) => ({
-    connectionStatus: state.connectionStatus,
-    joinError: state.joinError,
-  }));
+  const { connectionStatus, joinError } = useGameStore(
+    (state) => ({
+      connectionStatus: state.connectionStatus,
+      joinError: state.joinError,
+    }),
+    shallowEqual,
+  );
 
   const currentSkill = skillData?.currentSkill ?? null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
