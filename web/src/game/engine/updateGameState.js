@@ -159,7 +159,7 @@ const mergeNumericRecord = (defaults, ...sources) => {
 };
 
 const mergeEvolutionSlots = (...sources) => {
-  const keys = ['small', 'medium', 'large'];
+  const keys = ['small', 'medium', 'large', 'macro'];
   const result = Object.fromEntries(keys.map((key) => [key, { used: 0, max: 0 }]));
   sources.forEach((source) => {
     if (!source || typeof source !== 'object') return;
