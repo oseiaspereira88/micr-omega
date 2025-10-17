@@ -7,11 +7,13 @@ const Notifications = ({ notifications = [] }) => {
   }
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} role="status" aria-live="polite">
       {notifications.map((notification, index) => (
         <div
           key={notification.id ?? `${notification.text ?? ''}-${index}`}
           className={styles.notification}
+          role="status"
+          aria-atomic="true"
         >
           {notification.text}
         </div>
