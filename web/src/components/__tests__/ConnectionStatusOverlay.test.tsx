@@ -23,4 +23,19 @@ describe("ConnectionStatusOverlay", () => {
     expect(screen.getByText("Latência")).toBeInTheDocument();
     expect(screen.getByText("150 ms")).toBeInTheDocument();
   });
+
+  it("announces join errors with an alert role", () => {
+    gameStore.setPartial({
+      connectionStatus: "disconnected",
+      lastPingAt: null,
+      lastPongAt: null,
+      reconnectAttempts: 0,
+      joinError: "Unable to join game.",
+    });
+
+    render(<ConnectionStatusOverlay />);
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Unable to join game.");
+  });
 });
