@@ -1,12 +1,19 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import styles from './GameOverScreen.module.css';
 
 const numberFormatter = new Intl.NumberFormat('pt-BR');
 
 const GameOverScreen = ({ score, level, maxCombo, onRestart }) => {
+  const restartButtonRef = useRef(null);
   const formattedScore = numberFormatter.format(score ?? 0);
   const formattedLevel = numberFormatter.format(level ?? 0);
   const formattedMaxCombo = numberFormatter.format(maxCombo ?? 0);
+
+  useEffect(() => {
+    if (restartButtonRef.current) {
+      restartButtonRef.current.focus();
+    }
+  }, []);
 
   return (
     <div className={styles.container}>
@@ -19,7 +26,12 @@ const GameOverScreen = ({ score, level, maxCombo, onRestart }) => {
         <span className={styles.summaryDetail}>🔥 Combo Máximo: x{formattedMaxCombo}</span>
       </div>
 
-      <button type="button" className={styles.restartButton} onClick={onRestart}>
+      <button
+        type="button"
+        className={styles.restartButton}
+        onClick={onRestart}
+        ref={restartButtonRef}
+      >
         🔄 Jogar Novamente
       </button>
     </div>
