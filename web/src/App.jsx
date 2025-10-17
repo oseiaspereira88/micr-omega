@@ -305,10 +305,12 @@ const App = () => {
 
       const prepareAdjustments = (adjustments) => {
         if (!adjustments || typeof adjustments !== 'object') return undefined;
-        const entries = Object.entries(adjustments).filter(([, value]) => Number.isFinite(value) && value !== 0);
+        const entries = Object.entries(adjustments)
+          .map(([key, value]) => [key, Number(value)])
+          .filter(([, numericValue]) => Number.isFinite(numericValue) && numericValue !== 0);
         if (entries.length === 0) return undefined;
-        return entries.reduce((acc, [key, value]) => {
-          acc[key] = Number(value);
+        return entries.reduce((acc, [key, numericValue]) => {
+          acc[key] = numericValue;
           return acc;
         }, {});
       };
