@@ -1289,14 +1289,27 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
     const updateCanvasSize = () => {
       const dpr = window.devicePixelRatio || 1;
-      const width = window.innerWidth;
-      const height = window.innerHeight - 40;
+      const parentElement = canvas.parentElement;
+      let width;
+      let height;
 
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
+      if (parentElement && typeof parentElement.getBoundingClientRect === 'function') {
+        const { width: parentWidth, height: parentHeight } = parentElement.getBoundingClientRect();
+        width = parentWidth;
+        height = parentHeight;
+      } else {
+        width = window.innerWidth;
+        height = window.innerHeight;
+      }
 
-      const displayWidth = Math.round(width * dpr);
-      const displayHeight = Math.round(height * dpr);
+      const resolvedWidth = Math.max(0, width);
+      const resolvedHeight = Math.max(0, height);
+
+      canvas.style.width = `${resolvedWidth}px`;
+      canvas.style.height = `${resolvedHeight}px`;
+
+      const displayWidth = Math.round(resolvedWidth * dpr);
+      const displayHeight = Math.round(resolvedHeight * dpr);
 
       if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
         canvas.width = displayWidth;
