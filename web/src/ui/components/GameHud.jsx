@@ -58,8 +58,10 @@ const GameHud = ({
   onQuit,
   opponents = [],
 }) => {
-  const connectionStatus = useGameStore((state) => state.connectionStatus);
-  const joinError = useGameStore((state) => state.joinError);
+  const { connectionStatus, joinError } = useGameStore((state) => ({
+    connectionStatus: state.connectionStatus,
+    joinError: state.joinError,
+  }));
 
   const currentSkill = skillData?.currentSkill ?? null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
