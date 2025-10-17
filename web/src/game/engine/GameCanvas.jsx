@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import GameHud from '../../ui/components/GameHud';
 import GameOverScreen from '../../ui/components/GameOverScreen';
 import ArchetypeSelection from '../../ui/components/ArchetypeSelection';
@@ -42,6 +42,7 @@ const TIER_METADATA = Object.freeze({
 
 const EVOLUTION_TIER_KEYS = Object.freeze(['small', 'medium', 'large', 'macro']);
 const EVOLUTION_OPTIONS_PANEL_ID = 'evolution-options-panel';
+const EVOLUTION_DIALOG_TITLE_ID = 'evolution-dialog-title';
 
 const formatEvolutionCost = (cost = {}) => {
   const parts = [];
@@ -79,6 +80,8 @@ const formatEvolutionRequirements = (requirements = {}) => {
 
 const GameCanvas = ({ settings, onQuit }) => {
   const canvasRef = useRef(null);
+  const evolutionDialogRef = useRef(null);
+  const evolutionTriggerRef = useRef(null);
   const gameState = useGameState();
   const dispatch = useGameDispatch();
 
@@ -231,6 +234,85 @@ const GameCanvas = ({ settings, onQuit }) => {
     requestEvolutionReroll?.();
   }, [rerollAvailable, requestEvolutionReroll]);
 
+  const getEvolutionDialogFocusableElements = useCallback(() => {
+    const dialogNode = evolutionDialogRef.current;
+    if (!dialogNode) return [];
+
+    const selectors = [
+      'button',
+      '[href]',
+      'input',
+      'select',
+      'textarea',
+      '[tabindex]:not([tabindex="-1"])',
+    ];
+
+    return Array.from(dialogNode.querySelectorAll(selectors.join(','))).filter((element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.hasAttribute('disabled')) return false;
+      if (element.getAttribute('aria-hidden') === 'true') return false;
+      return true;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    if (showEvolutionChoice) {
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement) {
+        evolutionTriggerRef.current = activeElement;
+      } else {
+        evolutionTriggerRef.current = null;
+      }
+
+      const dialogNode = evolutionDialogRef.current;
+      const focusableElements = getEvolutionDialogFocusableElements();
+      const elementToFocus = focusableElements[0] || dialogNode;
+
+      if (elementToFocus instanceof HTMLElement) {
+        elementToFocus.focus();
+      }
+    } else if (evolutionTriggerRef.current instanceof HTMLElement) {
+      evolutionTriggerRef.current.focus();
+      evolutionTriggerRef.current = null;
+    }
+  }, [getEvolutionDialogFocusableElements, showEvolutionChoice]);
+
+  const handleEvolutionDialogKeyDown = useCallback(
+    (event) => {
+      if (event.key !== 'Tab') return;
+
+      const dialogNode = evolutionDialogRef.current;
+      if (!dialogNode) return;
+
+      const focusableElements = getEvolutionDialogFocusableElements();
+
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        dialogNode.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+
+      if (event.shiftKey) {
+        if (activeElement === firstElement || !dialogNode.contains(activeElement)) {
+          event.preventDefault();
+          lastElement.focus();
+        }
+      } else if (activeElement === lastElement || !dialogNode.contains(activeElement)) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    },
+    [getEvolutionDialogFocusableElements]
+  );
+
   return (
     <div className={styles.container}>
       <canvas ref={canvasRef} className={styles.canvas} />
@@ -286,8 +368,18 @@ const GameCanvas = ({ settings, onQuit }) => {
 
       {showEvolutionChoice && (
         <div className={styles.evolutionOverlay}>
-          <div className={styles.evolutionCard}>
-            <h2 className={styles.evolutionTitle}>🧬 Evolução Nível {level}</h2>
+          <div
+            className={styles.evolutionCard}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={EVOLUTION_DIALOG_TITLE_ID}
+            ref={evolutionDialogRef}
+            tabIndex={-1}
+            onKeyDown={handleEvolutionDialogKeyDown}
+          >
+            <h2 className={styles.evolutionTitle} id={EVOLUTION_DIALOG_TITLE_ID}>
+              🧬 Evolução Nível {level}
+            </h2>
 
             <div className={styles.rerollControls}>
               <button
