@@ -1251,7 +1251,12 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   useEffect(() => {
     if (!resolvedSettings.audioEnabled) {
       if (audioCtxRef.current && typeof audioCtxRef.current.close === 'function') {
-        audioCtxRef.current.close();
+        void audioCtxRef.current.close()?.catch((error) => {
+          if (!audioWarningLoggedRef.current) {
+            console.warn('Failed to close Web Audio context; audio resources may remain allocated.', error);
+            audioWarningLoggedRef.current = true;
+          }
+        });
       }
       audioCtxRef.current = null;
       return;
@@ -1287,7 +1292,12 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   useEffect(
     () => () => {
       if (audioCtxRef.current && typeof audioCtxRef.current.close === 'function') {
-        audioCtxRef.current.close();
+        void audioCtxRef.current.close()?.catch((error) => {
+          if (!audioWarningLoggedRef.current) {
+            console.warn('Failed to close Web Audio context; audio resources may remain allocated.', error);
+            audioWarningLoggedRef.current = true;
+          }
+        });
       }
     },
     []
