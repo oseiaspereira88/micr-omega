@@ -9,9 +9,14 @@ import {
   ELEMENT_TYPES,
 } from '../../shared/combat';
 
+const sanitizeNumber = (value, fallback = 0) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+
 const summarizeSlot = (slot) => {
-  const used = Math.max(0, Math.floor(slot?.used ?? 0));
-  const max = Math.max(0, Math.floor(slot?.max ?? 0));
+  const used = Math.max(0, Math.floor(sanitizeNumber(slot?.used)));
+  const max = Math.max(0, Math.floor(sanitizeNumber(slot?.max)));
   return `${used}/${max}`;
 };
 
@@ -41,45 +46,58 @@ const HudBar = ({
   affinityLabel,
   resistances,
 }) => {
-  const safeLevel = Math.max(0, Math.floor(level ?? 0));
-  const safeScore = Math.max(0, Math.floor(score ?? 0));
-  const safeEnergy = Math.max(0, Math.floor(energy ?? 0));
-  const safeHealth = Math.max(0, Math.floor(health ?? 0));
-  const safeMaxHealth = Math.max(0, Math.floor(maxHealth ?? safeHealth));
-  const safeDashCharge = Math.max(0, Math.min(100, Math.floor(dashCharge ?? 0)));
-  const safeCombo = Math.max(0, Math.floor(combo ?? 0));
-  const safeMaxCombo = Math.max(0, Math.floor(maxCombo ?? 0));
+  const safeLevel = Math.max(0, Math.floor(sanitizeNumber(level)));
+  const safeScore = Math.max(0, Math.floor(sanitizeNumber(score)));
+  const safeEnergy = Math.max(0, Math.floor(sanitizeNumber(energy)));
+  const safeHealth = Math.max(0, Math.floor(sanitizeNumber(health)));
+  const safeMaxHealth = Math.max(
+    0,
+    Math.floor(sanitizeNumber(maxHealth ?? safeHealth, safeHealth))
+  );
+  const safeDashCharge = Math.max(
+    0,
+    Math.min(100, Math.floor(sanitizeNumber(dashCharge)))
+  );
+  const safeCombo = Math.max(0, Math.floor(sanitizeNumber(combo)));
+  const safeMaxCombo = Math.max(0, Math.floor(sanitizeNumber(maxCombo)));
 
-  const xpCurrent = Math.max(0, Math.floor(xp?.current ?? 0));
-  const xpNext = Math.max(1, Math.floor(xp?.next ?? 1));
+  const xpCurrent = Math.max(0, Math.floor(sanitizeNumber(xp?.current)));
+  const xpNext = Math.max(1, Math.floor(sanitizeNumber(xp?.next ?? 1, 1)));
   const xpPercent = Math.max(0, Math.min(1, xpCurrent / xpNext));
 
-  const mgCurrent = Math.max(0, Math.floor(geneticMaterial?.current ?? 0));
-  const pcAvailable = Math.max(0, Math.floor(characteristicPoints?.available ?? 0));
-  const pcTotal = Math.max(pcAvailable, Math.floor(characteristicPoints?.total ?? pcAvailable));
+  const mgCurrent = Math.max(0, Math.floor(sanitizeNumber(geneticMaterial?.current)));
+  const pcAvailable = Math.max(0, Math.floor(sanitizeNumber(characteristicPoints?.available)));
+  const pcTotal = Math.max(
+    pcAvailable,
+    Math.floor(sanitizeNumber(characteristicPoints?.total ?? pcAvailable, pcAvailable))
+  );
 
-  const rerollCost = Math.max(0, Math.floor(reroll?.cost ?? reroll?.baseCost ?? 25));
-  const rerollCount = Math.max(0, Math.floor(reroll?.count ?? 0));
+  const rerollBaseCost = sanitizeNumber(reroll?.baseCost ?? 25, 25);
+  const rerollCost = Math.max(
+    0,
+    Math.floor(sanitizeNumber(reroll?.cost ?? rerollBaseCost, rerollBaseCost))
+  );
+  const rerollCount = Math.max(0, Math.floor(sanitizeNumber(reroll?.count)));
 
   const fragmentCounters = {
-    minor: Math.max(0, Math.floor(geneFragments?.minor ?? 0)),
-    major: Math.max(0, Math.floor(geneFragments?.major ?? 0)),
-    apex: Math.max(0, Math.floor(geneFragments?.apex ?? 0)),
+    minor: Math.max(0, Math.floor(sanitizeNumber(geneFragments?.minor))),
+    major: Math.max(0, Math.floor(sanitizeNumber(geneFragments?.major))),
+    apex: Math.max(0, Math.floor(sanitizeNumber(geneFragments?.apex))),
   };
   const stableCounters = {
-    minor: Math.max(0, Math.floor(stableGenes?.minor ?? 0)),
-    major: Math.max(0, Math.floor(stableGenes?.major ?? 0)),
-    apex: Math.max(0, Math.floor(stableGenes?.apex ?? 0)),
+    minor: Math.max(0, Math.floor(sanitizeNumber(stableGenes?.minor))),
+    major: Math.max(0, Math.floor(sanitizeNumber(stableGenes?.major))),
+    apex: Math.max(0, Math.floor(sanitizeNumber(stableGenes?.apex))),
   };
 
-  const dropPityFragment = Math.max(0, Math.floor(dropPity?.fragment ?? 0));
-  const dropPityStableGene = Math.max(0, Math.floor(dropPity?.stableGene ?? 0));
+  const dropPityFragment = Math.max(0, Math.floor(sanitizeNumber(dropPity?.fragment)));
+  const dropPityStableGene = Math.max(0, Math.floor(sanitizeNumber(dropPity?.stableGene)));
 
   const recentRewardsSummary = {
-    xp: Math.max(0, Math.floor(recentRewards?.xp ?? 0)),
-    geneticMaterial: Math.max(0, Math.floor(recentRewards?.geneticMaterial ?? 0)),
-    fragments: Math.max(0, Math.floor(recentRewards?.fragments ?? 0)),
-    stableGenes: Math.max(0, Math.floor(recentRewards?.stableGenes ?? 0)),
+    xp: Math.max(0, Math.floor(sanitizeNumber(recentRewards?.xp))),
+    geneticMaterial: Math.max(0, Math.floor(sanitizeNumber(recentRewards?.geneticMaterial))),
+    fragments: Math.max(0, Math.floor(sanitizeNumber(recentRewards?.fragments))),
+    stableGenes: Math.max(0, Math.floor(sanitizeNumber(recentRewards?.stableGenes))),
   };
 
   const normalizedElement = element ?? ELEMENT_TYPES.BIO;
@@ -91,6 +109,7 @@ const HudBar = ({
   const resistanceEntries = useMemo(
     () =>
       Object.entries(resistances || {})
+        .map(([key, value]) => [key, sanitizeNumber(value)])
         .filter(([, value]) => Math.abs(value) >= 0.05)
         .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
         .slice(0, 3),
@@ -104,8 +123,8 @@ const HudBar = ({
           label: entry.label,
           icon: entry.icon,
           color: entry.color,
-          stacks: entry.stacks,
-          remaining: Math.max(0, Math.ceil(entry.remaining ?? 0)),
+          stacks: Math.max(0, Math.floor(sanitizeNumber(entry.stacks))),
+          remaining: Math.max(0, Math.ceil(sanitizeNumber(entry.remaining))),
         }))
         .slice(0, 4),
     [statusEffects]
@@ -113,12 +132,12 @@ const HudBar = ({
   const powerUpSummaries = useMemo(
     () =>
       (activePowerUps || []).map((power) => {
-        const percent = power.duration
-          ? Math.max(
-              0,
-              Math.min(100, (((power.remaining ?? 0) / power.duration) * 100) || 0)
-            )
-          : 0;
+        const duration = Math.max(0, sanitizeNumber(power.duration));
+        const remaining = Math.max(0, sanitizeNumber(power.remaining));
+        const percent =
+          duration > 0
+            ? Math.max(0, Math.min(100, (remaining / duration) * 100))
+            : 0;
 
         return {
           key: power.type,
