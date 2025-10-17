@@ -3321,6 +3321,40 @@ export class RoomDO {
 
     this.markPlayersDirty();
 
+    const hadPendingSnapshot = this.pendingSnapshotAlarm;
+    const previousPlayersDirty = this.playersDirty;
+    const previousWorldDirty = this.worldDirty;
+    const previousSnapshotSchedule = this.alarmSchedule.get("snapshot");
+
+    try {
+      if (this.playersDirty) {
+        if (hadPendingSnapshot === null) {
+          await this.flushSnapshots({ force: true });
+        } else {
+          await this.flushSnapshots();
+          this.queueSyncAlarms();
+        }
+      }
+    } catch (error) {
+      this.playersDirty = previousPlayersDirty;
+      this.worldDirty = previousWorldDirty;
+      this.pendingSnapshotAlarm = hadPendingSnapshot;
+      if (previousSnapshotSchedule !== undefined) {
+        this.alarmSchedule.set("snapshot", previousSnapshotSchedule);
+      } else {
+        this.alarmSchedule.delete("snapshot");
+      }
+      this.queueSnapshotStatePersist();
+      this.queueSyncAlarms();
+      this.observability.logError("player_snapshot_flush_failed", error, {
+        category: "persistence",
+        playerId: player.id,
+      });
+      this.send(socket, { type: "error", reason: "internal_error" });
+      socket.close(1011, "internal_error");
+      return null;
+    }
+
     const connectedPlayers = this.countConnectedPlayers();
     const isReconnect = payload.playerId === player.id && !expiredPlayerRemoved;
     this.observability.log("info", "player_connected", {
