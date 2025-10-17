@@ -15,6 +15,7 @@ import {
   SharedProgressionState,
   SharedProgressionStream,
   Vector2,
+  StatusEffectEvent,
 } from "../utils/messageTypes";
 import { reportRealtimeLatency } from "../utils/observability";
 
@@ -252,6 +253,7 @@ export interface GameStoreState {
   roomObjects: EntityCollection<RoomObject>;
   world: SharedWorldState;
   progression: SharedProgressionState;
+  statusEffects: StatusEffectEvent[];
 }
 
 const cloneVector = (vector: Vector2): Vector2 => ({ x: vector.x, y: vector.y });
@@ -387,6 +389,7 @@ const initialState: GameStoreState = {
   roomObjects: emptySyncState.roomObjects,
   world: emptySyncState.world,
   progression: cloneProgressionState(emptySyncState.progression),
+  statusEffects: [],
 };
 
 type GameStoreListener = () => void;
@@ -556,6 +559,7 @@ const applyFullState = (state: SharedGameState) => {
   applyState((prev) => ({
     ...prev,
     ...derived,
+    statusEffects: [],
   }));
 };
 
@@ -673,6 +677,9 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       roomObjects: roomObjectResult.next,
       world: nextWorld,
       progression: progressionChanged ? nextProgression : prev.progression,
+      statusEffects: worldDiff?.statusEffects
+        ? worldDiff.statusEffects.map((event) => ({ ...event }))
+        : prev.statusEffects,
     };
   });
 };
@@ -756,6 +763,7 @@ const resetGameState = () => {
       obstacles: emptyState.obstacles,
       roomObjects: emptyState.roomObjects,
       world: emptyState.world,
+      statusEffects: [],
     };
   });
 };
@@ -784,6 +792,7 @@ const applyJoinedSnapshot = ({
     lastPingAt: null,
     lastPongAt: null,
     ranking,
+    statusEffects: [],
     ...derived,
   }));
 };

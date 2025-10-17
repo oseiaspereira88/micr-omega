@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
 import { RoomDO } from "../src/RoomDO";
+import { getDefaultSkillList } from "../src/skills";
 import type { Env } from "../src";
 import { MockDurableObjectState } from "./utils/mock-state";
 
@@ -15,6 +16,7 @@ async function createRoom() {
 
 function createTestPlayer(id: string): any {
   const now = Date.now();
+  const skillList = getDefaultSkillList();
   return {
     id,
     name: id,
@@ -34,6 +36,14 @@ function createTestPlayer(id: string): any {
     totalSessionDurationMs: 0,
     sessionCount: 0,
     evolutionState: undefined,
+    skillState: {
+      available: skillList,
+      current: skillList[0]!,
+      cooldowns: {},
+    },
+    pendingAttack: null,
+    statusEffects: [],
+    invulnerableUntil: null,
   };
 }
 
