@@ -87,5 +87,66 @@ describe('HudBar', () => {
 
     expectDefaultMetrics();
   });
+
+  it('formats large counters using pt-BR locale', () => {
+    render(
+      <HudBar
+        level={42}
+        score={1234567}
+        energy={8900}
+        health={12345}
+        maxHealth={67890}
+        dashCharge={75}
+        combo={2345}
+        maxCombo={67890}
+        xp={{ current: 123456, next: 789012 }}
+        geneticMaterial={{ current: 987654 }}
+        characteristicPoints={{ available: 4321, total: 98765 }}
+        geneFragments={{ minor: 1111, major: 2222, apex: 3333 }}
+        stableGenes={{ minor: 4444, major: 5555, apex: 6666 }}
+        evolutionSlots={{
+          small: { used: 12, max: 3456 },
+          medium: { used: 78, max: 9012 },
+          large: { used: 34, max: 56789 },
+          macro: { used: 1, max: 23456 },
+        }}
+        reroll={{ cost: 1234, count: 56, baseCost: 789 }}
+        dropPity={{ fragment: 123, stableGene: 4567 }}
+        recentRewards={{
+          xp: 890123,
+          geneticMaterial: 456789,
+          fragments: 101112,
+          stableGenes: 131415,
+        }}
+      />
+    );
+
+    expect(screen.getByText('MicrΩ • Nv.42 • 1.234.567 pts')).toBeInTheDocument();
+    expect(screen.getByText('⚡ 8.900')).toBeInTheDocument();
+    expect(screen.getByText('❤️ 12.345/67.890')).toBeInTheDocument();
+    expect(screen.getByText('💨 75%')).toBeInTheDocument();
+    expect(screen.getByText('🧬 MG 987.654')).toBeInTheDocument();
+    expect(screen.getByText('🧠 PC 4.321/98.765')).toBeInTheDocument();
+    expect(screen.getByText('🔥 Combo x2.345')).toBeInTheDocument();
+    expect(screen.getByText('🏅 Máx x67.890')).toBeInTheDocument();
+    expect(screen.getByText('XP 123.456 / 789.012')).toBeInTheDocument();
+    expect(screen.getByText('Pequena: 12/3.456')).toBeInTheDocument();
+    expect(screen.getByText('Média: 78/9.012')).toBeInTheDocument();
+    expect(screen.getByText('Grande: 34/56.789')).toBeInTheDocument();
+    expect(screen.getByText('Macro: 1/23.456')).toBeInTheDocument();
+    expect(screen.getByText('Menor 1.111')).toBeInTheDocument();
+    expect(screen.getByText('Maior 2.222')).toBeInTheDocument();
+    expect(screen.getByText('Ápice 3.333')).toBeInTheDocument();
+    expect(screen.getByText('Menor 4.444')).toBeInTheDocument();
+    expect(screen.getByText('Maior 5.555')).toBeInTheDocument();
+    expect(screen.getByText('Ápice 6.666')).toBeInTheDocument();
+    expect(screen.getByText('Custo 1.234 MG')).toBeInTheDocument();
+    expect(screen.getByText('Usado 56x')).toBeInTheDocument();
+    expect(screen.getByText('Piedade 123/4.567')).toBeInTheDocument();
+    expect(screen.getByText('XP +890.123')).toBeInTheDocument();
+    expect(screen.getByText('MG +456.789')).toBeInTheDocument();
+    expect(screen.getByText('Frags +101.112')).toBeInTheDocument();
+    expect(screen.getByText('Genes +131.415')).toBeInTheDocument();
+  });
 });
 
