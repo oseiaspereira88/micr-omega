@@ -34,8 +34,8 @@ const TouchControls = ({
   onOpenEvolutionMenu,
   canEvolve,
 }) => {
-  const dashProgressId = useId();
-  const skillProgressId = useId();
+  const dashStatusId = useId();
+  const skillStatusId = useId();
   const dashReady = dashCharge >= 30;
   const dashChargePercent = clampProgress(dashCharge);
   const dashValueText = dashReady
@@ -62,11 +62,6 @@ const TouchControls = ({
   const skillLabelColorClass = !hasCurrentSkill || skillDisabled
     ? styles.skillLabelDisabled
     : styles.skillLabelReady;
-  const skillValueNow = !hasCurrentSkill
-    ? 0
-    : showSkillCooldown
-    ? skillCooldownPercentClamped
-    : 100;
   const skillValueText = !hasCurrentSkill
     ? 'Nenhuma habilidade equipada'
     : showSkillCooldown
@@ -149,7 +144,7 @@ const TouchControls = ({
         onClick={onDash}
         aria-label={dashAriaLabel}
         aria-disabled={!dashReady}
-        aria-describedby={dashProgressId}
+        aria-describedby={dashStatusId}
         onTouchStart={event => {
           event.preventDefault();
           if (dashReady) {
@@ -172,21 +167,15 @@ const TouchControls = ({
           {dashReady ? 'Pronto' : `${dashChargePercent}%`}
         </span>
       </button>
-      <div
-        id={dashProgressId}
+      <span
+        id={dashStatusId}
         className={styles.visuallyHidden}
+        role="status"
         aria-live="polite"
+        aria-atomic="true"
       >
-        <div
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={dashChargePercent}
-          aria-valuetext={dashValueText}
-        >
-          {dashValueText}
-        </div>
-      </div>
+        {dashValueText}
+      </span>
 
       <button
         type="button"
@@ -199,7 +188,7 @@ const TouchControls = ({
         onClick={onUseSkill}
         aria-label={skillAriaLabel}
         aria-disabled={skillDisabled}
-        aria-describedby={skillProgressId}
+        aria-describedby={skillStatusId}
         onTouchStart={event => {
           event.preventDefault();
           onUseSkill?.();
@@ -238,21 +227,15 @@ const TouchControls = ({
           {hasCurrentSkill ? (showSkillCooldown ? '' : currentSkillCost) : '--'}
         </span>
       </button>
-      <div
-        id={skillProgressId}
+      <span
+        id={skillStatusId}
         className={styles.visuallyHidden}
+        role="status"
         aria-live="polite"
+        aria-atomic="true"
       >
-        <div
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={skillValueNow}
-          aria-valuetext={skillValueText}
-        >
-          {skillValueText}
-        </div>
-      </div>
+        {skillValueText}
+      </span>
 
       <button
         type="button"
