@@ -55,6 +55,9 @@ const createPlayer = (overrides = {}) => ({
   connected: true,
   score: overrides.score ?? 0,
   combo: overrides.combo ?? 0,
+  energy: overrides.energy ?? 0,
+  xp: overrides.xp ?? 0,
+  geneticMaterial: overrides.geneticMaterial ?? 0,
   lastActiveAt: overrides.lastActiveAt ?? 0,
   position: overrides.position ?? { x: 10, y: 12 },
   movementVector: overrides.movementVector ?? { x: 0, y: 0 },
@@ -74,6 +77,9 @@ const createPlayer = (overrides = {}) => ({
       speed: 1,
       range: 1,
     },
+  skillList: overrides.skillList ?? [],
+  currentSkill: overrides.currentSkill ?? null,
+  skillCooldowns: overrides.skillCooldowns ?? {},
 });
 
 const createSharedState = (overrides = {}) => ({

@@ -57,6 +57,9 @@ const createPlayer = () => ({
   connected: true,
   score: 0,
   combo: 0,
+  energy: 0,
+  xp: 0,
+  geneticMaterial: 0,
   lastActiveAt: 0,
   position: { x: 0, y: 0 },
   movementVector: { x: 0, y: 0 },
@@ -71,6 +74,9 @@ const createPlayer = () => ({
   combatAttributes: { attack: 1, defense: 1, speed: 1, range: 1 },
   archetype: null,
   archetypeKey: null,
+  skillList: [],
+  currentSkill: null,
+  skillCooldowns: {},
 });
 
 const initializeStoreWithPlayer = () => {

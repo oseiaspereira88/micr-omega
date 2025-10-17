@@ -288,6 +288,11 @@ const cloneCombatAttributes = (
 
 const clonePlayer = (player: SharedPlayerState): SharedPlayerState => ({
   ...player,
+  skillList: Array.isArray(player.skillList) ? player.skillList.slice() : [],
+  skillCooldowns:
+    player.skillCooldowns && typeof player.skillCooldowns === "object"
+      ? { ...player.skillCooldowns }
+      : {},
   position: cloneVector(player.position),
   movementVector: cloneVector(player.movementVector),
   orientation: cloneOrientation(player.orientation),
