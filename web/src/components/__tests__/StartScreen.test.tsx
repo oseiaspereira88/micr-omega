@@ -95,6 +95,38 @@ describe("StartScreen", () => {
     expect(input).toHaveFocus();
   });
 
+  it("foca o diálogo ao abrir e mantém o foco preso nele", async () => {
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+    const dialog = screen.getByRole("dialog", { name: /micro/i });
+    const nameInput = screen.getByLabelText(/nome do jogador/i);
+    const quitButton = screen.getByRole("button", { name: /sair da sala/i });
+
+    expect(dialog).toHaveAttribute("tabindex", "-1");
+
+    await waitFor(() => {
+      expect(dialog).toHaveFocus();
+    });
+
+    fireEvent.keyDown(dialog, { key: "Tab" });
+
+    await waitFor(() => {
+      expect(nameInput).toHaveFocus();
+    });
+
+    fireEvent.keyDown(nameInput, { key: "Tab", shiftKey: true });
+
+    await waitFor(() => {
+      expect(quitButton).toHaveFocus();
+    });
+
+    fireEvent.keyDown(quitButton, { key: "Tab" });
+
+    await waitFor(() => {
+      expect(nameInput).toHaveFocus();
+    });
+  });
+
   it("persiste o nome sanitizado e envia as configurações", () => {
     const onStart = vi.fn();
     renderWithProviders(<StartScreen onStart={onStart} onQuit={() => {}} />);

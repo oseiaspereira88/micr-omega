@@ -92,7 +92,13 @@ const StartScreen = ({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    focusInput();
+
+    const dialogNode = panelRef.current;
+    if (dialogNode && typeof dialogNode.focus === "function") {
+      dialogNode.focus({ preventScroll: true });
+    } else {
+      focusInput();
+    }
 
     return () => {
       const target = previouslyFocusedElementRef.current;
@@ -297,8 +303,13 @@ const StartScreen = ({
         return;
       }
 
-      const firstElement = focusableElements[0];
+      const preferredFirstElement =
+        inputRef.current && !inputRef.current.disabled
+          ? inputRef.current
+          : undefined;
+      const firstElement = preferredFirstElement ?? focusableElements[0];
       const lastElement = focusableElements[focusableElements.length - 1];
+      const dialogNode = panelRef.current;
       const activeElement =
         document.activeElement instanceof HTMLElement
           ? document.activeElement
@@ -307,15 +318,29 @@ const StartScreen = ({
         activeElement && panelRef.current?.contains(activeElement)
       );
 
+      if (dialogNode && activeElement === dialogNode) {
+        event.preventDefault();
+        if (event.shiftKey) {
+          focusLastFocusable();
+        } else {
+          focusFirstFocusable();
+        }
+        return;
+      }
+
       if (event.shiftKey) {
-        if (!isActiveInside || activeElement === firstElement) {
+        if (
+          !isActiveInside ||
+          (firstElement && activeElement === firstElement) ||
+          activeElement === dialogNode
+        ) {
           event.preventDefault();
           focusLastFocusable();
         }
         return;
       }
 
-      if (!isActiveInside || activeElement === lastElement) {
+      if (!isActiveInside || (lastElement && activeElement === lastElement)) {
         event.preventDefault();
         focusFirstFocusable();
       }
@@ -332,6 +357,7 @@ const StartScreen = ({
         aria-modal="true"
         aria-labelledby={dialogTitleId}
         aria-describedby={dialogDescriptionId}
+        tabIndex={-1}
         onKeyDown={handleKeyDown}
       >
         <header className={styles.header}>
