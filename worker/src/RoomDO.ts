@@ -2375,6 +2375,10 @@ export class RoomDO {
     return Math.sqrt(this.distanceSquared(a, b));
   }
 
+  private positionsEqual(a: Vector2, b: Vector2): boolean {
+    return a.x === b.x && a.y === b.y;
+  }
+
   private movePlayerDuringTick(player: PlayerInternal, deltaMs: number): boolean {
     const movement = player.movementVector;
     const magnitude = Math.sqrt(movement.x ** 2 + movement.y ** 2);
@@ -2400,11 +2404,11 @@ export class RoomDO {
       y: player.position.y + normalizedY * distance,
     });
 
-    if (this.isBlockedByObstacle(candidate)) {
+    if (this.positionsEqual(candidate, player.position)) {
       return false;
     }
 
-    if (candidate.x === player.position.x && candidate.y === player.position.y) {
+    if (this.isBlockedByObstacle(candidate)) {
       return false;
     }
 
@@ -2759,7 +2763,7 @@ export class RoomDO {
             x: microorganism.position.x + normalizedX * distance,
             y: microorganism.position.y + normalizedY * distance,
           });
-          if (!this.isBlockedByObstacle(candidate)) {
+          if (!this.positionsEqual(candidate, microorganism.position) && !this.isBlockedByObstacle(candidate)) {
             microorganism.position = candidate;
             worldDiff.upsertMicroorganisms = [
               ...(worldDiff.upsertMicroorganisms ?? []),
