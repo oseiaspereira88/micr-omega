@@ -414,6 +414,47 @@ describe('App command batch handling', () => {
     expect(sendAttackMock).not.toHaveBeenCalled();
   });
 
+  it('omits idle combat state when forwarding attack commands', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockSettingsRef.current).toBeTruthy();
+    });
+
+    await act(async () => {
+      gameStore.setState((state) => ({
+        ...state,
+        microorganisms: {
+          ...(state.microorganisms ?? {}),
+          byId: { ...(state.microorganisms?.byId ?? {}), 'micro-1': { id: 'micro-1' } },
+          all: state.microorganisms?.all ?? [],
+          indexById: state.microorganisms?.indexById ?? new Map(),
+        },
+      }));
+    });
+
+    const settings = mockSettingsRef.current;
+    sendAttackMock.mockClear();
+
+    await act(async () => {
+      settings.onCommandBatch({
+        attacks: [
+          {
+            kind: 'basic',
+            targetObjectId: 'micro-1',
+            state: 'idle',
+            timestamp: 789,
+          },
+        ],
+      });
+    });
+
+    expect(sendAttackMock).toHaveBeenCalledTimes(1);
+    const [payload] = sendAttackMock.mock.calls[0];
+    expect(payload.targetObjectId).toBe('micro-1');
+    expect(payload).not.toHaveProperty('state');
+  });
+
   it('prioritizes command orientation when sending movement updates', async () => {
     render(<App />);
 

@@ -233,7 +233,11 @@ const App = () => {
             if (Number.isFinite(attackCommand.damage)) {
               payload.damage = attackCommand.damage;
             }
-            if (typeof attackCommand.state === 'string' && attackCommand.state) {
+            if (
+              typeof attackCommand.state === 'string' &&
+              attackCommand.state &&
+              attackCommand.state !== 'idle'
+            ) {
               payload.state = attackCommand.state;
             }
             if (
