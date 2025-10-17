@@ -3304,6 +3304,7 @@ export class RoomDO {
       }
       const previousName = player.name;
       const previousKey = player.name.toLowerCase();
+      const previousLastSeenAt = player.lastSeenAt ?? now;
       if (previousKey !== nameKey && this.nameToPlayerId.get(previousKey) === player.id) {
         this.nameToPlayerId.delete(previousKey);
       }
@@ -3340,6 +3341,17 @@ export class RoomDO {
         }
       }
       player.evolutionState = createEvolutionState(player.evolutionState);
+      if (player.invulnerableUntil) {
+        if (player.invulnerableUntil <= now) {
+          player.invulnerableUntil = null;
+        } else {
+          const offlineDuration = Math.max(0, now - previousLastSeenAt);
+          if (offlineDuration > 0) {
+            const adjustedInvulnerability = player.invulnerableUntil - offlineDuration;
+            player.invulnerableUntil = adjustedInvulnerability <= now ? null : adjustedInvulnerability;
+          }
+        }
+      }
       this.updatePlayerCombatAttributes(player);
       this.players.set(player.id, player);
       this.nameToPlayerId.set(nameKey, player.id);
