@@ -571,6 +571,13 @@ describe('updateGameState', () => {
     expect(result.hudSnapshot.xp).not.toBe(previousHud.xp);
     expect(result.hudSnapshot.statusEffects).toEqual(previousHud.statusEffects);
     expect(result.hudSnapshot.statusEffects).not.toBe(previousHud.statusEffects);
+    expect(result.hudSnapshot.evolutionSlots).toEqual({
+      small: { used: 1, max: 2 },
+      medium: { used: 0, max: 1 },
+      large: { used: 0, max: 1 },
+      macro: { used: 0, max: 0 },
+    });
+    expect(result.hudSnapshot.evolutionSlots).not.toBe(previousHud.evolutionSlots);
     expect(result.hudSnapshot.evolutionMenu).toEqual(previousHud.evolutionMenu);
     expect(result.hudSnapshot.archetypeSelection).toEqual(previousHud.archetypeSelection);
     expect(result.hudSnapshot.selectedArchetype).toBe(previousHud.selectedArchetype);
