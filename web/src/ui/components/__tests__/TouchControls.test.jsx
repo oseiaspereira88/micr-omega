@@ -38,8 +38,30 @@ describe('TouchControls', () => {
 
     const attackButton = getByRole('button', { name: 'Executar ataque básico' });
 
+    fireEvent.touchStart(attackButton);
     fireEvent.touchCancel(attackButton);
 
+    expect(onAttackRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('triggers attack release when pointer leaves the button', () => {
+    const onAttackRelease = vi.fn();
+    const onAttackPress = vi.fn();
+
+    const { getByRole } = render(
+      <TouchControls
+        {...baseProps}
+        onAttackPress={onAttackPress}
+        onAttackRelease={onAttackRelease}
+      />
+    );
+
+    const attackButton = getByRole('button', { name: 'Executar ataque básico' });
+
+    fireEvent.pointerDown(attackButton, { pointerType: 'mouse' });
+    fireEvent.pointerLeave(attackButton, { pointerType: 'mouse' });
+
+    expect(onAttackPress).toHaveBeenCalledTimes(1);
     expect(onAttackRelease).toHaveBeenCalledTimes(1);
   });
 

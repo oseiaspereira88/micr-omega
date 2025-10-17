@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useId, useRef } from 'react';
 import styles from './TouchControls.module.css';
 
 const joinClassNames = (...classes) => classes.filter(Boolean).join(' ');
@@ -36,6 +36,7 @@ const TouchControls = ({
 }) => {
   const dashProgressId = useId();
   const skillProgressId = useId();
+  const attackPointerActiveRef = useRef(false);
   const dashReady = dashCharge >= 30;
   const dashChargePercent = clampProgress(dashCharge);
   const dashValueText = dashReady
@@ -81,9 +82,62 @@ const TouchControls = ({
     ? 'Trocar habilidade equipada'
     : 'Trocar habilidade — nenhuma habilidade equipada';
 
-  const handleAttackTouchEnd = event => {
-    event.preventDefault();
+  const startAttack = (event, { shouldPreventDefault = false } = {}) => {
+    if (shouldPreventDefault) {
+      event?.preventDefault?.();
+    }
+
+    attackPointerActiveRef.current = true;
+    onAttackPress?.();
+  };
+
+  const endAttack = (event, { shouldPreventDefault = false } = {}) => {
+    if (!attackPointerActiveRef.current) {
+      return;
+    }
+
+    if (shouldPreventDefault) {
+      event?.preventDefault?.();
+    }
+
+    attackPointerActiveRef.current = false;
     onAttackRelease?.();
+  };
+
+  const handleAttackTouchStart = event => {
+    startAttack(event, { shouldPreventDefault: true });
+  };
+
+  const handleAttackTouchEnd = event => {
+    endAttack(event, { shouldPreventDefault: true });
+  };
+
+  const handleAttackPointerDown = event => {
+    if (event.pointerType === 'touch') {
+      return;
+    }
+
+    startAttack(event);
+  };
+
+  const handleAttackPointerEnd = event => {
+    if (event.pointerType === 'touch') {
+      return;
+    }
+
+    endAttack(event);
+  };
+
+  const handleAttackMouseDown = event => {
+    if (attackPointerActiveRef.current) {
+      return;
+    }
+
+    startAttack(event);
+  };
+
+  const handleAttackMouseEnd = event => {
+    endAttack(event);
   };
 
   const handleDashTouchEnd = event => {
@@ -122,14 +176,16 @@ const TouchControls = ({
         type="button"
         className={joinClassNames(styles.button, styles.attackButton)}
         aria-label="Executar ataque básico"
-        onTouchStart={event => {
-          event.preventDefault();
-          onAttackPress?.();
-        }}
+        onTouchStart={handleAttackTouchStart}
         onTouchEnd={handleAttackTouchEnd}
         onTouchCancel={handleAttackTouchEnd}
-        onMouseDown={onAttackPress}
-        onMouseUp={onAttackRelease}
+        onPointerDown={handleAttackPointerDown}
+        onPointerUp={handleAttackPointerEnd}
+        onPointerCancel={handleAttackPointerEnd}
+        onPointerLeave={handleAttackPointerEnd}
+        onMouseDown={handleAttackMouseDown}
+        onMouseUp={handleAttackMouseEnd}
+        onMouseLeave={handleAttackMouseEnd}
         onClick={event => {
           event.preventDefault();
           onAttack?.();
