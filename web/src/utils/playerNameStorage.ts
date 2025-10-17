@@ -2,7 +2,9 @@ import { MAX_NAME_LENGTH, MIN_NAME_LENGTH, sanitizePlayerName } from "./messageT
 
 const STORAGE_KEY = "micr-omega:player-name";
 
-export const INVALID_PLAYER_NAME_MESSAGE = `Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos (letras, incluindo acentos, números, espaços, hífens ou sublinhados).`;
+export const INVALID_PLAYER_NAME_MESSAGE =
+  `Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos (letras, ` +
+  "incluindo acentos, números, espaços, hífens ou sublinhados).";
 
 export const readStoredName = (): string => {
   if (typeof window === "undefined") {
