@@ -13,8 +13,9 @@ const formatStat = (value) => {
   return numberFormatter.format(0);
 };
 
-const GameOverScreen = ({ score, level, maxCombo, onRestart }) => {
+const GameOverScreen = ({ score, level, maxCombo, onRestart, onQuit }) => {
   const restartButtonRef = useRef(null);
+  const quitButtonRef = useRef(null);
   const formattedScore = formatStat(score);
   const formattedLevel = formatStat(level);
   const formattedMaxCombo = formatStat(maxCombo);
@@ -22,6 +23,11 @@ const GameOverScreen = ({ score, level, maxCombo, onRestart }) => {
   useEffect(() => {
     if (restartButtonRef.current) {
       restartButtonRef.current.focus();
+      return;
+    }
+
+    if (quitButtonRef.current) {
+      quitButtonRef.current.focus();
     }
   }, []);
 
@@ -36,14 +42,27 @@ const GameOverScreen = ({ score, level, maxCombo, onRestart }) => {
         <span className={styles.summaryDetail}>🔥 Combo Máximo: x{formattedMaxCombo}</span>
       </div>
 
-      <button
-        type="button"
-        className={styles.restartButton}
-        onClick={onRestart}
-        ref={restartButtonRef}
-      >
-        🔄 Jogar Novamente
-      </button>
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className={styles.restartButton}
+          onClick={onRestart}
+          ref={restartButtonRef}
+        >
+          🔄 Jogar Novamente
+        </button>
+
+        {onQuit ? (
+          <button
+            type="button"
+            className={styles.quitButton}
+            onClick={onQuit}
+            ref={quitButtonRef}
+          >
+            🚪 Sair da sala
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 };

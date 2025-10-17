@@ -218,6 +218,7 @@ const GameCanvas = ({ settings, onQuit }) => {
         level={gameState.level}
         maxCombo={gameState.maxCombo}
         onRestart={handleRestart}
+        onQuit={onQuit}
       />
     );
   }
