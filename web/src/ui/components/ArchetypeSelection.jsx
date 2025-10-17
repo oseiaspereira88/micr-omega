@@ -131,7 +131,7 @@ const ArchetypeSelection = ({
           características.
         </p>
 
-        <div className={styles.grid}>
+        <div className={styles.grid} role="listbox" aria-label="Opções de arquétipo">
           {options.map((entry) => {
             const isSelected = selected === entry.key;
             const affinities = [
@@ -145,6 +145,8 @@ const ArchetypeSelection = ({
                 type="button"
                 className={`${styles.card} ${isSelected ? styles.cardSelected : ''}`}
                 onClick={() => onSelect?.(entry.key)}
+                role="option"
+                aria-selected={isSelected}
               >
                 <div className={styles.cardHeader}>
                   <span className={styles.cardIcon}>{entry.icon}</span>
