@@ -43,37 +43,47 @@ const TIER_METADATA = Object.freeze({
 const EVOLUTION_TIER_KEYS = Object.freeze(['small', 'medium', 'large', 'macro']);
 const EVOLUTION_OPTIONS_PANEL_ID = 'evolution-options-panel';
 
-const formatEvolutionCost = (cost = {}) => {
+export const formatEvolutionCost = (cost = {}) => {
+  const resolvedCost = typeof cost === 'object' && cost !== null ? cost : {};
   const parts = [];
-  if (Number.isFinite(cost.pc)) parts.push(`${cost.pc} PC`);
-  if (Number.isFinite(cost.mg)) parts.push(`${cost.mg} MG`);
-  if (cost.fragments) {
-    Object.entries(cost.fragments).forEach(([key, amount]) => {
+  if (Number.isFinite(resolvedCost.pc)) parts.push(`${resolvedCost.pc} PC`);
+  if (Number.isFinite(resolvedCost.mg)) parts.push(`${resolvedCost.mg} MG`);
+  if (typeof resolvedCost.fragments === 'object' && resolvedCost.fragments !== null) {
+    Object.entries(resolvedCost.fragments).forEach(([key, amount]) => {
       parts.push(`${amount} Frag ${key}`);
     });
   }
-  if (cost.stableGenes) {
-    Object.entries(cost.stableGenes).forEach(([key, amount]) => {
+  if (typeof resolvedCost.stableGenes === 'object' && resolvedCost.stableGenes !== null) {
+    Object.entries(resolvedCost.stableGenes).forEach(([key, amount]) => {
       parts.push(`${amount} Gene ${key}`);
     });
   }
   return parts.length > 0 ? parts.join(' · ') : 'Sem custo';
 };
 
-const formatEvolutionRequirements = (requirements = {}) => {
+export const formatEvolutionRequirements = (requirements = {}) => {
+  const resolvedRequirements =
+    typeof requirements === 'object' && requirements !== null ? requirements : {};
   const parts = [];
-  if (Number.isFinite(requirements.level)) parts.push(`Nível ${requirements.level}`);
-  if (requirements.fragments) {
-    Object.entries(requirements.fragments).forEach(([key, amount]) => {
+  if (Number.isFinite(resolvedRequirements.level))
+    parts.push(`Nível ${resolvedRequirements.level}`);
+  if (
+    typeof resolvedRequirements.fragments === 'object' &&
+    resolvedRequirements.fragments !== null
+  ) {
+    Object.entries(resolvedRequirements.fragments).forEach(([key, amount]) => {
       parts.push(`${amount} Frag ${key}`);
     });
   }
-  if (requirements.stableGenes) {
-    Object.entries(requirements.stableGenes).forEach(([key, amount]) => {
+  if (
+    typeof resolvedRequirements.stableGenes === 'object' &&
+    resolvedRequirements.stableGenes !== null
+  ) {
+    Object.entries(resolvedRequirements.stableGenes).forEach(([key, amount]) => {
       parts.push(`${amount} Gene ${key}`);
     });
   }
-  if (Number.isFinite(requirements.mg)) parts.push(`${requirements.mg} MG mínimo`);
+  if (Number.isFinite(resolvedRequirements.mg)) parts.push(`${resolvedRequirements.mg} MG mínimo`);
   return parts.length > 0 ? parts.join(' · ') : 'Nenhum requisito adicional';
 };
 
