@@ -288,6 +288,45 @@ const meetsRequirements = (state, requirements = {}) => {
 
 const describeCost = (cost = {}) => ({ ...cost });
 
+const clampRandom = (value) => {
+  const number = Number.isFinite(value) ? value : 0;
+  if (number <= 0) return 0;
+  if (number >= 1) return 0.999999999;
+  return number;
+};
+
+const pickRandomUniqueKeys = (keys = [], count = 0, randomFn = Math.random) => {
+  if (!Array.isArray(keys) || keys.length === 0 || count <= 0) {
+    return [];
+  }
+
+  const pool = [...keys];
+  const result = [];
+  const picks = Math.min(count, pool.length);
+  const generator = typeof randomFn === 'function' ? randomFn : Math.random;
+
+  for (let i = 0; i < picks; i += 1) {
+    const remaining = pool.length - i;
+    const randomValue = clampRandom(generator());
+    const offset = Math.floor(randomValue * remaining);
+    const index = i + offset;
+
+    const swap = pool[index];
+    pool[index] = pool[i];
+    pool[i] = swap;
+
+    result.push(pool[i]);
+  }
+
+  return result;
+};
+
+/**
+ * Builds the evolution options for the requested tier.
+ * When no deterministic picker is provided via `helpers.pickRandomUnique`,
+ * the selection uses the optional `helpers.random` function (falling back to
+ * `Math.random`) to shuffle available evolutions.
+ */
 const buildEvolutionOptions = (state, helpers = {}, tier = 'small') => {
   const pool = getEvolutionPool(helpers, tier);
   const entries = Object.entries(pool || {});
@@ -309,8 +348,8 @@ const buildEvolutionOptions = (state, helpers = {}, tier = 'small') => {
   const count = Math.min(3, keys.length);
   const pick =
     typeof helpers.pickRandomUnique === 'function'
-      ? helpers.pickRandomUnique(keys, count) || keys.slice(0, count)
-      : keys.slice(0, count);
+      ? helpers.pickRandomUnique(keys, count) || pickRandomUniqueKeys(keys, count, helpers.random)
+      : pickRandomUniqueKeys(keys, count, helpers.random);
 
   return pick.map((key) => {
     const entry = pool[key];

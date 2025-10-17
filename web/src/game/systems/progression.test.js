@@ -207,6 +207,38 @@ describe('requestEvolutionReroll', () => {
     expect(state.reroll.cost).toBeGreaterThan(costBefore);
     expect(state.reroll.count).toBe(1);
   });
+
+  it('reshuffles evolution options when using internal randomness', () => {
+    const state = createState();
+    state.progressionQueue.push('small');
+
+    const randomSequence = [
+      0, 0, 0, // initial small evolution roll
+      0.1, 0.1, 0.1, // initial medium evolution roll
+      0.2, 0.2, 0.2, // initial large evolution roll
+      0.9, 0.8, 0.7, // reroll for small evolutions
+    ];
+    const randomMock = vi.fn();
+    randomSequence.forEach((value) => randomMock.mockReturnValueOnce(value));
+    randomMock.mockReturnValue(0.3);
+
+    const randomHelpers = {
+      ...helpers,
+      pickRandomUnique: undefined,
+      random: randomMock,
+    };
+
+    openEvolutionMenu(state, randomHelpers);
+    const firstOptions = state.evolutionMenu.options.small.map((opt) => opt.key);
+
+    expect(firstOptions.length).toBeGreaterThan(0);
+
+    requestEvolutionReroll(state, randomHelpers);
+    const rerolledOptions = state.evolutionMenu.options.small.map((opt) => opt.key);
+
+    expect(rerolledOptions).not.toEqual(firstOptions);
+    expect(randomMock).toHaveBeenCalled();
+  });
 });
 
 describe('cancelEvolutionChoice', () => {
