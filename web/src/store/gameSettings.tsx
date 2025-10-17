@@ -12,11 +12,14 @@ import { featureToggles } from "../config/featureToggles.js";
 
 export type VisualDensity = "low" | "medium" | "high";
 
+export type TouchLayout = "right" | "left";
+
 export type GameSettings = {
   audioEnabled: boolean;
   visualDensity: VisualDensity;
   showTouchControls: boolean;
   showMinimap: boolean;
+  touchLayout: TouchLayout;
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -24,6 +27,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   visualDensity: "medium",
   showTouchControls: false,
   showMinimap: featureToggles.minimap,
+  touchLayout: "right",
 };
 
 const STORAGE_KEY = "micr-omega:game-settings";
@@ -69,6 +73,19 @@ const parseVisualDensity = (value: unknown, fallback: VisualDensity): VisualDens
   return fallback;
 };
 
+const parseTouchLayout = (value: unknown, fallback: TouchLayout): TouchLayout => {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "right" || normalized === "left") {
+    return normalized;
+  }
+
+  return fallback;
+};
+
 const parseStoredSettings = (): GameSettings => {
   if (typeof window === "undefined") {
     return { ...DEFAULT_SETTINGS };
@@ -102,11 +119,17 @@ const parseStoredSettings = (): GameSettings => {
       DEFAULT_SETTINGS.showMinimap,
     );
 
+    const touchLayout = parseTouchLayout(
+      parsed.touchLayout,
+      DEFAULT_SETTINGS.touchLayout,
+    );
+
     return {
       audioEnabled,
       visualDensity,
       showTouchControls,
       showMinimap,
+      touchLayout,
     };
   } catch (error) {
     console.warn("Não foi possível ler as configurações do jogo salvas", error);

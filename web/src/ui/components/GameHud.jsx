@@ -315,6 +315,7 @@ const GameHud = ({
             hasCurrentSkill={Boolean(currentSkill)}
             onOpenEvolutionMenu={onOpenEvolutionMenu}
             canEvolve={canEvolve}
+            touchLayout={settings.touchLayout}
           />
         ) : null}
       </div>

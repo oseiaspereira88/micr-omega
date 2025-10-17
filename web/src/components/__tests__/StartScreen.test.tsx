@@ -106,8 +106,11 @@ describe("StartScreen", () => {
     fireEvent.click(audioToggle); // desativa áudio
     expect(audioToggle).toHaveAccessibleName(/som desligado/i);
 
-    const densitySelect = screen.getByRole("combobox");
+    const densitySelect = screen.getByLabelText(/densidade visual/i);
     fireEvent.change(densitySelect, { target: { value: "high" } });
+
+    const touchLayoutSelect = screen.getByLabelText(/layout dos controles touch/i);
+    fireEvent.change(touchLayoutSelect, { target: { value: "left" } });
 
     const touchToggle = screen.getByLabelText(/mostrar controles/i);
     fireEvent.click(touchToggle);
@@ -123,6 +126,7 @@ describe("StartScreen", () => {
         visualDensity: "high",
         showTouchControls: true,
         showMinimap: featureToggles.minimap,
+        touchLayout: "left",
       },
       autoJoinRequested: true,
     });
@@ -186,8 +190,11 @@ describe("StartScreen", () => {
     fireEvent.click(audioToggle);
     expect(audioToggle).toHaveAccessibleName(/som desligado/i);
 
-    const densitySelect = screen.getByRole("combobox");
+    const densitySelect = screen.getByLabelText(/densidade visual/i);
     fireEvent.change(densitySelect, { target: { value: "low" } });
+
+    const touchLayoutSelect = screen.getByLabelText(/layout dos controles touch/i);
+    fireEvent.change(touchLayoutSelect, { target: { value: "left" } });
 
     const touchToggle = screen.getByLabelText(/mostrar controles/i);
     fireEvent.click(touchToggle);
@@ -200,6 +207,7 @@ describe("StartScreen", () => {
         visualDensity: "low",
         showTouchControls: true,
         showMinimap: featureToggles.minimap,
+        touchLayout: "left",
       });
     });
   });
