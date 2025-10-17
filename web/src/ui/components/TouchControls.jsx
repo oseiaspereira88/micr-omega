@@ -42,6 +42,19 @@ const TouchControls = ({
     ? 'Abrir menu de evolução'
     : 'Abrir menu de evolução — indisponível';
 
+  const handleAttackTouchEnd = event => {
+    event.preventDefault();
+    onAttackRelease?.();
+  };
+
+  const handleDashTouchEnd = event => {
+    event.preventDefault();
+  };
+
+  const handleSkillTouchEnd = event => {
+    event.preventDefault();
+  };
+
   return (
     <div className={styles.touchLayer}>
       <div
@@ -70,10 +83,8 @@ const TouchControls = ({
           event.preventDefault();
           onAttackPress?.();
         }}
-        onTouchEnd={event => {
-          event.preventDefault();
-          onAttackRelease?.();
-        }}
+        onTouchEnd={handleAttackTouchEnd}
+        onTouchCancel={handleAttackTouchEnd}
         onMouseDown={onAttackPress}
         onMouseUp={onAttackRelease}
         onClick={event => {
@@ -101,6 +112,8 @@ const TouchControls = ({
             onDash?.();
           }
         }}
+        onTouchEnd={handleDashTouchEnd}
+        onTouchCancel={handleDashTouchEnd}
         disabled={!dashReady}
       >
         💨
@@ -121,6 +134,8 @@ const TouchControls = ({
           event.preventDefault();
           onUseSkill?.();
         }}
+        onTouchEnd={handleSkillTouchEnd}
+        onTouchCancel={handleSkillTouchEnd}
         disabled={skillDisabled}
         title="Q: usar habilidade"
       >
