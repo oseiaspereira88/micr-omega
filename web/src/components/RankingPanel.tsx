@@ -119,8 +119,19 @@ const RankingPanel = () => {
           const itemClass = [styles.item, tierClass, row.isLocal ? styles.localPlayer : ""]
             .filter(Boolean)
             .join(" ");
+          const rankLabel = `${(index + 1).toLocaleString(RANKING_SORT_LOCALE)}º lugar`;
+          const playerLabel = row.isLocal ? "Você" : row.name;
+          const scoreLabel = `${row.score.toLocaleString(RANKING_SORT_LOCALE)} pontos`;
+          const connectionLabel = row.connected ? "conectado" : "desconectado";
+          const accessibleLabel = `${rankLabel} — ${playerLabel} — ${scoreLabel} — ${connectionLabel}`;
           return (
-            <li key={row.playerId} className={itemClass}>
+            <li
+              key={row.playerId}
+              className={itemClass}
+              role="row"
+              aria-current={row.isLocal ? "true" : undefined}
+              aria-label={accessibleLabel}
+            >
               <span className={styles.rankBadge}>{index + 1}</span>
               <div className={styles.nameCell}>
                 <span className={styles.name} title={row.name}>

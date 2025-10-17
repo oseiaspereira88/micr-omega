@@ -120,13 +120,16 @@ describe("RankingPanel", () => {
     expect(screen.getByText("Ranking")).toBeInTheDocument();
     expect(screen.getByText("Ao vivo")).toBeVisible();
 
-    const items = screen.getAllByRole("listitem");
+    const items = screen.getAllByRole("row");
     expect(items).toHaveLength(2);
 
     const firstRow = within(items[0]!);
     expect(firstRow.getByText("1")).toBeVisible();
     expect(firstRow.getByText("Alice")).toBeVisible();
     expect(firstRow.getByText("4.200")).toBeVisible();
+    expect(items[0]).toHaveAccessibleName(
+      "1º lugar — Alice — 4.200 pontos — conectado",
+    );
 
     const secondRow = within(items[1]!);
     expect(secondRow.getByText("2")).toBeVisible();
@@ -134,6 +137,10 @@ describe("RankingPanel", () => {
     expect(secondRow.getByText("3.150")).toBeVisible();
     expect(secondRow.getByText("Você")).toBeVisible();
     expect(secondRow.getByLabelText("Jogador desconectado")).toBeVisible();
+    expect(items[1]).toHaveAttribute("aria-current", "true");
+    expect(items[1]).toHaveAccessibleName(
+      "2º lugar — Você — 3.150 pontos — desconectado",
+    );
   });
 
   it("matches snapshot for a populated ranking", () => {
@@ -227,7 +234,7 @@ describe("RankingPanel", () => {
       }));
     });
 
-    const items = screen.getAllByRole("listitem");
+    const items = screen.getAllByRole("row");
     expect(items).toHaveLength(3);
 
     const [first, second, third] = items;
@@ -285,7 +292,7 @@ describe("RankingPanel", () => {
       }));
     });
 
-    const items = screen.getAllByRole("listitem");
+    const items = screen.getAllByRole("row");
     expect(items).toHaveLength(3);
 
     const [first, second, third] = items;
