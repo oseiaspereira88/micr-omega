@@ -37,7 +37,7 @@ const dispatchToLogflare = async (
   }
 
   try {
-    await fetch(LOGFLARE_ENDPOINT, {
+    const response = await fetch(LOGFLARE_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -49,6 +49,22 @@ const dispatchToLogflare = async (
         metadata: entry
       })
     });
+
+    if (!response.ok) {
+      let bodyText: string | undefined;
+      try {
+        bodyText = await response.text();
+      } catch (bodyReadError) {
+        bodyText = `[unavailable: ${String(bodyReadError)}]`;
+      }
+
+      // Não fazemos retry automático para evitar duplicar eventos e gerar backpressure no Logflare.
+      console.error("[observability] Logflare respondeu com erro", {
+        status: response.status,
+        body: bodyText,
+        entry
+      });
+    }
   } catch (error) {
     // Evita loop infinito de logs
     console.error("[observability] Falha ao enviar log para Logflare", error);
