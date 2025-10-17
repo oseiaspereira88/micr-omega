@@ -14,10 +14,21 @@ const ArchetypeSelection = ({
   onSelect,
 }) => {
   const pending = selection?.pending;
-  const allowed = Array.isArray(selection?.options)
-    ? selection.options.filter((option) => typeof option === 'string' && option.trim().length > 0)
-    : null;
-  const allowedKeys = allowed && allowed.length > 0 ? allowed : null;
+  const allowedSet = useMemo(() => {
+    if (!Array.isArray(selection?.options)) {
+      return null;
+    }
+
+    const filtered = selection.options.filter(
+      (option) => typeof option === 'string' && option.trim().length > 0,
+    );
+
+    if (filtered.length === 0) {
+      return null;
+    }
+
+    return new Set(filtered);
+  }, [selection?.options]);
 
   const dialogRef = useRef(null);
   const overlayRef = useRef(null);
@@ -101,11 +112,8 @@ const ArchetypeSelection = ({
   };
 
   const options = useMemo(() => {
-    return archetypeList.filter((entry) => {
-      if (!allowedKeys) return true;
-      return allowedKeys.includes(entry.key);
-    });
-  }, [allowedKeys]);
+    return archetypeList.filter((entry) => !allowedSet || allowedSet.has(entry.key));
+  }, [allowedSet]);
 
   if (!pending) {
     return null;
