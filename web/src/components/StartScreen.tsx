@@ -1,6 +1,7 @@
 import {
   ChangeEvent,
   FormEvent,
+  KeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -270,22 +271,46 @@ const StartScreen = ({
     ? "Reconectar"
     : "Entrar na partida";
 
-  const handleFocusTrapStart = useCallback(() => {
-    focusLastFocusable();
-  }, [focusLastFocusable]);
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Tab") {
+        return;
+      }
 
-  const handleFocusTrapEnd = useCallback(() => {
-    focusFirstFocusable();
-  }, [focusFirstFocusable]);
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      const activeElement =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      const isActiveInside = Boolean(
+        activeElement && panelRef.current?.contains(activeElement)
+      );
+
+      if (event.shiftKey) {
+        if (!isActiveInside || activeElement === firstElement) {
+          event.preventDefault();
+          focusLastFocusable();
+        }
+        return;
+      }
+
+      if (!isActiveInside || activeElement === lastElement) {
+        event.preventDefault();
+        focusFirstFocusable();
+      }
+    },
+    [focusFirstFocusable, focusLastFocusable, getFocusableElements]
+  );
 
   return (
     <div className={styles.root}>
-      <span
-        tabIndex={0}
-        className={styles.focusSentinel}
-        onFocus={handleFocusTrapStart}
-        aria-hidden="true"
-      />
       <div
         className={styles.panel}
         ref={panelRef}
@@ -293,6 +318,7 @@ const StartScreen = ({
         aria-modal="true"
         aria-labelledby={dialogTitleId}
         aria-describedby={dialogDescriptionId}
+        onKeyDown={handleKeyDown}
       >
         <button
           type="button"
@@ -455,12 +481,6 @@ const StartScreen = ({
           </div>
         </form>
       </div>
-      <span
-        tabIndex={0}
-        className={styles.focusSentinel}
-        onFocus={handleFocusTrapEnd}
-        aria-hidden="true"
-      />
     </div>
   );
 };
