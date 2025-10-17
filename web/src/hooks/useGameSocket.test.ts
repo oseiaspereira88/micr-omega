@@ -423,6 +423,19 @@ describe("useGameSocket", () => {
   ])(
     "keeps the socket open for recoverable error reason %s",
     ({ reason, payload, expectedMessage }) => {
+      let restoreRandom: (() => void) | null = null;
+      let restoreNow: (() => void) | null = null;
+      let currentTime = Date.now();
+
+      if (reason === "rate_limited") {
+        const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+        restoreRandom = () => randomSpy.mockRestore();
+
+        currentTime = 1_000;
+        const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => currentTime);
+        restoreNow = () => nowSpy.mockRestore();
+      }
+
       const {
         socket,
         statusSpy,
@@ -436,6 +449,9 @@ describe("useGameSocket", () => {
 
       try {
         act(() => {
+          if (reason === "rate_limited") {
+            currentTime = 1_500;
+          }
           socket.onmessage?.({
             data: JSON.stringify({ type: "error", reason, ...payload }),
           } as MessageEvent<string>);
@@ -448,6 +464,9 @@ describe("useGameSocket", () => {
         expect(incrementSpy).not.toHaveBeenCalled();
 
         act(() => {
+          if (reason === "rate_limited") {
+            currentTime = 2_000;
+          }
           socket.onclose?.();
         });
 
@@ -456,7 +475,17 @@ describe("useGameSocket", () => {
         expect(statusSpy).toHaveBeenCalledWith("reconnecting");
         const expectedTimeoutCalls = reason === "invalid_payload" ? 1 : 2;
         expect(setTimeoutSpy).toHaveBeenCalledTimes(expectedTimeoutCalls);
+        if (reason === "rate_limited") {
+          const reconnectCall = setTimeoutSpy.mock.calls.at(-1);
+          expect(reconnectCall?.[1]).toBe(3000);
+        }
       } finally {
+        if (restoreRandom) {
+          restoreRandom();
+        }
+        if (restoreNow) {
+          restoreNow();
+        }
         statusSpy.mockRestore();
         incrementSpy.mockRestore();
         setTimeoutSpy.mockRestore();
