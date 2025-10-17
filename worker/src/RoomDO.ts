@@ -4194,7 +4194,14 @@ export class RoomDO {
         current: player.health.max,
       });
       player.combatStatus = createCombatStatusState();
+      player.statusEffects = [];
+      player.pendingAttack = null;
+      player.invulnerableUntil = null;
     }
+
+    this.playersPendingRemoval.clear();
+    this.pendingStatusEffects = [];
+    this.microorganismStatusEffects.clear();
 
     this.playersDirty = true;
     this.invalidateGameStateSnapshot();
