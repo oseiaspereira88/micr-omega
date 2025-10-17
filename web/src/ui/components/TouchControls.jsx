@@ -76,7 +76,7 @@ const TouchControls = ({
     ? 'Trocar habilidade equipada'
     : 'Trocar habilidade — nenhuma habilidade equipada';
 
-  const handleAttackTouchEnd = event => {
+  const handleAttackReleaseEvent = event => {
     event.preventDefault();
     onAttackRelease?.();
   };
@@ -121,10 +121,13 @@ const TouchControls = ({
           event.preventDefault();
           onAttackPress?.();
         }}
-        onTouchEnd={handleAttackTouchEnd}
-        onTouchCancel={handleAttackTouchEnd}
+        onTouchEnd={handleAttackReleaseEvent}
+        onTouchCancel={handleAttackReleaseEvent}
+        onPointerUp={handleAttackReleaseEvent}
+        onPointerCancel={handleAttackReleaseEvent}
         onMouseDown={onAttackPress}
-        onMouseUp={onAttackRelease}
+        onMouseUp={handleAttackReleaseEvent}
+        onMouseLeave={handleAttackReleaseEvent}
         onClick={event => {
           event.preventDefault();
           onAttack?.();
