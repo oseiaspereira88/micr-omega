@@ -3307,11 +3307,38 @@ export class RoomDO {
       if (previousKey !== nameKey && this.nameToPlayerId.get(previousKey) === player.id) {
         this.nameToPlayerId.delete(previousKey);
       }
+      const offlineDuration = Math.max(0, now - (player.lastSeenAt ?? now));
       player.name = normalizedName;
       player.connected = true;
       player.lastSeenAt = now;
       player.lastActiveAt = now;
       player.connectedAt = now;
+      const statusCollection = this.ensurePlayerStatusEffects(player);
+      player.statusEffects = pruneExpiredStatusEffects(statusCollection, now);
+      if (player.invulnerableUntil && player.invulnerableUntil <= now) {
+        player.invulnerableUntil = null;
+      }
+      if (offlineDuration > 0) {
+        this.tickPlayerSkillCooldowns(player, offlineDuration);
+      }
+      const combatStatus = player.combatStatus;
+      if (combatStatus.lastAttackAt !== null) {
+        const clampedLastAttackAt = Math.min(combatStatus.lastAttackAt, now);
+        const remainingCooldown = Math.max(
+          0,
+          PLAYER_ATTACK_COOLDOWN_MS - (now - clampedLastAttackAt),
+        );
+        if (remainingCooldown === 0 && combatStatus.state === "cooldown") {
+          player.combatStatus = createCombatStatusState({ state: "idle" });
+        } else if (clampedLastAttackAt !== combatStatus.lastAttackAt) {
+          player.combatStatus = createCombatStatusState({
+            state: combatStatus.state,
+            targetPlayerId: combatStatus.targetPlayerId ?? null,
+            targetObjectId: combatStatus.targetObjectId ?? null,
+            lastAttackAt: clampedLastAttackAt,
+          });
+        }
+      }
       player.evolutionState = createEvolutionState(player.evolutionState);
       this.updatePlayerCombatAttributes(player);
       this.players.set(player.id, player);
