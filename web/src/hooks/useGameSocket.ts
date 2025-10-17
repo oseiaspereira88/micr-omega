@@ -608,6 +608,18 @@ export const useGameSocket = (
     stopSocket,
   ]);
 
+  const isWithinReconnectWindow = useCallback(() => {
+    const { reconnectUntil } = gameStore.getState();
+    if (typeof reconnectUntil === "number" && Date.now() >= reconnectUntil) {
+      shouldReconnectRef.current = false;
+      lastRequestedNameRef.current = null;
+      gameStore.actions.setConnectionStatus("disconnected");
+      return false;
+    }
+
+    return true;
+  }, []);
+
   const connectInternal = useCallback(
     (name: string, isReconnect: boolean) => {
       if (typeof window === "undefined" || !effectiveUrl) {
@@ -670,7 +682,11 @@ export const useGameSocket = (
 
         socket.onclose = () => {
           stopSocket(false);
-          if (shouldReconnectRef.current && lastRequestedNameRef.current) {
+          if (
+            shouldReconnectRef.current &&
+            lastRequestedNameRef.current &&
+            isWithinReconnectWindow()
+          ) {
             const scheduledName = lastRequestedNameRef.current;
             const attempts = gameStore.actions.incrementReconnectAttempts();
             const delay = computeReconnectDelay(
@@ -698,7 +714,7 @@ export const useGameSocket = (
         };
       } catch (err) {
         console.error("Não foi possível abrir WebSocket", err);
-        if (shouldReconnectRef.current) {
+        if (shouldReconnectRef.current && isWithinReconnectWindow()) {
           const attempts = gameStore.actions.incrementReconnectAttempts();
           const delay = computeReconnectDelay(
             attempts,
@@ -731,6 +747,7 @@ export const useGameSocket = (
       version,
       sendMessage,
       clearJoinErrorTimer,
+      isWithinReconnectWindow,
     ]
   );
 
