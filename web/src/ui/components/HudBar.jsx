@@ -183,7 +183,14 @@ const HudBar = ({
         <div className={styles.progressRow}>
           <div className={styles.xpPanel}>
             <div className={styles.xpHeader}>XP {xpCurrent} / {xpNext}</div>
-            <div className={styles.xpBar}>
+            <div
+              className={styles.xpBar}
+              role="progressbar"
+              aria-label="Progresso de XP"
+              aria-valuenow={Math.round(xpPercent * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
               <div className={styles.xpFill} style={{ width: `${xpPercent * 100}%` }} />
             </div>
           </div>
