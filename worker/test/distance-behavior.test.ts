@@ -325,6 +325,141 @@ describe("RoomDO distance-sensitive behaviour", () => {
     expect(combatLog.some((entry) => entry.targetId === playerNear.id)).toBe(true);
   });
 
+  it("does not let hostile microorganisms attack disconnected players", async () => {
+    const { roomAny } = await createRoom();
+
+    const disconnected: TestPlayer = createTestPlayer("disconnected", {
+      position: { x: 50, y: 0 },
+      connected: false,
+    });
+    const connected: TestPlayer = createTestPlayer("connected", {
+      position: { x: 90, y: 0 },
+    });
+
+    roomAny.players.set(disconnected.id, disconnected);
+    roomAny.players.set(connected.id, connected);
+
+    const microorganism: Microorganism = {
+      id: "hostile-2",
+      kind: "microorganism",
+      species: "amoeba",
+      position: { x: 0, y: 0 },
+      movementVector: { x: 0, y: 0 },
+      orientation: { angle: 0 },
+      health: { current: 20, max: 20 },
+      aggression: "hostile",
+      attributes: { speed: 0, damage: 5, resilience: 0 },
+    };
+
+    roomAny.microorganisms.clear();
+    roomAny.microorganisms.set(microorganism.id, microorganism);
+    roomAny.world.microorganisms = [microorganism];
+    roomAny.microorganismBehavior.clear();
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, TestPlayer>();
+    const now = Date.now();
+
+    roomAny.updateMicroorganismsDuringTick(0, now, worldDiff, combatLog, updatedPlayers);
+
+    expect(disconnected.health.current).toBe(disconnected.health.max);
+    expect(connected.health.current).toBeLessThan(connected.health.max);
+    expect(updatedPlayers.has(disconnected.id)).toBe(false);
+    expect(updatedPlayers.has(connected.id)).toBe(true);
+    expect(combatLog.some((entry) => entry.targetId === connected.id)).toBe(true);
+  });
+
+  it("does not let hostile microorganisms attack defeated players", async () => {
+    const { roomAny } = await createRoom();
+
+    const defeated: TestPlayer = createTestPlayer("defeated", {
+      position: { x: 30, y: 0 },
+      health: { current: 0, max: 100 },
+    });
+    const active: TestPlayer = createTestPlayer("active", {
+      position: { x: 90, y: 0 },
+    });
+
+    roomAny.players.set(defeated.id, defeated);
+    roomAny.players.set(active.id, active);
+
+    const microorganism: Microorganism = {
+      id: "hostile-3",
+      kind: "microorganism",
+      species: "amoeba",
+      position: { x: 0, y: 0 },
+      movementVector: { x: 0, y: 0 },
+      orientation: { angle: 0 },
+      health: { current: 20, max: 20 },
+      aggression: "hostile",
+      attributes: { speed: 0, damage: 5, resilience: 0 },
+    };
+
+    roomAny.microorganisms.clear();
+    roomAny.microorganisms.set(microorganism.id, microorganism);
+    roomAny.world.microorganisms = [microorganism];
+    roomAny.microorganismBehavior.clear();
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, TestPlayer>();
+    const now = Date.now();
+
+    roomAny.updateMicroorganismsDuringTick(0, now, worldDiff, combatLog, updatedPlayers);
+
+    expect(defeated.health.current).toBe(0);
+    expect(active.health.current).toBeLessThan(active.health.max);
+    expect(updatedPlayers.has(defeated.id)).toBe(false);
+    expect(updatedPlayers.has(active.id)).toBe(true);
+    expect(combatLog.some((entry) => entry.targetId === active.id)).toBe(true);
+  });
+
+  it("does not let hostile microorganisms attack players marked for removal", async () => {
+    const { roomAny } = await createRoom();
+
+    const pendingRemoval: TestPlayer = createTestPlayer("pending", {
+      position: { x: 40, y: 0 },
+    });
+    pendingRemoval.pendingRemoval = true;
+    const eligible: TestPlayer = createTestPlayer("eligible", {
+      position: { x: 90, y: 0 },
+    });
+
+    roomAny.players.set(pendingRemoval.id, pendingRemoval);
+    roomAny.players.set(eligible.id, eligible);
+
+    const microorganism: Microorganism = {
+      id: "hostile-4",
+      kind: "microorganism",
+      species: "amoeba",
+      position: { x: 0, y: 0 },
+      movementVector: { x: 0, y: 0 },
+      orientation: { angle: 0 },
+      health: { current: 20, max: 20 },
+      aggression: "hostile",
+      attributes: { speed: 0, damage: 5, resilience: 0 },
+    };
+
+    roomAny.microorganisms.clear();
+    roomAny.microorganisms.set(microorganism.id, microorganism);
+    roomAny.world.microorganisms = [microorganism];
+    roomAny.microorganismBehavior.clear();
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, TestPlayer>();
+    const now = Date.now();
+
+    roomAny.updateMicroorganismsDuringTick(0, now, worldDiff, combatLog, updatedPlayers);
+
+    expect(pendingRemoval.health.current).toBe(pendingRemoval.health.max);
+    expect(eligible.health.current).toBeLessThan(eligible.health.max);
+    expect(updatedPlayers.has(pendingRemoval.id)).toBe(false);
+    expect(updatedPlayers.has(eligible.id)).toBe(true);
+    expect(combatLog.some((entry) => entry.targetId === eligible.id)).toBe(true);
+  });
+
   it("ignores large position jumps from clients and caps movement per tick", async () => {
     const { roomAny } = await createRoom();
 
