@@ -27,6 +27,9 @@ function createTestPlayer(id: string): any {
     name: id,
     score: 0,
     combo: 1,
+    energy: 120,
+    xp: 50,
+    geneticMaterial: 20,
     position: { x: 0, y: 0 },
     movementVector: { x: 0, y: 0 },
     orientation: { angle: 0 },
@@ -162,5 +165,24 @@ describe("RoomDO attack kind resolution", () => {
     expect(worldDiff.upsertOrganicMatter?.length ?? 0).toBeGreaterThan(0);
     const surviving = roomAny.microorganisms.get(sturdyMicro.id);
     expect(surviving?.health.current).toBeLessThan(sturdyMicro.health.max);
+  });
+
+  it("prevents skill execution when resources are insufficient", async () => {
+    const { roomAny } = await createRoom();
+    const player = createTestPlayer("caster");
+    player.skillState.current = "pulse";
+    player.energy = 0;
+    roomAny.players.set(player.id, player);
+
+    const applied = roomAny.applyPlayerAction(player, {
+      type: "attack",
+      kind: "skill",
+      state: "engaged",
+    });
+
+    expect(applied).toEqual({ updatedPlayers: [player] });
+    expect(player.combatStatus.state).toBe("cooldown");
+    expect(player.pendingAttack).toBeNull();
+    expect(player.skillState.cooldowns.pulse).toBeGreaterThan(0);
   });
 });

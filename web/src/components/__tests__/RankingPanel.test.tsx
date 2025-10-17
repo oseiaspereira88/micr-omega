@@ -244,6 +244,9 @@ const createPlayer = (
   connected: overrides.connected ?? true,
   score: overrides.score ?? 0,
   combo: overrides.combo ?? 1,
+  energy: overrides.energy ?? 0,
+  xp: overrides.xp ?? 0,
+  geneticMaterial: overrides.geneticMaterial ?? 0,
   lastActiveAt: overrides.lastActiveAt ?? 0,
   position: overrides.position ?? { x: 0, y: 0 },
   movementVector: overrides.movementVector ?? { x: 0, y: 0 },
@@ -263,4 +266,7 @@ const createPlayer = (
       speed: 1,
       range: 1,
     },
+  skillList: overrides.skillList ?? [],
+  currentSkill: overrides.currentSkill ?? null,
+  skillCooldowns: overrides.skillCooldowns ?? {},
 });

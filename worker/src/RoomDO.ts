@@ -197,6 +197,9 @@ type StoredPlayer = {
   name: string;
   score: number;
   combo: number;
+  energy: number;
+  xp: number;
+  geneticMaterial: number;
   position: Vector2;
   movementVector: Vector2;
   orientation: OrientationState;
@@ -321,6 +324,10 @@ const DEFAULT_COMBAT_ATTRIBUTES: CombatAttributes = {
   speed: 140,
   range: 80,
 };
+
+const DEFAULT_PLAYER_ENERGY = 100;
+const DEFAULT_PLAYER_XP = 0;
+const DEFAULT_PLAYER_GENETIC_MATERIAL = 0;
 
 const createCombatAttributes = (attributes?: CombatAttributes): CombatAttributes => ({
   attack: attributes?.attack ?? DEFAULT_COMBAT_ATTRIBUTES.attack,
@@ -1201,6 +1208,13 @@ export class RoomDO {
           name: stored.name,
           score: stored.score,
           combo: stored.combo,
+          energy: Number.isFinite(stored.energy)
+            ? Math.max(0, stored.energy)
+            : DEFAULT_PLAYER_ENERGY,
+          xp: Number.isFinite(stored.xp) ? Math.max(0, stored.xp) : DEFAULT_PLAYER_XP,
+          geneticMaterial: Number.isFinite(stored.geneticMaterial)
+            ? Math.max(0, stored.geneticMaterial)
+            : DEFAULT_PLAYER_GENETIC_MATERIAL,
           position: createVector(stored.position),
           movementVector: createVector(stored.movementVector),
           orientation: createOrientation(stored.orientation),
@@ -1778,6 +1792,36 @@ export class RoomDO {
     const remainingCooldown = skillState.cooldowns[skill.key] ?? 0;
     if (remainingCooldown > 0) {
       return this.finalizeAttackResolution({ worldChanged, scoresChanged }, worldDiff);
+    }
+
+    const energyCost = Math.max(0, skill.cost?.energy ?? 0);
+    const xpCost = Math.max(0, skill.cost?.xp ?? 0);
+    const mgCost = Math.max(0, skill.cost?.mg ?? 0);
+
+    if (
+      (energyCost > 0 && player.energy < energyCost) ||
+      (xpCost > 0 && player.xp < xpCost) ||
+      (mgCost > 0 && player.geneticMaterial < mgCost)
+    ) {
+      skillState.cooldowns[skill.key] = Math.max(skillState.cooldowns[skill.key] ?? 0, skill.cooldownMs);
+      player.combatStatus = createCombatStatusState({
+        state: "cooldown",
+        targetPlayerId: null,
+        targetObjectId: null,
+        lastAttackAt: now,
+      });
+      updatedPlayers.set(player.id, player);
+      return this.finalizeAttackResolution({ worldChanged, scoresChanged }, worldDiff);
+    }
+
+    if (energyCost > 0) {
+      player.energy = Math.max(0, player.energy - energyCost);
+    }
+    if (xpCost > 0) {
+      player.xp = Math.max(0, player.xp - xpCost);
+    }
+    if (mgCost > 0) {
+      player.geneticMaterial = Math.max(0, player.geneticMaterial - mgCost);
     }
 
     const params = skill.parameters ?? {};
@@ -3071,6 +3115,9 @@ export class RoomDO {
         name: normalizedName,
         score: 0,
         combo: 1,
+        energy: DEFAULT_PLAYER_ENERGY,
+        xp: DEFAULT_PLAYER_XP,
+        geneticMaterial: DEFAULT_PLAYER_GENETIC_MATERIAL,
         position: createVector(spawnPosition),
         movementVector: createVector(),
         orientation: createOrientation(),
@@ -3403,11 +3450,57 @@ export class RoomDO {
           }
         }
 
+        const now = Date.now();
+
+        if (attackKind === "skill") {
+          const skillState = this.ensurePlayerSkillState(player);
+          const skill = getSkillDefinition(skillState.current);
+          if (!skill) {
+            player.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
+            player.pendingAttack = null;
+            updatedPlayers.push(player);
+            return { updatedPlayers };
+          }
+
+          const remainingCooldown = Math.max(0, skillState.cooldowns[skill.key] ?? 0);
+          if (remainingCooldown > 0) {
+            player.combatStatus = createCombatStatusState({
+              state: "cooldown",
+              targetPlayerId: action.targetPlayerId ?? null,
+              targetObjectId: action.targetObjectId ?? null,
+              lastAttackAt: now,
+            });
+            player.pendingAttack = null;
+            updatedPlayers.push(player);
+            return { updatedPlayers };
+          }
+
+          const energyCost = Math.max(0, skill.cost?.energy ?? 0);
+          const xpCost = Math.max(0, skill.cost?.xp ?? 0);
+          const mgCost = Math.max(0, skill.cost?.mg ?? 0);
+          const lacksEnergy = player.energy < energyCost;
+          const lacksXp = player.xp < xpCost;
+          const lacksGeneticMaterial = player.geneticMaterial < mgCost;
+
+          if (lacksEnergy || lacksXp || lacksGeneticMaterial) {
+            const nextCooldown = Math.max(skill.cooldownMs, skillState.cooldowns[skill.key] ?? 0);
+            skillState.cooldowns[skill.key] = nextCooldown;
+            player.combatStatus = createCombatStatusState({
+              state: "cooldown",
+              targetPlayerId: action.targetPlayerId ?? null,
+              targetObjectId: action.targetObjectId ?? null,
+              lastAttackAt: now,
+            });
+            player.pendingAttack = null;
+            updatedPlayers.push(player);
+            return { updatedPlayers };
+          }
+        }
+
         const nextState = action.state ?? "engaged";
         const previousLastAttackAt = player.combatStatus.lastAttackAt;
         let nextLastAttackAt = previousLastAttackAt;
         if (typeof clientTime === "number" && Number.isFinite(clientTime)) {
-          const now = Date.now();
           nextLastAttackAt = Math.min(
             Math.max(clientTime, now),
             now + CLIENT_TIME_MAX_FUTURE_DRIFT_MS,
@@ -4005,6 +4098,9 @@ export class RoomDO {
       connected: player.connected,
       score: player.score,
       combo: player.combo,
+      energy: player.energy,
+      xp: player.xp,
+      geneticMaterial: player.geneticMaterial,
       lastActiveAt: player.lastActiveAt,
       position: cloneVector(player.position),
       movementVector: cloneVector(player.movementVector),
@@ -4336,6 +4432,9 @@ export class RoomDO {
         name: player.name,
         score: player.score,
         combo: player.combo,
+        energy: player.energy,
+        xp: player.xp,
+        geneticMaterial: player.geneticMaterial,
         position: cloneVector(player.position),
         movementVector: cloneVector(player.movementVector),
         orientation: cloneOrientation(player.orientation),
