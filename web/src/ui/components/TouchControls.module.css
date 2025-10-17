@@ -41,6 +41,7 @@
   touch-action: none;
   pointer-events: auto;
   color: #fff;
+  overflow: hidden;
 }
 
 .attackButton {
@@ -79,11 +80,71 @@
   background: rgba(100, 100, 100, 0.35);
 }
 
+.buttonIcon {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.cooldownOverlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(rgba(0, 0, 0, 0.45) var(--cooldown-progress, 0%), transparent 0);
+  transform: rotate(-90deg);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.skillCooldownOverlay {
+  background: conic-gradient(rgba(0, 0, 0, 0.55) var(--cooldown-progress, 0%), transparent 0);
+}
+
+.cooldownLabel {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  font-weight: 600;
+  pointer-events: none;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.75);
+  z-index: 2;
+}
+
+.dashLabel {
+  color: #fff;
+}
+
 .skillLabel {
   position: absolute;
-  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 0.6rem;
   font-weight: 600;
+  pointer-events: none;
+  z-index: 2;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.55);
+}
+
+.skillCostLabel {
+  bottom: 6px;
+}
+
+.skillLabelReady {
+  color: #001;
+}
+
+.skillLabelDisabled {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.skillLabelHidden {
+  opacity: 0;
+}
+
+.skillCooldownLabel {
+  color: #fff;
 }
 
 .evolveButton {

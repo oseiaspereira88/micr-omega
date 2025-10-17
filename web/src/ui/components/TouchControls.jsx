@@ -3,6 +3,15 @@ import styles from './TouchControls.module.css';
 
 const joinClassNames = (...classes) => classes.filter(Boolean).join(' ');
 
+const clampProgress = value => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(numericValue)));
+};
+
 const TouchControls = ({
   joystick,
   onJoystickStart,
@@ -26,6 +35,10 @@ const TouchControls = ({
   canEvolve,
 }) => {
   const dashReady = dashCharge >= 30;
+  const dashChargePercent = clampProgress(dashCharge);
+  const dashValueText = dashReady
+    ? 'Dash carregado'
+    : `Dash carregando: ${dashChargePercent}%`;
   const dashAriaLabel = dashReady ? 'Usar dash — pronto' : 'Usar dash — carregando';
 
   let skillAriaLabel = 'Usar habilidade';
@@ -38,6 +51,25 @@ const TouchControls = ({
   } else {
     skillAriaLabel = 'Usar habilidade — pronta';
   }
+
+  const skillCooldownPercentClamped = clampProgress(skillCooldownPercent);
+  const showSkillCooldown = Boolean(hasCurrentSkill && skillCoolingDown);
+  const skillCooldownDisplay = showSkillCooldown
+    ? skillCooldownLabel || `${skillCooldownPercentClamped}%`
+    : null;
+  const skillLabelColorClass = !hasCurrentSkill || skillDisabled
+    ? styles.skillLabelDisabled
+    : styles.skillLabelReady;
+  const skillValueNow = !hasCurrentSkill
+    ? 0
+    : showSkillCooldown
+    ? skillCooldownPercentClamped
+    : 100;
+  const skillValueText = !hasCurrentSkill
+    ? 'Nenhuma habilidade equipada'
+    : showSkillCooldown
+    ? `Habilidade em recarga: ${skillCooldownDisplay}`
+    : 'Habilidade pronta';
 
   const evolveAriaLabel = canEvolve
     ? 'Abrir menu de evolução'
@@ -115,6 +147,10 @@ const TouchControls = ({
         onClick={onDash}
         aria-label={dashAriaLabel}
         aria-disabled={!dashReady}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={dashChargePercent}
+        aria-valuetext={dashValueText}
         onTouchStart={event => {
           event.preventDefault();
           if (dashReady) {
@@ -125,7 +161,17 @@ const TouchControls = ({
         onTouchCancel={handleDashTouchEnd}
         disabled={!dashReady}
       >
-        💨
+        {!dashReady && (
+          <div
+            className={styles.cooldownOverlay}
+            aria-hidden="true"
+            style={{ '--cooldown-progress': `${100 - dashChargePercent}%` }}
+          />
+        )}
+        <span className={styles.buttonIcon}>💨</span>
+        <span className={joinClassNames(styles.cooldownLabel, styles.dashLabel)}>
+          {dashReady ? 'Pronto' : `${dashChargePercent}%`}
+        </span>
       </button>
 
       <button
@@ -139,6 +185,10 @@ const TouchControls = ({
         onClick={onUseSkill}
         aria-label={skillAriaLabel}
         aria-disabled={skillDisabled}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={skillValueNow}
+        aria-valuetext={skillValueText}
         onTouchStart={event => {
           event.preventDefault();
           onUseSkill?.();
@@ -148,29 +198,34 @@ const TouchControls = ({
         disabled={skillDisabled}
         title="Q: usar habilidade"
       >
-        <span>{hasCurrentSkill ? currentSkillIcon : '🌀'}</span>
+        {showSkillCooldown && (
+          <div
+            className={joinClassNames(styles.cooldownOverlay, styles.skillCooldownOverlay)}
+            aria-hidden="true"
+            style={{ '--cooldown-progress': `${100 - skillCooldownPercentClamped}%` }}
+          />
+        )}
+        <span className={styles.buttonIcon}>
+          {hasCurrentSkill ? currentSkillIcon : '🌀'}
+        </span>
+        {showSkillCooldown && (
+          <span
+            className={joinClassNames(styles.cooldownLabel, styles.skillCooldownLabel)}
+          >
+            {skillCooldownDisplay}
+          </span>
+        )}
         <span
-          className={styles.skillLabel}
-          style={{ color: skillDisabled ? '#fff' : '#001' }}
+          className={joinClassNames(
+            styles.skillLabel,
+            showSkillCooldown ? styles.skillLabelHidden : styles.skillCostLabel,
+            skillLabelColorClass,
+          )}
           aria-live="polite"
           aria-atomic="true"
         >
-          {hasCurrentSkill ? (skillCoolingDown ? skillCooldownLabel : currentSkillCost) : '--'}
+          {hasCurrentSkill ? (showSkillCooldown ? '' : currentSkillCost) : '--'}
         </span>
-        {hasCurrentSkill && skillCoolingDown && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: `${Math.max(0, Math.min(100, skillCooldownPercent))}%`,
-              background: 'rgba(0, 0, 0, 0.4)',
-              borderRadius: '0 0 32px 32px',
-              pointerEvents: 'none',
-            }}
-          />
-        )}
       </button>
 
       <button
