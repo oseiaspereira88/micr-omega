@@ -29,4 +29,22 @@ describe('GameOverScreen', () => {
       expect(restartButton).toHaveFocus();
     });
   });
+
+  it('formata pontuação, nível e combo usando formatação pt-BR', () => {
+    render(
+      <GameOverScreen score={1234567} level={8901} maxCombo={23456} onRestart={() => {}} />
+    );
+
+    expect(screen.getByText('1.234.567')).toBeInTheDocument();
+    expect(screen.getByText('🧬 Nível Alcançado: 8.901')).toBeInTheDocument();
+    expect(screen.getByText('🔥 Combo Máximo: x23.456')).toBeInTheDocument();
+  });
+
+  it('usa 0 como fallback quando os valores são ausentes ou inválidos', () => {
+    render(<GameOverScreen score={undefined} level={NaN} maxCombo={null} onRestart={() => {}} />);
+
+    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('🧬 Nível Alcançado: 0')).toBeInTheDocument();
+    expect(screen.getByText('🔥 Combo Máximo: x0')).toBeInTheDocument();
+  });
 });
