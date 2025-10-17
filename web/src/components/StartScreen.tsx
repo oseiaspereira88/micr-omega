@@ -263,6 +263,8 @@ const StartScreen = ({
   const audioToggleId = "audio-enabled";
   const touchToggleId = "show-touch-controls";
 
+  const audioLabel = settings.audioEnabled ? "Som ligado" : "Som desligado";
+
   const startButtonLabel = isConnecting
     ? "Conectando…"
     : isConnected
@@ -351,7 +353,10 @@ const StartScreen = ({
                     Ative os efeitos sonoros durante a partida.
                   </span>
                 </div>
-                <label className={styles.toggleWrapper} htmlFor={audioToggleId}>
+                <label
+                  className={styles.toggleWrapper}
+                  htmlFor={audioToggleId}
+                >
                   <input
                     type="checkbox"
                     id={audioToggleId}
@@ -361,12 +366,15 @@ const StartScreen = ({
                     onChange={handleAudioToggle}
                     disabled={isConnecting}
                     aria-checked={settings.audioEnabled}
+                    aria-label={audioLabel}
                   />
                   <span className={styles.toggleLabelText}>
-                    Som
-                    {' '}
-                    <span className={styles.toggleStatus} aria-live="polite" aria-atomic="true">
-                      {settings.audioEnabled ? 'ligado' : 'desligado'}
+                    <span
+                      className={styles.toggleStatus}
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
+                      {audioLabel}
                     </span>
                   </span>
                 </label>
