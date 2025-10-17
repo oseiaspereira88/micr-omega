@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PROTOCOL_VERSION } from "@micr-omega/shared";
 import {
   createMiniflare,
   onceMessage,
@@ -176,6 +177,69 @@ describe("RoomDO", () => {
             resolve();
           },
           { once: true }
+        );
+      });
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("rejects malformed join payloads with invalid_payload", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const errorPromise = onceMessage<{ type: string; reason: string }>(socket, "error");
+
+      socket.send(
+        JSON.stringify({ type: "join", name: "Alice", version: 123 }),
+      );
+
+      const error = await errorPromise;
+      expect(error.type).toBe("error");
+      expect(error.reason).toBe("invalid_payload");
+
+      await new Promise<void>((resolve) => {
+        socket.addEventListener(
+          "close",
+          () => {
+            resolve();
+          },
+          { once: true },
+        );
+      });
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("rejects clients on version mismatch with upgrade_required", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const upgradePromise = onceMessage<{ type: string; minVersion: string }>(
+        socket,
+        "upgrade_required",
+      );
+
+      socket.send(
+        JSON.stringify({
+          type: "join",
+          name: "Alice",
+          version: `${PROTOCOL_VERSION}-old`,
+        }),
+      );
+
+      const upgrade = await upgradePromise;
+      expect(upgrade.type).toBe("upgrade_required");
+      expect(upgrade.minVersion).toBe(PROTOCOL_VERSION);
+
+      await new Promise<void>((resolve) => {
+        socket.addEventListener(
+          "close",
+          () => {
+            resolve();
+          },
+          { once: true },
         );
       });
     } finally {

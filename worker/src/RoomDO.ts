@@ -113,6 +113,11 @@ const WORLD_BOUNDS = {
 } as const;
 
 const SUPPORTED_CLIENT_VERSIONS = new Set([PROTOCOL_VERSION]);
+const NAME_VALIDATION_ERROR_MESSAGES = new Set([
+  "name_too_short",
+  "name_too_long",
+  "name_invalid_chars",
+]);
 
 export class MessageRateLimiter {
   private timestamps: number[] = [];
@@ -3015,8 +3020,15 @@ export class RoomDO {
         });
 
         if (rawType === "join") {
-          this.send(socket, { type: "error", reason: "invalid_name" });
-          socket.close(1008, "invalid_name");
+          const hasNameValidationError = validation.error.issues.some(
+            (issue) =>
+              issue.path.length > 0 &&
+              issue.path[0] === "name" &&
+              NAME_VALIDATION_ERROR_MESSAGES.has(issue.message ?? ""),
+          );
+          const reason = hasNameValidationError ? "invalid_name" : "invalid_payload";
+          this.send(socket, { type: "error", reason });
+          socket.close(1008, reason);
         } else {
           this.send(socket, { type: "error", reason: "invalid_payload" });
           socket.close(1003, "invalid_payload");
@@ -3166,8 +3178,15 @@ export class RoomDO {
   private async handleJoin(socket: WebSocket, message: JoinMessage): Promise<string | null> {
     const validation = joinMessageSchema.safeParse(message);
     if (!validation.success) {
-      this.send(socket, { type: "error", reason: "invalid_payload" });
-      socket.close(1008, "invalid_payload");
+      const hasNameValidationError = validation.error.issues.some(
+        (issue) =>
+          issue.path.length > 0 &&
+          issue.path[0] === "name" &&
+          NAME_VALIDATION_ERROR_MESSAGES.has(issue.message ?? ""),
+      );
+      const reason = hasNameValidationError ? "invalid_name" : "invalid_payload";
+      this.send(socket, { type: "error", reason });
+      socket.close(1008, reason);
       return null;
     }
 
