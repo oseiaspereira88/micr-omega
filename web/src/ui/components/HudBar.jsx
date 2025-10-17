@@ -191,6 +191,9 @@ const HudBar = ({
             <span>Pequena: {summarizeSlot(evolutionSlots?.small)}</span>
             <span>Média: {summarizeSlot(evolutionSlots?.medium)}</span>
             <span>Grande: {summarizeSlot(evolutionSlots?.large)}</span>
+            {evolutionSlots?.macro && (
+              <span>Macro: {summarizeSlot(evolutionSlots?.macro)}</span>
+            )}
           </div>
         </div>
         <div className={styles.resourceGrid}>
