@@ -17,9 +17,14 @@ const ToastStack = ({ toasts, onDismiss }: ToastStackProps) => {
   }
 
   return (
-    <div className={styles.container} role="alert" aria-live="assertive">
+    <div className={styles.container} aria-live="assertive">
       {toasts.map((toast) => (
-        <div key={toast.id} className={styles.toast}>
+        <div
+          key={toast.id}
+          className={styles.toast}
+          role="alert"
+          aria-atomic="true"
+        >
           <span className={styles.toastIcon} aria-hidden="true">
             ⚠️
           </span>
