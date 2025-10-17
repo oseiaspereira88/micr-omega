@@ -214,11 +214,15 @@ const ArchetypeSelection = ({
         className={styles.dialog}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="archetype-selection-title"
+        aria-describedby="archetype-selection-description"
         tabIndex={-1}
         ref={dialogRef}
       >
-        <h2 className={styles.title}>Escolha seu arquétipo inicial</h2>
-        <p className={styles.subtitle}>
+        <h2 id="archetype-selection-title" className={styles.title}>
+          Escolha seu arquétipo inicial
+        </h2>
+        <p id="archetype-selection-description" className={styles.subtitle}>
           Cada arquétipo define afinidades elementares, passivas únicas e habilidades
           iniciais. Escolha com sabedoria: evoluções futuras expandirão essas
           características.
