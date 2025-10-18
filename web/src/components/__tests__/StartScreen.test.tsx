@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import StartScreen from "../StartScreen";
 import { GameSettingsProvider, useGameSettings } from "../../store/gameSettings";
 import { gameStore, type GameStoreState } from "../../store/gameStore";
-import { MIN_NAME_LENGTH } from "../../utils/messageTypes";
+import { MIN_NAME_LENGTH, NAME_PATTERN } from "../../utils/messageTypes";
 import { INVALID_PLAYER_NAME_MESSAGE } from "../../utils/playerNameStorage";
 import React, { useEffect } from "react";
 import { featureToggles } from "../../config/featureToggles.js";
@@ -84,6 +84,18 @@ describe("StartScreen", () => {
     expect(validationAlert.textContent).toBe(INVALID_PLAYER_NAME_MESSAGE);
   });
 
+  it("configura os atributos de validação do campo de nome", () => {
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+    const input = screen.getByLabelText(/nome do jogador/i);
+
+    expect(input).toBeRequired();
+    expect(input).toHaveAttribute("aria-required", "true");
+    expect(input).toHaveAttribute("minlength", String(MIN_NAME_LENGTH));
+    expect(input).toHaveAttribute("maxlength");
+    expect(input).toHaveAttribute("pattern", NAME_PATTERN.source);
+  });
+
   it("mantém o foco no campo de nome quando a validação falha", () => {
     renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
 
@@ -96,11 +108,16 @@ describe("StartScreen", () => {
   });
 
   it("foca o diálogo ao abrir e mantém o foco preso nele", async () => {
+    act(() => {
+      gameStore.actions.setConnectionStatus("connected");
+      gameStore.actions.setPlayerId("player-1");
+    });
+
     renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
 
     const dialog = screen.getByRole("dialog", { name: /micro/i });
     const nameInput = screen.getByLabelText(/nome do jogador/i);
-    const quitButton = screen.getByRole("button", { name: /sair da sala/i });
+    const quitButton = screen.getByRole("button", { name: /desconectar/i });
 
     expect(dialog).toHaveAttribute("tabindex", "-1");
 

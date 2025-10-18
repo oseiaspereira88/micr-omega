@@ -28,6 +28,7 @@ import {
 import {
   MAX_NAME_LENGTH,
   MIN_NAME_LENGTH,
+  NAME_PATTERN,
   sanitizePlayerName,
 } from "../utils/messageTypes";
 import styles from "./StartScreen.module.css";
@@ -388,9 +389,13 @@ const StartScreen = ({
               onChange={handleInputChange}
               ref={inputRef}
               disabled={isConnecting}
+              required
+              minLength={MIN_NAME_LENGTH}
               maxLength={MAX_NAME_LENGTH}
+              pattern={NAME_PATTERN.source}
               autoComplete="name"
               aria-invalid={Boolean(errorMessage)}
+              aria-required="true"
               aria-describedby={playerNameDescribedBy}
             />
             {errorMessage ? (
