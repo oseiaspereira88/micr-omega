@@ -69,6 +69,8 @@ import {
   type StatusCollection,
 } from "./statuses";
 
+const TEXT_ENCODER = new TextEncoder();
+
 const MIN_PLAYERS_TO_START = 1;
 const WAITING_START_DELAY_MS = 15_000;
 const WAITING_START_DELAY_ENABLED = MIN_PLAYERS_TO_START > 1;
@@ -3183,14 +3185,17 @@ export class RoomDO {
       const data = typeof event.data === "string" ? event.data : String(event.data);
       const now = Date.now();
 
-      if (data.length > MAX_CLIENT_MESSAGE_SIZE_BYTES) {
+      const payloadByteLength = TEXT_ENCODER.encode(data).length;
+
+      if (payloadByteLength > MAX_CLIENT_MESSAGE_SIZE_BYTES) {
         this.observability.log("warn", "client_payload_invalid", {
           stage: "size",
-          length: data.length,
+          bytes: payloadByteLength,
           category: "protocol_error"
         });
         this.observability.recordMetric("protocol_errors", 1, {
-          type: "payload_too_large"
+          type: "payload_too_large",
+          bytes: payloadByteLength
         });
         this.send(socket, { type: "error", reason: "invalid_payload" });
         socket.close(1009, "invalid_payload");

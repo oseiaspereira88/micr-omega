@@ -8,6 +8,8 @@ import {
 } from "./utils/miniflare";
 import { MAX_CLIENT_MESSAGE_SIZE_BYTES } from "../src/RoomDO";
 
+const textEncoder = new TextEncoder();
+
 describe("RoomDO", () => {
   it("responds with joined payload when a player joins", async () => {
     const mf = await createMiniflare();
@@ -220,10 +222,11 @@ describe("RoomDO", () => {
       const joinedPromise = onceMessage<{ type: string }>(socket, "joined");
 
       const payload = JSON.stringify({ type: "join", name: "Alice" });
-      expect(MAX_CLIENT_MESSAGE_SIZE_BYTES).toBeGreaterThan(payload.length);
-      const paddedPayload = `${" ".repeat(MAX_CLIENT_MESSAGE_SIZE_BYTES - payload.length)}${payload}`;
+      const payloadByteLength = textEncoder.encode(payload).length;
+      expect(MAX_CLIENT_MESSAGE_SIZE_BYTES).toBeGreaterThan(payloadByteLength);
+      const paddedPayload = `${" ".repeat(MAX_CLIENT_MESSAGE_SIZE_BYTES - payloadByteLength)}${payload}`;
 
-      expect(paddedPayload.length).toBe(MAX_CLIENT_MESSAGE_SIZE_BYTES);
+      expect(textEncoder.encode(paddedPayload).length).toBe(MAX_CLIENT_MESSAGE_SIZE_BYTES);
 
       socket.send(paddedPayload);
 
@@ -243,6 +246,47 @@ describe("RoomDO", () => {
       const errorPromise = onceMessage<{ type: string; reason: string }>(socket, "error");
 
       const oversizedPayload = "x".repeat(MAX_CLIENT_MESSAGE_SIZE_BYTES + 1);
+      expect(textEncoder.encode(oversizedPayload).length).toBeGreaterThan(MAX_CLIENT_MESSAGE_SIZE_BYTES);
+
+      socket.send(oversizedPayload);
+
+      const error = await errorPromise;
+      expect(error.type).toBe("error");
+      expect(error.reason).toBe("invalid_payload");
+
+      const closeEvent = await new Promise<{ code?: number; reason?: string }>((resolve) => {
+        socket.addEventListener(
+          "close",
+          (event) => {
+            resolve(event as { code?: number; reason?: string });
+          },
+          { once: true },
+        );
+      });
+
+      expect(closeEvent.code).toBe(1009);
+      expect(closeEvent.reason).toBe("invalid_payload");
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("rejects multi-byte messages exceeding the client payload limit", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const errorPromise = onceMessage<{ type: string; reason: string }>(socket, "error");
+
+      const multiByteCharacter = "😀";
+      const basePayload = JSON.stringify({ type: "join", name: "" });
+      const baseByteLength = textEncoder.encode(basePayload).length;
+      const bytesPerCharacter = textEncoder.encode(multiByteCharacter).length;
+      const availableBytes = MAX_CLIENT_MESSAGE_SIZE_BYTES - baseByteLength;
+      const repeatCount = Math.max(0, Math.floor(availableBytes / bytesPerCharacter));
+      const oversizedName = multiByteCharacter.repeat(repeatCount + 1);
+      const oversizedPayload = JSON.stringify({ type: "join", name: oversizedName });
+
+      expect(textEncoder.encode(oversizedPayload).length).toBeGreaterThan(MAX_CLIENT_MESSAGE_SIZE_BYTES);
 
       socket.send(oversizedPayload);
 
