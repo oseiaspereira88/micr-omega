@@ -16,6 +16,7 @@ import {
   SharedProgressionStream,
   Vector2,
   StatusEffectEvent,
+  CombatLogEntry,
 } from "../utils/messageTypes";
 import { reportRealtimeLatency } from "../utils/observability";
 
@@ -84,6 +85,7 @@ type DerivedSynchronizedState = Pick<
   | "roomObjects"
   | "world"
   | "progression"
+  | "combatLog"
 >;
 
 const createEmptyEntityCollection = <T extends { id: string }>(): EntityCollection<T> => ({
@@ -256,6 +258,9 @@ const deriveSynchronizedStateFromFullSnapshot = (
     roomObjects: worldCollections.roomObjects,
     world: buildWorldFromCollections(worldCollections),
     progression: cloneProgressionState(state.progression),
+    combatLog: cloneCombatLogEntries(
+      (state as SharedGameState & { combatLog?: CombatLogEntry[] | undefined }).combatLog,
+    ),
   };
 };
 
@@ -287,6 +292,7 @@ export interface GameStoreState {
   world: SharedWorldState;
   progression: SharedProgressionState;
   statusEffects: StatusEffectEvent[];
+  combatLog: CombatLogEntry[];
 }
 
 const cloneVector = (vector: Vector2): Vector2 => ({ x: vector.x, y: vector.y });
@@ -362,6 +368,16 @@ const cloneRoomObject = (object: RoomObject): RoomObject => ({
   state: object.state ? { ...object.state } : undefined,
 });
 
+const cloneCombatLogEntries = (
+  entries?: readonly CombatLogEntry[] | null,
+): CombatLogEntry[] => {
+  if (!entries || entries.length === 0) {
+    return [];
+  }
+
+  return entries.map((entry) => ({ ...entry }));
+};
+
 const cloneProgressionStream = (stream: SharedProgressionStream): SharedProgressionStream => ({
   sequence: typeof stream.sequence === "number" ? stream.sequence : 0,
   dropPity: stream.dropPity ? { ...stream.dropPity } : undefined,
@@ -396,6 +412,7 @@ const createEmptySynchronizedState = () => {
     roomObjects: worldCollections.roomObjects,
     world: buildWorldFromCollections(worldCollections),
     progression: cloneProgressionState(),
+    combatLog: [],
   };
 };
 
@@ -429,6 +446,7 @@ const initialState: GameStoreState = {
   world: emptySyncState.world,
   progression: cloneProgressionState(emptySyncState.progression),
   statusEffects: [],
+  combatLog: [],
 };
 
 type GameStoreListener = () => void;
@@ -604,6 +622,7 @@ const applyFullState = (state: SharedGameState) => {
     ...prev,
     ...derived,
     statusEffects: [],
+    combatLog: derived.combatLog,
   }));
 };
 
@@ -688,6 +707,16 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
     const statusEffects = worldDiff?.statusEffects;
     const statusEffectsChanged = statusEffects !== undefined;
 
+    let nextCombatLog = prev.combatLog;
+    const diffCombatLog = diff.combatLog;
+    if (diffCombatLog && diffCombatLog.length > 0) {
+      nextCombatLog = [
+        ...prev.combatLog,
+        ...diffCombatLog.map((entry) => ({ ...entry })),
+      ];
+    }
+    const combatLogChanged = nextCombatLog !== prev.combatLog;
+
     const worldChanged =
       microorganismsResult.changed ||
       organicMatterResult.changed ||
@@ -699,7 +728,8 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       playersResult.changed ||
       worldChanged ||
       progressionChanged ||
-      statusEffectsChanged;
+      statusEffectsChanged ||
+      combatLogChanged;
 
     if (!stateChanged) {
       return prev;
@@ -728,6 +758,7 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       statusEffects: statusEffectsChanged
         ? statusEffects.map((event) => ({ ...event }))
         : prev.statusEffects,
+      combatLog: nextCombatLog,
     };
   });
 };
@@ -814,6 +845,7 @@ const resetGameState = () => {
       roomObjects: emptyState.roomObjects,
       world: emptyState.world,
       statusEffects: [],
+      combatLog: emptyState.combatLog,
     };
   });
 };

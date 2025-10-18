@@ -7,6 +7,7 @@ import type {
   SharedPlayerState,
   SharedWorldState,
   StatusEffectEvent,
+  CombatLogEntry,
 } from "../utils/messageTypes";
 
 const baseState = gameStore.getState();
@@ -94,6 +95,7 @@ const createFreshState = (): GameStoreState => {
       roomObjects: emptyRoomObjects.all,
     },
     progression: { players: {} },
+    combatLog: [],
   };
 };
 
@@ -212,6 +214,74 @@ describe("gameStore", () => {
     gameStore.actions.applyStateDiff({ removedPlayerIds: ["p1"] });
     expect(gameStore.getState().players.p1).toBeUndefined();
     expect(gameStore.getState().remotePlayers.all).toHaveLength(0);
+  });
+
+  it("preserves combat log entries when applying diffs", () => {
+    const firstEntry: CombatLogEntry = {
+      timestamp: 1_000,
+      attackerId: "p1",
+      targetId: "p2",
+      targetKind: "player",
+      damage: 12,
+      outcome: "hit",
+      remainingHealth: 88,
+    };
+
+    const fullStateWithLog = {
+      phase: "active" as const,
+      roundId: "round-10",
+      roundStartedAt: 1_000,
+      roundEndsAt: 2_000,
+      players: [
+        createPlayerState({
+          id: "p1",
+          name: "Alice",
+          score: 15,
+          lastActiveAt: 1_000,
+        }),
+      ],
+      world: createWorld(),
+      combatLog: [firstEntry],
+    } satisfies SharedGameState & { combatLog: CombatLogEntry[] };
+
+    gameStore.actions.applyFullState(fullStateWithLog);
+
+    const afterFull = gameStore.getState();
+    expect(afterFull.combatLog).toHaveLength(1);
+    expect(afterFull.combatLog[0]).toMatchObject(firstEntry);
+    expect(afterFull.combatLog[0]).not.toBe(firstEntry);
+
+    gameStore.actions.applyStateDiff({
+      upsertPlayers: [
+        createPlayerState({
+          id: "p1",
+          name: "Alice",
+          score: 25,
+        }),
+      ],
+    });
+
+    const afterPlayerDiff = gameStore.getState();
+    expect(afterPlayerDiff.combatLog).toBe(afterFull.combatLog);
+
+    const secondEntry: CombatLogEntry = {
+      timestamp: 1_500,
+      attackerId: "p2",
+      targetId: "p1",
+      targetKind: "player",
+      damage: 30,
+      outcome: "defeated",
+      remainingHealth: 0,
+      scoreAwarded: 50,
+    };
+
+    gameStore.actions.applyStateDiff({ combatLog: [secondEntry] });
+
+    const afterCombatDiff = gameStore.getState();
+    expect(afterCombatDiff.combatLog).toHaveLength(2);
+    expect(afterCombatDiff.combatLog[0]).toMatchObject(firstEntry);
+    expect(afterCombatDiff.combatLog[1]).toMatchObject(secondEntry);
+    expect(afterCombatDiff.combatLog).not.toBe(afterFull.combatLog);
   });
 
   it("applies status effect diffs even when no other fields change", () => {
