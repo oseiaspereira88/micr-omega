@@ -796,41 +796,118 @@ const cloneOrganicMatter = (matter: OrganicMatter): OrganicMatter => ({
   nutrients: { ...matter.nutrients },
 });
 
+type InitialMicroorganismTemplate = {
+  id: string;
+  species: Microorganism["species"];
+  name: Microorganism["name"];
+  level: Microorganism["level"];
+  aggression: Microorganism["aggression"];
+  position: Vector2;
+  movementVector: Vector2;
+  orientation: OrientationState;
+  health: HealthState;
+  attributes: Microorganism["attributes"];
+};
+
+const createInitialMicroorganism = ({
+  id,
+  species,
+  name,
+  level,
+  aggression,
+  position,
+  movementVector,
+  orientation,
+  health,
+  attributes,
+}: InitialMicroorganismTemplate): Microorganism => ({
+  id,
+  kind: "microorganism",
+  species,
+  name,
+  level,
+  aggression,
+  position,
+  movementVector,
+  orientation,
+  health,
+  attributes,
+});
+
 const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
   microorganisms: [
-    {
+    createInitialMicroorganism({
       id: "micro-alpha",
-      kind: "microorganism",
       species: "bacillus",
+      name: "Amber Spindle",
+      level: 3,
       position: { x: -200, y: -150 },
-      movementVector: { x: 1, y: 0 },
+      movementVector: { x: 1, y: 0.2 },
       orientation: { angle: 0 },
       health: { current: 40, max: 40 },
       aggression: "neutral",
       attributes: { speed: 40, damage: 6, resilience: 3 },
-    },
-    {
+    }),
+    createInitialMicroorganism({
       id: "micro-beta",
-      kind: "microorganism",
       species: "amoeba",
+      name: "Crimson Bloom",
+      level: 5,
       position: { x: 220, y: 160 },
       movementVector: { x: -0.6, y: 0.8 },
       orientation: { angle: Math.PI / 2 },
       health: { current: 55, max: 55 },
       aggression: "hostile",
       attributes: { speed: 50, damage: 9, resilience: 4 },
-    },
-    {
+    }),
+    createInitialMicroorganism({
       id: "micro-gamma",
-      kind: "microorganism",
       species: "ciliate",
+      name: "Azure Spiral",
+      level: 2,
       position: { x: 0, y: 260 },
-      movementVector: { x: 0, y: -1 },
+      movementVector: { x: 0.2, y: -1 },
       orientation: { angle: Math.PI },
       health: { current: 35, max: 35 },
       aggression: "neutral",
       attributes: { speed: 30, damage: 5, resilience: 2 },
-    },
+    }),
+    createInitialMicroorganism({
+      id: "micro-delta",
+      species: "protozoa",
+      name: "Verdant Lancer",
+      level: 4,
+      position: { x: -320, y: 280 },
+      movementVector: { x: 0.7, y: -0.4 },
+      orientation: { angle: (3 * Math.PI) / 4 },
+      health: { current: 60, max: 60 },
+      aggression: "hostile",
+      attributes: { speed: 48, damage: 8, resilience: 5 },
+    }),
+    createInitialMicroorganism({
+      id: "micro-epsilon",
+      species: "fungus",
+      name: "Saffron Veil",
+      level: 1,
+      position: { x: 360, y: -240 },
+      movementVector: { x: -0.3, y: 0.6 },
+      orientation: { angle: Math.PI / 6 },
+      health: { current: 28, max: 28 },
+      aggression: "passive",
+      attributes: { speed: 24, damage: 3, resilience: 6 },
+    }),
+    createInitialMicroorganism({
+      id: "micro-zeta",
+      species: "virus",
+      name: "Obsidian Shard",
+      level: 6,
+      position: { x: 120, y: -300 },
+      movementVector: { x: -1.1, y: 0.5 },
+      orientation: { angle: (5 * Math.PI) / 6 },
+      health: { current: 32, max: 32 },
+      aggression: "hostile",
+      attributes: { speed: 60, damage: 11, resilience: 2 },
+    }),
   ],
   organicMatter: [
     {

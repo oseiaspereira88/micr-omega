@@ -66,6 +66,31 @@ function createTestPlayer(
   return { ...base, ...overrides };
 }
 
+function createTestMicroorganism(
+  id: string,
+  overrides: Partial<Microorganism> = {},
+): Microorganism {
+  const base: Microorganism = {
+    id,
+    kind: "microorganism",
+    species: "amoeba",
+    name: `${id}-specimen`,
+    level: 1,
+    position: { x: 0, y: 0 },
+    movementVector: { x: 0, y: 0 },
+    orientation: { angle: 0 },
+    health: { current: 10, max: 10 },
+    aggression: "neutral",
+    attributes: {},
+  };
+
+  return {
+    ...base,
+    ...overrides,
+    attributes: { ...base.attributes, ...(overrides.attributes ?? {}) },
+  };
+}
+
 describe("RoomDO distance-sensitive behaviour", () => {
   it("collects organic matter and respawns a new entity near the collector", async () => {
     const { roomAny } = await createRoom();
@@ -301,17 +326,14 @@ describe("RoomDO distance-sensitive behaviour", () => {
     roomAny.players.set(playerFar.id, playerFar);
     roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
-    const microorganism: Microorganism = {
-      id: "hostile-1",
-      kind: "microorganism",
-      species: "amoeba",
+    const microorganism = createTestMicroorganism("hostile-1", {
       position: { x: 0, y: 0 },
       movementVector: { x: 0, y: 0 },
       orientation: { angle: 0 },
       health: { current: 20, max: 20 },
       aggression: "hostile",
       attributes: { speed: 0, damage: 5, resilience: 0 },
-    };
+    });
 
     roomAny.microorganisms.clear();
     roomAny.microorganisms.set(microorganism.id, microorganism);
@@ -348,17 +370,14 @@ describe("RoomDO distance-sensitive behaviour", () => {
     roomAny.players.set(connected.id, connected);
     roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
-    const microorganism: Microorganism = {
-      id: "hostile-2",
-      kind: "microorganism",
-      species: "amoeba",
+    const microorganism = createTestMicroorganism("hostile-2", {
       position: { x: 0, y: 0 },
       movementVector: { x: 0, y: 0 },
       orientation: { angle: 0 },
       health: { current: 20, max: 20 },
       aggression: "hostile",
       attributes: { speed: 0, damage: 5, resilience: 0 },
-    };
+    });
 
     roomAny.microorganisms.clear();
     roomAny.microorganisms.set(microorganism.id, microorganism);
@@ -394,17 +413,14 @@ describe("RoomDO distance-sensitive behaviour", () => {
     roomAny.players.set(active.id, active);
     roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
-    const microorganism: Microorganism = {
-      id: "hostile-3",
-      kind: "microorganism",
-      species: "amoeba",
+    const microorganism = createTestMicroorganism("hostile-3", {
       position: { x: 0, y: 0 },
       movementVector: { x: 0, y: 0 },
       orientation: { angle: 0 },
       health: { current: 20, max: 20 },
       aggression: "hostile",
       attributes: { speed: 0, damage: 5, resilience: 0 },
-    };
+    });
 
     roomAny.microorganisms.clear();
     roomAny.microorganisms.set(microorganism.id, microorganism);
@@ -440,17 +456,14 @@ describe("RoomDO distance-sensitive behaviour", () => {
     roomAny.players.set(eligible.id, eligible);
     roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
-    const microorganism: Microorganism = {
-      id: "hostile-4",
-      kind: "microorganism",
-      species: "amoeba",
+    const microorganism = createTestMicroorganism("hostile-4", {
       position: { x: 0, y: 0 },
       movementVector: { x: 0, y: 0 },
       orientation: { angle: 0 },
       health: { current: 20, max: 20 },
       aggression: "hostile",
       attributes: { speed: 0, damage: 5, resilience: 0 },
-    };
+    });
 
     roomAny.microorganisms.clear();
     roomAny.microorganisms.set(microorganism.id, microorganism);
@@ -518,17 +531,14 @@ describe("RoomDO distance-sensitive behaviour", () => {
       impassable: true,
     };
 
-    const microorganism: Microorganism = {
-      id: "micro-blocked",
-      kind: "microorganism",
-      species: "amoeba",
+    const microorganism = createTestMicroorganism("micro-blocked", {
       position: { x: -100, y: 0 },
       movementVector: { x: 1, y: 0 },
       orientation: { angle: 0 },
       health: { current: 10, max: 10 },
       aggression: "neutral",
       attributes: { speed: 50, damage: 0, resilience: 0 },
-    };
+    });
 
     roomAny.obstacles.clear();
     roomAny.obstacles.set(obstacle.id, obstacle);
