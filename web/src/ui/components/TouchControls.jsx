@@ -235,7 +235,7 @@ const TouchControls = ({
         onTouchEnd={handleSkillTouchEnd}
         onTouchCancel={handleSkillTouchEnd}
         disabled={skillDisabled}
-        title="Q: usar habilidade"
+        title={skillAriaLabel}
       >
         {showSkillCooldown && (
           <div
