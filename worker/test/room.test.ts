@@ -132,6 +132,59 @@ describe("RoomDO", () => {
     }
   });
 
+  it("includes joining player in initial diff when session starts immediately", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const joinedPromise = onceMessage<{ type: string; playerId: string }>(socket, "joined", 5000);
+
+      const diffPromise = new Promise<{
+        type: string;
+        mode: string;
+        state: { upsertPlayers?: { id: string }[] };
+      }>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          socket.removeEventListener("message", onMessage as EventListener);
+          reject(new Error("Timed out waiting for initial diff"));
+        }, 5000);
+
+        const onMessage = (event: MessageEvent) => {
+          const data = typeof event.data === "string" ? event.data : String(event.data);
+          const parsed = JSON.parse(data) as {
+            type: string;
+            mode?: string;
+            state?: { upsertPlayers?: { id: string }[] };
+          };
+          if (parsed.type === "state" && parsed.mode === "diff") {
+            clearTimeout(timeout);
+            socket.removeEventListener("message", onMessage as EventListener);
+            resolve(parsed as {
+              type: string;
+              mode: string;
+              state: { upsertPlayers?: { id: string }[] };
+            });
+          }
+        };
+
+        socket.addEventListener("message", onMessage as EventListener);
+      });
+
+      socket.send(JSON.stringify({ type: "join", name: "Solo" }));
+
+      const joined = await joinedPromise;
+      const diff = await diffPromise;
+
+      expect(diff.type).toBe("state");
+      expect(diff.mode).toBe("diff");
+      const upsertPlayers = diff.state.upsertPlayers ?? [];
+      expect(upsertPlayers.some((player) => player.id === joined.playerId)).toBe(true);
+
+      socket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
   it("allows joining with accented unicode characters", async () => {
     const mf = await createMiniflare();
     try {

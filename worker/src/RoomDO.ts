@@ -1241,6 +1241,7 @@ export class RoomDO {
   private pendingStatusEffects: StatusEffectEvent[] = [];
   private pendingPlayerDeaths: Array<{ playerId: string; socket: WebSocket | null }> = [];
   private playersPendingRemoval = new Set<string>();
+  private pendingInitialDiffPlayerIds = new Set<string>();
 
   private alarmSchedule: Map<AlarmType, number> = new Map();
   private alarmsDirty = false;
@@ -4219,20 +4220,16 @@ export class RoomDO {
 
     this.send(socket, joinedMessage);
 
-    const joinDiff: SharedGameStateDiff = {
-      upsertPlayers: [this.serializePlayer(player)]
-    };
-    const joinBroadcast: StateDiffMessage = {
-      type: "state",
-      mode: "diff",
-      state: joinDiff
-    };
-
     const willStartImmediately =
       this.phase === "waiting" && this.getConnectedPlayersCount() >= MIN_PLAYERS_TO_START;
 
-    if (!willStartImmediately) {
-      this.broadcast(joinBroadcast, socket);
+    if (willStartImmediately) {
+      this.pendingInitialDiffPlayerIds.add(player.id);
+    } else {
+      const joinDiff: SharedGameStateDiff = {
+        upsertPlayers: [this.serializePlayer(player)]
+      };
+      this.broadcastStateDiff(joinDiff, socket);
     }
 
     const rankingMessage: RankingMessage = {
@@ -4347,14 +4344,7 @@ export class RoomDO {
       diff.progression = progression;
     }
 
-    if (Object.keys(diff).length > 0) {
-      const stateMessage: StateDiffMessage = {
-        type: "state",
-        mode: "diff",
-        state: diff
-      };
-      this.broadcast(stateMessage);
-    }
+    this.broadcastStateDiff(diff);
 
     if (result.scoresChanged) {
       this.markRankingDirty();
@@ -4666,13 +4656,7 @@ export class RoomDO {
       diff.progression = progression;
     }
 
-    const stateMessage: StateDiffMessage = {
-      type: "state",
-      mode: "diff",
-      state: diff
-    };
-
-    this.broadcast(stateMessage, socket);
+    this.broadcastStateDiff(diff, socket);
 
     const connectedPlayers = this.getConnectedPlayersCount();
     this.observability.log("info", "player_disconnected", {
@@ -4912,14 +4896,7 @@ export class RoomDO {
       diff.progression = progression;
     }
 
-    if (diff.upsertPlayers || diff.world || diff.combatLog || diff.progression) {
-      const stateMessage: StateDiffMessage = {
-        type: "state",
-        mode: "diff",
-        state: diff,
-      };
-      this.broadcast(stateMessage);
-    }
+    this.broadcastStateDiff(diff);
 
     const hadQueuedDeaths = this.pendingPlayerDeaths.length > 0;
     await this.flushPendingPlayerDeaths();
@@ -5000,14 +4977,11 @@ export class RoomDO {
 
     this.broadcast(stateMessage);
 
+    const startDiff: SharedGameStateDiff = {};
     if (worldDiff) {
-      const worldDiffMessage: StateDiffMessage = {
-        type: "state",
-        mode: "diff",
-        state: { world: worldDiff },
-      };
-      this.broadcast(worldDiffMessage);
+      startDiff.world = worldDiff;
     }
+    this.broadcastStateDiff(startDiff);
 
     const now = Date.now();
     this.lastWorldTickAt = now;
@@ -5127,14 +5101,11 @@ export class RoomDO {
 
     this.broadcast(message);
 
+    const resetDiff: SharedGameStateDiff = {};
     if (worldDiff) {
-      const worldDiffMessage: StateDiffMessage = {
-        type: "state",
-        mode: "diff",
-        state: { world: worldDiff },
-      };
-      this.broadcast(worldDiffMessage);
+      resetDiff.world = worldDiff;
     }
+    this.broadcastStateDiff(resetDiff);
 
     const rankingMessage: RankingMessage = {
       type: "ranking",
@@ -5432,10 +5403,12 @@ export class RoomDO {
     if (progression) {
       diff.progression = progression;
     }
-    const stateMessage: StateDiffMessage = { type: "state", mode: "diff", state: diff };
-    this.broadcast(stateMessage);
-    if (socket) {
-      this.send(socket, stateMessage);
+    const stateMessage = this.createStateDiffMessage(diff);
+    if (stateMessage) {
+      this.broadcast(stateMessage);
+      if (socket) {
+        this.send(socket, stateMessage);
+      }
     }
 
     const rankingMessage: RankingMessage = { type: "ranking", ranking: this.getRanking() };
@@ -5488,9 +5461,11 @@ export class RoomDO {
     if (progression) {
       diff.progression = progression;
     }
-    const stateMessage: StateDiffMessage = { type: "state", mode: "diff", state: diff };
+    const stateMessage = this.createStateDiffMessage(diff);
 
-    this.broadcast(stateMessage);
+    if (stateMessage) {
+      this.broadcast(stateMessage);
+    }
 
     this.observability.log("info", "player_removed", {
       playerId: removed.id,
@@ -5670,6 +5645,68 @@ export class RoomDO {
       }
     }
     return count;
+  }
+
+  private createStateDiffMessage(diff: SharedGameStateDiff): StateDiffMessage | null {
+    const finalizedDiff = this.includePendingInitialDiffPlayers(diff);
+    if (!finalizedDiff) {
+      return null;
+    }
+    return { type: "state", mode: "diff", state: finalizedDiff };
+  }
+
+  private broadcastStateDiff(diff: SharedGameStateDiff, except?: WebSocket): void {
+    const message = this.createStateDiffMessage(diff);
+    if (!message) {
+      return;
+    }
+    this.broadcast(message, except);
+  }
+
+  private includePendingInitialDiffPlayers(diff: SharedGameStateDiff): SharedGameStateDiff | null {
+    let upsertPlayers = diff.upsertPlayers;
+
+    if (this.pendingInitialDiffPlayerIds.size > 0) {
+      const existingIds = new Set(upsertPlayers ? upsertPlayers.map((player) => player.id) : []);
+      const pendingPlayers = upsertPlayers ? [...upsertPlayers] : [];
+
+      for (const playerId of this.pendingInitialDiffPlayerIds) {
+        const player = this.players.get(playerId);
+        if (!player) {
+          continue;
+        }
+        if (existingIds.has(player.id)) {
+          continue;
+        }
+        pendingPlayers.push(this.serializePlayer(player));
+        existingIds.add(player.id);
+      }
+
+      this.pendingInitialDiffPlayerIds.clear();
+
+      if (pendingPlayers.length > (upsertPlayers?.length ?? 0)) {
+        upsertPlayers = pendingPlayers;
+        diff.upsertPlayers = upsertPlayers;
+      }
+    }
+
+    if (upsertPlayers && upsertPlayers.length === 0) {
+      delete diff.upsertPlayers;
+      upsertPlayers = undefined;
+    }
+
+    const hasContent =
+      (upsertPlayers && upsertPlayers.length > 0) ||
+      (diff.removedPlayerIds && diff.removedPlayerIds.length > 0) ||
+      diff.world !== undefined ||
+      diff.combatLog !== undefined ||
+      diff.progression !== undefined ||
+      diff.phase !== undefined ||
+      diff.roundId !== undefined ||
+      diff.roundStartedAt !== undefined ||
+      diff.roundEndsAt !== undefined;
+
+    return hasContent ? diff : null;
   }
 
   private broadcast(message: ServerMessage, except?: WebSocket): void {
