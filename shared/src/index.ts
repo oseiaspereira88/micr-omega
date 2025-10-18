@@ -168,6 +168,37 @@ export const sharedPlayerStateSchema = z.object({
     .default({})
 });
 
+const microorganismAppearanceSchema = z
+  .object({
+    bodyShape: z.enum(["orb", "helix", "shield", "needle", "cluster"]).optional(),
+    bodyColor: z.string().trim().min(1).max(32).optional(),
+    coreColor: z.string().trim().min(1).max(32).optional(),
+    mantleColor: z.string().trim().min(1).max(32).optional(),
+    accentColor: z.string().trim().min(1).max(32).optional(),
+    glowColor: z.string().trim().min(1).max(32).optional(),
+    appendages: z.number().finite().nonnegative().max(12).optional(),
+    texture: z.string().trim().min(1).max(48).optional(),
+    scale: z.number().finite().positive().max(3).optional()
+  })
+  .passthrough();
+
+const microorganismAiSchema = z
+  .object({
+    behavior: z.enum(["wander", "patrol", "orbit", "stalker", "swarm"]),
+    anchor: vector2Schema.optional(),
+    orbitRadius: z.number().finite().nonnegative().optional(),
+    orbitSpeed: z.number().finite().optional(),
+    roamRadius: z.number().finite().nonnegative().optional(),
+    patrolPoints: z.array(vector2Schema).min(2).max(8).optional(),
+    patrolPauseMs: z.number().finite().nonnegative().optional(),
+    preferredDistance: z.number().finite().nonnegative().optional(),
+    lastDecision: z.string().trim().min(1).max(96).optional(),
+    state: z.record(z.string().trim().min(1).max(64), z.unknown()).optional(),
+    focus: z.string().trim().min(1).max(64).optional(),
+    aggressionBias: z.number().finite().optional()
+  })
+  .passthrough();
+
 export const microorganismSchema = z.object({
   id: worldObjectIdSchema,
   kind: z.literal("microorganism"),
@@ -183,7 +214,13 @@ export const microorganismSchema = z.object({
       damage: z.number().finite().nonnegative().optional(),
       resilience: z.number().finite().nonnegative().optional()
     })
-    .default({})
+    .default({}),
+  displayName: z.string().trim().min(1).max(64).optional(),
+  level: z.number().int().min(1).max(99).optional(),
+  variant: z.string().trim().min(1).max(64).optional(),
+  appearance: microorganismAppearanceSchema.optional(),
+  description: z.string().trim().min(1).max(280).optional(),
+  ai: microorganismAiSchema.optional()
 });
 
 export const organicMatterSchema = z.object({
