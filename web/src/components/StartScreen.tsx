@@ -283,6 +283,14 @@ const StartScreen = ({
   const audioToggleId = "audio-enabled";
   const touchToggleId = "show-touch-controls";
   const touchLayoutSelectId = "touch-layout";
+  const touchLayoutDescriptionId = "touch-layout-description";
+  const touchLayoutHelperId = "touch-layout-helper";
+
+  const isTouchLayoutDisabled =
+    isConnecting || !settings.showTouchControls;
+  const touchLayoutDescribedBy = settings.showTouchControls
+    ? touchLayoutDescriptionId
+    : `${touchLayoutDescriptionId} ${touchLayoutHelperId}`;
 
   const audioLabel = settings.audioEnabled ? "Som ligado" : "Som desligado";
 
@@ -515,9 +523,20 @@ const StartScreen = ({
                   >
                     Layout dos controles touch
                   </label>
-                  <span className={styles.optionDescription}>
+                  <span
+                    className={styles.optionDescription}
+                    id={touchLayoutDescriptionId}
+                  >
                     Escolha o lado onde os botões de ação ficam posicionados.
                   </span>
+                  {!settings.showTouchControls ? (
+                    <span
+                      className={styles.optionDescription}
+                      id={touchLayoutHelperId}
+                    >
+                      Ative os controles touch para escolher o layout.
+                    </span>
+                  ) : null}
                 </div>
                 <select
                   id={touchLayoutSelectId}
@@ -525,8 +544,10 @@ const StartScreen = ({
                   className={`${styles.select} ${styles.input}`.trim()}
                   value={settings.touchLayout}
                   onChange={handleTouchLayoutChange}
-                  disabled={isConnecting}
+                  disabled={isTouchLayoutDisabled}
                   aria-label="Layout dos controles touch"
+                  aria-disabled={isTouchLayoutDisabled}
+                  aria-describedby={touchLayoutDescribedBy}
                 >
                   <option value="right">Botões à direita</option>
                   <option value="left">Botões à esquerda</option>

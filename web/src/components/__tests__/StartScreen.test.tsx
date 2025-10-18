@@ -158,11 +158,20 @@ describe("StartScreen", () => {
     const densitySelect = screen.getByLabelText(/densidade visual/i);
     fireEvent.change(densitySelect, { target: { value: "high" } });
 
-    const touchLayoutSelect = screen.getByLabelText(/layout dos controles touch/i);
-    fireEvent.change(touchLayoutSelect, { target: { value: "left" } });
-
     const touchToggle = screen.getByLabelText(/mostrar controles/i);
+    const touchLayoutSelect = screen.getByLabelText(
+      /layout dos controles touch/i,
+    );
+    expect(touchLayoutSelect).toBeDisabled();
+    expect(touchLayoutSelect).toHaveAttribute("aria-disabled", "true");
+    expect(
+      screen.getByText(/ative os controles touch para escolher o layout/i),
+    ).toBeInTheDocument();
+
     fireEvent.click(touchToggle);
+
+    expect(touchLayoutSelect).not.toBeDisabled();
+    fireEvent.change(touchLayoutSelect, { target: { value: "left" } });
 
     const startButton = screen.getByRole("button", { name: /entrar na partida/i });
     fireEvent.click(startButton);
@@ -252,11 +261,13 @@ describe("StartScreen", () => {
     const densitySelect = screen.getByLabelText(/densidade visual/i);
     fireEvent.change(densitySelect, { target: { value: "low" } });
 
-    const touchLayoutSelect = screen.getByLabelText(/layout dos controles touch/i);
-    fireEvent.change(touchLayoutSelect, { target: { value: "left" } });
-
     const touchToggle = screen.getByLabelText(/mostrar controles/i);
     fireEvent.click(touchToggle);
+
+    const touchLayoutSelect = screen.getByLabelText(
+      /layout dos controles touch/i,
+    );
+    fireEvent.change(touchLayoutSelect, { target: { value: "left" } });
 
     await waitFor(() => {
       expect(settingsSpy).toHaveBeenCalled();
@@ -269,5 +280,27 @@ describe("StartScreen", () => {
         touchLayout: "left",
       });
     });
+  });
+
+  it("mantém o layout selecionado ao reativar os controles touch", () => {
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+    const touchToggle = screen.getByLabelText(/mostrar controles/i);
+    fireEvent.click(touchToggle);
+
+    const touchLayoutSelect = screen.getByLabelText(
+      /layout dos controles touch/i,
+    );
+    fireEvent.change(touchLayoutSelect, { target: { value: "left" } });
+
+    fireEvent.click(touchToggle);
+
+    expect(touchLayoutSelect).toBeDisabled();
+    expect(touchLayoutSelect).toHaveAttribute("aria-disabled", "true");
+
+    fireEvent.click(touchToggle);
+
+    expect(touchLayoutSelect).toHaveValue("left");
+    expect(touchLayoutSelect).not.toBeDisabled();
   });
 });
