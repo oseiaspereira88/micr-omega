@@ -11,6 +11,20 @@ const sendMovementMock = vi.fn();
 const mockSettingsRef = { current: null };
 const toastStackPropsRef = { current: null };
 
+const updateSearchParams = (search) => {
+  const url = new URL(window.location.href);
+  url.search = search;
+  window.history.replaceState({}, '', url.toString());
+};
+
+beforeEach(() => {
+  updateSearchParams('?mode=play');
+});
+
+afterEach(() => {
+  updateSearchParams('');
+});
+
 vi.mock('./hooks/useGameSocket', () => ({
   useGameSocket: () => ({
     connect: vi.fn(),
