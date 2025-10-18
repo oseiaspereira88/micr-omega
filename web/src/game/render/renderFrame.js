@@ -22,10 +22,6 @@ const mapMicroorganismsToEnemies = (microorganisms = []) =>
     maxHealth: entity.maxHealth ?? entity.health ?? 0,
     boss: Boolean(entity.boss),
     animPhase: entity.animPhase ?? 0,
-    name: entity.name ?? null,
-    level: entity.level ?? 1,
-    variant: entity.variant ?? null,
-    decision: entity.decision ?? null,
   }));
 
 const renderWorldEntities = (ctx, worldView, camera) => {
@@ -39,227 +35,20 @@ const renderWorldEntities = (ctx, worldView, camera) => {
   const offsetY = camera.offsetY ?? camera.y - height / 2;
 
   withCameraTransform(ctx, camera, () => {
-    const drawMicroorganismBody = (entity, screenX, screenY, size, pulse) => {
-      const appearance = entity.appearance || {};
-      const bodyColor = entity.color ?? '#8fb8ff';
-      const coreColor = entity.coreColor ?? bodyColor;
-      const outerColor = entity.outerColor ?? bodyColor;
-      const accentColor = appearance.accentColor ?? coreColor;
-      const glowColor = appearance.glowColor ?? coreColor;
-      const appendages = Math.max(0, appearance.appendages ?? 0);
-      const shape = appearance.bodyShape ?? 'orb';
-
-      ctx.save();
-      ctx.translate(screenX, screenY);
-      ctx.rotate((entity.animPhase || 0) * 0.08);
-      ctx.globalAlpha = 0.65 + pulse * 0.3;
-      ctx.shadowColor = glowColor;
-      ctx.shadowBlur = (entity.boss ? 26 : 18) * (0.4 + pulse * 0.5);
-
-      const gradient = ctx.createRadialGradient(0, 0, size * 0.2, 0, 0, size);
-      gradient.addColorStop(0, coreColor);
-      gradient.addColorStop(0.55, bodyColor);
-      gradient.addColorStop(1, shadeColor(bodyColor, -0.18));
-
-      const strokeColor = shadeColor(outerColor, -0.18);
-      const strokeWidth = entity.boss ? 3 : 1.6;
-
-      const fillAndStroke = () => {
-        ctx.globalAlpha = 0.65 + pulse * 0.3;
-        ctx.fill();
-        ctx.globalAlpha = 0.95;
-        ctx.shadowBlur = 0;
-        ctx.lineWidth = strokeWidth;
-        ctx.strokeStyle = strokeColor;
-        ctx.stroke();
-      };
-
-      switch (shape) {
-        case 'shield': {
-          ctx.beginPath();
-          ctx.fillStyle = gradient;
-          ctx.moveTo(0, -size);
-          ctx.quadraticCurveTo(size * 0.85, -size * 0.25, size * 0.7, 0);
-          ctx.quadraticCurveTo(size * 0.8, size * 0.55, 0, size * 0.95);
-          ctx.quadraticCurveTo(-size * 0.8, size * 0.55, -size * 0.7, 0);
-          ctx.quadraticCurveTo(-size * 0.85, -size * 0.25, 0, -size);
-          ctx.closePath();
-          fillAndStroke();
-
-          ctx.globalAlpha = 0.9;
-          ctx.fillStyle = coreColor;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, size * 0.52, size * 0.68, 0, 0, Math.PI * 2);
-          ctx.fill();
-
-          if (appendages > 0) {
-            ctx.strokeStyle = accentColor;
-            ctx.lineWidth = 1.3;
-            ctx.globalAlpha = 0.7;
-            ctx.beginPath();
-            for (let i = 0; i < appendages; i += 1) {
-              const angle = (entity.animPhase || 0) * 0.4 + (Math.PI * 2 * i) / appendages;
-              ctx.moveTo(Math.cos(angle) * size * 0.25, Math.sin(angle) * size * 0.25);
-              ctx.lineTo(Math.cos(angle) * size * 0.95, Math.sin(angle) * size * 0.95);
-            }
-            ctx.stroke();
-          }
-          break;
-        }
-        case 'helix': {
-          ctx.beginPath();
-          ctx.fillStyle = gradient;
-          ctx.ellipse(0, 0, size * 0.95, size * 0.55, 0, 0, Math.PI * 2);
-          fillAndStroke();
-
-          ctx.globalAlpha = 0.9;
-          ctx.fillStyle = coreColor;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, size * 0.55, size * 0.35, 0, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.strokeStyle = accentColor;
-          ctx.lineWidth = 1.2;
-          ctx.globalAlpha = 0.7;
-          ctx.beginPath();
-          const strands = Math.max(3, appendages || 5);
-          for (let i = 0; i < strands; i += 1) {
-            const angle = (entity.animPhase || 0) * 0.5 + (Math.PI * 2 * i) / strands;
-            ctx.moveTo(Math.cos(angle) * size * 0.2, Math.sin(angle) * size * 0.2);
-            ctx.lineTo(Math.cos(angle) * size * 0.9, Math.sin(angle) * size * 0.9);
-          }
-          ctx.stroke();
-          break;
-        }
-        case 'needle': {
-          ctx.beginPath();
-          ctx.fillStyle = gradient;
-          ctx.ellipse(0, 0, size * 1.05, size * 0.35, 0, 0, Math.PI * 2);
-          fillAndStroke();
-
-          ctx.globalAlpha = 0.85;
-          ctx.fillStyle = coreColor;
-          ctx.beginPath();
-          ctx.ellipse(-size * 0.12, 0, size * 0.55, size * 0.22, 0, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.globalAlpha = 0.4;
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
-          ctx.beginPath();
-          ctx.ellipse(-size * 0.55, 0, size * 0.4, size * 0.12, 0, 0, Math.PI * 2);
-          ctx.fill();
-          break;
-        }
-        case 'cluster': {
-          const nodeCount = Math.max(3, appendages || 4);
-          ctx.globalAlpha = 0.85;
-          for (let i = 0; i < nodeCount; i += 1) {
-            const angle = (entity.animPhase || 0) * 0.4 + (Math.PI * 2 * i) / nodeCount;
-            ctx.beginPath();
-            const radius = size * 0.55;
-            ctx.fillStyle = gradient;
-            ctx.arc(Math.cos(angle) * radius * 0.65, Math.sin(angle) * radius * 0.65, size * 0.4, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          ctx.globalAlpha = 0.95;
-          ctx.fillStyle = coreColor;
-          ctx.beginPath();
-          ctx.arc(0, 0, size * 0.55, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.lineWidth = strokeWidth;
-          ctx.strokeStyle = strokeColor;
-          ctx.stroke();
-          break;
-        }
-        default: {
-          ctx.beginPath();
-          ctx.fillStyle = gradient;
-          ctx.arc(0, 0, size, 0, Math.PI * 2);
-          fillAndStroke();
-
-          ctx.globalAlpha = 0.35 + pulse * 0.25;
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
-          ctx.beginPath();
-          ctx.arc(-size * 0.35, -size * 0.35, size * 0.35, 0, Math.PI * 2);
-          ctx.fill();
-          break;
-        }
-      }
-
-      ctx.restore();
-    };
-
     microorganisms.forEach((entity) => {
       const screenX = entity.x - offsetX;
       const screenY = entity.y - offsetY;
-      const size = clamp(entity.size ?? 6, 3, 24);
+      const size = clamp(entity.size ?? 6, 3, 18);
       const pulse = (Math.sin(entity.animPhase || 0) + 1) * 0.5;
-      entity.animPhase = (entity.animPhase || 0) + 0.035;
-
-      drawMicroorganismBody(entity, screenX, screenY, size, pulse);
-
-      if (entity.boss) {
-        ctx.save();
-        ctx.translate(screenX, screenY);
-        ctx.globalAlpha = 0.65 + pulse * 0.2;
-        ctx.strokeStyle = 'rgba(255, 93, 115, 0.85)';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([6, 6]);
-        ctx.beginPath();
-        ctx.arc(0, 0, size + 6 + pulse * 2, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.restore();
-      }
-
-      const healthRatio = entity.maxHealth > 0 ? entity.health / entity.maxHealth : 0;
-      const barWidth = Math.max(32, size * 2.5);
-      const barHeight = 5;
+      entity.animPhase = (entity.animPhase || 0) + 0.04;
 
       ctx.save();
       ctx.translate(screenX, screenY);
-      ctx.globalAlpha = 0.92;
-      ctx.fillStyle = 'rgba(6, 10, 24, 0.78)';
-      ctx.fillRect(-barWidth / 2, -size - 18, barWidth, barHeight);
-      ctx.fillStyle = entity.boss ? '#ff5d73' : '#5af4b5';
-      ctx.fillRect(-barWidth / 2, -size - 18, barWidth * clampValue(healthRatio, 0, 1), barHeight);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(-barWidth / 2, -size - 18, barWidth, barHeight);
-      ctx.restore();
-
-      const level = entity.level ?? entity.evolutionLevel ?? 1;
-      const nameLabel = entity.name ? `${entity.name} · Lv.${level}` : `Lv.${level}`;
-      const variantLabel = entity.variant ?? null;
-      const decisionLabel = entity.decision ?? null;
-
-      ctx.save();
-      ctx.translate(screenX, screenY);
-      ctx.textAlign = 'center';
-      ctx.lineJoin = 'round';
-
-      ctx.font = '600 13px "Rajdhani", "Helvetica Neue", sans-serif';
-      ctx.textBaseline = 'bottom';
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
-      ctx.strokeText(nameLabel, 0, -size - 22);
-      ctx.fillText(nameLabel, 0, -size - 22);
-
-      if (variantLabel) {
-        ctx.font = '500 11px "Rajdhani", "Helvetica Neue", sans-serif';
-        ctx.textBaseline = 'top';
-        ctx.strokeText(variantLabel, 0, -size - 16);
-        ctx.fillText(variantLabel, 0, -size - 16);
-      }
-
-      if (decisionLabel) {
-        ctx.font = '500 11px "Rajdhani", "Helvetica Neue", sans-serif';
-        ctx.textBaseline = 'top';
-        ctx.strokeText(decisionLabel, 0, size + 10);
-        ctx.fillText(decisionLabel, 0, size + 10);
-      }
-
+      ctx.globalAlpha = 0.5 + pulse * 0.4;
+      ctx.fillStyle = entity.color ?? '#8fb8ff';
+      ctx.beginPath();
+      ctx.arc(0, 0, size, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     });
 

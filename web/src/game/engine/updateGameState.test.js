@@ -685,11 +685,6 @@ describe('updateGameState', () => {
       boss: true,
       opacity: 0.6,
       depth: 0.5,
-      name: 'Rotifer',
-      level: 1,
-      species: 'rotifer',
-      aggression: 'neutral',
-      appearance: null,
     });
     expect(microorganism.size).toBeCloseTo(Math.sqrt(9) * 2, 5);
     expect(typeof microorganism.coreColor).toBe('string');

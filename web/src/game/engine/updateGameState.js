@@ -131,32 +131,6 @@ const createMicroorganismPalette = (baseColor) => {
   };
 };
 
-const shadeColor = (color, amount = 0) => {
-  if (typeof color !== 'string' || !color.startsWith('#')) {
-    return color;
-  }
-
-  const expanded =
-    color.length === 4
-      ? `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`
-      : color;
-
-  const numeric = parseInt(expanded.slice(1), 16);
-  if (Number.isNaN(numeric)) {
-    return color;
-  }
-
-  const applyAmount = (channel) => clampColorChannel(channel + channel * amount);
-
-  const r = applyAmount((numeric >> 16) & 0xff);
-  const g = applyAmount((numeric >> 8) & 0xff);
-  const b = applyAmount(numeric & 0xff);
-
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b
-    .toString(16)
-    .padStart(2, '0')}`;
-};
-
 const sumModifiers = (modifiers = []) =>
   (Array.isArray(modifiers) ? modifiers : [])
     .map((value) => (Number.isFinite(value) ? value : 0))
@@ -989,41 +963,13 @@ const toEntityMap = (entities = []) => {
   return map;
 };
 
-const capitalize = (value = '') => {
-  if (!value) return '';
-  return value.charAt(0).toUpperCase() + value.slice(1);
-};
-
 const mapMicroorganisms = (entities = [], previous = new Map()) =>
   entities.map((entity) => {
     const prior = previous.get(entity.id);
-    const fallbackColor = SPECIES_COLORS[entity.species] ?? entity.color ?? DEFAULT_SPECIES_COLOR;
-    const paletteBase = entity.appearance?.bodyColor ?? fallbackColor;
-    const palette = createMicroorganismPalette(paletteBase);
-    const bodyColor = entity.appearance?.bodyColor ?? palette.color;
-    const coreColor = entity.appearance?.coreColor ?? palette.coreColor;
-    const mantleColor = entity.appearance?.mantleColor ?? palette.outerColor;
-    const shadowColor = entity.appearance?.mantleColor
-      ? shadeColor(entity.appearance.mantleColor, -0.25)
-      : palette.shadowColor;
+    const baseColor = SPECIES_COLORS[entity.species] ?? entity.color ?? DEFAULT_SPECIES_COLOR;
+    const { color, coreColor, outerColor, shadowColor } = createMicroorganismPalette(baseColor);
     const maxHealth = Math.max(1, entity.health?.max ?? entity.health?.current ?? 1);
     const health = Math.max(0, Math.min(maxHealth, entity.health?.current ?? maxHealth));
-    const sizeBase = Math.max(1, entity.health?.max ?? 1);
-    const scale = Number.isFinite(entity.appearance?.scale) ? entity.appearance.scale : 1;
-    const displayName = entity.displayName ?? capitalize(entity.species ?? '');
-    const variant = entity.variant ?? null;
-    const aggression = entity.aggression ?? 'neutral';
-
-    const resolvedAppearance = entity.appearance
-      ? {
-          ...entity.appearance,
-          bodyColor,
-          coreColor,
-          mantleColor,
-          accentColor: entity.appearance.accentColor ?? coreColor,
-          glowColor: entity.appearance.glowColor ?? coreColor,
-        }
-      : null;
 
     return {
       id: entity.id,
@@ -1031,20 +977,13 @@ const mapMicroorganisms = (entities = [], previous = new Map()) =>
       y: entity.position?.y ?? 0,
       vx: entity.movementVector?.x ?? 0,
       vy: entity.movementVector?.y ?? 0,
-      size: Math.max(4, Math.sqrt(sizeBase) * 2 * scale),
-      color: bodyColor,
+      size: Math.max(4, Math.sqrt(Math.max(1, entity.health?.max ?? 1)) * 2),
+      color,
       coreColor,
-      outerColor: mantleColor,
+      outerColor,
       shadowColor,
       health,
       maxHealth,
-      name: displayName,
-      level: Number.isFinite(entity.level) ? entity.level : entity.evolutionLevel ?? 1,
-      variant,
-      species: entity.species,
-      aggression,
-      description: entity.description ?? null,
-      appearance: resolvedAppearance,
       boss: Boolean(entity?.boss || entity?.tier === 'boss' || entity?.classification === 'boss'),
       opacity: 0.6,
       animPhase: prior ? prior.animPhase ?? 0 : Math.random() * Math.PI * 2,
