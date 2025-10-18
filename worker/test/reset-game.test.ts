@@ -212,6 +212,7 @@ describe("RoomDO resetGame", () => {
     const updatedPlayerA = players.get(playerA.id)!;
     const updatedPlayerB = players.get(playerB.id)!;
 
+    expect(updatedPlayerA.score).toBe(0);
     expect(updatedPlayerA.combo).toBe(1);
     expect(updatedPlayerA.lastActiveAt).not.toBe(0);
     expect(updatedPlayerA.movementVector).toEqual({ x: 0, y: 0 });
@@ -228,6 +229,7 @@ describe("RoomDO resetGame", () => {
     expect(updatedPlayerA.pendingAttack).toBeNull();
     expect(updatedPlayerA.invulnerableUntil).toBeNull();
 
+    expect(updatedPlayerB.score).toBe(0);
     expect(updatedPlayerB.combo).toBe(1);
     expect(updatedPlayerB.lastActiveAt).not.toBe(0);
     expect(updatedPlayerB.movementVector).toEqual({ x: 0, y: 0 });

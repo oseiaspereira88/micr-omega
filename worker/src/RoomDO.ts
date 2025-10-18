@@ -4321,6 +4321,7 @@ export class RoomDO {
 
     const resetTimestamp = Date.now();
     for (const player of this.players.values()) {
+      player.score = 0;
       player.combo = 1;
       player.lastActiveAt = resetTimestamp;
       player.movementVector = createVector();
