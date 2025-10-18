@@ -71,6 +71,7 @@ const GameHud = ({
   onCameraZoomChange,
   onQuit,
   opponents = [],
+  onReconnect,
 }) => {
   const { connectionStatus, joinError } = useGameStore(
     (state) => ({
@@ -290,6 +291,20 @@ const GameHud = ({
   const hudDisabled = showStatusOverlay;
   const statusTitle = statusMessages[connectionStatus] ?? 'Problemas de conexão';
   const statusHint = statusHints[connectionStatus];
+  const isReconnectInProgress =
+    connectionStatus === 'connecting' || connectionStatus === 'reconnecting';
+  const reconnectButtonLabel = isReconnectInProgress
+    ? 'Tentando reconectar…'
+    : 'Tentar novamente';
+  const showReconnectButton = showStatusOverlay && typeof onReconnect === 'function';
+
+  const handleReconnectClick = useCallback(() => {
+    if (typeof onReconnect !== 'function' || isReconnectInProgress) {
+      return;
+    }
+
+    onReconnect();
+  }, [isReconnectInProgress, onReconnect]);
 
   const sidebarIsInactive = hudDisabled || !isSidebarOpen;
   const sidebarAriaHidden = hudDisabled ? true : undefined;
@@ -331,6 +346,32 @@ const GameHud = ({
               ) : null}
               {statusHint ? (
                 <p className={styles.canvasOverlayHint}>{statusHint}</p>
+              ) : null}
+              {showReconnectButton ? (
+                <div className={styles.canvasOverlayActions}>
+                  <button
+                    type="button"
+                    className={styles.canvasOverlayButton}
+                    onClick={handleReconnectClick}
+                    disabled={isReconnectInProgress}
+                    aria-disabled={isReconnectInProgress ? true : undefined}
+                    aria-busy={isReconnectInProgress ? true : undefined}
+                  >
+                    {isReconnectInProgress ? (
+                      <>
+                        <span
+                          className={styles.canvasOverlaySpinner}
+                          aria-hidden="true"
+                        />
+                        <span className={styles.canvasOverlayButtonLabel}>
+                          {reconnectButtonLabel}
+                        </span>
+                      </>
+                    ) : (
+                      reconnectButtonLabel
+                    )}
+                  </button>
+                </div>
               ) : null}
             </div>
           ) : null}

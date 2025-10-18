@@ -583,7 +583,11 @@ const App = () => {
   return (
     <>
       {isGameActive ? (
-        <MicroOmegaGame settings={resolvedSettings} onQuit={handleQuit} />
+        <MicroOmegaGame
+          settings={resolvedSettings}
+          onQuit={handleQuit}
+          onReconnect={connect}
+        />
       ) : null}
       {!isGameActive ? (
         <StartScreen onStart={handleStart} onQuit={handleQuit} />
