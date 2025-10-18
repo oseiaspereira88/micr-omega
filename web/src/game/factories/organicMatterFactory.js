@@ -28,16 +28,18 @@ export const spawnOrganicMatter = ({
     const type = types[typeKey];
     if (!type) continue;
 
-    const isCluster = random() > 0.4;
-    const clusterSize = isCluster ? Math.floor(random() * 5) + 3 : 1;
+    const isCluster = random() > 0.35;
+    const clusterSize = isCluster ? Math.floor(random() * 4) + 4 : 1;
     const baseX = random() * worldSize;
     const baseY = random() * worldSize;
 
     for (let j = 0; j < clusterSize; j++) {
-      const offset = isCluster ? (random() - 0.5) * 40 : 0;
+      const scatterScale = isCluster ? 70 : 25;
+      const offsetX = (random() - 0.5) * scatterScale;
+      const offsetY = (random() - 0.5) * scatterScale;
       const organic = createOrganicMatter(typeKey, type, {
-        x: baseX + offset,
-        y: baseY + offset,
+        x: baseX + offsetX,
+        y: baseY + offsetY,
         rng: random
       });
 

@@ -38,6 +38,30 @@ const getSpawnPositionForPlayer = (playerId: string) => {
 };
 
 const ENTITY_OFFSET_RATIOS = [0.22, 0.18, 0.16, 0.14, 0.12, 0.1] as const;
+const ORGANIC_CLUSTER_PATTERNS = [
+  [
+    { offset: { x: 0, y: 0 }, quantityFactor: 1.2 },
+    { offset: { x: 28, y: -18 }, quantityFactor: 0.95 },
+    { offset: { x: -30, y: 24 }, quantityFactor: 0.85 },
+    { offset: { x: 18, y: 32 }, quantityFactor: 0.9 },
+    { offset: { x: -26, y: -28 }, quantityFactor: 0.8 },
+  ],
+  [
+    { offset: { x: 0, y: 0 }, quantityFactor: 1.1 },
+    { offset: { x: -24, y: 22 }, quantityFactor: 0.88 },
+    { offset: { x: 32, y: 18 }, quantityFactor: 0.92 },
+    { offset: { x: -36, y: -16 }, quantityFactor: 0.84 },
+    { offset: { x: 18, y: -30 }, quantityFactor: 0.86 },
+  ],
+  [
+    { offset: { x: 0, y: 0 }, quantityFactor: 1.15 },
+    { offset: { x: 26, y: 24 }, quantityFactor: 0.9 },
+    { offset: { x: -28, y: -22 }, quantityFactor: 0.87 },
+    { offset: { x: 34, y: -14 }, quantityFactor: 0.93 },
+    { offset: { x: -22, y: 32 }, quantityFactor: 0.85 },
+    { offset: { x: 8, y: -36 }, quantityFactor: 0.82 },
+  ],
+] as const;
 
 const normalizeVector = (vector: { x: number; y: number }) => {
   const magnitude = Math.hypot(vector.x, vector.y);
@@ -61,26 +85,60 @@ const getOrderedSpawnDirections = (primarySpawn: { x: number; y: number }) => {
   return [primarySpawn, ...remaining].map((position) => normalizeVector(position));
 };
 
-const getOffsetsForSpawn = (primarySpawn: { x: number; y: number }, count: number) => {
-  const directions = getOrderedSpawnDirections(primarySpawn);
-  return Array.from({ length: count }, (_, index) => {
-    const direction = directions[index % directions.length] ?? { x: 0, y: 0 };
-    const ratio = ENTITY_OFFSET_RATIOS[index % ENTITY_OFFSET_RATIOS.length] ?? 0;
-    const distance = WORLD_RADIUS * ratio;
-    return {
-      x: direction.x * distance,
-      y: direction.y * distance,
-    };
-  });
-};
-
-const applyOffset = (
+const translateWithinWorldBounds = (
   position: { x: number; y: number },
   offset: { x: number; y: number },
 ) => ({
   x: clamp(position.x + offset.x, -WORLD_RADIUS, WORLD_RADIUS),
   y: clamp(position.y + offset.y, -WORLD_RADIUS, WORLD_RADIUS),
 });
+
+const getEntityOffset = (directions: { x: number; y: number }[], index: number) => {
+  if (directions.length === 0) {
+    return { x: 0, y: 0 };
+  }
+  const direction = directions[index % directions.length] ?? { x: 0, y: 0 };
+  const ratio = ENTITY_OFFSET_RATIOS[index % ENTITY_OFFSET_RATIOS.length] ?? 0;
+  const distance = WORLD_RADIUS * ratio;
+  return {
+    x: direction.x * distance,
+    y: direction.y * distance,
+  };
+};
+
+const generateClusterPositions = (
+  basePosition: { x: number; y: number },
+  baseOffset: { x: number; y: number },
+  index: number,
+) => {
+  const anchor = translateWithinWorldBounds(basePosition, baseOffset);
+  const angle = Math.atan2(baseOffset.y, baseOffset.x);
+  const cosAngle = Math.cos(angle);
+  const sinAngle = Math.sin(angle);
+  const pattern =
+    ORGANIC_CLUSTER_PATTERNS[index % ORGANIC_CLUSTER_PATTERNS.length] ??
+    ORGANIC_CLUSTER_PATTERNS[0];
+
+  return pattern.map((entry, offsetIndex) => {
+    const rotatedOffset = {
+      x: entry.offset.x * cosAngle - entry.offset.y * sinAngle,
+      y: entry.offset.x * sinAngle + entry.offset.y * cosAngle,
+    };
+    const jitterSeed = Math.sin((index + 1) * (offsetIndex + 11));
+    const jitterMagnitude = (jitterSeed - Math.floor(jitterSeed)) * 12 - 6;
+    const jitterAngle = ((index + 3) * (offsetIndex + 5)) % 360;
+    const jitterRadians = (jitterAngle * Math.PI) / 180;
+    const jitterOffset = {
+      x: Math.cos(jitterRadians) * jitterMagnitude,
+      y: Math.sin(jitterRadians) * jitterMagnitude,
+    };
+
+    return translateWithinWorldBounds(anchor, {
+      x: rotatedOffset.x + jitterOffset.x,
+      y: rotatedOffset.y + jitterOffset.y,
+    });
+  });
+};
 
 describe("RoomDO resetGame", () => {
   async function createRoom() {
@@ -199,10 +257,7 @@ describe("RoomDO resetGame", () => {
     expect(resetPlayerB?.dashCooldownMs).toBe(0);
 
     const anchorSpawn = getSpawnPositionForPlayer(playerB.id);
-    const offsets = getOffsetsForSpawn(
-      anchorSpawn,
-      baseMicroPositions.length + baseOrganicPositions.length,
-    );
+    const directions = getOrderedSpawnDirections(anchorSpawn);
 
     const updatedMicroPositions = roomAny.world.microorganisms.map(
       (entity: { position: { x: number; y: number } }) => entity.position,
@@ -212,11 +267,17 @@ describe("RoomDO resetGame", () => {
     );
 
     expect(updatedMicroPositions).toEqual(
-      baseMicroPositions.map((position, index) => applyOffset(position, offsets[index]!)),
+      baseMicroPositions.map((position, index) =>
+        translateWithinWorldBounds(position, getEntityOffset(directions, index)),
+      ),
     );
     expect(updatedOrganicPositions).toEqual(
-      baseOrganicPositions.map((position, index) =>
-        applyOffset(position, offsets[baseMicroPositions.length + index]!),
+      baseOrganicPositions.flatMap((position, index) =>
+        generateClusterPositions(
+          position,
+          getEntityOffset(directions, baseMicroPositions.length + index),
+          index,
+        ),
       ),
     );
 
