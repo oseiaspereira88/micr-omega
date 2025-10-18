@@ -292,10 +292,8 @@ const GameHud = ({
   const statusHint = statusHints[connectionStatus];
 
   const sidebarIsInactive = hudDisabled || !isSidebarOpen;
-  const sidebarAriaHidden = sidebarIsInactive ? true : undefined;
+  const sidebarAriaHidden = hudDisabled ? true : undefined;
   const sidebarInert = sidebarIsInactive ? true : undefined;
-  const sidebarToggleTabIndex = hudDisabled ? -1 : undefined;
-  const sidebarToggleAriaHidden = hudDisabled ? true : undefined;
 
   return (
     <>
@@ -308,8 +306,6 @@ const GameHud = ({
         aria-expanded={isSidebarOpen}
         aria-controls={sidebarId}
         ref={toggleButtonRef}
-        tabIndex={sidebarToggleTabIndex}
-        aria-hidden={sidebarToggleAriaHidden}
         disabled={hudDisabled}
         aria-disabled={hudDisabled ? true : undefined}
         inert={hudDisabled ? true : undefined}
