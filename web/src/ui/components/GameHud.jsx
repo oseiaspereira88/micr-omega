@@ -299,7 +299,6 @@ const GameHud = ({
     : isSidebarOpen
     ? undefined
     : -1;
-  const sidebarToggleAriaHidden = hudDisabled ? true : isSidebarOpen ? undefined : true;
 
   return (
     <>
@@ -313,7 +312,7 @@ const GameHud = ({
         aria-controls={sidebarId}
         ref={toggleButtonRef}
         tabIndex={sidebarToggleTabIndex}
-        aria-hidden={sidebarToggleAriaHidden}
+        aria-hidden={hudDisabled ? true : undefined}
         disabled={hudDisabled}
         aria-disabled={hudDisabled ? true : undefined}
         inert={hudDisabled ? true : undefined}
