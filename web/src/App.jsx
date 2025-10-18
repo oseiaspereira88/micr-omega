@@ -5,6 +5,7 @@ import ToastStack from './components/ToastStack';
 import { useGameSocket } from './hooks/useGameSocket';
 import { gameStore, useGameStore } from './store/gameStore';
 import { useGameSettings } from './store/gameSettings';
+import { buildEvolutionPayload } from './utils/evolution';
 import { sanitizeArchetypeKey, TARGET_OPTIONAL_ATTACK_KINDS } from './utils/messageTypes';
 import {
   findNearestHostileMicroorganismId,
@@ -266,82 +267,14 @@ const App = () => {
 
   const handleEvolutionDelta = useCallback(
     (delta) => {
-      if (!delta || typeof delta !== 'object') {
-        return;
-      }
-
-      const { evolutionId } = delta;
-      if (typeof evolutionId !== 'string' || !evolutionId.trim()) {
-        return;
-      }
-
       const state = gameStore.getState();
       const playerId = state?.playerId;
       if (!playerId) {
         return;
       }
 
-      const actionPayload = {
-        type: 'evolution',
-        evolutionId: evolutionId.trim(),
-      };
-
-      if (typeof delta.tier === 'string' && delta.tier) {
-        actionPayload.tier = delta.tier;
-      }
-
-      if (Number.isFinite(delta.countDelta) && delta.countDelta !== 0) {
-        actionPayload.countDelta = Math.trunc(delta.countDelta);
-      }
-
-      if (Array.isArray(delta.traitDeltas) && delta.traitDeltas.length > 0) {
-        const traits = Array.from(
-          new Set(
-            delta.traitDeltas
-              .map((trait) => (typeof trait === 'string' ? trait.trim() : ''))
-              .filter((trait) => trait.length > 0),
-          ),
-        );
-        if (traits.length > 0) {
-          actionPayload.traitDeltas = traits;
-        }
-      }
-
-      const prepareAdjustments = (adjustments) => {
-        if (!adjustments || typeof adjustments !== 'object') return undefined;
-        const entries = Object.entries(adjustments)
-          .map(([key, value]) => [key, Number(value)])
-          .filter(([, numericValue]) => Number.isFinite(numericValue) && numericValue !== 0);
-        if (entries.length === 0) return undefined;
-        return entries.reduce((acc, [key, numericValue]) => {
-          acc[key] = numericValue;
-          return acc;
-        }, {});
-      };
-
-      const additiveDelta = prepareAdjustments(delta.additiveDelta);
-      if (additiveDelta) {
-        actionPayload.additiveDelta = additiveDelta;
-      }
-
-      const multiplierDelta = prepareAdjustments(delta.multiplierDelta);
-      if (multiplierDelta) {
-        actionPayload.multiplierDelta = multiplierDelta;
-      }
-
-      const baseDelta = prepareAdjustments(delta.baseDelta);
-      if (baseDelta) {
-        actionPayload.baseDelta = baseDelta;
-      }
-
-      const hasAdjustments =
-        Boolean(actionPayload.countDelta) ||
-        Boolean(actionPayload.traitDeltas?.length) ||
-        Boolean(additiveDelta) ||
-        Boolean(multiplierDelta) ||
-        Boolean(baseDelta);
-
-      if (!hasAdjustments) {
+      const actionPayload = buildEvolutionPayload(delta);
+      if (!actionPayload) {
         return;
       }
 
