@@ -714,6 +714,20 @@ export const useGameSocket = (
 
           if (!sendMessage(joinMessage)) {
             console.error("Falha ao enviar join após validação");
+            shouldReconnectRef.current = false;
+            lastRequestedNameRef.current = null;
+            gameStore.actions.setConnectionStatus("disconnected");
+
+            try {
+              socket.close(1011, "join_failed");
+            } catch (err) {
+              console.error(
+                "Erro ao fechar WebSocket após falha no envio do join",
+                err,
+              );
+            }
+
+            stopSocket(false);
             return;
           }
 

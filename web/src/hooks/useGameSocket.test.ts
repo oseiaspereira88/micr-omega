@@ -418,6 +418,50 @@ describe("useGameSocket", () => {
     }
   });
 
+  it("fecha a conexão e interrompe reconexão quando o join falha ao ser enviado", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const {
+      socket,
+      statusSpy,
+      incrementSpy,
+      setTimeoutSpy,
+      clearTimeoutSpy,
+      setIntervalSpy,
+      clearIntervalSpy,
+      unmount,
+      result,
+    } = setupSocketConnection({ autoOpen: false });
+
+    try {
+      const failure = new Error("join send failure");
+      socket.send.mockImplementation(() => {
+        throw failure;
+      });
+
+      act(() => {
+        socket.onopen?.();
+      });
+
+      expect(socket.send).toHaveBeenCalledTimes(1);
+      expect(socket.close).toHaveBeenCalledWith(1011, "join_failed");
+      expect(incrementSpy).not.toHaveBeenCalled();
+      expect(statusSpy).toHaveBeenCalledWith("disconnected");
+      expect(gameStore.getState().connectionStatus).toBe("disconnected");
+      expect(result.current.socket).toBeNull();
+      expect(setTimeoutSpy).not.toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+      statusSpy.mockRestore();
+      incrementSpy.mockRestore();
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      unmount();
+    }
+  });
+
   it("sets status to reconnecting when the initial connection fails and reconnection is enabled", () => {
     const timeoutSpy = vi.spyOn(window, "setTimeout");
     timeoutSpy.mockImplementation((() => 1) as unknown as Window["setTimeout"]);
