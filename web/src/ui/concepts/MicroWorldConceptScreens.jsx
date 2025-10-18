@@ -1,4 +1,7 @@
 import React, { useCallback, useState } from 'react';
+import SplashScreen from '../onboarding/SplashScreen.jsx';
+import MainMenuScreen from '../onboarding/MainMenuScreen.jsx';
+import LobbyScreen from '../onboarding/LobbyScreen.jsx';
 import styles from './MicroWorldConceptScreens.module.css';
 
 const ScreenPreview = ({ title, orientation = 'desktop', canvasClass, children }) => {
@@ -46,50 +49,14 @@ const conceptSteps = [
         </div>
         <div className={styles.sectionGallery}>
           <ScreenPreview title="Splash Screen — Desktop" canvasClass={styles.splashCanvas}>
-            <div className={styles.splashScene}>
-              <div className={styles.logoStack}>
-                <span className={styles.gameMark}>MICR•OMEGA</span>
-                <span className={styles.gameVersion}>Evolution Protocol v2.1</span>
-              </div>
-              <div className={styles.progressRail}>
-                <div className={styles.progressPulse} />
-              </div>
-              <div className={styles.loadingFeed}>
-                <span>Loading environment...</span>
-                <span>Syncing data...</span>
-                <span>Stabilising biomes...</span>
-              </div>
-              <div className={styles.poweredBy}>Powered by CloseApps</div>
-              <div className={styles.microSwarm}>
-                <span className={`${styles.microOrb} ${styles.orbOne}`} />
-                <span className={`${styles.microOrb} ${styles.orbTwo}`} />
-                <span className={`${styles.microOrb} ${styles.orbThree}`} />
-              </div>
-            </div>
+            <SplashScreen />
           </ScreenPreview>
           <ScreenPreview
             title="Splash Screen — Mobile"
             orientation="mobile"
             canvasClass={`${styles.splashCanvas} ${styles.mobileSplash}`}
           >
-            <div className={styles.splashSceneMobile}>
-              <div className={styles.logoStackCompact}>
-                <span className={styles.gameMark}>MICR•OMEGA</span>
-                <span className={styles.gameVersion}>Phase Shift Loading</span>
-              </div>
-              <div className={styles.progressRailMobile}>
-                <div className={styles.progressPulse} />
-              </div>
-              <div className={styles.loadingFeedMobile}>
-                <span>Calibrating senses...</span>
-                <span>Syncing data...</span>
-              </div>
-              <div className={styles.poweredBy}>Powered by CloseApps</div>
-              <div className={styles.mobileOrbits}>
-                <span className={`${styles.microOrb} ${styles.orbFour}`} />
-                <span className={`${styles.microOrb} ${styles.orbFive}`} />
-              </div>
-            </div>
+            <SplashScreen variant="mobile" />
           </ScreenPreview>
         </div>
       </section>
@@ -114,98 +81,14 @@ const conceptSteps = [
         </div>
         <div className={styles.sectionGallery}>
           <ScreenPreview title="Main Menu — Desktop" canvasClass={styles.menuCanvas}>
-            <div className={styles.menuLayout}>
-              <div className={styles.menuTopRow}>
-                <div className={styles.profileCard}>
-                  <div className={styles.avatarRing}>
-                    <div className={styles.avatarGlow} />
-                    <span className={styles.avatarInitials}>AR</span>
-                  </div>
-                  <div>
-                    <p className={styles.profileName}>Artemis_Rift</p>
-                    <p className={styles.profileMeta}>Lvl 42 • XP 78%</p>
-                  </div>
-                </div>
-                <button type="button" className={styles.playButton}>
-                  Play
-                </button>
-              </div>
-              <div className={styles.secondaryGrid}>
-                <button type="button" className={styles.secondaryAction}>
-                  ⚙️ Settings
-                </button>
-                <button type="button" className={styles.secondaryAction}>
-                  🛒 Loja
-                </button>
-                <button type="button" className={styles.secondaryAction}>
-                  ⭐ Missões
-                </button>
-                <button type="button" className={styles.secondaryAction}>
-                  👥 Amigos
-                </button>
-              </div>
-              <div className={styles.newsPanel}>
-                <div className={styles.newsBanner}>
-                  <span className={styles.bannerTitle}>Nova mutação liberada</span>
-                  <span className={styles.bannerMeta}>Evento Eclipse Azul • 02h restantes</span>
-                </div>
-                <div className={styles.newsBanner}>
-                  <span className={styles.bannerTitle}>Temporada Genesis ++</span>
-                  <span className={styles.bannerMeta}>Ranked reset em 3 dias</span>
-                </div>
-              </div>
-              <footer className={styles.menuFooter}>
-                <span>v1.3.0</span>
-                <span>•</span>
-                <span>Privacy Policy</span>
-              </footer>
-            </div>
+            <MainMenuScreen />
           </ScreenPreview>
           <ScreenPreview
             title="Main Menu — Mobile"
             orientation="mobile"
             canvasClass={`${styles.menuCanvas} ${styles.menuMobileCanvas}`}
           >
-            <div className={styles.menuLayoutMobile}>
-              <div className={styles.profileSummaryMobile}>
-                <div className={styles.avatarRingSmall}>
-                  <div className={styles.avatarGlow} />
-                  <span className={styles.avatarInitials}>AR</span>
-                </div>
-                <div>
-                  <p className={styles.profileName}>Artemis_Rift</p>
-                  <p className={styles.profileMeta}>Lvl 42 • XP 78%</p>
-                </div>
-              </div>
-              <button type="button" className={styles.playButtonMobile}>
-                Play
-              </button>
-              <div className={styles.mobileActionsRow}>
-                <button type="button" className={styles.secondaryActionCompact}>
-                  ⚙️
-                </button>
-                <button type="button" className={styles.secondaryActionCompact}>
-                  🛒
-                </button>
-                <button type="button" className={styles.secondaryActionCompact}>
-                  ⭐
-                </button>
-                <button type="button" className={styles.secondaryActionCompact}>
-                  👥
-                </button>
-              </div>
-              <div className={styles.newsStackMobile}>
-                <div className={styles.newsBannerMobile}>
-                  <span className={styles.bannerTitle}>Nova mutação liberada</span>
-                  <span className={styles.bannerMeta}>Evento Eclipse Azul</span>
-                </div>
-                <div className={styles.newsBannerMobile}>
-                  <span className={styles.bannerTitle}>Temporada Genesis ++</span>
-                  <span className={styles.bannerMeta}>Reset em 3 dias</span>
-                </div>
-              </div>
-              <footer className={styles.menuFooterMobile}>v1.3.0 • Privacy Policy</footer>
-            </div>
+            <MainMenuScreen variant="mobile" />
           </ScreenPreview>
         </div>
       </section>
@@ -230,107 +113,14 @@ const conceptSteps = [
         </div>
         <div className={styles.sectionGallery}>
           <ScreenPreview title="Lobby — Desktop" canvasClass={styles.lobbyCanvas}>
-            <div className={styles.lobbyLayout}>
-              <aside className={styles.lobbySidebar}>
-                <h3>Criar Sala</h3>
-                <p>Configure regras avançadas e convide seu esquadrão.</p>
-                <button type="button" className={styles.createRoomButton}>
-                  Criar nova sala
-                </button>
-                <div className={styles.pingCard}>
-                  <span>🏓 Ping: 22ms</span>
-                  <span>Latência estável</span>
-                </div>
-              </aside>
-              <div className={styles.lobbyContent}>
-                <div className={styles.filterBar}>
-                  <button type="button" className={`${styles.filterChip} ${styles.filterChipActive}`}>
-                    Região: Global
-                  </button>
-                  <button type="button" className={styles.filterChip}>Idioma: PT-BR</button>
-                  <button type="button" className={styles.filterChip}>Tipo: Co-op</button>
-                </div>
-                <div className={styles.roomList}>
-                  <article className={`${styles.roomCard} ${styles.roomCardFeatured}`}>
-                    <div>
-                      <h4>Sala Pública — Gratuita</h4>
-                      <p>Entre e jogue com qualquer jogador online 🌍</p>
-                    </div>
-                    <div className={styles.roomMeta}>
-                      <span>Jogadores: 24 / 40</span>
-                      <span>Ping 26ms</span>
-                      <button type="button" className={styles.joinButton}>
-                        Entrar agora
-                      </button>
-                    </div>
-                  </article>
-                  <article className={`${styles.roomCard} ${styles.roomCardLocked}`}>
-                    <div>
-                      <h4>Cluster Sináptico</h4>
-                      <p>Modos mutantes exclusivos • +45% XP</p>
-                    </div>
-                    <div className={styles.roomMeta}>
-                      <span>Jogadores: 8 / 12</span>
-                      <span className={styles.lockedLabel}>🔒 Premium</span>
-                      <button type="button" className={styles.unlockButton}>
-                        Desbloquear 120💎
-                      </button>
-                    </div>
-                  </article>
-                  <article className={`${styles.roomCard} ${styles.roomCardLocked}`}>
-                    <div>
-                      <h4>Ninho Lúmen</h4>
-                      <p>Experiência narrativa cooperativa</p>
-                    </div>
-                    <div className={styles.roomMeta}>
-                      <span>Jogadores: 2 / 6</span>
-                      <span className={styles.lockedLabel}>🔒 Premium</span>
-                      <button type="button" className={styles.unlockButton}>
-                        Desbloquear 95💎
-                      </button>
-                    </div>
-                  </article>
-                </div>
-              </div>
-            </div>
+            <LobbyScreen />
           </ScreenPreview>
           <ScreenPreview
             title="Lobby — Mobile"
             orientation="mobile"
             canvasClass={`${styles.lobbyCanvas} ${styles.lobbyMobileCanvas}`}
           >
-            <div className={styles.lobbyLayoutMobile}>
-              <div className={styles.mobileFilterStrip}>
-                <span className={styles.filterPill}>Global</span>
-                <span className={styles.filterPill}>PT-BR</span>
-                <span className={styles.filterPill}>Co-op</span>
-              </div>
-              <div className={styles.mobileRooms}>
-                <div className={`${styles.roomTile} ${styles.roomTileFeatured}`}>
-                  <h4>Sala Pública</h4>
-                  <p>🌍 Jogadores online agora</p>
-                  <span>24 / 40 • 26ms</span>
-                  <button type="button" className={styles.joinButton}>Entrar</button>
-                </div>
-                <div className={styles.roomTile}>
-                  <h4>Cluster Sináptico</h4>
-                  <p>🔒 Premium</p>
-                  <button type="button" className={styles.unlockButton}>120💎</button>
-                </div>
-                <div className={styles.roomTile}>
-                  <h4>Ninho Lúmen</h4>
-                  <p>🔒 Premium</p>
-                  <button type="button" className={styles.unlockButton}>95💎</button>
-                </div>
-              </div>
-              <div className={styles.mobileFooterCard}>
-                <div>
-                  <h5>Criar Sala</h5>
-                  <p>Monte partidas privadas instantâneas.</p>
-                </div>
-                <button type="button" className={styles.createRoomButton}>Criar</button>
-              </div>
-            </div>
+            <LobbyScreen variant="mobile" />
           </ScreenPreview>
         </div>
       </section>

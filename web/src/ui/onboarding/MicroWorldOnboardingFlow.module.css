@@ -1,0 +1,185 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&display=swap');
+
+.flowRoot {
+  position: relative;
+  min-height: 100vh;
+  padding: clamp(32px, 6vw, 72px) clamp(20px, 5vw, 64px) 48px;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(24px, 4vw, 40px);
+  background: linear-gradient(135deg, #040b1f 0%, #06031c 48%, #0a1c36 100%);
+  color: var(--micr-text, #e8f6ff);
+  font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+  overflow: hidden;
+}
+
+.aura {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 20% 25%, rgba(74, 224, 255, 0.24), transparent 55%),
+    radial-gradient(circle at 80% 70%, rgba(94, 66, 255, 0.22), transparent 60%),
+    radial-gradient(circle at 50% 50%, rgba(60, 247, 168, 0.18), transparent 68%);
+  filter: blur(60px);
+  opacity: 0.9;
+}
+
+.header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+  z-index: 1;
+}
+
+.kicker {
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: rgba(180, 220, 255, 0.75);
+  margin: 0;
+}
+
+.heading {
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: clamp(2.1rem, 4vw, 3.2rem);
+  margin: 0;
+}
+
+.subheading {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: rgba(210, 235, 255, 0.82);
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.viewport {
+  width: min(100%, 980px);
+  min-height: clamp(420px, 58vh, 640px);
+  border-radius: 28px;
+  padding: clamp(18px, 2.5vw, 28px);
+  background: rgba(8, 18, 36, 0.78);
+  border: 1px solid rgba(74, 224, 255, 0.18);
+  box-shadow: 0 32px 72px rgba(4, 10, 28, 0.65);
+  backdrop-filter: blur(18px);
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+}
+
+.viewportCanvas {
+  flex: 1;
+  display: flex;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.controls {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 20px 24px;
+  border-radius: 20px;
+  background: rgba(6, 16, 36, 0.8);
+  border: 1px solid rgba(60, 247, 168, 0.22);
+  box-shadow: 0 22px 64px rgba(4, 10, 28, 0.58);
+  z-index: 1;
+}
+
+.stepMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stepLabel {
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(170, 220, 255, 0.75);
+}
+
+.stepTitle {
+  font-size: 1.1rem;
+  color: rgba(226, 244, 255, 0.92);
+}
+
+.progressTrack {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.progressDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(60, 247, 168, 0.22);
+  border: 1px solid rgba(74, 224, 255, 0.35);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.progressDotActive {
+  background: rgba(74, 224, 255, 0.85);
+  transform: scale(1.2);
+  box-shadow: 0 0 18px rgba(74, 224, 255, 0.6);
+}
+
+.primaryCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 32px;
+  border-radius: 999px;
+  border: none;
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #041224;
+  background: linear-gradient(125deg, rgba(60, 247, 168, 0.95), rgba(74, 224, 255, 0.95));
+  box-shadow: 0 18px 48px rgba(20, 222, 190, 0.3), 0 0 0 1px rgba(74, 224, 255, 0.4) inset;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primaryCta:hover,
+.primaryCta:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 58px rgba(20, 222, 190, 0.34), 0 0 0 1px rgba(74, 224, 255, 0.55) inset;
+}
+
+.primaryCta:focus-visible {
+  outline: none;
+}
+
+@media (max-width: 768px) {
+  .flowRoot {
+    padding-bottom: 72px;
+  }
+
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .progressTrack {
+    justify-content: flex-start;
+  }
+}

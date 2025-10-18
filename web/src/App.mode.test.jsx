@@ -25,26 +25,27 @@ describe('App display mode flow', () => {
     updateSearch('');
   });
 
-  it('renders concept screens by default', () => {
+  it('renders onboarding flow by default', () => {
     render(<App />);
 
-    expect(screen.getByText('Evolving Microworlds UI Kit')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Próximo' })).toBeInTheDocument();
+    expect(screen.getByTestId('micro-world-onboarding-flow')).toBeInTheDocument();
+    expect(screen.getByTestId('splash-screen')).toBeInTheDocument();
+    expect(screen.getByTestId('onboarding-cta')).toHaveTextContent('Próximo');
   });
 
-  it('advances through concept steps before entering the game', async () => {
+  it('advances through onboarding steps before entering the game', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Splash Screen' })).toBeInTheDocument();
+    expect(screen.getByTestId('splash-screen')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Próximo' }));
-    expect(screen.getByRole('heading', { name: 'Main Menu' })).toBeInTheDocument();
+    await user.click(screen.getByTestId('onboarding-cta'));
+    expect(screen.getByTestId('main-menu-screen')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Próximo' }));
-    expect(screen.getByRole('heading', { name: 'Lobby — Seleção de Salas' })).toBeInTheDocument();
+    await user.click(screen.getByTestId('onboarding-cta'));
+    expect(screen.getByTestId('lobby-screen')).toBeInTheDocument();
 
-    const finalCta = screen.getByRole('button', { name: 'Entrar no jogo' });
+    const finalCta = screen.getByTestId('onboarding-cta');
     await user.click(finalCta);
 
     expect(screen.getByTestId('game-app')).toBeInTheDocument();
@@ -56,7 +57,7 @@ describe('App display mode flow', () => {
     render(<App />);
 
     expect(screen.getByTestId('game-app')).toBeInTheDocument();
-    expect(screen.queryByText('Evolving Microworlds UI Kit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('micro-world-onboarding-flow')).not.toBeInTheDocument();
   });
 });
 
