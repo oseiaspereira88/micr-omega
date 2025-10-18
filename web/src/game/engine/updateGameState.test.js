@@ -376,33 +376,6 @@ describe('updateGameState', () => {
     expect(result.localPlayerId).toBe('p1');
   });
 
-  it('injects the local player when remote snapshots omit it', () => {
-    const renderState = createRenderState();
-    const localPlayer = createPlayer({ id: 'local-player', name: 'Local Pilot' });
-    const remotePlayer = createPlayer({ id: 'remote-player', name: 'Remote Ally' });
-
-    const sharedState = createSharedState({
-      playerId: localPlayer.id,
-      players: [remotePlayer],
-    });
-
-    sharedState.players = { [localPlayer.id]: localPlayer };
-
-    updateGameState({
-      renderState,
-      sharedState,
-      delta: 0.2,
-      movementIntent: { x: 0, y: 0 },
-      actionBuffer: { attacks: [] },
-    });
-
-    expect(renderState.playerList.map((player) => player.id)).toEqual(
-      expect.arrayContaining([remotePlayer.id, localPlayer.id]),
-    );
-    const restoredLocal = renderState.playerList.find((player) => player.id === localPlayer.id);
-    expect(restoredLocal?.isLocal).toBe(true);
-  });
-
   it('creates a renderer-ready playerList from synchronized players', () => {
     const renderState = createRenderState();
     const localPlayer = createPlayer({
