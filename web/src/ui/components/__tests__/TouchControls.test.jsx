@@ -6,7 +6,7 @@ import TouchControls from '../TouchControls';
 import styles from '../TouchControls.module.css';
 
 describe('TouchControls', () => {
-  const joystick = { isTouchActive: false, position: { x: 0, y: 0 } };
+  const joystick = { isPointerActive: false, position: { x: 0, y: 0 } };
 
   const baseProps = {
     joystick,
