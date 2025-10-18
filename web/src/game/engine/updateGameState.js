@@ -121,13 +121,76 @@ const DEFAULT_RESOURCE_STUB = {
   level: 1,
 };
 
+const hexToRgb = (hex) => {
+  const normalized = normalizeHexColor(hex ?? DEFAULT_SPECIES_COLOR);
+  const match = /^#([0-9a-fA-F]{6})$/.exec(normalized);
+  if (!match) {
+    return { r: 143, g: 184, b: 255 };
+  }
+  return {
+    r: parseInt(match[1].slice(0, 2), 16),
+    g: parseInt(match[1].slice(2, 4), 16),
+    b: parseInt(match[1].slice(4, 6), 16),
+  };
+};
+
+const toLinearChannel = (value) => {
+  const scaled = value / 255;
+  return scaled <= 0.03928 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
+};
+
+const getRelativeLuminance = (hex) => {
+  const { r, g, b } = hexToRgb(hex);
+  const linearR = toLinearChannel(r);
+  const linearG = toLinearChannel(g);
+  const linearB = toLinearChannel(b);
+  return 0.2126 * linearR + 0.7152 * linearG + 0.0722 * linearB;
+};
+
+const getContrastingTextColor = (hex) =>
+  getRelativeLuminance(hex) > 0.48 ? '#0c111e' : '#f8fbff';
+
 const createMicroorganismPalette = (baseColor) => {
   const color = normalizeHexColor(baseColor ?? DEFAULT_SPECIES_COLOR);
+  const coreColor = adjustHexColor(color, 24);
+  const outerColor = color;
+  const shadowColor = adjustHexColor(color, -40);
+  const accentColor = adjustHexColor(color, 48);
+  const detailColor = adjustHexColor(color, -26);
+  const glowColor = adjustHexColor(color, 72);
+  const hpFillColor = adjustHexColor(color, 16);
+  const hpBorderColor = adjustHexColor(color, -52);
+  const labelColor = getContrastingTextColor(coreColor);
+  const labelBackground =
+    getRelativeLuminance(color) > 0.42 ? 'rgba(12, 17, 29, 0.82)' : 'rgba(245, 249, 255, 0.88)';
+
+  const palette = {
+    base: color,
+    core: coreColor,
+    outer: outerColor,
+    shadow: shadowColor,
+    accent: accentColor,
+    detail: detailColor,
+    glow: glowColor,
+    hpFill: hpFillColor,
+    hpBorder: hpBorderColor,
+    label: labelColor,
+    labelBackground,
+  };
+
   return {
     color,
-    coreColor: adjustHexColor(color, 24),
-    outerColor: color,
-    shadowColor: adjustHexColor(color, -40),
+    coreColor,
+    outerColor,
+    shadowColor,
+    accentColor,
+    detailColor,
+    glowColor,
+    hpFillColor,
+    hpBorderColor,
+    labelColor,
+    labelBackground,
+    palette,
   };
 };
 
@@ -981,13 +1044,52 @@ const toEntityMap = (entities = []) => {
   return map;
 };
 
+const sanitizeName = (value, fallback) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+  }
+  return fallback;
+};
+
+const getThreatTier = (level, isBoss) => {
+  if (isBoss) return 'boss';
+  if (level >= 20) return 'apex';
+  if (level >= 12) return 'advanced';
+  if (level >= 6) return 'mature';
+  return 'juvenile';
+};
+
 const mapMicroorganisms = (entities = [], previous = new Map()) =>
   entities.map((entity) => {
     const prior = previous.get(entity.id);
     const baseColor = SPECIES_COLORS[entity.species] ?? entity.color ?? DEFAULT_SPECIES_COLOR;
-    const { color, coreColor, outerColor, shadowColor } = createMicroorganismPalette(baseColor);
+    const {
+      color,
+      coreColor,
+      outerColor,
+      shadowColor,
+      accentColor,
+      detailColor,
+      glowColor,
+      hpFillColor,
+      hpBorderColor,
+      labelColor,
+      labelBackground,
+      palette,
+    } = createMicroorganismPalette(baseColor);
     const maxHealth = Math.max(1, entity.health?.max ?? entity.health?.current ?? 1);
     const health = Math.max(0, Math.min(maxHealth, entity.health?.current ?? maxHealth));
+    const level = Math.max(0, Math.floor(Number.isFinite(entity.level) ? entity.level : entity.evolutionLevel ?? 1));
+    const boss = Boolean(entity?.boss || entity?.tier === 'boss' || entity?.classification === 'boss');
+    const threatTier = getThreatTier(level, boss);
+    const name = sanitizeName(entity.name, entity.species ?? 'Microorganism');
+    const species = sanitizeName(entity.species, 'unknown');
+    const aggression = sanitizeName(entity.aggression, 'neutral');
+    const attributes = { ...(entity.attributes || {}) };
+    const label = `${name} · Lv ${level}`;
 
     return {
       id: entity.id,
@@ -1000,9 +1102,17 @@ const mapMicroorganisms = (entities = [], previous = new Map()) =>
       coreColor,
       outerColor,
       shadowColor,
+      accentColor,
+      detailColor,
+      glowColor,
+      hpFillColor,
+      hpBorderColor,
+      labelColor,
+      labelBackground,
+      palette,
       health,
       maxHealth,
-      boss: Boolean(entity?.boss || entity?.tier === 'boss' || entity?.classification === 'boss'),
+      boss,
       opacity: 0.6,
       animPhase: prior ? prior.animPhase ?? 0 : Math.random() * Math.PI * 2,
       depth: 0.5,
@@ -1010,6 +1120,13 @@ const mapMicroorganisms = (entities = [], previous = new Map()) =>
       decision: entity.ai?.lastDecision ?? null,
       targetId: entity.ai?.targetId ?? null,
       evolutionLevel: entity.evolutionLevel ?? 1,
+      level,
+      species,
+      name,
+      aggression,
+      attributes,
+      label,
+      threatTier,
     };
   });
 

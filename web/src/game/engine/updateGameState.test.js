@@ -631,11 +631,15 @@ describe('updateGameState', () => {
           {
             id: 'hostile-micro-1',
             species: 'rotifer',
+            name: 'Prime Rotifer',
+            level: 7,
             position: { x: 64, y: -32 },
             movementVector: { x: -0.2, y: 0.4 },
             orientation: { angle: 0 },
             health: { current: 3, max: 9 },
             classification: 'boss',
+            aggression: 'hostile',
+            attributes: { speed: 1.4, damage: 2.2 },
           },
         ],
         organicMatter: [
@@ -691,10 +695,19 @@ describe('updateGameState', () => {
       boss: true,
       opacity: 0.6,
       depth: 0.5,
+      name: 'Prime Rotifer',
+      level: 7,
+      label: 'Prime Rotifer · Lv 7',
+      species: 'rotifer',
+      aggression: 'hostile',
     });
     expect(microorganism.size).toBeCloseTo(Math.sqrt(9) * 2, 5);
     expect(typeof microorganism.coreColor).toBe('string');
     expect(typeof microorganism.shadowColor).toBe('string');
+    expect(typeof microorganism.labelColor).toBe('string');
+    expect(typeof microorganism.hpFillColor).toBe('string');
+    expect(microorganism.attributes).toEqual({ speed: 1.4, damage: 2.2 });
+    expect(microorganism.palette).toMatchObject({ base: '#ffa3d0', core: expect.any(String) });
 
     const initialPhase = microorganism.animPhase;
 
