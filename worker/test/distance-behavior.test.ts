@@ -555,9 +555,195 @@ describe("RoomDO distance-sensitive behaviour", () => {
 
     const result = roomAny.updateMicroorganismsDuringTick(1_000, now, worldDiff, combatLog, updatedPlayers);
 
-    expect(result.worldChanged).toBe(false);
-    expect(worldDiff.upsertMicroorganisms).toBeUndefined();
-    expect(microorganism.position).toEqual({ x: -100, y: 0 });
+    expect(result.worldChanged).toBe(true);
+    expect(worldDiff.upsertMicroorganisms).toHaveLength(1);
+    const halfWidth = obstacle.size.x / 2;
+    expect(Math.abs(microorganism.position.x - obstacle.position.x)).toBeGreaterThanOrEqual(
+      halfWidth,
+    );
+  });
+
+  it("steers hostile microorganisms toward the closest player each tick", async () => {
+    const { roomAny } = await createRoom();
+
+    const playerNear: TestPlayer = createTestPlayer("target-near", {
+      position: { x: 80, y: 0 },
+    });
+    const playerFar: TestPlayer = createTestPlayer("target-far", {
+      position: { x: -140, y: 60 },
+    });
+    roomAny.players.set(playerNear.id, playerNear);
+    roomAny.players.set(playerFar.id, playerFar);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    const microorganism = createTestMicroorganism("hunter", {
+      aggression: "hostile",
+      position: { x: -150, y: 0 },
+      attributes: { speed: 60, damage: 4, resilience: 0 },
+    });
+
+    roomAny.microorganisms.clear();
+    roomAny.microorganisms.set(microorganism.id, microorganism);
+    roomAny.world.microorganisms = [microorganism];
+    roomAny.microorganismBehavior.clear();
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, TestPlayer>();
+    const now = Date.now();
+
+    roomAny.updateMicroorganismsDuringTick(
+      WORLD_TICK_INTERVAL_MS,
+      now,
+      worldDiff,
+      combatLog,
+      updatedPlayers,
+    );
+
+    expect(worldDiff.upsertMicroorganisms).toHaveLength(1);
+    const update = worldDiff.upsertMicroorganisms![0]!;
+    const magnitude = Math.hypot(update.movementVector.x, update.movementVector.y);
+    expect(magnitude).toBeGreaterThan(0);
+    expect(update.movementVector.x).toBeGreaterThan(0);
+    expect(update.orientation.angle).toBeGreaterThan(-Math.PI / 2);
+    expect(update.orientation.angle).toBeLessThan(Math.PI / 2);
+    expect(microorganism.position.x).toBeGreaterThan(-150);
+  });
+
+  it("maintains patrol movement for neutral microorganisms with zig-zag steering", async () => {
+    const { roomAny } = await createRoom();
+
+    const microorganism = createTestMicroorganism("wanderer", {
+      aggression: "neutral",
+      position: { x: -200, y: 200 },
+      attributes: { speed: 45 },
+    });
+
+    roomAny.microorganisms.clear();
+    roomAny.microorganisms.set(microorganism.id, microorganism);
+    roomAny.world.microorganisms = [microorganism];
+    const now = Date.now();
+    roomAny.microorganismBehavior.clear();
+    roomAny.microorganismBehavior.set(microorganism.id, {
+      lastAttackAt: 0,
+      movement: {
+        targetPlayerId: null,
+        retargetAfter: now - 2_000,
+        nextWaypoint: { x: 80, y: 0 },
+        zigzagDirection: 1,
+        lastZigToggleAt: 0,
+        baseHeadingAngle: 0,
+        fleeUntil: 0,
+      },
+    });
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, TestPlayer>();
+
+    roomAny.updateMicroorganismsDuringTick(
+      WORLD_TICK_INTERVAL_MS,
+      now,
+      worldDiff,
+      combatLog,
+      updatedPlayers,
+    );
+
+    expect(worldDiff.upsertMicroorganisms).toHaveLength(1);
+    const update = worldDiff.upsertMicroorganisms![0]!;
+    expect(Math.hypot(update.movementVector.x, update.movementVector.y)).toBeGreaterThan(0);
+    expect(update.orientation.angle).not.toBeNaN();
+  });
+
+  it("forces microorganisms to flee from nearby players when low on health", async () => {
+    const { roomAny } = await createRoom();
+
+    const pursuer: TestPlayer = createTestPlayer("chaser", {
+      position: { x: 40, y: 0 },
+    });
+    roomAny.players.set(pursuer.id, pursuer);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    const microorganism = createTestMicroorganism("frail", {
+      health: { current: 2, max: 10 },
+      aggression: "hostile",
+      position: { x: -150, y: 0 },
+      attributes: { speed: 50, damage: 3, resilience: 0 },
+    });
+
+    roomAny.microorganisms.clear();
+    roomAny.microorganisms.set(microorganism.id, microorganism);
+    roomAny.world.microorganisms = [microorganism];
+    roomAny.microorganismBehavior.clear();
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, TestPlayer>();
+    const now = Date.now();
+
+    roomAny.updateMicroorganismsDuringTick(
+      WORLD_TICK_INTERVAL_MS,
+      now,
+      worldDiff,
+      combatLog,
+      updatedPlayers,
+    );
+
+    expect(worldDiff.upsertMicroorganisms).toHaveLength(1);
+    const update = worldDiff.upsertMicroorganisms![0]!;
+    expect(update.movementVector.x).toBeLessThan(0);
+    expect(Math.abs(update.orientation.angle)).toBeCloseTo(Math.PI, 1);
+  });
+
+  it("adjusts pursuit vectors to dodge immediate obstacles", async () => {
+    const { roomAny } = await createRoom();
+
+    const player: TestPlayer = createTestPlayer("runner", {
+      position: { x: 120, y: 0 },
+    });
+    roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    const obstacle: Obstacle = {
+      id: "wall", 
+      kind: "obstacle",
+      position: { x: 40, y: 0 },
+      size: { x: 60, y: 40 },
+      impassable: true,
+    };
+
+    roomAny.obstacles.clear();
+    roomAny.obstacles.set(obstacle.id, obstacle);
+    roomAny.world.obstacles = [obstacle];
+
+    const microorganism = createTestMicroorganism("dodger", {
+      aggression: "hostile",
+      position: { x: -150, y: 0 },
+      attributes: { speed: 60, damage: 4, resilience: 0 },
+    });
+
+    roomAny.microorganisms.clear();
+    roomAny.microorganisms.set(microorganism.id, microorganism);
+    roomAny.world.microorganisms = [microorganism];
+    roomAny.microorganismBehavior.clear();
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, TestPlayer>();
+    const now = Date.now();
+
+    roomAny.updateMicroorganismsDuringTick(
+      WORLD_TICK_INTERVAL_MS,
+      now,
+      worldDiff,
+      combatLog,
+      updatedPlayers,
+    );
+
+    expect(worldDiff.upsertMicroorganisms).toHaveLength(1);
+    const update = worldDiff.upsertMicroorganisms![0]!;
+    expect(Math.abs(update.movementVector.y)).toBeGreaterThan(0.05);
+    expect(update.orientation.angle).not.toBeCloseTo(0);
   });
 });
 

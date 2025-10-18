@@ -105,6 +105,17 @@ const PLAYER_COLLECT_RADIUS = 60;
 const PLAYER_ATTACK_RANGE_BUFFER = 4;
 const OBSTACLE_PADDING = 12;
 
+const MICRO_LOW_HEALTH_THRESHOLD = 0.3;
+const MICRO_RETARGET_COOLDOWN_MS = 500;
+const MICRO_FLEE_DURATION_MS = 2_000;
+const MICRO_PATROL_RADIUS = 140;
+const MICRO_WAYPOINT_REACH_DISTANCE = 16;
+const MICRO_WAYPOINT_REFRESH_MS = 6_000;
+const MICRO_ZIG_ANGLE_RADIANS = Math.PI / 6;
+const MICRO_ZIG_INTERVAL_MS = 1_200;
+const MICRO_STEERING_SAMPLE_DISTANCE = 360;
+const MICRO_STEERING_ANGLES = [Math.PI / 6, Math.PI / 4, Math.PI / 3] as const;
+
 const ORGANIC_MATTER_CELL_SIZE = PLAYER_COLLECT_RADIUS;
 const ORGANIC_RESPAWN_DELAY_RANGE_MS = { min: 1_200, max: 3_600 } as const;
 const ORGANIC_RESPAWN_CLUSTER_RADIUS = 70;
@@ -349,6 +360,39 @@ const createVector = (vector?: Vector2): Vector2 => ({
 });
 
 const cloneVector = (vector: Vector2): Vector2 => ({ x: vector.x, y: vector.y });
+
+const vectorMagnitude = (vector: Vector2): number => Math.sqrt(vector.x ** 2 + vector.y ** 2);
+
+const normalizeVectorOrNull = (vector: Vector2): Vector2 | null => {
+  const magnitude = vectorMagnitude(vector);
+  if (!Number.isFinite(magnitude) || magnitude === 0) {
+    return null;
+  }
+  return { x: vector.x / magnitude, y: vector.y / magnitude };
+};
+
+const rotateVector = (vector: Vector2, angle: number): Vector2 => {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return {
+    x: vector.x * cos - vector.y * sin,
+    y: vector.x * sin + vector.y * cos,
+  };
+};
+
+const vectorsApproximatelyEqual = (a: Vector2, b: Vector2, tolerance = 1e-3): boolean =>
+  Math.abs(a.x - b.x) <= tolerance && Math.abs(a.y - b.y) <= tolerance;
+
+const orientationsApproximatelyEqual = (
+  a: OrientationState,
+  b: OrientationState,
+  tolerance = 1e-3,
+): boolean => {
+  if (Math.abs(a.angle - b.angle) > tolerance) {
+    return false;
+  }
+  return a.tilt === b.tilt;
+};
 
 const createOrientation = (orientation?: OrientationState): OrientationState => {
   if (!orientation) {
@@ -790,6 +834,21 @@ const cloneMicroorganism = (entity: Microorganism): Microorganism => ({
   attributes: { ...entity.attributes },
 });
 
+type MicroorganismMovementMemory = {
+  targetPlayerId: string | null;
+  retargetAfter: number;
+  nextWaypoint: Vector2 | null;
+  zigzagDirection: 1 | -1;
+  lastZigToggleAt: number;
+  baseHeadingAngle: number | null;
+  fleeUntil: number;
+};
+
+type MicroorganismBehaviorState = {
+  lastAttackAt: number;
+  movement: MicroorganismMovementMemory;
+};
+
 const cloneOrganicMatter = (matter: OrganicMatter): OrganicMatter => ({
   ...matter,
   position: cloneVector(matter.position),
@@ -1173,7 +1232,7 @@ export class RoomDO {
   private organicMatterRespawnRng: () => number = Math.random;
   private organicRespawnQueue: PendingOrganicRespawn[] = [];
   private obstacles = new Map<string, Obstacle>();
-  private microorganismBehavior = new Map<string, { lastAttackAt: number }>();
+  private microorganismBehavior = new Map<string, MicroorganismBehaviorState>();
   private microorganismStatusEffects = new Map<string, StatusCollection>();
   private lastWorldTickAt: number | null = null;
   private pendingStatusEffects: StatusEffectEvent[] = [];
@@ -1585,8 +1644,50 @@ export class RoomDO {
     const now = Date.now();
     this.microorganismBehavior.clear();
     for (const microorganism of this.microorganisms.values()) {
-      this.microorganismBehavior.set(microorganism.id, { lastAttackAt: now });
+      this.microorganismBehavior.set(
+        microorganism.id,
+        this.createMicroorganismBehaviorState(now),
+      );
     }
+  }
+
+  private createMicroorganismBehaviorState(now: number): MicroorganismBehaviorState {
+    return {
+      lastAttackAt: 0,
+      movement: {
+        targetPlayerId: null,
+        retargetAfter: now,
+        nextWaypoint: null,
+        zigzagDirection: 1,
+        lastZigToggleAt: now,
+        baseHeadingAngle: null,
+        fleeUntil: 0,
+      },
+    };
+  }
+
+  private getMicroorganismBehaviorState(
+    microorganismId: string,
+    now: number,
+  ): MicroorganismBehaviorState {
+    let behavior = this.microorganismBehavior.get(microorganismId);
+    if (!behavior) {
+      behavior = this.createMicroorganismBehaviorState(now);
+      this.microorganismBehavior.set(microorganismId, behavior);
+      return behavior;
+    }
+    if (!behavior.movement) {
+      behavior.movement = {
+        targetPlayerId: null,
+        retargetAfter: now,
+        nextWaypoint: null,
+        zigzagDirection: 1,
+        lastZigToggleAt: now,
+        baseHeadingAngle: null,
+        fleeUntil: 0,
+      };
+    }
+    return behavior;
   }
 
   private getPrimaryPlayerForSpawn(): PlayerInternal | null {
@@ -2651,6 +2752,238 @@ export class RoomDO {
     };
   }
 
+  private buildOrientationFromDirection(
+    direction: Vector2,
+    existing: OrientationState,
+  ): OrientationState | null {
+    const normalized = normalizeVectorOrNull(direction);
+    if (!normalized) {
+      return null;
+    }
+    const angle = Math.atan2(normalized.y, normalized.x);
+    if (!Number.isFinite(angle)) {
+      return null;
+    }
+    return existing.tilt === undefined
+      ? { angle }
+      : { angle, tilt: existing.tilt };
+  }
+
+  private generateMicroorganismWaypoint(origin: Vector2): Vector2 {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = MICRO_PATROL_RADIUS * (0.4 + Math.random() * 0.6);
+      const candidate = this.clampPosition({
+        x: origin.x + Math.cos(angle) * distance,
+        y: origin.y + Math.sin(angle) * distance,
+      });
+      if (!this.isBlockedByObstacle(candidate)) {
+        return candidate;
+      }
+    }
+    return { ...origin };
+  }
+
+  private findClosestPlayer(
+    position: Vector2,
+    candidates: PlayerInternal[],
+  ): PlayerInternal | null {
+    let closest: { player: PlayerInternal; distanceSquared: number } | null = null;
+    for (const player of candidates) {
+      const distanceSquared = this.distanceSquared(player.position, position);
+      if (!closest || distanceSquared < closest.distanceSquared) {
+        closest = { player, distanceSquared };
+      }
+    }
+    return closest?.player ?? null;
+  }
+
+  private isDirectionViable(origin: Vector2, direction: Vector2, sampleDistance: number): boolean {
+    const steps = Math.max(1, Math.ceil(sampleDistance / 20));
+    const originBlocked = this.isBlockedByObstacle(origin);
+    let hasExitedBlockedRegion = !originBlocked;
+    for (let step = 1; step <= steps; step += 1) {
+      const distance = (sampleDistance / steps) * step;
+      const candidate = {
+        x: origin.x + direction.x * distance,
+        y: origin.y + direction.y * distance,
+      };
+      const clamped = this.clampPosition(candidate);
+      if (!this.positionsEqual(candidate, clamped)) {
+        return false;
+      }
+      const blocked = this.isBlockedByObstacle(clamped);
+      if (blocked && hasExitedBlockedRegion) {
+        return false;
+      }
+      if (!blocked) {
+        hasExitedBlockedRegion = true;
+      }
+    }
+    return hasExitedBlockedRegion;
+  }
+
+  private computeSteeredDirection(origin: Vector2, desired: Vector2): Vector2 {
+    const normalized = normalizeVectorOrNull(desired);
+    if (!normalized) {
+      return createVector();
+    }
+
+    if (this.isDirectionViable(origin, normalized, MICRO_STEERING_SAMPLE_DISTANCE)) {
+      return normalized;
+    }
+
+    for (const angle of MICRO_STEERING_ANGLES) {
+      for (const sign of [1, -1] as const) {
+        const rotated = rotateVector(normalized, angle * sign);
+        if (this.isDirectionViable(origin, rotated, MICRO_STEERING_SAMPLE_DISTANCE)) {
+          return rotated;
+        }
+      }
+    }
+
+    return createVector();
+  }
+
+  private resolveMicroorganismTarget(
+    microorganism: Microorganism,
+    behavior: MicroorganismBehaviorState,
+    now: number,
+  ): PlayerInternal | null {
+    const { movement } = behavior;
+    let target: PlayerInternal | null = null;
+    if (movement.targetPlayerId) {
+      const candidate = this.players.get(movement.targetPlayerId) ?? null;
+      if (
+        candidate &&
+        candidate.connected &&
+        candidate.health.current > 0 &&
+        !candidate.pendingRemoval &&
+        !this.playersPendingRemoval.has(candidate.id)
+      ) {
+        target = candidate;
+      } else {
+        movement.targetPlayerId = null;
+      }
+    }
+
+    if (!target || now >= movement.retargetAfter) {
+      const candidates = this.getMicroorganismTargetCandidates();
+      if (candidates.length === 0) {
+        movement.targetPlayerId = null;
+        movement.retargetAfter = now + MICRO_RETARGET_COOLDOWN_MS;
+        return null;
+      }
+      const closest = this.findClosestPlayer(microorganism.position, candidates);
+      if (!closest) {
+        movement.targetPlayerId = null;
+        movement.retargetAfter = now + MICRO_RETARGET_COOLDOWN_MS;
+        return null;
+      }
+      movement.targetPlayerId = closest.id;
+      movement.retargetAfter = now + MICRO_RETARGET_COOLDOWN_MS;
+      target = closest;
+    }
+
+    return target;
+  }
+
+  private computeMicroorganismIntent(
+    microorganism: Microorganism,
+    behavior: MicroorganismBehaviorState,
+    now: number,
+  ): { movementVector: Vector2; orientation: OrientationState | null } {
+    const { movement } = behavior;
+    const healthRatio = microorganism.health.max > 0
+      ? microorganism.health.current / microorganism.health.max
+      : 0;
+
+    if (healthRatio <= MICRO_LOW_HEALTH_THRESHOLD) {
+      movement.fleeUntil = Math.max(movement.fleeUntil, now + MICRO_FLEE_DURATION_MS);
+    } else if (movement.fleeUntil < now) {
+      movement.fleeUntil = 0;
+    }
+
+    if (movement.fleeUntil > now) {
+      const candidates = this.getMicroorganismTargetCandidates();
+      const closest = this.findClosestPlayer(microorganism.position, candidates);
+      if (!closest) {
+        return { movementVector: createVector(), orientation: null };
+      }
+      const fleeDirection = {
+        x: microorganism.position.x - closest.position.x,
+        y: microorganism.position.y - closest.position.y,
+      };
+      const movementVector = this.computeSteeredDirection(microorganism.position, fleeDirection);
+      const orientation = this.buildOrientationFromDirection(movementVector, microorganism.orientation);
+      movement.targetPlayerId = null;
+      return { movementVector, orientation };
+    }
+
+    if (microorganism.aggression === "hostile") {
+      const target = this.resolveMicroorganismTarget(microorganism, behavior, now);
+      if (!target) {
+        return { movementVector: createVector(), orientation: null };
+      }
+      const pursuit = {
+        x: target.position.x - microorganism.position.x,
+        y: target.position.y - microorganism.position.y,
+      };
+      const movementVector = this.computeSteeredDirection(microorganism.position, pursuit);
+      const orientation = this.buildOrientationFromDirection(movementVector, microorganism.orientation);
+      return { movementVector, orientation };
+    }
+
+    if (
+      !movement.nextWaypoint ||
+      now >= movement.retargetAfter ||
+      this.distanceSquared(microorganism.position, movement.nextWaypoint) <=
+        MICRO_WAYPOINT_REACH_DISTANCE ** 2
+    ) {
+      movement.nextWaypoint = this.generateMicroorganismWaypoint(microorganism.position);
+      movement.retargetAfter = now + MICRO_WAYPOINT_REFRESH_MS;
+      if (movement.nextWaypoint) {
+        movement.baseHeadingAngle = Math.atan2(
+          movement.nextWaypoint.y - microorganism.position.y,
+          movement.nextWaypoint.x - microorganism.position.x,
+        );
+      } else {
+        movement.baseHeadingAngle = null;
+      }
+    }
+
+    if (now - movement.lastZigToggleAt >= MICRO_ZIG_INTERVAL_MS) {
+      movement.zigzagDirection = movement.zigzagDirection === 1 ? -1 : 1;
+      movement.lastZigToggleAt = now;
+    }
+
+    if (!movement.nextWaypoint) {
+      return { movementVector: createVector(), orientation: null };
+    }
+
+    let patrolDirection = {
+      x: movement.nextWaypoint.x - microorganism.position.x,
+      y: movement.nextWaypoint.y - microorganism.position.y,
+    };
+
+    if (movement.baseHeadingAngle !== null) {
+      patrolDirection = rotateVector(
+        normalizeVectorOrNull(patrolDirection) ?? createVector(),
+        movement.zigzagDirection * MICRO_ZIG_ANGLE_RADIANS,
+      );
+    }
+
+    const movementVector = this.computeSteeredDirection(microorganism.position, patrolDirection);
+
+    if (vectorsApproximatelyEqual(movementVector, createVector())) {
+      movement.nextWaypoint = this.generateMicroorganismWaypoint(microorganism.position);
+    }
+
+    const orientation = this.buildOrientationFromDirection(movementVector, microorganism.orientation);
+    movement.targetPlayerId = null;
+    return { movementVector, orientation };
+  }
+
   private isBlockedByObstacle(position: Vector2): boolean {
     return this.findBlockingObstacle(position) !== null;
   }
@@ -2820,6 +3153,37 @@ export class RoomDO {
     }
 
     player.position = candidate;
+    return true;
+  }
+
+  private moveMicroorganismDuringTick(microorganism: Microorganism, deltaMs: number): boolean {
+    const movement = microorganism.movementVector;
+    const magnitude = vectorMagnitude(movement);
+    if (!Number.isFinite(magnitude) || magnitude === 0) {
+      return false;
+    }
+
+    const speed = Math.max(0, microorganism.attributes.speed ?? 30);
+    if (speed <= 0) {
+      return false;
+    }
+
+    const normalized = { x: movement.x / magnitude, y: movement.y / magnitude };
+    const distance = (speed * deltaMs) / 1000;
+    const candidate = this.clampPosition({
+      x: microorganism.position.x + normalized.x * distance,
+      y: microorganism.position.y + normalized.y * distance,
+    });
+
+    if (this.positionsEqual(candidate, microorganism.position)) {
+      return false;
+    }
+
+    if (this.isBlockedByObstacle(candidate)) {
+      return false;
+    }
+
+    microorganism.position = candidate;
     return true;
   }
 
@@ -3265,6 +3629,7 @@ export class RoomDO {
     let scoresChanged = false;
 
     for (const microorganism of this.microorganisms.values()) {
+      const behavior = this.getMicroorganismBehaviorState(microorganism.id, now);
       const statusCollection = this.microorganismStatusEffects.get(microorganism.id);
       if (statusCollection) {
         const pruned = pruneExpiredStatusEffects(statusCollection, now);
@@ -3275,34 +3640,39 @@ export class RoomDO {
         }
       }
 
-      const movement = microorganism.movementVector;
-      const magnitude = Math.sqrt(movement.x ** 2 + movement.y ** 2);
-      if (Number.isFinite(magnitude) && magnitude > 0) {
-        const speed = Math.max(0, microorganism.attributes.speed ?? 30);
-        if (speed > 0) {
-          const normalizedX = movement.x / magnitude;
-          const normalizedY = movement.y / magnitude;
-          const distance = (speed * deltaMs) / 1000;
-          const candidate = this.clampPosition({
-            x: microorganism.position.x + normalizedX * distance,
-            y: microorganism.position.y + normalizedY * distance,
-          });
-          if (!this.positionsEqual(candidate, microorganism.position) && !this.isBlockedByObstacle(candidate)) {
-            microorganism.position = candidate;
-            worldDiff.upsertMicroorganisms = [
-              ...(worldDiff.upsertMicroorganisms ?? []),
-              cloneMicroorganism(microorganism),
-            ];
-            worldChanged = true;
-          }
+      const intent = this.computeMicroorganismIntent(microorganism, behavior, now);
+
+      let microorganismDiffNeeded = false;
+
+      if (!vectorsApproximatelyEqual(microorganism.movementVector, intent.movementVector)) {
+        microorganism.movementVector = createVector(intent.movementVector);
+        microorganismDiffNeeded = true;
+      }
+
+      if (intent.orientation) {
+        const nextOrientation = createOrientation(intent.orientation);
+        if (!orientationsApproximatelyEqual(microorganism.orientation, nextOrientation)) {
+          microorganism.orientation = nextOrientation;
+          microorganismDiffNeeded = true;
         }
+      }
+
+      if (this.moveMicroorganismDuringTick(microorganism, deltaMs)) {
+        microorganismDiffNeeded = true;
+      }
+
+      if (microorganismDiffNeeded) {
+        worldDiff.upsertMicroorganisms = [
+          ...(worldDiff.upsertMicroorganisms ?? []),
+          cloneMicroorganism(microorganism),
+        ];
+        worldChanged = true;
       }
 
       if (microorganism.aggression !== "hostile") {
         continue;
       }
 
-      const behavior = this.microorganismBehavior.get(microorganism.id) ?? { lastAttackAt: 0 };
       const cooldown = PLAYER_ATTACK_COOLDOWN_MS + 400;
       if (behavior.lastAttackAt && now - behavior.lastAttackAt < cooldown) {
         continue;
@@ -3346,7 +3716,7 @@ export class RoomDO {
         max: closest.player.health.max,
       };
       updatedPlayers.set(closest.player.id, closest.player);
-      this.microorganismBehavior.set(microorganism.id, { lastAttackAt: now });
+      behavior.lastAttackAt = now;
 
       if (nextHealth === 0) {
         closest.player.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
