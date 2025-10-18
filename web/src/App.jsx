@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import GameApp from './GameApp.jsx';
+import MicroWorldOnboardingFlow from './ui/onboarding/MicroWorldOnboardingFlow.jsx';
 import MicroWorldConceptScreens from './ui/concepts/MicroWorldConceptScreens.jsx';
 
 const detectInitialMode = () => {
@@ -33,7 +34,7 @@ const App = () => {
   }, []);
 
   if (displayMode === 'concept') {
-    return <MicroWorldConceptScreens onContinue={handleConceptComplete} />;
+    return <MicroWorldOnboardingFlow onComplete={handleConceptComplete} />;
   }
 
   return <GameApp />;
