@@ -11,6 +11,10 @@ import type {
 import type { Env } from "../src";
 import { MockDurableObjectState } from "./utils/mock-state";
 
+const DASH_CHARGE_COST = 30;
+const DASH_COOLDOWN_MS = 1_000;
+const DASH_RECHARGE_PER_MS = 20 / 1_000;
+
 async function createRoom() {
   const mockState = new MockDurableObjectState();
   const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
@@ -30,6 +34,8 @@ function createTestPlayer(id: string): any {
     energy: 120,
     xp: 50,
     geneticMaterial: 20,
+    dashCharge: 100,
+    dashCooldownMs: 0,
     position: { x: 0, y: 0 },
     movementVector: { x: 0, y: 0 },
     orientation: { angle: 0 },
@@ -103,6 +109,75 @@ describe("RoomDO attack kind resolution", () => {
     expect(remaining?.health.current).toBeLessThan(microorganism.health.max);
     expect(worldDiff.statusEffects).toBeDefined();
     expect(worldDiff.statusEffects?.some((event) => event.status === "KNOCKBACK")).toBe(true);
+  });
+
+  it("consumes dash charge, applies cooldown and recharges over time", async () => {
+    const { roomAny } = await createRoom();
+    const player = createTestPlayer("sprinter");
+    player.dashCharge = 90;
+    roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    const applied = roomAny.applyPlayerAction(player, {
+      type: "attack",
+      kind: "dash",
+      state: "engaged",
+    });
+    expect(applied).not.toBeNull();
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, typeof player>();
+
+    roomAny.resolvePlayerAttackDuringTick(player, Date.now(), worldDiff, combatLog, updatedPlayers);
+
+    expect(player.dashCharge).toBeCloseTo(90 - DASH_CHARGE_COST, 5);
+    expect(player.dashCooldownMs).toBeGreaterThanOrEqual(DASH_COOLDOWN_MS);
+
+    roomAny.tickPlayerDashState(player, 500);
+    expect(player.dashCooldownMs).toBeCloseTo(DASH_COOLDOWN_MS - 500, 5);
+    expect(player.dashCharge).toBeCloseTo(90 - DASH_CHARGE_COST, 5);
+
+    roomAny.tickPlayerDashState(player, 600);
+    expect(player.dashCooldownMs).toBe(0);
+    const expectedCharge = 90 - DASH_CHARGE_COST + (100 * DASH_RECHARGE_PER_MS);
+    expect(player.dashCharge).toBeCloseTo(expectedCharge, 5);
+  });
+
+  it("rejects dash commands when no charge is available", async () => {
+    const { roomAny } = await createRoom();
+    const player = createTestPlayer("tired");
+    player.dashCharge = 10;
+    roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    const applied = roomAny.applyPlayerAction(player, {
+      type: "attack",
+      kind: "dash",
+      state: "engaged",
+    });
+
+    expect(applied).toEqual({ updatedPlayers: [player] });
+    expect(player.combatStatus.state).toBe("cooldown");
+    expect(player.pendingAttack).toBeNull();
+    expect(player.dashCharge).toBe(10);
+    expect(player.dashCooldownMs).toBeGreaterThanOrEqual(DASH_COOLDOWN_MS);
+
+    const previousPosition = { ...player.position };
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, typeof player>();
+
+    const result = roomAny.resolvePlayerAttackDuringTick(
+      player,
+      Date.now(),
+      worldDiff,
+      combatLog,
+      updatedPlayers,
+    );
+
+    expect(result.worldChanged).toBe(false);
+    expect(player.position).toEqual(previousPosition);
   });
 
   it("resolves skill attacks applying damage, cooldowns and statuses", async () => {

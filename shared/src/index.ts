@@ -141,6 +141,8 @@ export const sharedPlayerStateSchema = z.object({
   energy: z.number().finite().nonnegative().default(0),
   xp: z.number().finite().nonnegative().default(0),
   geneticMaterial: z.number().finite().nonnegative().default(0),
+  dashCharge: z.number().finite().nonnegative().max(100).default(0),
+  dashCooldownMs: z.number().finite().nonnegative().default(0),
   lastActiveAt: z.number().finite(),
   position: vector2Schema,
   movementVector: vector2Schema,

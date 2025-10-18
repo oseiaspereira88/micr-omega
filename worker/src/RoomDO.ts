@@ -209,6 +209,8 @@ type StoredPlayer = {
   energy: number;
   xp: number;
   geneticMaterial: number;
+  dashCharge: number;
+  dashCooldownMs: number;
   position: Vector2;
   movementVector: Vector2;
   orientation: OrientationState;
@@ -239,6 +241,8 @@ type StoredPlayerSnapshot = Omit<
       | "evolutionState"
       | "archetypeKey"
       | "skillState"
+      | "dashCharge"
+      | "dashCooldownMs"
     >
   >;
 
@@ -355,12 +359,33 @@ const DEFAULT_PLAYER_ENERGY = 100;
 const DEFAULT_PLAYER_XP = 0;
 const DEFAULT_PLAYER_GENETIC_MATERIAL = 0;
 
+const MAX_DASH_CHARGE = 100;
+const DEFAULT_DASH_CHARGE = MAX_DASH_CHARGE;
+const DASH_CHARGE_COST = 30;
+const DASH_COOLDOWN_MS = 1_000;
+const DASH_RECHARGE_RATE_PER_SECOND = 20;
+const DASH_RECHARGE_PER_MS = DASH_RECHARGE_RATE_PER_SECOND / 1_000;
+
 const createCombatAttributes = (attributes?: CombatAttributes): CombatAttributes => ({
   attack: attributes?.attack ?? DEFAULT_COMBAT_ATTRIBUTES.attack,
   defense: attributes?.defense ?? DEFAULT_COMBAT_ATTRIBUTES.defense,
   speed: attributes?.speed ?? DEFAULT_COMBAT_ATTRIBUTES.speed,
   range: attributes?.range ?? DEFAULT_COMBAT_ATTRIBUTES.range,
 });
+
+const normalizeDashCharge = (charge?: number): number => {
+  if (!Number.isFinite(charge)) {
+    return DEFAULT_DASH_CHARGE;
+  }
+  return clamp(charge as number, 0, MAX_DASH_CHARGE);
+};
+
+const normalizeDashCooldown = (cooldown?: number): number => {
+  if (!Number.isFinite(cooldown)) {
+    return 0;
+  }
+  return Math.max(0, cooldown as number);
+};
 
 const createPlayerSkillState = (stored?: StoredPlayerSkillState): PlayerSkillState => {
   const storedAvailable = Array.isArray(stored?.available)
@@ -1247,6 +1272,8 @@ export class RoomDO {
           geneticMaterial: Number.isFinite(stored.geneticMaterial)
             ? Math.max(0, stored.geneticMaterial)
             : DEFAULT_PLAYER_GENETIC_MATERIAL,
+          dashCharge: normalizeDashCharge(stored.dashCharge),
+          dashCooldownMs: normalizeDashCooldown(stored.dashCooldownMs),
           position: createVector(stored.position),
           movementVector: createVector(stored.movementVector),
           orientation: createOrientation(stored.orientation),
@@ -1727,6 +1754,38 @@ export class RoomDO {
     return changed;
   }
 
+  private tickPlayerDashState(player: PlayerInternal, deltaMs: number): boolean {
+    let changed = false;
+    let remainingMs = Math.max(0, deltaMs);
+
+    if (player.dashCooldownMs > 0 && remainingMs > 0) {
+      const consumed = Math.min(player.dashCooldownMs, remainingMs);
+      const nextCooldown = player.dashCooldownMs - consumed;
+      if (nextCooldown !== player.dashCooldownMs) {
+        player.dashCooldownMs = nextCooldown;
+        changed = true;
+      }
+      remainingMs -= consumed;
+    }
+
+    if (player.dashCooldownMs === 0 && player.dashCharge < MAX_DASH_CHARGE && remainingMs > 0) {
+      const recharge = remainingMs * DASH_RECHARGE_PER_MS;
+      if (recharge > 0) {
+        const nextCharge = Math.min(MAX_DASH_CHARGE, player.dashCharge + recharge);
+        if (nextCharge !== player.dashCharge) {
+          player.dashCharge = nextCharge;
+          changed = true;
+        }
+      }
+    }
+
+    return changed;
+  }
+
+  private canPlayerDash(player: PlayerInternal): boolean {
+    return player.dashCharge >= DASH_CHARGE_COST && player.dashCooldownMs <= 0;
+  }
+
   private resolveDashAttack(
     player: PlayerInternal,
     now: number,
@@ -1801,6 +1860,14 @@ export class RoomDO {
       targetObjectId: null,
       lastAttackAt: now,
     });
+    const nextCharge = Math.max(0, Math.min(MAX_DASH_CHARGE, player.dashCharge - DASH_CHARGE_COST));
+    if (nextCharge !== player.dashCharge) {
+      player.dashCharge = nextCharge;
+    }
+    const nextCooldown = Math.max(player.dashCooldownMs, DASH_COOLDOWN_MS);
+    if (nextCooldown !== player.dashCooldownMs) {
+      player.dashCooldownMs = nextCooldown;
+    }
     updatedPlayers.set(player.id, player);
 
     return { worldChanged, scoresChanged };
@@ -2611,6 +2678,20 @@ export class RoomDO {
     player.pendingAttack = null;
 
     if (pending.kind === "dash") {
+      if (!this.canPlayerDash(player)) {
+        player.combatStatus = createCombatStatusState({
+          state: "cooldown",
+          targetPlayerId: null,
+          targetObjectId: null,
+          lastAttackAt: now,
+        });
+        const nextCooldown = Math.max(player.dashCooldownMs, DASH_COOLDOWN_MS);
+        if (nextCooldown !== player.dashCooldownMs) {
+          player.dashCooldownMs = nextCooldown;
+        }
+        updatedPlayers.set(player.id, player);
+        return this.finalizeAttackResolution({ worldChanged, scoresChanged }, worldDiff);
+      }
       const result = this.resolveDashAttack(player, now, worldDiff, combatLog, updatedPlayers);
       return this.finalizeAttackResolution(result, worldDiff);
     }
@@ -3310,6 +3391,8 @@ export class RoomDO {
         energy: DEFAULT_PLAYER_ENERGY,
         xp: DEFAULT_PLAYER_XP,
         geneticMaterial: DEFAULT_PLAYER_GENETIC_MATERIAL,
+        dashCharge: DEFAULT_DASH_CHARGE,
+        dashCooldownMs: 0,
         position: createVector(spawnPosition),
         movementVector: createVector(),
         orientation: createOrientation(),
@@ -3799,6 +3882,22 @@ export class RoomDO {
           }
         }
 
+        if (attackKind === "dash" && !this.canPlayerDash(player)) {
+          player.combatStatus = createCombatStatusState({
+            state: "cooldown",
+            targetPlayerId: action.targetPlayerId ?? null,
+            targetObjectId: action.targetObjectId ?? null,
+            lastAttackAt: now,
+          });
+          player.pendingAttack = null;
+          const nextCooldown = Math.max(player.dashCooldownMs, DASH_COOLDOWN_MS);
+          if (nextCooldown !== player.dashCooldownMs) {
+            player.dashCooldownMs = nextCooldown;
+          }
+          updatedPlayers.push(player);
+          return { updatedPlayers };
+        }
+
         const nextState = action.state ?? "engaged";
         const previousLastAttackAt = player.combatStatus.lastAttackAt;
         let nextLastAttackAt = previousLastAttackAt;
@@ -4093,6 +4192,10 @@ export class RoomDO {
         updatedPlayers.set(player.id, player);
       }
 
+      if (this.tickPlayerDashState(player, deltaMs)) {
+        updatedPlayers.set(player.id, player);
+      }
+
       const collectionResult = this.handleCollectionsDuringTick(player, worldDiff, combatLog, now);
       if (collectionResult.playerUpdated) {
         updatedPlayers.set(player.id, player);
@@ -4347,6 +4450,8 @@ export class RoomDO {
     for (const player of this.players.values()) {
       player.score = 0;
       player.combo = 1;
+      player.dashCharge = DEFAULT_DASH_CHARGE;
+      player.dashCooldownMs = 0;
       player.lastActiveAt = resetTimestamp;
       player.movementVector = createVector();
       player.orientation = createOrientation();
@@ -4420,6 +4525,8 @@ export class RoomDO {
       energy: player.energy,
       xp: player.xp,
       geneticMaterial: player.geneticMaterial,
+      dashCharge: player.dashCharge,
+      dashCooldownMs: player.dashCooldownMs,
       lastActiveAt: player.lastActiveAt,
       position: cloneVector(player.position),
       movementVector: cloneVector(player.movementVector),
@@ -4803,6 +4910,8 @@ export class RoomDO {
         energy: player.energy,
         xp: player.xp,
         geneticMaterial: player.geneticMaterial,
+        dashCharge: player.dashCharge,
+        dashCooldownMs: player.dashCooldownMs,
         position: cloneVector(player.position),
         movementVector: cloneVector(player.movementVector),
         orientation: cloneOrientation(player.orientation),

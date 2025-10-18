@@ -110,6 +110,8 @@ describe("RoomDO resetGame", () => {
       name: "Alice",
       score: 12,
       combo: 7,
+      dashCharge: 12,
+      dashCooldownMs: 250,
       position: { x: 123, y: -456 },
       movementVector: { x: 1, y: 1 },
       orientation: { angle: Math.PI / 2, tilt: 0.3 },
@@ -140,6 +142,8 @@ describe("RoomDO resetGame", () => {
       name: "Bob",
       score: 3,
       combo: 2,
+      dashCharge: 4,
+      dashCooldownMs: 750,
       position: { x: -400, y: 600 },
       movementVector: { x: -0.2, y: 0.8 },
       orientation: { angle: Math.PI, tilt: -0.1 },
@@ -186,6 +190,13 @@ describe("RoomDO resetGame", () => {
 
     const snapshotAfter = roomAny.serializeGameState();
     expect(snapshotAfter).not.toBe(snapshotBefore);
+
+    const resetPlayerA = players.get(playerA.id);
+    const resetPlayerB = players.get(playerB.id);
+    expect(resetPlayerA?.dashCharge).toBe(100);
+    expect(resetPlayerA?.dashCooldownMs).toBe(0);
+    expect(resetPlayerB?.dashCharge).toBe(100);
+    expect(resetPlayerB?.dashCooldownMs).toBe(0);
 
     const anchorSpawn = getSpawnPositionForPlayer(playerB.id);
     const offsets = getOffsetsForSpawn(
@@ -264,6 +275,8 @@ describe("RoomDO resetGame", () => {
       energy: 0,
       xp: 0,
       geneticMaterial: 0,
+      dashCharge: 100,
+      dashCooldownMs: 0,
       position: { x: 0, y: 0 },
       movementVector: { x: 0, y: 0 },
       orientation: { angle: 0 },
