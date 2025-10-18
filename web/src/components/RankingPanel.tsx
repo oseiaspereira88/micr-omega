@@ -131,6 +131,7 @@ const RankingPanel = () => {
               className={itemClass}
               aria-current={row.isLocal ? "true" : undefined}
               aria-label={accessibleLabel}
+              role="listitem"
             >
               <span className={styles.rankBadge}>{index + 1}</span>
               <div className={styles.nameCell}>
