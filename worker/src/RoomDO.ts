@@ -198,6 +198,19 @@ type PlayerSkillState = {
   cooldowns: Record<string, number>;
 };
 
+type MicroorganismBehaviorMemory = {
+  lastAttackAt: number;
+  heading: number;
+  movementTimer: number;
+  orbitAngle?: number;
+  anchor?: Vector2;
+  patrolIndex: number;
+  pauseTimer: number;
+  strafeDirection: 1 | -1;
+  decision: string;
+  focusPlayerId?: string | null;
+};
+
 type PendingAttack = {
   kind: AttackKind;
   targetPlayerId?: string | null;
@@ -734,6 +747,17 @@ const cloneWorldState = (world: SharedWorldState): SharedWorldState => ({
     orientation: cloneOrientation(entity.orientation),
     health: cloneHealthState(entity.health),
     attributes: { ...entity.attributes },
+    appearance: entity.appearance ? { ...entity.appearance } : undefined,
+    ai: entity.ai
+      ? {
+          ...entity.ai,
+          anchor: entity.ai.anchor ? cloneVector(entity.ai.anchor) : undefined,
+          patrolPoints: Array.isArray(entity.ai.patrolPoints)
+            ? entity.ai.patrolPoints.map((point) => cloneVector(point))
+            : undefined,
+          state: entity.ai.state ? { ...entity.ai.state } : undefined
+        }
+      : undefined
   })),
   organicMatter: world.organicMatter.map((matter) => ({
     ...matter,
@@ -760,6 +784,17 @@ const cloneMicroorganism = (entity: Microorganism): Microorganism => ({
   orientation: cloneOrientation(entity.orientation),
   health: cloneHealthState(entity.health),
   attributes: { ...entity.attributes },
+  appearance: entity.appearance ? { ...entity.appearance } : undefined,
+  ai: entity.ai
+    ? {
+        ...entity.ai,
+        anchor: entity.ai.anchor ? cloneVector(entity.ai.anchor) : undefined,
+        patrolPoints: Array.isArray(entity.ai.patrolPoints)
+          ? entity.ai.patrolPoints.map((point) => cloneVector(point))
+          : undefined,
+        state: entity.ai.state ? { ...entity.ai.state } : undefined
+      }
+    : undefined
 });
 
 const cloneOrganicMatter = (matter: OrganicMatter): OrganicMatter => ({
@@ -774,34 +809,206 @@ const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
       id: "micro-alpha",
       kind: "microorganism",
       species: "bacillus",
-      position: { x: -200, y: -150 },
-      movementVector: { x: 1, y: 0 },
-      orientation: { angle: 0 },
-      health: { current: 40, max: 40 },
+      displayName: "Sargóvia",
+      variant: "Sentinela Âmbar",
+      level: 3,
+      position: { x: -220, y: -150 },
+      movementVector: { x: 0.6, y: 0.2 },
+      orientation: { angle: Math.atan2(0.2, 0.6) },
+      health: { current: 48, max: 48 },
       aggression: "neutral",
-      attributes: { speed: 40, damage: 6, resilience: 3 },
+      attributes: { speed: 42, damage: 7, resilience: 4 },
+      appearance: {
+        bodyShape: "shield",
+        bodyColor: "#FFB86C",
+        coreColor: "#FFE2AA",
+        mantleColor: "#E08A3F",
+        accentColor: "#FFD49B",
+        glowColor: "#FF9E4B",
+        appendages: 4,
+        texture: "plates",
+        scale: 1.1,
+      },
+      description: "Guardião tranquilo que desenha círculos largos ao redor de rochas fósseis.",
+      ai: {
+        behavior: "patrol",
+        anchor: { x: -220, y: -150 },
+        patrolPoints: [
+          { x: -260, y: -120 },
+          { x: -210, y: -190 },
+          { x: -170, y: -140 },
+        ],
+        patrolPauseMs: 900,
+        roamRadius: 140,
+        lastDecision: "Patrulhando perímetro",
+      },
     },
     {
       id: "micro-beta",
       kind: "microorganism",
       species: "amoeba",
-      position: { x: 220, y: 160 },
-      movementVector: { x: -0.6, y: 0.8 },
-      orientation: { angle: Math.PI / 2 },
-      health: { current: 55, max: 55 },
+      displayName: "Miríade",
+      variant: "Caçadora Fluida",
+      level: 4,
+      position: { x: 240, y: 140 },
+      movementVector: { x: -0.4, y: 0.9 },
+      orientation: { angle: Math.atan2(0.9, -0.4) },
+      health: { current: 62, max: 62 },
       aggression: "hostile",
-      attributes: { speed: 50, damage: 9, resilience: 4 },
+      attributes: { speed: 58, damage: 11, resilience: 4 },
+      appearance: {
+        bodyShape: "orb",
+        bodyColor: "#FF5E9F",
+        coreColor: "#FFC1E0",
+        mantleColor: "#DB3E76",
+        accentColor: "#FF8BC1",
+        glowColor: "#FF7CB4",
+        texture: "veins",
+        scale: 1.2,
+      },
+      description: "Amoeba predadora que rastreia vibrações bioelétricas.",
+      ai: {
+        behavior: "stalker",
+        anchor: { x: 240, y: 140 },
+        roamRadius: 280,
+        preferredDistance: 180,
+        aggressionBias: 0.6,
+        lastDecision: "Observando presas",
+      },
     },
     {
       id: "micro-gamma",
       kind: "microorganism",
       species: "ciliate",
-      position: { x: 0, y: 260 },
-      movementVector: { x: 0, y: -1 },
-      orientation: { angle: Math.PI },
-      health: { current: 35, max: 35 },
+      displayName: "Helióx",
+      variant: "Monge Espiral",
+      level: 2,
+      position: { x: -40, y: 260 },
+      movementVector: { x: 0.2, y: -0.9 },
+      orientation: { angle: Math.atan2(-0.9, 0.2) },
+      health: { current: 36, max: 36 },
       aggression: "neutral",
-      attributes: { speed: 30, damage: 5, resilience: 2 },
+      attributes: { speed: 34, damage: 6, resilience: 3 },
+      appearance: {
+        bodyShape: "helix",
+        bodyColor: "#6EE8FF",
+        coreColor: "#C2F7FF",
+        mantleColor: "#1FB6D5",
+        accentColor: "#7AF3FF",
+        glowColor: "#6EE8FF",
+        appendages: 6,
+        texture: "cilia",
+        scale: 1.05,
+      },
+      description: "Ser contemplativo que orbita correntes de nutrientes.",
+      ai: {
+        behavior: "orbit",
+        anchor: { x: -10, y: 230 },
+        orbitRadius: 110,
+        orbitSpeed: 0.9,
+        roamRadius: 180,
+        lastDecision: "Orbitando coluna de luz",
+      },
+    },
+    {
+      id: "micro-delta",
+      kind: "microorganism",
+      species: "diatom",
+      displayName: "Lútea",
+      variant: "Jardineira Prismática",
+      level: 1,
+      position: { x: 140, y: -220 },
+      movementVector: { x: -0.3, y: 0.5 },
+      orientation: { angle: Math.atan2(0.5, -0.3) },
+      health: { current: 28, max: 28 },
+      aggression: "passive",
+      attributes: { speed: 28, damage: 4, resilience: 3 },
+      appearance: {
+        bodyShape: "cluster",
+        bodyColor: "#9CF77A",
+        coreColor: "#E2FFD4",
+        mantleColor: "#6BC24A",
+        accentColor: "#B8FF9E",
+        glowColor: "#C8FFB9",
+        appendages: 5,
+        texture: "petals",
+      },
+      description: "Microjardineira que cultiva algas fluorescentes.",
+      ai: {
+        behavior: "wander",
+        anchor: { x: 140, y: -220 },
+        roamRadius: 200,
+        lastDecision: "Derivando entre pétalas",
+      },
+    },
+    {
+      id: "micro-epsilon",
+      kind: "microorganism",
+      species: "radiolarian",
+      displayName: "Âncora Rubra",
+      variant: "Vanguarda Lamelar",
+      level: 5,
+      position: { x: -320, y: 120 },
+      movementVector: { x: 0.8, y: -0.4 },
+      orientation: { angle: Math.atan2(-0.4, 0.8) },
+      health: { current: 70, max: 70 },
+      aggression: "hostile",
+      attributes: { speed: 52, damage: 13, resilience: 5 },
+      appearance: {
+        bodyShape: "shield",
+        bodyColor: "#FF715A",
+        coreColor: "#FFC9BF",
+        mantleColor: "#CC4733",
+        accentColor: "#FF9A88",
+        glowColor: "#FF8C76",
+        appendages: 3,
+        texture: "spines",
+        scale: 1.25,
+      },
+      description: "Escudeiro agressivo que protege colônias menores com violência súbita.",
+      ai: {
+        behavior: "patrol",
+        anchor: { x: -320, y: 120 },
+        patrolPoints: [
+          { x: -360, y: 150 },
+          { x: -280, y: 80 },
+          { x: -340, y: 60 },
+        ],
+        patrolPauseMs: 600,
+        roamRadius: 200,
+        lastDecision: "Guardando colônia",
+      },
+    },
+    {
+      id: "micro-zeta",
+      kind: "microorganism",
+      species: "flagellate",
+      displayName: "Sideral",
+      variant: "Batedor Lumínico",
+      level: 2,
+      position: { x: 40, y: -40 },
+      movementVector: { x: 0.7, y: 0.3 },
+      orientation: { angle: Math.atan2(0.3, 0.7) },
+      health: { current: 32, max: 32 },
+      aggression: "neutral",
+      attributes: { speed: 60, damage: 5, resilience: 2 },
+      appearance: {
+        bodyShape: "needle",
+        bodyColor: "#7AE2FF",
+        coreColor: "#D9FBFF",
+        mantleColor: "#2F95BA",
+        accentColor: "#A4F0FF",
+        glowColor: "#9DEBFF",
+        appendages: 2,
+        texture: "stream",
+      },
+      description: "Explorador veloz que risca trilhas luminosas na água.",
+      ai: {
+        behavior: "wander",
+        anchor: { x: 40, y: -40 },
+        roamRadius: 260,
+        lastDecision: "Mapeando correntes",
+      },
     },
   ],
   organicMatter: [
@@ -1028,7 +1235,7 @@ export class RoomDO {
   private entitySequence = 0;
   private organicMatterRespawnRng: () => number = Math.random;
   private obstacles = new Map<string, Obstacle>();
-  private microorganismBehavior = new Map<string, { lastAttackAt: number }>();
+  private microorganismBehavior = new Map<string, MicroorganismBehaviorMemory>();
   private microorganismStatusEffects = new Map<string, StatusCollection>();
   private lastWorldTickAt: number | null = null;
   private pendingStatusEffects: StatusEffectEvent[] = [];
@@ -1439,8 +1646,51 @@ export class RoomDO {
     const now = Date.now();
     this.microorganismBehavior.clear();
     for (const microorganism of this.microorganisms.values()) {
-      this.microorganismBehavior.set(microorganism.id, { lastAttackAt: now });
+      this.microorganismBehavior.set(
+        microorganism.id,
+        this.createInitialMicroorganismBehavior(microorganism, now),
+      );
     }
+  }
+
+  private createInitialMicroorganismBehavior(
+    microorganism: Microorganism,
+    now: number,
+  ): MicroorganismBehaviorMemory {
+    const movementVector = microorganism.movementVector ?? createVector();
+    const initialHeading = Math.atan2(movementVector.y || 0, movementVector.x || 0);
+    const anchorSource = microorganism.ai?.anchor ?? microorganism.position ?? null;
+    const anchor = anchorSource ? { x: anchorSource.x, y: anchorSource.y } : undefined;
+    const angleToAnchor = anchor
+      ? Math.atan2(microorganism.position.y - anchor.y, microorganism.position.x - anchor.x)
+      : undefined;
+
+    return {
+      lastAttackAt: now,
+      heading: Number.isFinite(initialHeading) ? initialHeading : Math.random() * Math.PI * 2,
+      movementTimer: 0,
+      orbitAngle:
+        microorganism.ai?.behavior === "orbit" && Number.isFinite(angleToAnchor)
+          ? (angleToAnchor as number)
+          : undefined,
+      anchor,
+      patrolIndex: 0,
+      pauseTimer: 0,
+      strafeDirection: Math.random() > 0.5 ? 1 : -1,
+      decision: microorganism.ai?.lastDecision ?? "Observando",
+      focusPlayerId: null,
+    };
+  }
+
+  private ensureMicroorganismAi(entity: Microorganism): NonNullable<Microorganism["ai"]> {
+    if (!entity.ai) {
+      entity.ai = {
+        behavior: "wander",
+        lastDecision: "Derivando",
+      };
+    }
+
+    return entity.ai as NonNullable<Microorganism["ai"]>;
   }
 
   private getPrimaryPlayerForSpawn(): PlayerInternal | null {
@@ -3053,6 +3303,172 @@ export class RoomDO {
         }
       }
 
+      let behaviorState = this.microorganismBehavior.get(microorganism.id);
+      if (!behaviorState) {
+        behaviorState = this.createInitialMicroorganismBehavior(microorganism, now);
+        this.microorganismBehavior.set(microorganism.id, behaviorState);
+      }
+
+      const aiProfile = this.ensureMicroorganismAi(microorganism);
+      const deltaSeconds = deltaMs / 1000;
+
+      behaviorState.movementTimer = Math.max(0, behaviorState.movementTimer - deltaSeconds);
+      behaviorState.pauseTimer = Math.max(0, behaviorState.pauseTimer - deltaSeconds);
+
+      if (aiProfile.anchor) {
+        behaviorState.anchor = { x: aiProfile.anchor.x, y: aiProfile.anchor.y };
+      } else if (!behaviorState.anchor) {
+        behaviorState.anchor = { x: microorganism.position.x, y: microorganism.position.y };
+      }
+
+      const anchor = behaviorState.anchor ?? microorganism.position;
+      const roamRadius = aiProfile.roamRadius;
+      const toAnchorX = microorganism.position.x - anchor.x;
+      const toAnchorY = microorganism.position.y - anchor.y;
+      const distanceToAnchor = Math.hypot(toAnchorX, toAnchorY);
+
+      const previousVector = createVector(microorganism.movementVector);
+      const previousOrientation = microorganism.orientation?.angle ?? 0;
+      const previousDecision = aiProfile.lastDecision ?? behaviorState.decision ?? "Observando";
+
+      let decision = previousDecision;
+      let desiredVector: Vector2 | null = null;
+      let needsUpdate = false;
+
+      const wanderVector = (): Vector2 => {
+        if (behaviorState.movementTimer <= 0) {
+          behaviorState.heading = Math.random() * Math.PI * 2;
+          behaviorState.movementTimer = 1.2 + Math.random() * 2.4;
+        }
+        return { x: Math.cos(behaviorState.heading), y: Math.sin(behaviorState.heading) };
+      };
+
+      switch (aiProfile.behavior) {
+        case "orbit": {
+          const radius = aiProfile.orbitRadius ?? 140;
+          const angularSpeed = aiProfile.orbitSpeed ?? 0.8;
+          const baseAngle =
+            behaviorState.orbitAngle ??
+            Math.atan2(microorganism.position.y - anchor.y, microorganism.position.x - anchor.x);
+          const nextAngle = baseAngle + angularSpeed * deltaSeconds;
+          behaviorState.orbitAngle = nextAngle;
+          const targetX = anchor.x + Math.cos(nextAngle) * radius;
+          const targetY = anchor.y + Math.sin(nextAngle) * radius;
+          desiredVector = { x: targetX - microorganism.position.x, y: targetY - microorganism.position.y };
+          decision = "Orbitando núcleo";
+          break;
+        }
+        case "patrol": {
+          const patrolPoints =
+            Array.isArray(aiProfile.patrolPoints) && aiProfile.patrolPoints.length >= 2
+              ? aiProfile.patrolPoints
+              : [
+                  { x: anchor.x + 90, y: anchor.y },
+                  { x: anchor.x, y: anchor.y - 90 },
+                ];
+          const target = patrolPoints[behaviorState.patrolIndex % patrolPoints.length]!;
+          const distance = Math.hypot(
+            microorganism.position.x - target.x,
+            microorganism.position.y - target.y,
+          );
+          if (distance < 18) {
+            if (behaviorState.pauseTimer <= 0) {
+              behaviorState.patrolIndex = (behaviorState.patrolIndex + 1) % patrolPoints.length;
+              behaviorState.pauseTimer = (aiProfile.patrolPauseMs ?? 800) / 1000;
+            }
+            decision = "Observando rota";
+            desiredVector = { x: 0, y: 0 };
+          } else {
+            decision = "Patrulhando";
+            desiredVector = { x: target.x - microorganism.position.x, y: target.y - microorganism.position.y };
+          }
+          break;
+        }
+        case "stalker": {
+          const candidates = this.getMicroorganismTargetCandidates();
+          let closest: { player: PlayerInternal; distanceSquared: number } | null = null;
+          for (const player of candidates) {
+            const distanceSquared = this.distanceSquared(player.position, microorganism.position);
+            if (!closest || distanceSquared < closest.distanceSquared) {
+              closest = { player, distanceSquared };
+            }
+          }
+          if (closest) {
+            const dx = closest.player.position.x - microorganism.position.x;
+            const dy = closest.player.position.y - microorganism.position.y;
+            const distance = Math.sqrt(Math.max(closest.distanceSquared, 0));
+            const preferred = aiProfile.preferredDistance ?? 200;
+            if (distance > preferred * 1.1) {
+              decision = "Caçando";
+              desiredVector = { x: dx, y: dy };
+            } else if (distance < preferred * 0.7) {
+              decision = "Recuando";
+              desiredVector = { x: -dx, y: -dy };
+            } else {
+              if (behaviorState.movementTimer <= 0) {
+                behaviorState.strafeDirection = (behaviorState.strafeDirection ?? 1) * -1 as 1 | -1;
+                behaviorState.movementTimer = 0.6 + Math.random() * 0.6;
+              }
+              const strafeAngle = Math.atan2(dy, dx) + (Math.PI / 2) * (behaviorState.strafeDirection ?? 1);
+              decision = "Circundando";
+              desiredVector = { x: Math.cos(strafeAngle), y: Math.sin(strafeAngle) };
+            }
+            behaviorState.focusPlayerId = closest.player.id;
+          } else {
+            behaviorState.focusPlayerId = null;
+            decision = "Buscando alvo";
+            desiredVector = wanderVector();
+          }
+          break;
+        }
+        default: {
+          decision = "Derivando";
+          desiredVector = wanderVector();
+          break;
+        }
+      }
+
+      if (roamRadius && distanceToAnchor > roamRadius * 1.1) {
+        decision = "Retornando";
+        desiredVector = {
+          x: anchor.x - microorganism.position.x,
+          y: anchor.y - microorganism.position.y,
+        };
+      } else if (roamRadius && distanceToAnchor > roamRadius * 0.9 && desiredVector) {
+        desiredVector = {
+          x: desiredVector.x * 0.7 + (anchor.x - microorganism.position.x) * 0.3,
+          y: desiredVector.y * 0.7 + (anchor.y - microorganism.position.y) * 0.3,
+        };
+      }
+
+      if (!desiredVector) {
+        desiredVector = wanderVector();
+      }
+
+      const nextVector = desiredVector;
+      const vectorChanged =
+        Math.abs(previousVector.x - nextVector.x) > 0.001 ||
+        Math.abs(previousVector.y - nextVector.y) > 0.001;
+      if (vectorChanged) {
+        needsUpdate = true;
+        worldChanged = true;
+      }
+      microorganism.movementVector = nextVector;
+
+      const orientationAngle = Math.atan2(nextVector.y, nextVector.x);
+      if (!microorganism.orientation) {
+        microorganism.orientation = { angle: orientationAngle };
+        needsUpdate = true;
+        worldChanged = true;
+      } else if (Number.isFinite(orientationAngle)) {
+        if (Math.abs(orientationAngle - previousOrientation) > 0.01) {
+          microorganism.orientation.angle = orientationAngle;
+          needsUpdate = true;
+          worldChanged = true;
+        }
+      }
+      behaviorState.heading = orientationAngle;
+
       const movement = microorganism.movementVector;
       const magnitude = Math.sqrt(movement.x ** 2 + movement.y ** 2);
       if (Number.isFinite(magnitude) && magnitude > 0) {
@@ -3067,79 +3483,81 @@ export class RoomDO {
           });
           if (!this.positionsEqual(candidate, microorganism.position) && !this.isBlockedByObstacle(candidate)) {
             microorganism.position = candidate;
-            worldDiff.upsertMicroorganisms = [
-              ...(worldDiff.upsertMicroorganisms ?? []),
-              cloneMicroorganism(microorganism),
-            ];
+            needsUpdate = true;
             worldChanged = true;
           }
         }
       }
 
-      if (microorganism.aggression !== "hostile") {
-        continue;
-      }
+      if (microorganism.aggression === "hostile") {
+        const cooldown = PLAYER_ATTACK_COOLDOWN_MS + 400;
+        if (!behaviorState.lastAttackAt || now - behaviorState.lastAttackAt >= cooldown) {
+          const candidates = this.getMicroorganismTargetCandidates();
+          let closest: { player: PlayerInternal; distanceSquared: number } | null = null;
+          for (const player of candidates) {
+            const distanceSquared = this.distanceSquared(player.position, microorganism.position);
+            if (!closest || distanceSquared < closest.distanceSquared) {
+              closest = { player, distanceSquared };
+            }
+          }
+          if (closest) {
+            const attackRange = 100;
+            const attackRangeSquared = attackRange ** 2;
+            if (closest.distanceSquared <= attackRangeSquared) {
+              const baseDamage = Math.max(1, Math.round(microorganism.attributes.damage ?? 6));
+              const mitigation = Math.max(0, Math.round(closest.player.combatAttributes.defense / 4));
+              const damage = Math.max(1, baseDamage - mitigation);
+              if (closest.player.invulnerableUntil && closest.player.invulnerableUntil <= now) {
+                closest.player.invulnerableUntil = null;
+              }
+              if (!closest.player.invulnerableUntil || closest.player.invulnerableUntil <= now) {
+                const nextHealth = Math.max(0, closest.player.health.current - damage);
+                closest.player.health = {
+                  current: nextHealth,
+                  max: closest.player.health.max,
+                };
+                updatedPlayers.set(closest.player.id, closest.player);
+                behaviorState.lastAttackAt = now;
+                decision = "Atacando";
+                needsUpdate = true;
+                worldChanged = true;
 
-      const behavior = this.microorganismBehavior.get(microorganism.id) ?? { lastAttackAt: 0 };
-      const cooldown = PLAYER_ATTACK_COOLDOWN_MS + 400;
-      if (behavior.lastAttackAt && now - behavior.lastAttackAt < cooldown) {
-        continue;
-      }
+                if (nextHealth === 0) {
+                  closest.player.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
+                  this.queuePlayerDeath(closest.player, now, updatedPlayers);
+                }
 
-      const candidates = this.getMicroorganismTargetCandidates();
-      if (candidates.length === 0) {
-        continue;
-      }
-
-      let closest: { player: PlayerInternal; distanceSquared: number } | null = null;
-      for (const player of candidates) {
-        const distanceSquared = this.distanceSquared(player.position, microorganism.position);
-        if (!closest || distanceSquared < closest.distanceSquared) {
-          closest = { player, distanceSquared };
+                combatLog.push({
+                  timestamp: now,
+                  targetId: closest.player.id,
+                  targetKind: "player",
+                  targetObjectId: microorganism.id,
+                  damage,
+                  outcome: nextHealth === 0 ? "defeated" : "hit",
+                  remainingHealth: nextHealth,
+                });
+              }
+            }
+          }
         }
       }
 
-      if (!closest) {
-        continue;
+      const decisionChanged = decision !== previousDecision;
+      if (decisionChanged) {
+        aiProfile.lastDecision = decision;
+        needsUpdate = true;
+        worldChanged = true;
       }
+      behaviorState.decision = decision;
 
-      const attackRange = 100;
-      const attackRangeSquared = attackRange ** 2;
-      if (closest.distanceSquared > attackRangeSquared) {
-        continue;
-      }
+      this.microorganismBehavior.set(microorganism.id, behaviorState);
 
-      const baseDamage = Math.max(1, Math.round(microorganism.attributes.damage ?? 6));
-      const mitigation = Math.max(0, Math.round(closest.player.combatAttributes.defense / 4));
-      const damage = Math.max(1, baseDamage - mitigation);
-      if (closest.player.invulnerableUntil && closest.player.invulnerableUntil <= now) {
-        closest.player.invulnerableUntil = null;
+      if (needsUpdate) {
+        worldDiff.upsertMicroorganisms = [
+          ...(worldDiff.upsertMicroorganisms ?? []),
+          cloneMicroorganism(microorganism),
+        ];
       }
-      if (closest.player.invulnerableUntil && closest.player.invulnerableUntil > now) {
-        continue;
-      }
-      const nextHealth = Math.max(0, closest.player.health.current - damage);
-      closest.player.health = {
-        current: nextHealth,
-        max: closest.player.health.max,
-      };
-      updatedPlayers.set(closest.player.id, closest.player);
-      this.microorganismBehavior.set(microorganism.id, { lastAttackAt: now });
-
-      if (nextHealth === 0) {
-        closest.player.combatStatus = createCombatStatusState({ state: "cooldown", lastAttackAt: now });
-        this.queuePlayerDeath(closest.player, now, updatedPlayers);
-      }
-
-      combatLog.push({
-        timestamp: now,
-        targetId: closest.player.id,
-        targetKind: "player",
-        targetObjectId: microorganism.id,
-        damage,
-        outcome: nextHealth === 0 ? "defeated" : "hit",
-        remainingHealth: nextHealth,
-      });
     }
 
     return { worldChanged, scoresChanged };
