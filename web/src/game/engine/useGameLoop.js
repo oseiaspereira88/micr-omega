@@ -529,23 +529,27 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     });
   }, [dispatchRef, updateLocalSkillState]);
 
-  const setCameraZoom = useCallback((zoomValue) => {
-    const state = renderStateRef.current;
-    const camera = state?.camera;
-    if (!camera) return;
+  const setCameraZoom = useCallback(
+    (zoomValue) => {
+      const state = renderStateRef.current;
+      const camera = state?.camera;
+      if (!camera) return;
 
-    const minZoom = 0.6;
-    const maxZoom = 1.2;
-    const parsed = Number.parseFloat(zoomValue);
-    const safeValue = Number.isFinite(parsed) ? parsed : 1;
-    const clamped = clamp(safeValue, minZoom, maxZoom);
+      const minZoom = 0.6;
+      const maxZoom = 1.2;
+      const parsed = Number.parseFloat(zoomValue);
+      const safeValue = Number.isFinite(parsed) ? parsed : 1;
+      const clamped = clamp(safeValue, minZoom, maxZoom);
 
-    if (Math.abs((camera.zoom ?? 1) - clamped) < 0.0001) {
-      return;
-    }
+      if (Math.abs((camera.zoom ?? 1) - clamped) < 0.0001) {
+        return;
+      }
 
-    camera.zoom = clamped;
-  }, []);
+      camera.zoom = clamped;
+      syncHudState(state);
+    },
+    [syncHudState]
+  );
 
   const setActiveEvolutionTier = useCallback(
     (tierKey) => {
