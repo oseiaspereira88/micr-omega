@@ -3539,14 +3539,23 @@ export class RoomDO {
     return sanitizePlayerName(rawName);
   }
 
-  private async handleActionMessage(message: ActionMessage, socket: WebSocket): Promise<void> {
-    const validation = actionMessageSchema.safeParse(message);
-    if (!validation.success) {
-      this.send(socket, { type: "error", reason: "invalid_payload" });
-      return;
-    }
+  private async handleActionMessage(
+    message: ActionMessage,
+    socket: WebSocket,
+    options?: { validate?: boolean },
+  ): Promise<void> {
+    const shouldValidate = options?.validate ?? false;
+    let payload: ActionMessage = message;
 
-    const payload = validation.data;
+    if (shouldValidate) {
+      const validation = actionMessageSchema.safeParse(message);
+      if (!validation.success) {
+        this.send(socket, { type: "error", reason: "invalid_payload" });
+        return;
+      }
+
+      payload = validation.data;
+    }
 
     const socketPlayerId = this.clientsBySocket.get(socket);
     if (socketPlayerId && socketPlayerId !== payload.playerId) {
