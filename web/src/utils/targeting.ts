@@ -39,10 +39,21 @@ const extractFromTuple = (value: PositionTuple): Vector2 | null => {
   return { x, y };
 };
 
-export const extractPosition = (entity: unknown): Vector2 | null => {
+const extractPositionInternal = (
+  entity: unknown,
+  visited: Set<object>
+): Vector2 | null => {
   if (!isVectorLike(entity)) {
     return null;
   }
+
+  const objectEntity = entity as object;
+
+  if (visited.has(objectEntity)) {
+    return null;
+  }
+
+  visited.add(objectEntity);
 
   if (Array.isArray(entity) && entity.length >= 2) {
     return extractFromTuple(entity as PositionTuple);
@@ -58,11 +69,14 @@ export const extractPosition = (entity: unknown): Vector2 | null => {
   }
 
   if ("position" in entity) {
-    return extractPosition((entity as { position?: unknown }).position);
+    return extractPositionInternal((entity as { position?: unknown }).position, visited);
   }
 
   return null;
 };
+
+export const extractPosition = (entity: unknown): Vector2 | null =>
+  extractPositionInternal(entity, new Set<object>());
 
 const dist2 = (a: Vector2, b: Vector2) => {
   const dx = a.x - b.x;
