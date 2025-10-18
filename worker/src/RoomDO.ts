@@ -4364,6 +4364,12 @@ export class RoomDO {
       this.broadcast(worldDiffMessage);
     }
 
+    const rankingMessage: RankingMessage = {
+      type: "ranking",
+      ranking: this.getRanking()
+    };
+    this.broadcast(rankingMessage);
+
     await this.maybeStartGame();
   }
 
