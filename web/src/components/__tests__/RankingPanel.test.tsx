@@ -120,7 +120,7 @@ describe("RankingPanel", () => {
     expect(screen.getByText("Ranking")).toBeInTheDocument();
     expect(screen.getByText("Ao vivo")).toBeVisible();
 
-    const items = screen.getAllByRole("row");
+    const items = screen.getAllByRole("listitem");
     expect(items).toHaveLength(2);
 
     const firstRow = within(items[0]!);
@@ -234,7 +234,7 @@ describe("RankingPanel", () => {
       }));
     });
 
-    const items = screen.getAllByRole("row");
+    const items = screen.getAllByRole("listitem");
     expect(items).toHaveLength(3);
 
     const [first, second, third] = items;
@@ -292,7 +292,7 @@ describe("RankingPanel", () => {
       }));
     });
 
-    const items = screen.getAllByRole("row");
+    const items = screen.getAllByRole("listitem");
     expect(items).toHaveLength(3);
 
     const [first, second, third] = items;
