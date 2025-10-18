@@ -1501,12 +1501,20 @@ export const updateGameState = ({
 
   const sharedPlayersCollection = sharedState.remotePlayers?.all;
   const fallbackSharedPlayers = Object.values(sharedState.players || {});
-  const sharedPlayers =
+  const sharedPlayers = (
     Array.isArray(sharedPlayersCollection) &&
     (sharedPlayersCollection.length > 0 || fallbackSharedPlayers.length === 0)
       ? sharedPlayersCollection
-      : fallbackSharedPlayers;
+      : fallbackSharedPlayers
+  ).slice();
   const localPlayerId = sharedState.playerId ?? null;
+  if (localPlayerId && !sharedPlayers.some((player) => player?.id === localPlayerId)) {
+    const localPlayerSnapshot =
+      sharedState.players?.[localPlayerId] ?? sharedState.remotePlayers?.byId?.[localPlayerId] ?? null;
+    if (localPlayerSnapshot) {
+      sharedPlayers.push(localPlayerSnapshot);
+    }
+  }
   const previousHudSnapshot = renderState.hudSnapshot ?? null;
 
   updateAppearanceMapFromShared(renderState, sharedPlayers, localPlayerId, previousHudSnapshot);
