@@ -295,7 +295,7 @@ const GameHud = ({
   const sidebarAriaHidden = sidebarIsInactive ? true : undefined;
   const sidebarInert = sidebarIsInactive ? true : undefined;
   const sidebarToggleTabIndex = hudDisabled ? -1 : undefined;
-  const sidebarToggleAriaHidden = hudDisabled ? true : isSidebarOpen ? undefined : true;
+  const sidebarToggleAriaHidden = hudDisabled ? true : undefined;
 
   return (
     <>
