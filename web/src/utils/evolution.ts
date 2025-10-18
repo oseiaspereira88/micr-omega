@@ -108,17 +108,6 @@ export const buildEvolutionPayload = (
     actionPayload.baseDelta = normalizedBaseDelta;
   }
 
-  const hasAdjustments =
-    typeof actionPayload.countDelta === 'number' ||
-    Array.isArray(actionPayload.traitDeltas) ||
-    Boolean(normalizedAdditiveDelta) ||
-    Boolean(normalizedMultiplierDelta) ||
-    Boolean(normalizedBaseDelta);
-
-  if (!hasAdjustments) {
-    return null;
-  }
-
   return actionPayload;
 };
 

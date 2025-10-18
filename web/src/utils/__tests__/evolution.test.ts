@@ -36,4 +36,31 @@ describe("buildEvolutionPayload", () => {
     expect(payload?.multiplierDelta).toEqual({ health: 1.5 });
     expect(payload?.baseDelta).toEqual({ stamina: -3 });
   });
+
+  it("returns a minimal payload when only the evolutionId is provided", () => {
+    const payload = buildEvolutionPayload({
+      evolutionId: "unlock-1",
+    });
+
+    expect(payload).toEqual({
+      type: "evolution",
+      evolutionId: "unlock-1",
+    });
+  });
+
+  it("includes the tier for simple unlock payloads", () => {
+    const payload = buildEvolutionPayload({
+      evolutionId: "unlock-2",
+      tier: "alpha",
+      additiveDelta: {},
+      multiplierDelta: { attack: 0 },
+      baseDelta: null,
+    });
+
+    expect(payload).toEqual({
+      type: "evolution",
+      evolutionId: "unlock-2",
+      tier: "alpha",
+    });
+  });
 });
