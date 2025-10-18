@@ -87,4 +87,99 @@ describe("RoomDO reconnection status handling", () => {
       (globalThis as any).WebSocket = originalWebSocket;
     }
   });
+
+  it("restores previous reconnect token when snapshot flush fails", async () => {
+    const originalWebSocket = globalThis.WebSocket;
+    const websocketMock = { OPEN: 1, CLOSING: 2, CLOSED: 3 } as const;
+    (globalThis as any).WebSocket = websocketMock;
+
+    vi.useFakeTimers();
+
+    try {
+      const initialTime = 2_000_000;
+      vi.setSystemTime(initialTime);
+
+      const mockState = new MockDurableObjectState();
+      const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+      const roomAny = room as any;
+      await roomAny.ready;
+
+      roomAny.scheduleWorldTick = vi.fn();
+      roomAny.maybeStartGame = vi.fn().mockResolvedValue(undefined);
+      roomAny.broadcast = vi.fn();
+      roomAny.send = vi.fn();
+      roomAny.queueSnapshotStatePersist = vi.fn();
+      roomAny.queueSyncAlarms = vi.fn();
+
+      const joinSocket = createMockSocket();
+      const playerId = await roomAny.handleJoin(joinSocket, { type: "join", name: "Bob" });
+      expect(playerId).toBeTruthy();
+
+      const player = roomAny.players.get(playerId!);
+      expect(player).toBeDefined();
+      if (!player) {
+        throw new Error("player not created");
+      }
+
+      const originalToken = player.reconnectToken;
+
+      roomAny.clientsBySocket.delete(joinSocket);
+      roomAny.socketsByPlayer.delete(player.id);
+      roomAny.activeSockets.delete(joinSocket);
+
+      player.connected = false;
+      player.lastSeenAt = initialTime;
+
+      const reconnectTime = initialTime + 5_000;
+      vi.setSystemTime(reconnectTime);
+
+      const flushSnapshotsMock = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("flush failed"))
+        .mockResolvedValue(undefined);
+      roomAny.flushSnapshots = flushSnapshotsMock;
+
+      roomAny.send.mockClear();
+      const failingSocket = createMockSocket();
+      const failedResult = await roomAny.handleJoin(failingSocket, {
+        type: "join",
+        name: "Bob",
+        playerId: player.id,
+        reconnectToken: originalToken,
+      });
+
+      expect(failedResult).toBeNull();
+      expect(roomAny.send).toHaveBeenCalledWith(failingSocket, {
+        type: "error",
+        reason: "internal_error",
+      });
+      expect(failingSocket.close).toHaveBeenCalledWith(1011, "internal_error");
+      expect(player.reconnectToken).toBe(originalToken);
+
+      roomAny.send.mockClear();
+      const retrySocket = createMockSocket();
+      const retryResult = await roomAny.handleJoin(retrySocket, {
+        type: "join",
+        name: "Bob",
+        playerId: player.id,
+        reconnectToken: originalToken,
+      });
+
+      expect(retryResult).toBe(player.id);
+      expect(flushSnapshotsMock).toHaveBeenCalledTimes(2);
+      expect(player.reconnectToken).not.toBe(originalToken);
+
+      const joinedCall = roomAny.send.mock.calls.find(
+        ([socket, message]: any[]) => socket === retrySocket && message?.type === "joined"
+      );
+      expect(joinedCall).toBeTruthy();
+      if (joinedCall) {
+        const [, joinedMessage] = joinedCall as [any, any];
+        expect(joinedMessage.reconnectToken).toBe(player.reconnectToken);
+      }
+    } finally {
+      vi.useRealTimers();
+      (globalThis as any).WebSocket = originalWebSocket;
+    }
+  });
 });

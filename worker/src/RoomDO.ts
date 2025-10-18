@@ -3417,6 +3417,7 @@ export class RoomDO {
     this.clientsBySocket.set(socket, player.id);
     this.socketsByPlayer.set(player.id, socket);
 
+    const previousReconnectToken = player.reconnectToken;
     const reconnectToken = generateReconnectToken();
     player.reconnectToken = reconnectToken;
 
@@ -3447,6 +3448,7 @@ export class RoomDO {
       }
       this.queueSnapshotStatePersist();
       this.queueSyncAlarms();
+      player.reconnectToken = previousReconnectToken;
       this.observability.logError("player_snapshot_flush_failed", error, {
         category: "persistence",
         playerId: player.id,
