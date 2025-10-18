@@ -17,15 +17,20 @@ const BASE_PROPS = {
   combo: 0,
   maxCombo: 10,
   activePowerUps: [],
-  xp: 0,
-  geneticMaterial: 0,
-  characteristicPoints: 0,
-  geneFragments: 0,
-  stableGenes: 0,
-  evolutionSlots: 0,
-  reroll: 0,
-  dropPity: 0,
-  recentRewards: [],
+  xp: { current: 0, next: 120, total: 0, level: 1 },
+  geneticMaterial: { current: 0, total: 0, bonus: 0 },
+  characteristicPoints: { total: 0, available: 0, spent: 0, perLevel: [] },
+  geneFragments: { minor: 0, major: 0, apex: 0 },
+  stableGenes: { minor: 0, major: 0, apex: 0 },
+  evolutionSlots: {
+    small: { used: 0, max: 0 },
+    medium: { used: 0, max: 0 },
+    large: { used: 0, max: 0 },
+    macro: { used: 0, max: 0 },
+  },
+  reroll: { baseCost: 25, cost: 25, count: 0, pity: 0 },
+  dropPity: { fragment: 0, stableGene: 0 },
+  recentRewards: { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 },
   bossActive: false,
   bossHealth: 0,
   bossMaxHealth: 0,
@@ -119,6 +124,26 @@ describe('GameHud connection status overlay', () => {
 });
 
 describe('GameHud touch controls', () => {
+  let originalConnectionStatus;
+
+  beforeEach(() => {
+    const state = gameStore.getState();
+    originalConnectionStatus = state.connectionStatus;
+
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'connected', joinError: null });
+    });
+  });
+
+  afterEach(() => {
+    act(() => {
+      gameStore.setPartial({
+        connectionStatus: originalConnectionStatus,
+        joinError: null,
+      });
+    });
+  });
+
   it('forward cycle skill handler to touch controls', () => {
     const onCycleSkill = vi.fn();
 
@@ -153,6 +178,26 @@ describe('GameHud touch controls', () => {
 });
 
 describe('GameHud sidebar accessibility', () => {
+  let originalConnectionStatus;
+
+  beforeEach(() => {
+    const state = gameStore.getState();
+    originalConnectionStatus = state.connectionStatus;
+
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'connected', joinError: null });
+    });
+  });
+
+  afterEach(() => {
+    act(() => {
+      gameStore.setPartial({
+        connectionStatus: originalConnectionStatus,
+        joinError: null,
+      });
+    });
+  });
+
   it('focuses the sidebar when it is opened', async () => {
     const user = userEvent.setup();
 

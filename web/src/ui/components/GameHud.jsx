@@ -308,7 +308,7 @@ const GameHud = ({
 
   const sidebarIsInactive = hudDisabled || !isSidebarOpen;
   const sidebarAriaHidden = hudDisabled ? true : undefined;
-  const sidebarInert = sidebarIsInactive ? true : undefined;
+  const sidebarInert = sidebarIsInactive ? 'true' : undefined;
 
   return (
     <>
@@ -323,7 +323,7 @@ const GameHud = ({
         ref={toggleButtonRef}
         disabled={hudDisabled}
         aria-disabled={hudDisabled ? true : undefined}
-        inert={hudDisabled ? true : undefined}
+        inert={hudDisabled ? 'true' : undefined}
       >
         {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
       </button>
@@ -386,7 +386,7 @@ const GameHud = ({
           aria-label="Painel lateral do jogo"
           aria-hidden={sidebarAriaHidden}
           tabIndex={-1}
-          inert={sidebarInert}
+          inert={sidebarInert ? 'true' : undefined}
           ref={sidebarRef}
         >
           <div className={styles.sidebarSectionGroup} data-sidebar-focus>
@@ -468,7 +468,7 @@ const GameHud = ({
         <div
           className={`${styles.mainHud} ${hudDisabled ? styles.hudElementDisabled : ''}`}
           aria-hidden={hudDisabled ? true : undefined}
-          inert={hudDisabled ? true : undefined}
+          inert={hudDisabled ? 'true' : undefined}
         >
           <HudBar
             level={level}
@@ -538,7 +538,7 @@ const GameHud = ({
             touchLayout={settings.touchLayout}
             className={hudDisabled ? styles.hudElementDisabled : undefined}
             aria-hidden={hudDisabled ? true : undefined}
-            inert={hudDisabled ? true : undefined}
+            inert={hudDisabled ? 'true' : undefined}
           />
         ) : null}
       </div>

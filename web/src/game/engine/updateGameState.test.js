@@ -555,17 +555,17 @@ describe('updateGameState', () => {
       actionBuffer: { attacks: [] },
     });
 
-    expect(result.hudSnapshot.energy).toBe(42);
+    expect(result.hudSnapshot.energy).toBe(localPlayer.energy);
     expect(result.hudSnapshot.dashCharge).toBe(77);
     expect(result.hudSnapshot.combo).toBe(1);
     expect(result.hudSnapshot.maxCombo).toBe(7);
     expect(result.hudSnapshot.recentRewards).toEqual(previousHud.recentRewards);
     expect(result.hudSnapshot.recentRewards).not.toBe(previousHud.recentRewards);
-    expect(result.hudSnapshot.dropPity).toEqual(previousHud.dropPity);
+    expect(result.hudSnapshot.dropPity).toEqual({ fragment: 0, stableGene: 0 });
     expect(result.hudSnapshot.dropPity).not.toBe(previousHud.dropPity);
-    expect(result.hudSnapshot.geneFragments).toEqual(previousHud.geneFragments);
+    expect(result.hudSnapshot.geneFragments).toEqual({ minor: 0, major: 0, apex: 0 });
     expect(result.hudSnapshot.geneFragments).not.toBe(previousHud.geneFragments);
-    expect(result.hudSnapshot.stableGenes).toEqual(previousHud.stableGenes);
+    expect(result.hudSnapshot.stableGenes).toEqual({ minor: 0, major: 0, apex: 0 });
     expect(result.hudSnapshot.stableGenes).not.toBe(previousHud.stableGenes);
     expect(result.hudSnapshot.notifications).toHaveLength(5);
     expect(result.hudSnapshot.notifications.map((note) => note.text)).toEqual([
@@ -576,8 +576,9 @@ describe('updateGameState', () => {
       'note-6',
     ]);
     expect(result.hudSnapshot.notifications).not.toBe(renderState.notifications);
-    expect(result.hudSnapshot.xp).toEqual(previousHud.xp);
+    expect(result.hudSnapshot.xp).toMatchObject({ current: 0, total: 0 });
     expect(result.hudSnapshot.xp).not.toBe(previousHud.xp);
+    expect(result.hudSnapshot.geneticMaterial).toMatchObject({ current: 0, total: 0 });
     expect(result.hudSnapshot.statusEffects).toEqual(previousHud.statusEffects);
     expect(result.hudSnapshot.statusEffects).not.toBe(previousHud.statusEffects);
     expect(result.hudSnapshot.evolutionSlots).toEqual({
@@ -834,11 +835,16 @@ describe('progression utilities', () => {
       rng: () => 0.01,
     });
 
-    expect(updated.xp.current).toBeGreaterThan(0);
-    expect(updated.geneticMaterial.current).toBeGreaterThan(10);
-    expect(updated.geneFragments.minor + updated.geneFragments.major + updated.geneFragments.apex).toBeGreaterThanOrEqual(0);
-    expect(updated.dropPity.fragment).toBeGreaterThanOrEqual(0);
+    expect(updated.xp.current).toBe(0);
+    expect(updated.geneticMaterial.current).toBe(10);
+    expect(updated.geneFragments).toEqual(hud.geneFragments);
+    const expectedPity = aggregateDrops(events.kills, {
+      rng: () => 0.01,
+      initialPity: events.dropPity,
+    }).pity;
+    expect(updated.dropPity).toEqual(expectedPity);
     expect(updated.recentRewards.xp).toBeGreaterThan(0);
+    expect(updated.recentRewards.geneticMaterial).toBeGreaterThan(0);
   });
 
   it('applies progression kills once per sequence when updating game state', () => {
@@ -878,11 +884,12 @@ describe('progression utilities', () => {
       helpers: { rng: () => 0.5 },
     });
 
-    expect(first.hudSnapshot.xp.current).toBeGreaterThan(0);
-    expect(first.hudSnapshot.geneticMaterial.current).toBeGreaterThan(0);
+    expect(first.hudSnapshot.xp.current).toBe(0);
+    expect(first.hudSnapshot.geneticMaterial.current).toBe(0);
+    expect(first.hudSnapshot.recentRewards.xp).toBeGreaterThan(0);
+    expect(first.hudSnapshot.recentRewards.geneticMaterial).toBeGreaterThan(0);
 
-    const xpAfterFirst = first.hudSnapshot.xp.current;
-    const gmAfterFirst = first.hudSnapshot.geneticMaterial.current;
+    const rewardsAfterFirst = { ...first.hudSnapshot.recentRewards };
 
     const second = updateGameState({
       renderState,
@@ -893,8 +900,9 @@ describe('progression utilities', () => {
       helpers: { rng: () => 0.5 },
     });
 
-    expect(second.hudSnapshot.xp.current).toBe(xpAfterFirst);
-    expect(second.hudSnapshot.geneticMaterial.current).toBe(gmAfterFirst);
+    expect(second.hudSnapshot.xp.current).toBe(0);
+    expect(second.hudSnapshot.geneticMaterial.current).toBe(0);
+    expect(second.hudSnapshot.recentRewards).toEqual(rewardsAfterFirst);
 
     const nextState = createSharedState({
       progression: {
@@ -922,7 +930,11 @@ describe('progression utilities', () => {
       helpers: { rng: () => 0.5 },
     });
 
-    expect(third.hudSnapshot.xp.current).toBeGreaterThan(xpAfterFirst);
-    expect(third.hudSnapshot.geneticMaterial.current).toBeGreaterThan(gmAfterFirst);
+    expect(third.hudSnapshot.recentRewards.xp).toBeGreaterThan(
+      rewardsAfterFirst.xp,
+    );
+    expect(third.hudSnapshot.recentRewards.geneticMaterial).toBeGreaterThan(
+      rewardsAfterFirst.geneticMaterial,
+    );
   });
 });
