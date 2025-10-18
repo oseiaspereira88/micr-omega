@@ -292,6 +292,12 @@ const StartScreen = ({
     ? "Reconectar"
     : "Entrar na partida";
 
+  const quitButtonLabel = isConnected
+    ? "Desconectar"
+    : isConnecting
+    ? "Cancelar tentativa"
+    : "Desconectar";
+
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (event.key !== "Tab") {
@@ -544,7 +550,7 @@ const StartScreen = ({
                 className={styles.secondaryButton}
                 onClick={handleQuit}
               >
-                Desconectar
+                {quitButtonLabel}
               </button>
             ) : null}
           </div>
