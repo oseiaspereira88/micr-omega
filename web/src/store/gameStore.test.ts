@@ -6,6 +6,7 @@ import type {
   SharedGameStateDiff,
   SharedPlayerState,
   SharedWorldState,
+  CombatLogEntry,
 } from "../utils/messageTypes";
 
 const baseState = gameStore.getState();
@@ -93,6 +94,7 @@ const createFreshState = (): GameStoreState => {
       roomObjects: emptyRoomObjects.all,
     },
     progression: { players: {} },
+    combatLog: [],
   };
 };
 
@@ -211,6 +213,60 @@ describe("gameStore", () => {
     gameStore.actions.applyStateDiff({ removedPlayerIds: ["p1"] });
     expect(gameStore.getState().players.p1).toBeUndefined();
     expect(gameStore.getState().remotePlayers.all).toHaveLength(0);
+  });
+
+  it("preserves combat logs when applying incremental diffs", () => {
+    const logEntry: CombatLogEntry = {
+      timestamp: 1,
+      attackerId: "p-attacker",
+      targetId: "p-target",
+      targetKind: "player",
+      damage: 10,
+      outcome: "hit",
+      remainingHealth: 90,
+    };
+
+    const fullState: SharedGameState & { combatLog: CombatLogEntry[] } = {
+      phase: "active",
+      roundId: "round-log",
+      roundStartedAt: 100,
+      roundEndsAt: 200,
+      players: [],
+      world: createWorld(),
+      combatLog: [logEntry],
+    };
+
+    gameStore.actions.applyFullState(fullState);
+
+    const afterFull = gameStore.getState();
+    expect(afterFull.combatLog).toHaveLength(1);
+    expect(afterFull.combatLog[0]).toEqual(logEntry);
+    expect(afterFull.combatLog).not.toBe(fullState.combatLog);
+
+    const diffEntry: CombatLogEntry = {
+      timestamp: 2,
+      attackerId: "p-attacker",
+      targetKind: "microorganism",
+      targetObjectId: "micro-1",
+      damage: 15,
+      outcome: "defeated",
+      scoreAwarded: 25,
+    };
+
+    const diff: SharedGameStateDiff = {
+      combatLog: [diffEntry],
+    };
+
+    gameStore.actions.applyStateDiff(diff);
+
+    const afterDiff = gameStore.getState().combatLog;
+    expect(afterDiff).toHaveLength(2);
+    expect(afterDiff[0]).toEqual(logEntry);
+    expect(afterDiff[1]).toEqual(diffEntry);
+
+    gameStore.actions.applyStateDiff({});
+
+    expect(gameStore.getState().combatLog).toBe(afterDiff);
   });
 
   it("retains previous world data during reconnection until the new joined snapshot arrives", () => {
