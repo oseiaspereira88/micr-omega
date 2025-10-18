@@ -1,49 +1,35 @@
 import React from 'react';
-import styles from '../concepts/MicroWorldConceptScreens.module.css';
+import styles from './SplashScreen.module.css';
 
 const SplashScreen = ({ variant = 'desktop' }) => {
-  if (variant === 'mobile') {
-    return (
-      <div className={styles.splashSceneMobile} data-testid="splash-screen-mobile">
-        <div className={styles.logoStackCompact}>
-          <span className={styles.gameMark}>MICR•OMEGA</span>
-          <span className={styles.gameVersion}>Phase Shift Loading</span>
-        </div>
-        <div className={styles.progressRailMobile}>
-          <div className={styles.progressPulse} />
-        </div>
-        <div className={styles.loadingFeedMobile}>
-          <span>Calibrating senses...</span>
-          <span>Syncing data...</span>
-        </div>
-        <div className={styles.poweredBy}>Powered by CloseApps</div>
-        <div className={styles.mobileOrbits}>
-          <span className={`${styles.microOrb} ${styles.orbFour}`} />
-          <span className={`${styles.microOrb} ${styles.orbFive}`} />
-        </div>
-      </div>
-    );
-  }
+  const testId = variant === 'mobile' ? 'splash-screen-mobile' : 'splash-screen';
+  const className = [styles.root, variant === 'mobile' ? styles.mobile : ''].filter(Boolean).join(' ');
 
   return (
-    <div className={styles.splashScene} data-testid="splash-screen">
-      <div className={styles.logoStack}>
-        <span className={styles.gameMark}>MICR•OMEGA</span>
-        <span className={styles.gameVersion}>Evolution Protocol v2.1</span>
+    <div className={className} data-testid={testId}>
+      <div className={styles.glowLayer} />
+      <div className={styles.gridLayer} />
+      <div className={styles.orbLayer}>
+        <span className={`${styles.particle} ${styles.particleOne}`} />
+        <span className={`${styles.particle} ${styles.particleSecondary} ${styles.particleTwo}`} />
+        <span className={`${styles.particle} ${styles.particleAccent} ${styles.particleThree}`} />
       </div>
-      <div className={styles.progressRail}>
-        <div className={styles.progressPulse} />
-      </div>
-      <div className={styles.loadingFeed}>
-        <span>Loading environment...</span>
-        <span>Syncing data...</span>
-        <span>Stabilising biomes...</span>
-      </div>
-      <div className={styles.poweredBy}>Powered by CloseApps</div>
-      <div className={styles.microSwarm}>
-        <span className={`${styles.microOrb} ${styles.orbOne}`} />
-        <span className={`${styles.microOrb} ${styles.orbTwo}`} />
-        <span className={`${styles.microOrb} ${styles.orbThree}`} />
+      <div className={styles.content}>
+        <span className={styles.protocol}>Micr•Omega Protocol</span>
+        <h1 className={styles.title}>MICR•OMEGA</h1>
+        <p className={styles.tagline}>Sincronizando com o núcleo biológico do campo de batalha.</p>
+        <div className={styles.progressTrack}>
+          <span className={styles.progressMeter} />
+        </div>
+        <div className={styles.statusFeed}>
+          <span>Bio-scan alinhado</span>
+          <span>Matriz neural calibrada</span>
+          <span>Gerando ecossistemas dinâmicos</span>
+        </div>
+        <div className={styles.footer}>
+          <span className={styles.signature}>CloseApps Neural Link</span>
+          <span>Fluxo de ativação em progresso...</span>
+        </div>
       </div>
     </div>
   );
