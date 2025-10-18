@@ -54,7 +54,7 @@
 
 .item {
   display: grid;
-  grid-template-columns: 2.2rem 1fr auto;
+  grid-template-columns: minmax(2.2rem, max-content) 1fr auto;
   gap: 0.65rem;
   align-items: center;
   padding: 0.55rem 0.75rem;
@@ -68,8 +68,9 @@
   font-size: 0.95rem;
   font-weight: 600;
   justify-self: center;
-  width: 1.8rem;
+  min-width: 2.2rem;
   height: 1.8rem;
+  padding-inline: 0.2rem;
   display: grid;
   place-items: center;
   border-radius: 999px;
