@@ -18,6 +18,12 @@ import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
 import { shallowEqual, useGameStore } from '../../store/gameStore';
 import { useGameSettings } from '../../store/gameSettings';
 
+const COMBAT_STATE_LABELS = {
+  idle: 'Ocioso',
+  engaged: 'Em combate',
+  cooldown: 'Em recuperação',
+};
+
 const GameHud = ({
   level,
   score,
@@ -240,13 +246,15 @@ const GameHud = ({
         ? Math.max(0, Math.min(1, opponent.health / opponent.maxHealth))
         : 0;
       const percent = Math.round(ratio * 100);
+      const combatStateLabel =
+        COMBAT_STATE_LABELS[opponent.combatState] ?? opponent.combatState;
 
       return {
         id: opponent.id,
         name: opponent.name,
         elementLabel: opponent.elementLabel ?? opponent.element ?? '—',
         affinityLabel: opponent.affinityLabel ?? opponent.affinity ?? '—',
-        combatState: opponent.combatState,
+        combatState: combatStateLabel,
         healthRatio: ratio,
         healthPercent: percent,
         barStyle: {
@@ -363,7 +371,13 @@ const GameHud = ({
                           {opponent.healthPercent}%
                         </span>
                       </div>
-                      <div className={styles.opponentStatus}>{opponent.combatState}</div>
+                      <div
+                        className={styles.opponentStatus}
+                        aria-label={opponent.combatState}
+                        title={opponent.combatState}
+                      >
+                        {opponent.combatState}
+                      </div>
                     </li>
                   ))}
                 </ul>
