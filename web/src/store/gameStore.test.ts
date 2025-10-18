@@ -6,6 +6,7 @@ import type {
   SharedGameStateDiff,
   SharedPlayerState,
   SharedWorldState,
+  StatusEffectEvent,
 } from "../utils/messageTypes";
 
 const baseState = gameStore.getState();
@@ -211,6 +212,34 @@ describe("gameStore", () => {
     gameStore.actions.applyStateDiff({ removedPlayerIds: ["p1"] });
     expect(gameStore.getState().players.p1).toBeUndefined();
     expect(gameStore.getState().remotePlayers.all).toHaveLength(0);
+  });
+
+  it("applies status effect diffs even when no other fields change", () => {
+    const before = gameStore.getState();
+    expect(before.statusEffects).toEqual([]);
+
+    const statusEvent: StatusEffectEvent = {
+      targetKind: "player",
+      targetPlayerId: "p1",
+      status: "fissure",
+      stacks: 2,
+      durationMs: 1500,
+      sourcePlayerId: "p2",
+    };
+
+    gameStore.actions.applyStateDiff({
+      world: { statusEffects: [statusEvent] },
+    });
+
+    const after = gameStore.getState();
+
+    expect(after.statusEffects).toEqual([
+      expect.objectContaining(statusEvent),
+    ]);
+    expect(after.world).toBe(before.world);
+    expect(after.room).toBe(before.room);
+    expect(after.players).toBe(before.players);
+    expect(after.progression).toBe(before.progression);
   });
 
   it("retains previous world data during reconnection until the new joined snapshot arrives", () => {
