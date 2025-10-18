@@ -172,6 +172,12 @@ export const microorganismSchema = z.object({
   id: worldObjectIdSchema,
   kind: z.literal("microorganism"),
   species: z.string().trim().min(1).max(64),
+  name: z
+    .string()
+    .trim()
+    .min(1, "microorganism_name_too_short")
+    .max(64, "microorganism_name_too_long"),
+  level: z.number().finite().int().nonnegative(),
   position: vector2Schema,
   movementVector: vector2Schema,
   orientation: orientationSchema,

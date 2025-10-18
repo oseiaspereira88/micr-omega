@@ -50,6 +50,8 @@ describe('resolveNpcCombat', () => {
         {
           id: 'virus-alpha',
           species: 'virus',
+          name: 'Alpha Rift',
+          level: 3,
           position: { x: 0, y: 0 },
           movementVector: { x: 0, y: 0 },
           health: { current: 9, max: 9 },
@@ -67,6 +69,8 @@ describe('resolveNpcCombat', () => {
         {
           id: 'bacteria-beta',
           species: 'bacteria',
+          name: 'Beta Shroud',
+          level: 2,
           position: { x: 18, y: 0 },
           movementVector: { x: 0, y: 0 },
           health: { current: 6, max: 6 },
@@ -109,6 +113,8 @@ describe('resolveNpcCombat', () => {
         {
           id: 'amoeba-1',
           species: 'amoeba',
+          name: 'Quivering Bloom',
+          level: 1,
           position: { x: 0, y: 0 },
           movementVector: { x: 0, y: 0 },
           health: { current: 1, max: 10 },
@@ -122,6 +128,8 @@ describe('resolveNpcCombat', () => {
         {
           id: 'bacteria-strong',
           species: 'bacteria',
+          name: 'Iron Husk',
+          level: 4,
           position: { x: 12, y: 0 },
           movementVector: { x: 0, y: 0 },
           health: { current: 12, max: 12 },
