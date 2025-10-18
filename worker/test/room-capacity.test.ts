@@ -92,4 +92,25 @@ describe("RoomDO capacity limits", () => {
       (globalThis as any).WebSocket = originalWebSocket;
     }
   });
+
+  it("does not retain players when the socket is already closed", async () => {
+    const originalWebSocket = (globalThis as any).WebSocket;
+    const websocketMock = { OPEN: 1, CLOSING: 2, CLOSED: 3 };
+    (globalThis as any).WebSocket = websocketMock;
+
+    try {
+      const { roomAny } = await createRoom();
+      const socket = createMockSocket();
+      (socket as any).readyState = websocketMock.CLOSED;
+
+      const result = await roomAny.handleJoin(socket, { type: "join", name: "Ghost" });
+
+      expect(result).toBeNull();
+      expect(roomAny.getConnectedPlayersCount()).toBe(0);
+      expect(roomAny.players.size).toBe(0);
+      expect(roomAny.nameToPlayerId.size).toBe(0);
+    } finally {
+      (globalThis as any).WebSocket = originalWebSocket;
+    }
+  });
 });
