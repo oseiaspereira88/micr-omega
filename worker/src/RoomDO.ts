@@ -3273,6 +3273,7 @@ export class RoomDO {
     const previousSocket = player ? this.socketsByPlayer.get(player.id) : undefined;
 
     let rankingShouldUpdate = false;
+    let playerWasCreated = false;
 
     if (!player && this.getConnectedPlayersCount() >= MAX_PLAYERS) {
       this.send(socket, { type: "error", reason: "room_full" });
@@ -3319,6 +3320,7 @@ export class RoomDO {
       this.nameToPlayerId.set(nameKey, id);
       this.adjustConnectedPlayers(1);
       rankingShouldUpdate = true;
+      playerWasCreated = true;
     } else {
       for (const pendingSocket of pendingSockets) {
         this.discardSocket(pendingSocket, 1000, "reconnected", "discard_pending_socket_failed");
@@ -3389,6 +3391,13 @@ export class RoomDO {
     this.ensureProgressionState(player.id);
 
     if (socket.readyState !== WebSocket.OPEN) {
+      if (playerWasCreated) {
+        this.players.delete(player.id);
+        if (this.nameToPlayerId.get(nameKey) === player.id) {
+          this.nameToPlayerId.delete(nameKey);
+        }
+        this.adjustConnectedPlayers(-1);
+      }
       return null;
     }
 
