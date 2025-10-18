@@ -298,7 +298,6 @@ const TouchControls = ({
         onTouchEnd={handleCycleSkillTouchEnd}
         onTouchCancel={handleCycleSkillTouchEnd}
         disabled={!hasCurrentSkill}
-        title="E: trocar habilidade"
       >
         🔄
       </button>
