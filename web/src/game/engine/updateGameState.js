@@ -1500,12 +1500,9 @@ export const updateGameState = ({
   }
 
   const sharedPlayersCollection = sharedState.remotePlayers?.all;
-  const fallbackSharedPlayers = Object.values(sharedState.players || {});
-  const sharedPlayers =
-    Array.isArray(sharedPlayersCollection) &&
-    (sharedPlayersCollection.length > 0 || fallbackSharedPlayers.length === 0)
-      ? sharedPlayersCollection
-      : fallbackSharedPlayers;
+  const sharedPlayers = Array.isArray(sharedPlayersCollection)
+    ? sharedPlayersCollection
+    : Object.values(sharedState.players || {});
   const localPlayerId = sharedState.playerId ?? null;
   const previousHudSnapshot = renderState.hudSnapshot ?? null;
 
