@@ -25,6 +25,8 @@ function createTestPlayer(id: string): any {
     energy: 120,
     xp: 50,
     geneticMaterial: 20,
+    dashCharge: 100,
+    dashCooldownMs: 0,
     position: { x: 0, y: 0 },
     movementVector: { x: 0, y: 0 },
     orientation: { angle: 0 },

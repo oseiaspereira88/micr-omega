@@ -29,6 +29,8 @@ describe("RoomDO inactivity handling", () => {
         energy: 100,
         xp: 0,
         geneticMaterial: 0,
+        dashCharge: 100,
+        dashCooldownMs: 0,
         position: { x: 0, y: 0 },
         movementVector: { x: 0, y: 0 },
         orientation: { angle: 0 },

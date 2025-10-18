@@ -28,6 +28,8 @@ describe("RoomDO disconnect behavior", () => {
         energy: 100,
         xp: 0,
         geneticMaterial: 0,
+        dashCharge: 100,
+        dashCooldownMs: 0,
         position: { x: 0, y: 0 },
         movementVector: { x: 1, y: 0 },
         orientation: { angle: 0 },
@@ -125,6 +127,8 @@ describe("RoomDO disconnect behavior", () => {
         energy: 100,
         xp: 0,
         geneticMaterial: 0,
+        dashCharge: 100,
+        dashCooldownMs: 0,
         position: { x: 0, y: 0 },
         movementVector: { x: 0, y: 0 },
         orientation: { angle: 0 },
@@ -161,6 +165,8 @@ describe("RoomDO disconnect behavior", () => {
         connectedAt: null,
         totalSessionDurationMs: 0,
         sessionCount: 0,
+        dashCharge: 100,
+        dashCooldownMs: 0,
       };
 
       roomAny.players.set(disconnected.id, disconnected);
