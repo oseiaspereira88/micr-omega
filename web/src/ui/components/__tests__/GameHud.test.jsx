@@ -127,7 +127,7 @@ describe('GameHud touch controls', () => {
         <GameHud
           {...BASE_PROPS}
           showTouchControls
-          joystick={{ isTouchActive: false, position: { x: 0, y: 0 } }}
+          joystick={{ isPointerActive: false, position: { x: 0, y: 0 } }}
           skillData={{
             ...BASE_PROPS.skillData,
             currentSkill: { icon: '🔥' },

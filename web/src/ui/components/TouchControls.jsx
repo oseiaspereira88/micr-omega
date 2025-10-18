@@ -96,10 +96,36 @@ const TouchControls = ({
 
   const layoutClass = touchLayout === 'left' ? styles.layoutLeft : styles.layoutRight;
 
+  const isTouchLikePointer = event => {
+    const pointerType =
+      typeof event.pointerType === 'string' ? event.pointerType.toLowerCase() : event.pointerType;
+
+    return pointerType === 'touch' || pointerType === 'pen' || pointerType === '';
+  };
+
+  const handleJoystickPointerStart = event => {
+    if (!isTouchLikePointer(event)) return;
+    onJoystickStart?.(event);
+  };
+
+  const handleJoystickPointerMove = event => {
+    if (!isTouchLikePointer(event)) return;
+    onJoystickMove?.(event);
+  };
+
+  const handleJoystickPointerEnd = event => {
+    if (!isTouchLikePointer(event)) return;
+    onJoystickEnd?.(event);
+  };
+
   return (
     <div className={joinClassNames(styles.touchLayer, layoutClass)}>
       <div
         className={styles.joystickZone}
+        onPointerDown={handleJoystickPointerStart}
+        onPointerMove={handleJoystickPointerMove}
+        onPointerUp={handleJoystickPointerEnd}
+        onPointerCancel={handleJoystickPointerEnd}
         onTouchStart={onJoystickStart}
         onTouchMove={onJoystickMove}
         onTouchEnd={onJoystickEnd}
@@ -108,10 +134,12 @@ const TouchControls = ({
         <div
           className={styles.joystickKnob}
           style={{
-            background: joystick.isTouchActive ? 'rgba(0, 217, 255, 0.7)' : 'rgba(255, 255, 255, 0.4)',
-            boxShadow: joystick.isTouchActive ? '0 0 20px rgba(0, 217, 255, 0.8)' : 'none',
+            background: joystick.isPointerActive
+              ? 'rgba(0, 217, 255, 0.7)'
+              : 'rgba(255, 255, 255, 0.4)',
+            boxShadow: joystick.isPointerActive ? '0 0 20px rgba(0, 217, 255, 0.8)' : 'none',
             transform: `translate(${joystick.position.x}px, ${joystick.position.y}px)`,
-            transition: joystick.isTouchActive ? 'none' : 'transform 0.2s',
+            transition: joystick.isPointerActive ? 'none' : 'transform 0.2s',
           }}
         />
       </div>

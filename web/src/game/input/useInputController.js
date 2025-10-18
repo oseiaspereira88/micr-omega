@@ -13,6 +13,30 @@ const preventDefaultForGame = (event) => {
   return true;
 };
 
+const POINTER_TYPES = new Set(['touch', 'pen']);
+
+const isTouchLikePointerEvent = (event) => {
+  if (!('pointerType' in event)) return false;
+
+  const pointerType =
+    typeof event.pointerType === 'string' ? event.pointerType.toLowerCase() : event.pointerType;
+
+  return POINTER_TYPES.has(pointerType);
+};
+
+const getEventClientPosition = (event) => {
+  const touch = event.touches?.[0] ?? event.changedTouches?.[0];
+  if (touch) {
+    return { clientX: touch.clientX, clientY: touch.clientY };
+  }
+
+  if (typeof event.clientX === 'number' && typeof event.clientY === 'number') {
+    return { clientX: event.clientX, clientY: event.clientY };
+  }
+
+  return null;
+};
+
 const useInputController = ({
   onMovementIntent,
   onAttack,
@@ -23,7 +47,8 @@ const useInputController = ({
   onActionButtonChange
 }) => {
   const keyboardStateRef = useRef({ up: false, down: false, left: false, right: false });
-  const [touchActive, setTouchActive] = useState(false);
+  const activePointerIdRef = useRef(null);
+  const [pointerActive, setPointerActive] = useState(false);
   const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 });
   const [movementIntent, setMovementIntent] = useState({ ...DEFAULT_JOYSTICK_STATE });
 
@@ -132,18 +157,31 @@ const useInputController = ({
 
   const handleJoystickStart = useCallback(
     (event) => {
+      if (!event) return;
+
+      if ('pointerType' in event && !isTouchLikePointerEvent(event)) {
+        return;
+      }
+
+      const coordinates = getEventClientPosition(event);
+      if (!coordinates) return;
+
       event.preventDefault();
-      const touch = event.touches[0];
-      if (!touch) return;
+
+      if ('pointerId' in event) {
+        activePointerIdRef.current = event.pointerId;
+      } else {
+        activePointerIdRef.current = null;
+      }
 
       const rect = event.currentTarget.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
 
-      setTouchActive(true);
+      setPointerActive(true);
       const { position, joystick } = updateJoystickPosition(
-        touch.clientX,
-        touch.clientY,
+        coordinates.clientX,
+        coordinates.clientY,
         centerX,
         centerY
       );
@@ -156,18 +194,32 @@ const useInputController = ({
 
   const handleJoystickMove = useCallback(
     (event) => {
-      if (!touchActive) return;
+      if (!event) return;
+
+      if ('pointerType' in event) {
+        if (!isTouchLikePointerEvent(event)) return;
+        if (
+          activePointerIdRef.current !== null &&
+          event.pointerId !== activePointerIdRef.current
+        ) {
+          return;
+        }
+      }
+
+      if (!pointerActive) return;
+
+      const coordinates = getEventClientPosition(event);
+      if (!coordinates) return;
+
       event.preventDefault();
-      const touch = event.touches[0];
-      if (!touch) return;
 
       const rect = event.currentTarget.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
 
       const { position, joystick } = updateJoystickPosition(
-        touch.clientX,
-        touch.clientY,
+        coordinates.clientX,
+        coordinates.clientY,
         centerX,
         centerY
       );
@@ -175,15 +227,29 @@ const useInputController = ({
       setJoystickPosition(position);
       emitMovementIntent(joystick);
     },
-    [emitMovementIntent, touchActive]
+    [emitMovementIntent, pointerActive]
   );
 
-  const handleJoystickEnd = useCallback(() => {
-    setTouchActive(false);
-    setJoystickPosition({ x: 0, y: 0 });
-    const intent = computeJoystickFromKeys(keyboardStateRef.current);
-    emitMovementIntent(intent);
-  }, [emitMovementIntent]);
+  const handleJoystickEnd = useCallback(
+    (event) => {
+      if (event && 'pointerType' in event) {
+        if (!isTouchLikePointerEvent(event)) return;
+        if (
+          activePointerIdRef.current !== null &&
+          event.pointerId !== activePointerIdRef.current
+        ) {
+          return;
+        }
+      }
+
+      activePointerIdRef.current = null;
+      setPointerActive(false);
+      setJoystickPosition({ x: 0, y: 0 });
+      const intent = computeJoystickFromKeys(keyboardStateRef.current);
+      emitMovementIntent(intent);
+    },
+    [emitMovementIntent]
+  );
 
   const handleAttackPress = useCallback(() => {
     onActionButtonChange?.(true);
@@ -197,7 +263,8 @@ const useInputController = ({
   const reset = useCallback(
     (state) => {
       keyboardStateRef.current = { up: false, down: false, left: false, right: false };
-      setTouchActive(false);
+      activePointerIdRef.current = null;
+      setPointerActive(false);
       setJoystickPosition({ x: 0, y: 0 });
       const intent = { ...DEFAULT_JOYSTICK_STATE };
       emitMovementIntent(intent);
@@ -213,9 +280,9 @@ const useInputController = ({
     () => ({
       ...movementIntent,
       position: joystickPosition,
-      isTouchActive: touchActive
+      isPointerActive: pointerActive
     }),
-    [movementIntent, joystickPosition, touchActive]
+    [movementIntent, joystickPosition, pointerActive]
   );
 
   const actions = useMemo(
