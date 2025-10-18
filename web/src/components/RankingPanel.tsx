@@ -129,7 +129,6 @@ const RankingPanel = () => {
             <li
               key={row.playerId}
               className={itemClass}
-              role="row"
               aria-current={row.isLocal ? "true" : undefined}
               aria-label={accessibleLabel}
             >
