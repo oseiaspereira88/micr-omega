@@ -353,6 +353,99 @@ describe('useGameLoop timing safeguards', () => {
     }));
     mocks.gameStoreState = {};
   });
+
+  it('omits cooldown state when resending dash commands after recovery', async () => {
+    const canvas = createCanvas();
+    const dispatch = vi.fn();
+    let api;
+
+    const localPlayerId = 'player-1';
+    const sharedCombatStatus = {
+      state: 'cooldown',
+      targetPlayerId: null,
+      targetObjectId: 'micro-1',
+      lastAttackAt: null,
+    };
+
+    mocks.gameStoreState = {
+      playerId: localPlayerId,
+      players: {
+        [localPlayerId]: {
+          id: localPlayerId,
+          position: { x: 0, y: 0 },
+          combatStatus: sharedCombatStatus,
+        },
+      },
+      remotePlayers: {
+        byId: {
+          [localPlayerId]: {
+            id: localPlayerId,
+            combatStatus: sharedCombatStatus,
+          },
+        },
+      },
+      world: { microorganisms: [] },
+      microorganisms: { all: [], byId: {}, indexById: new Map() },
+    };
+
+    let capturedActionBuffer = null;
+    mocks.updateGameState.mockImplementation(({ renderState, actionBuffer }) => {
+      capturedActionBuffer = actionBuffer;
+
+      if (renderState) {
+        renderState.playersById.set(localPlayerId, {
+          id: localPlayerId,
+          renderPosition: { x: 0, y: 0 },
+          combatStatus: { ...sharedCombatStatus },
+        });
+      }
+
+      return {
+        commands: { movement: null, attacks: actionBuffer.attacks.slice() },
+        localPlayerId,
+        hudSnapshot: null,
+      };
+    });
+
+    render(
+      <HookWrapper
+        canvas={canvas}
+        dispatch={dispatch}
+        onReady={(readyApi) => {
+          api = readyApi;
+        }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(typeof rafCallback).toBe('function');
+      expect(api).toBeTruthy();
+    });
+
+    act(() => {
+      api.inputActions.dash();
+      api.inputActions.dash();
+    });
+
+    act(() => {
+      rafCallback(16);
+    });
+
+    expect(capturedActionBuffer).toBeTruthy();
+    expect(capturedActionBuffer.attacks).toHaveLength(2);
+    capturedActionBuffer.attacks.forEach((command) => {
+      expect(command.kind).toBe('dash');
+      expect(command.targetObjectId).toBe('micro-1');
+      expect(command).not.toHaveProperty('state');
+    });
+
+    mocks.updateGameState.mockImplementation(() => ({
+      commands: [],
+      localPlayerId: null,
+      hudSnapshot: null,
+    }));
+    mocks.gameStoreState = {};
+  });
 });
 
 describe('setActiveEvolutionTier', () => {

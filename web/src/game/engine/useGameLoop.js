@@ -1045,8 +1045,11 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
         payload.targetObjectId = combatSnapshot.targetObjectId;
       }
 
-      if (combatSnapshot?.state && combatSnapshot.state !== 'idle') {
-        payload.state = combatSnapshot.state;
+      const rawState = typeof combatSnapshot?.state === 'string' ? combatSnapshot.state : null;
+      const normalizedState = rawState === 'engaged' ? rawState : null;
+
+      if (normalizedState) {
+        payload.state = normalizedState;
       }
 
       actionBufferRef.current.attacks.push(payload);
