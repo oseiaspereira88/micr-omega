@@ -1,5 +1,5 @@
 import { WORLD_RADIUS } from "@micr-omega/shared";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
 import type { Env } from "../src";
@@ -249,5 +249,68 @@ describe("RoomDO resetGame", () => {
     expect(roomAny.playersPendingRemoval.size).toBe(0);
     expect(roomAny.pendingStatusEffects).toEqual([]);
     expect(roomAny.microorganismStatusEffects.size).toBe(0);
+  });
+
+  it("broadcasts an updated ranking after resetting the game", async () => {
+    const { room } = await createRoom();
+    const roomAny = room as any;
+
+    const now = Date.now();
+    const player = {
+      id: "player-1",
+      name: "Alice",
+      score: 42,
+      combo: 2,
+      energy: 0,
+      xp: 0,
+      geneticMaterial: 0,
+      position: { x: 0, y: 0 },
+      movementVector: { x: 0, y: 0 },
+      orientation: { angle: 0 },
+      health: { current: 50, max: 100 },
+      combatStatus: { state: "idle", targetPlayerId: null, targetObjectId: null, lastAttackAt: now },
+      combatAttributes: { attack: 0, defense: 0, speed: 0, range: 0 },
+      connected: true,
+      connectedAt: now,
+      lastActiveAt: now,
+      lastSeenAt: now,
+      totalSessionDurationMs: 0,
+      sessionCount: 0,
+      pendingAttack: null,
+      statusEffects: [],
+      invulnerableUntil: null,
+    };
+
+    roomAny.players.set(player.id, player);
+    roomAny.nameToPlayerId.set(player.name.toLowerCase(), player.id);
+    roomAny.adjustConnectedPlayers(1);
+
+    const broadcastSpy = vi.fn();
+    roomAny.broadcast = broadcastSpy;
+
+    await roomAny.resetGame();
+
+    const messages = broadcastSpy.mock.calls.map(([message]: [any]) => message);
+    const stateIndex = messages.findIndex(
+      (message: any) => message?.type === "state" && message?.mode === "full",
+    );
+    expect(stateIndex).toBeGreaterThanOrEqual(0);
+
+    const diffIndex = messages.findIndex(
+      (message: any) =>
+        message?.type === "state" && message?.mode === "diff" && message?.state?.world !== undefined,
+    );
+
+    const rankingIndex = messages.findIndex((message: any) => message?.type === "ranking");
+    expect(rankingIndex).toBeGreaterThanOrEqual(0);
+    expect(rankingIndex).toBeGreaterThan(stateIndex);
+    if (diffIndex >= 0) {
+      expect(rankingIndex).toBeGreaterThan(diffIndex);
+    }
+
+    const rankingMessage = messages[rankingIndex]!;
+    expect(rankingMessage.ranking).toEqual([
+      expect.objectContaining({ playerId: player.id, name: player.name, score: player.score }),
+    ]);
   });
 });
