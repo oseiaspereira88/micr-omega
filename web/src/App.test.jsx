@@ -192,6 +192,46 @@ describe('App toast handling', () => {
 
     expect(clearTimeoutSpy).toHaveBeenCalledTimes(TOAST_LIMIT + 2);
   });
+
+  it('clears timeout when dismissing a toast with a zero timer id', async () => {
+    setTimeoutSpy = vi
+      .spyOn(window, 'setTimeout')
+      .mockImplementation((callback, delay, ...args) => {
+        const id = 0;
+        const wrapped = () => {
+          callback(...args);
+        };
+        timers.set(id, wrapped);
+        return id;
+      });
+
+    clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
+
+    render(<App />);
+
+    expect(toastStackPropsRef.current).toBeTruthy();
+
+    await act(async () => {
+      gameStore.setState((state) => ({
+        ...state,
+        joinError: 'Zero timer toast',
+      }));
+    });
+
+    const toasts = toastStackPropsRef.current?.toasts ?? [];
+    expect(toasts).toHaveLength(1);
+
+    const [toast] = toasts;
+    expect(toast).toBeTruthy();
+
+    await act(async () => {
+      toastStackPropsRef.current.onDismiss(toast.id);
+    });
+
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(0);
+    const remainingToasts = toastStackPropsRef.current?.toasts ?? [];
+    expect(remainingToasts).toHaveLength(0);
+  });
 });
 
 const initializeStoreWithPlayer = () => {
