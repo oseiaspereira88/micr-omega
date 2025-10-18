@@ -50,11 +50,13 @@ export const formatEvolutionCost = (cost = {}) => {
   if (Number.isFinite(resolvedCost.mg)) parts.push(`${resolvedCost.mg} MG`);
   if (typeof resolvedCost.fragments === 'object' && resolvedCost.fragments !== null) {
     Object.entries(resolvedCost.fragments).forEach(([key, amount]) => {
+      if (!Number.isFinite(amount) || amount <= 0) return;
       parts.push(`${amount} Frag ${key}`);
     });
   }
   if (typeof resolvedCost.stableGenes === 'object' && resolvedCost.stableGenes !== null) {
     Object.entries(resolvedCost.stableGenes).forEach(([key, amount]) => {
+      if (!Number.isFinite(amount) || amount <= 0) return;
       parts.push(`${amount} Gene ${key}`);
     });
   }
@@ -72,6 +74,7 @@ export const formatEvolutionRequirements = (requirements = {}) => {
     resolvedRequirements.fragments !== null
   ) {
     Object.entries(resolvedRequirements.fragments).forEach(([key, amount]) => {
+      if (!Number.isFinite(amount) || amount <= 0) return;
       parts.push(`${amount} Frag ${key}`);
     });
   }
@@ -80,6 +83,7 @@ export const formatEvolutionRequirements = (requirements = {}) => {
     resolvedRequirements.stableGenes !== null
   ) {
     Object.entries(resolvedRequirements.stableGenes).forEach(([key, amount]) => {
+      if (!Number.isFinite(amount) || amount <= 0) return;
       parts.push(`${amount} Gene ${key}`);
     });
   }
