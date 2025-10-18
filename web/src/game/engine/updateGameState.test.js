@@ -58,6 +58,8 @@ const createPlayer = (overrides = {}) => ({
   energy: overrides.energy ?? 0,
   xp: overrides.xp ?? 0,
   geneticMaterial: overrides.geneticMaterial ?? 0,
+  dashCharge: overrides.dashCharge ?? 100,
+  dashCooldownMs: overrides.dashCooldownMs ?? 0,
   lastActiveAt: overrides.lastActiveAt ?? 0,
   position: overrides.position ?? { x: 10, y: 12 },
   movementVector: overrides.movementVector ?? { x: 0, y: 0 },
@@ -556,7 +558,7 @@ describe('updateGameState', () => {
     });
 
     expect(result.hudSnapshot.energy).toBe(localPlayer.energy);
-    expect(result.hudSnapshot.dashCharge).toBe(77);
+    expect(result.hudSnapshot.dashCharge).toBe(100);
     expect(result.hudSnapshot.combo).toBe(1);
     expect(result.hudSnapshot.maxCombo).toBe(7);
     expect(result.hudSnapshot.recentRewards).toEqual(previousHud.recentRewards);
@@ -720,6 +722,32 @@ describe('updateGameState', () => {
     });
     expect(renderState.worldView.organicMatter[0]).toMatchObject({ id: 'nutrient-1', quantity: 4 });
     expect(renderState.worldView.roomObjects[0]).toMatchObject({ id: 'console-1', type: 'control' });
+  });
+
+  it('marks the HUD as game over when the local player health reaches zero', () => {
+    const renderState = createRenderState();
+    const sharedState = createSharedState({
+      playerId: 'local',
+      players: [
+        createPlayer({
+          id: 'local',
+          name: 'Local Hero',
+          health: { current: 0, max: 120 },
+          dashCharge: 12,
+        }),
+      ],
+    });
+
+    const { hudSnapshot } = updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    expect(hudSnapshot.gameOver).toBe(true);
+    expect(hudSnapshot.dashCharge).toBe(12);
   });
 
   it('propagates NPC combat decisions and loot through helpers', () => {

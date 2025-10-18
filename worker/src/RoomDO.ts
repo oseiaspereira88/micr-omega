@@ -106,6 +106,34 @@ const PLAYER_ATTACK_RANGE_BUFFER = 4;
 const OBSTACLE_PADDING = 12;
 
 const ORGANIC_MATTER_CELL_SIZE = PLAYER_COLLECT_RADIUS;
+const ORGANIC_RESPAWN_DELAY_RANGE_MS = { min: 1_200, max: 3_600 } as const;
+const ORGANIC_RESPAWN_CLUSTER_RADIUS = 70;
+const ORGANIC_RESPAWN_SCATTER_MIN = 20;
+
+const ORGANIC_CLUSTER_PATTERNS = [
+  [
+    { offset: { x: 0, y: 0 }, quantityFactor: 1.2 },
+    { offset: { x: 28, y: -18 }, quantityFactor: 0.95 },
+    { offset: { x: -30, y: 24 }, quantityFactor: 0.85 },
+    { offset: { x: 18, y: 32 }, quantityFactor: 0.9 },
+    { offset: { x: -26, y: -28 }, quantityFactor: 0.8 },
+  ],
+  [
+    { offset: { x: 0, y: 0 }, quantityFactor: 1.1 },
+    { offset: { x: -24, y: 22 }, quantityFactor: 0.88 },
+    { offset: { x: 32, y: 18 }, quantityFactor: 0.92 },
+    { offset: { x: -36, y: -16 }, quantityFactor: 0.84 },
+    { offset: { x: 18, y: -30 }, quantityFactor: 0.86 },
+  ],
+  [
+    { offset: { x: 0, y: 0 }, quantityFactor: 1.15 },
+    { offset: { x: 26, y: 24 }, quantityFactor: 0.9 },
+    { offset: { x: -28, y: -22 }, quantityFactor: 0.87 },
+    { offset: { x: 34, y: -14 }, quantityFactor: 0.93 },
+    { offset: { x: -22, y: 32 }, quantityFactor: 0.85 },
+    { offset: { x: 8, y: -36 }, quantityFactor: 0.82 },
+  ],
+] as const;
 
 const CLIENT_TIME_MAX_FUTURE_DRIFT_MS = 2_000;
 
@@ -850,6 +878,15 @@ type WorldGenerationOptions = {
   primarySpawn?: Vector2 | null;
 };
 
+type PendingOrganicRespawn = {
+  template: {
+    quantity: number;
+    nutrients: OrganicMatter["nutrients"];
+  };
+  position: Vector2;
+  respawnAt: number;
+};
+
 const clampToWorldBounds = (position: Vector2): Vector2 => ({
   x: clamp(position.x, WORLD_BOUNDS.minX, WORLD_BOUNDS.maxX),
   y: clamp(position.y, WORLD_BOUNDS.minY, WORLD_BOUNDS.maxY),
@@ -914,13 +951,43 @@ const createInitialWorldState = (options: WorldGenerationOptions = {}): SharedWo
     position: translateWithinWorldBounds(entity.position, getEntityOffset(directions, index)),
   }));
 
-  const translatedOrganicMatter = base.organicMatter.map((matter, index) => ({
-    ...matter,
-    position: translateWithinWorldBounds(
-      matter.position,
-      getEntityOffset(directions, index + base.microorganisms.length),
-    ),
-  }));
+  const translatedOrganicMatter = base.organicMatter.flatMap((matter, index) => {
+    const baseOffset = getEntityOffset(directions, index + base.microorganisms.length);
+    const anchor = translateWithinWorldBounds(matter.position, baseOffset);
+    const angle = Math.atan2(baseOffset.y, baseOffset.x);
+    const cosAngle = Math.cos(angle);
+    const sinAngle = Math.sin(angle);
+    const pattern =
+      ORGANIC_CLUSTER_PATTERNS[index % ORGANIC_CLUSTER_PATTERNS.length] ?? ORGANIC_CLUSTER_PATTERNS[0];
+
+    return pattern.map((entry, offsetIndex) => {
+      const rotatedOffset = {
+        x: entry.offset.x * cosAngle - entry.offset.y * sinAngle,
+        y: entry.offset.x * sinAngle + entry.offset.y * cosAngle,
+      };
+      const jitterSeed = Math.sin((index + 1) * (offsetIndex + 11));
+      const jitterMagnitude = (jitterSeed - Math.floor(jitterSeed)) * 12 - 6;
+      const jitterAngle = ((index + 3) * (offsetIndex + 5)) % 360;
+      const jitterRadians = (jitterAngle * Math.PI) / 180;
+      const jitterOffset = {
+        x: Math.cos(jitterRadians) * jitterMagnitude,
+        y: Math.sin(jitterRadians) * jitterMagnitude,
+      };
+      const position = translateWithinWorldBounds(anchor, {
+        x: rotatedOffset.x + jitterOffset.x,
+        y: rotatedOffset.y + jitterOffset.y,
+      });
+      const quantityBase = Math.max(4, matter.quantity);
+      const quantity = Math.max(3, Math.round(quantityBase * entry.quantityFactor));
+
+      return {
+        ...matter,
+        id: offsetIndex === 0 ? matter.id : `${matter.id}-cluster-${offsetIndex}`,
+        position,
+        quantity,
+      };
+    });
+  });
 
   return {
     ...base,
@@ -1027,6 +1094,7 @@ export class RoomDO {
   private roomObjects = new Map<string, RoomObject>();
   private entitySequence = 0;
   private organicMatterRespawnRng: () => number = Math.random;
+  private organicRespawnQueue: PendingOrganicRespawn[] = [];
   private obstacles = new Map<string, Obstacle>();
   private microorganismBehavior = new Map<string, { lastAttackAt: number }>();
   private microorganismStatusEffects = new Map<string, StatusCollection>();
@@ -1428,6 +1496,7 @@ export class RoomDO {
     this.organicMatterCells = new Map();
     this.organicMatterCellById = new Map();
     this.organicMatterOrder = new Map();
+    this.organicRespawnQueue = [];
     this.obstacles = new Map(this.world.obstacles.map((obstacle) => [obstacle.id, obstacle]));
     this.roomObjects = new Map(this.world.roomObjects.map((object) => [object.id, object]));
 
@@ -2718,38 +2787,60 @@ export class RoomDO {
       this.removeOrganicMatterEntity(id);
     }
 
-    const respawnedMatter: OrganicMatter[] = [];
-    for (const { matter } of collectedEntries) {
-      const spawnPosition = this.findOrganicMatterRespawnPosition(player.position);
-      if (!spawnPosition) {
-        continue;
-      }
-
-      const id = this.createEntityId(
-        "organic",
-        (candidate) =>
-          this.organicMatter.has(candidate) || respawnedMatter.some((entry) => entry.id === candidate),
-      );
-      const replacement: OrganicMatter = {
-        ...matter,
-        id,
-        position: spawnPosition,
-      };
-      this.addOrganicMatterEntity(replacement);
-      respawnedMatter.push(replacement);
-    }
-
     const removedIds = collectedEntries.map((entry) => entry.id);
     worldDiff.removeOrganicMatterIds = [
       ...(worldDiff.removeOrganicMatterIds ?? []),
       ...removedIds,
     ];
 
-    if (respawnedMatter.length > 0) {
-      worldDiff.upsertOrganicMatter = [
-        ...(worldDiff.upsertOrganicMatter ?? []),
-        ...respawnedMatter.map((matter) => cloneOrganicMatter(matter)),
-      ];
+    const pendingRespawns: PendingOrganicRespawn[] = [];
+    const rng = this.organicMatterRespawnRng;
+    let index = 0;
+    while (index < collectedEntries.length) {
+      const remaining = collectedEntries.length - index;
+      const baseSize = Math.min(remaining, Math.floor(rng() * 3) + 3);
+      const clusterSize = Math.max(1, baseSize);
+      const anchor = this.findOrganicMatterRespawnPosition(player.position, 18);
+      if (!anchor) {
+        break;
+      }
+
+      for (let clusterIndex = 0; clusterIndex < clusterSize; clusterIndex += 1) {
+        const entry = collectedEntries[index + clusterIndex];
+        if (!entry) {
+          break;
+        }
+
+        const scatterAngle = rng() * Math.PI * 2;
+        const scatterDistance = ORGANIC_RESPAWN_SCATTER_MIN + rng() * ORGANIC_RESPAWN_CLUSTER_RADIUS;
+        const scatterX = Math.cos(scatterAngle) * scatterDistance;
+        const scatterY = Math.sin(scatterAngle) * scatterDistance;
+        const candidatePosition = this.clampPosition({
+          x: anchor.x + scatterX,
+          y: anchor.y + scatterY,
+        });
+
+        const template: PendingOrganicRespawn["template"] = {
+          quantity: Math.max(1, Math.round(entry.matter.quantity)),
+          nutrients: { ...entry.matter.nutrients },
+        };
+
+        const delayBase = ORGANIC_RESPAWN_DELAY_RANGE_MS.min;
+        const delayVariance = ORGANIC_RESPAWN_DELAY_RANGE_MS.max - ORGANIC_RESPAWN_DELAY_RANGE_MS.min;
+        const delay = delayBase + rng() * delayVariance + clusterIndex * 90;
+
+        pendingRespawns.push({
+          template,
+          position: candidatePosition,
+          respawnAt: now + Math.max(delay, ORGANIC_RESPAWN_DELAY_RANGE_MS.min),
+        });
+      }
+
+      index += clusterSize;
+    }
+
+    if (pendingRespawns.length > 0) {
+      this.organicRespawnQueue.push(...pendingRespawns);
     }
 
     let totalScore = 0;
@@ -2805,6 +2896,60 @@ export class RoomDO {
       worldChanged: true,
       scoresChanged: totalScore > 0,
     };
+  }
+
+  private processOrganicRespawnQueue(now: number, worldDiff: SharedWorldStateDiff): void {
+    if (this.organicRespawnQueue.length === 0) {
+      return;
+    }
+
+    const ready: PendingOrganicRespawn[] = [];
+    const pending: PendingOrganicRespawn[] = [];
+    for (const entry of this.organicRespawnQueue) {
+      if (entry.respawnAt <= now) {
+        ready.push(entry);
+      } else {
+        pending.push(entry);
+      }
+    }
+    this.organicRespawnQueue = pending;
+
+    if (ready.length === 0) {
+      return;
+    }
+
+    const generatedIds = new Set<string>();
+    for (const entry of ready) {
+      let spawnPosition = entry.position;
+      if (this.isBlockedByObstacle(spawnPosition)) {
+        const fallback = this.findOrganicMatterRespawnPosition(spawnPosition, 12);
+        if (fallback) {
+          spawnPosition = fallback;
+        } else {
+          spawnPosition = this.clampPosition(spawnPosition);
+        }
+      }
+
+      const id = this.createEntityId(
+        "organic",
+        (candidate) => this.organicMatter.has(candidate) || generatedIds.has(candidate),
+      );
+      generatedIds.add(id);
+
+      const matter: OrganicMatter = {
+        id,
+        kind: "organic_matter",
+        position: spawnPosition,
+        quantity: Math.max(1, Math.round(entry.template.quantity)),
+        nutrients: { ...entry.template.nutrients },
+      };
+
+      this.addOrganicMatterEntity(matter);
+      worldDiff.upsertOrganicMatter = [
+        ...(worldDiff.upsertOrganicMatter ?? []),
+        cloneOrganicMatter(matter),
+      ];
+    }
   }
 
   private computePlayerCombatAttributes(player: PlayerInternal): CombatAttributes {
@@ -4435,6 +4580,8 @@ export class RoomDO {
       }
     }
 
+    this.processOrganicRespawnQueue(now, worldDiff);
+
     const microorganismResult = this.updateMicroorganismsDuringTick(
       deltaMs,
       now,
@@ -4682,6 +4829,7 @@ export class RoomDO {
     this.playersPendingRemoval.clear();
     this.pendingStatusEffects = [];
     this.microorganismStatusEffects.clear();
+    this.organicRespawnQueue = [];
 
     this.playersDirty = true;
     this.invalidateGameStateSnapshot();

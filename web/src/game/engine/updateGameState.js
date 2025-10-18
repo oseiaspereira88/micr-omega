@@ -739,6 +739,12 @@ const createRenderPlayer = (sharedPlayer, appearance) => {
   );
   const geneFragments = mergeGeneCounters(sharedPlayer.geneFragments);
   const stableGenes = mergeGeneCounters(sharedPlayer.stableGenes);
+  const dashCharge = Number.isFinite(sharedPlayer.dashCharge)
+    ? Math.max(0, Math.min(100, sharedPlayer.dashCharge))
+    : 0;
+  const dashCooldownMs = Number.isFinite(sharedPlayer.dashCooldownMs)
+    ? Math.max(0, sharedPlayer.dashCooldownMs)
+    : 0;
 
   return {
     id: sharedPlayer.id,
@@ -769,7 +775,10 @@ const createRenderPlayer = (sharedPlayer, appearance) => {
       geneFragments,
       stableGenes,
       dropPity: mergeNumericRecord({ fragment: 0, stableGene: 0 }),
+      dashCharge,
     },
+    dashCharge,
+    dashCooldownMs,
     combatStatus: {
       state: sharedPlayer.combatStatus?.state ?? 'idle',
       targetPlayerId: sharedPlayer.combatStatus?.targetPlayerId ?? null,
@@ -891,6 +900,12 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
       { fragment: 0, stableGene: 0 },
       previousResources.dropPity
     );
+    const dashChargeValue = Number.isFinite(player.dashCharge)
+      ? Math.max(0, Math.min(100, player.dashCharge))
+      : Math.max(0, Math.min(100, previousResources.dashCharge ?? existing.dashCharge ?? 0));
+    const dashCooldownValue = Number.isFinite(player.dashCooldownMs)
+      ? Math.max(0, player.dashCooldownMs)
+      : Math.max(0, existing.dashCooldownMs ?? 0);
 
     existing.resources = {
       ...previousResources,
@@ -900,10 +915,13 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
       geneFragments: geneFragmentsResource,
       stableGenes: stableGenesResource,
       dropPity: dropPityResource,
+      dashCharge: dashChargeValue,
     };
     existing.energy = energyValue;
     existing.geneFragments = geneFragmentsResource;
     existing.stableGenes = stableGenesResource;
+    existing.dashCharge = dashChargeValue;
+    existing.dashCooldownMs = dashCooldownValue;
 
     const tookDamage =
       previousHealth &&
@@ -1505,6 +1523,19 @@ export const updateGameState = ({
     renderState.camera,
     renderState.hudSnapshot
   );
+  if (localRenderPlayer) {
+    const localHealth = Number.isFinite(localRenderPlayer.health?.current)
+      ? localRenderPlayer.health.current
+      : null;
+    if (localHealth !== null && localHealth <= 0) {
+      hudSnapshot.gameOver = true;
+    }
+    if (Number.isFinite(localRenderPlayer.dashCharge)) {
+      hudSnapshot.dashCharge = Math.max(0, Math.min(100, localRenderPlayer.dashCharge));
+    }
+  } else if (renderState.hudSnapshot?.gameOver) {
+    hudSnapshot.gameOver = true;
+  }
   if (renderState.localArchetypeSelection) {
     hudSnapshot.archetypeSelection = {
       ...renderState.localArchetypeSelection,
