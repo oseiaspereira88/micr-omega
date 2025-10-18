@@ -514,7 +514,7 @@ const App = () => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
     if (typeof window !== 'undefined') {
       const timerId = timersRef.current.get(id);
-      if (timerId) {
+      if (typeof timerId !== 'undefined' && timerId !== null) {
         window.clearTimeout(timerId);
         timersRef.current.delete(id);
       }
