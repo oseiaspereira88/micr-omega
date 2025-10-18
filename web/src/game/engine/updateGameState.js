@@ -274,12 +274,6 @@ export const applyProgressionEvents = (
   if (!hudSnapshot || !progression) return hudSnapshot;
 
   const xpGain = calculateExperienceFromEvents(progression, xpConfig);
-  if (xpGain > 0) {
-    const baseXp = hudSnapshot.xp ? { ...hudSnapshot.xp } : { ...DEFAULT_RESOURCE_STUB };
-    baseXp.current = (baseXp.current ?? 0) + xpGain;
-    baseXp.total = (baseXp.total ?? 0) + xpGain;
-    hudSnapshot.xp = baseXp;
-  }
 
   const dropResults = aggregateDrops(progression.kills, {
     dropTables,
@@ -287,23 +281,6 @@ export const applyProgressionEvents = (
     initialPity: progression.dropPity ?? hudSnapshot.dropPity,
   });
 
-  if (!hudSnapshot.geneticMaterial) {
-    hudSnapshot.geneticMaterial = { current: 0, total: 0, bonus: 0 };
-  }
-  hudSnapshot.geneticMaterial = {
-    ...hudSnapshot.geneticMaterial,
-    current: (hudSnapshot.geneticMaterial.current ?? 0) + dropResults.geneticMaterial,
-    total: (hudSnapshot.geneticMaterial.total ?? 0) + dropResults.geneticMaterial,
-  };
-
-  const mergeGenes = (target = {}, increments = {}) => ({
-    minor: (target.minor ?? 0) + (increments.minor ?? 0),
-    major: (target.major ?? 0) + (increments.major ?? 0),
-    apex: (target.apex ?? 0) + (increments.apex ?? 0),
-  });
-
-  hudSnapshot.geneFragments = mergeGenes(hudSnapshot.geneFragments, dropResults.fragments);
-  hudSnapshot.stableGenes = mergeGenes(hudSnapshot.stableGenes, dropResults.stableGenes);
   hudSnapshot.dropPity = { ...dropResults.pity };
 
   if (!hudSnapshot.recentRewards) {
@@ -754,6 +731,16 @@ const createRenderPlayer = (sharedPlayer, appearance) => {
     name: sharedPlayer.name,
     score: Number.isFinite(sharedPlayer.score) ? sharedPlayer.score : 0,
     combo: Number.isFinite(sharedPlayer.combo) ? sharedPlayer.combo : 1,
+    energy: Number.isFinite(sharedPlayer.energy) ? sharedPlayer.energy : 0,
+    xp: Number.isFinite(sharedPlayer.xp) ? sharedPlayer.xp : 0,
+    geneticMaterial: Number.isFinite(sharedPlayer.geneticMaterial)
+      ? sharedPlayer.geneticMaterial
+      : 0,
+    geneFragments: {
+      minor: Math.max(0, Math.floor(sharedPlayer.geneFragments?.minor ?? 0)),
+      major: Math.max(0, Math.floor(sharedPlayer.geneFragments?.major ?? 0)),
+      apex: Math.max(0, Math.floor(sharedPlayer.geneFragments?.apex ?? 0)),
+    },
     palette,
     form: forms.form,
     hybridForms: forms.hybridForms,
@@ -844,6 +831,24 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
     existing.score = Number.isFinite(player.score) ? player.score : existing.score ?? 0;
     const fallbackCombo = existing.combo ?? 1;
     existing.combo = Number.isFinite(player.combo) ? player.combo : fallbackCombo;
+    if (Number.isFinite(player.energy)) {
+      existing.energy = player.energy;
+    }
+    if (Number.isFinite(player.xp)) {
+      existing.xp = player.xp;
+    }
+    if (Number.isFinite(player.geneticMaterial)) {
+      existing.geneticMaterial = player.geneticMaterial;
+    }
+    if (player.geneFragments && typeof player.geneFragments === 'object') {
+      existing.geneFragments = {
+        minor: Math.max(0, Math.floor(player.geneFragments.minor ?? existing.geneFragments?.minor ?? 0)),
+        major: Math.max(0, Math.floor(player.geneFragments.major ?? existing.geneFragments?.major ?? 0)),
+        apex: Math.max(0, Math.floor(player.geneFragments.apex ?? existing.geneFragments?.apex ?? 0)),
+      };
+    } else if (!existing.geneFragments) {
+      existing.geneFragments = { minor: 0, major: 0, apex: 0 };
+    }
     existing.element =
       player.element ??
       player.combatAttributes?.element ??
@@ -1012,12 +1017,22 @@ const buildHudSnapshot = (
   xp.next = safeNumber(xp.next, DEFAULT_RESOURCE_STUB.next);
   xp.total = safeNumber(xp.total, 0);
   xp.level = safeNumber(xp.level, DEFAULT_RESOURCE_STUB.level);
+  if (Number.isFinite(localPlayer?.xp)) {
+    const xpCurrent = Math.max(0, Math.floor(localPlayer.xp));
+    xp.current = xpCurrent;
+    xp.total = Math.max(xp.total, xpCurrent);
+  }
 
   const geneticMaterial = mergeNumericRecord(
     { current: 0, total: 0, bonus: 0 },
     safePreviousHud?.geneticMaterial,
     resourceBag.geneticMaterial
   );
+  if (Number.isFinite(localPlayer?.geneticMaterial)) {
+    const mgCurrent = Math.max(0, Math.floor(localPlayer.geneticMaterial));
+    geneticMaterial.current = mgCurrent;
+    geneticMaterial.total = Math.max(geneticMaterial.total ?? 0, mgCurrent);
+  }
 
   const characteristicPointsSource =
     resourceBag.characteristicPoints ?? safePreviousHud?.characteristicPoints ?? {};

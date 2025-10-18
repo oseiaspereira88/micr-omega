@@ -49,6 +49,7 @@ import {
   type PlayerEvolutionAction,
   type ArchetypeKey,
   aggregateDrops,
+  calculateExperienceFromEvents,
   DROP_TABLES,
   TARGET_OPTIONAL_ATTACK_KINDS
 } from "./types";
@@ -209,6 +210,7 @@ type StoredPlayer = {
   energy: number;
   xp: number;
   geneticMaterial: number;
+  geneFragments: GeneFragmentCounts;
   position: Vector2;
   movementVector: Vector2;
   orientation: OrientationState;
@@ -225,7 +227,13 @@ type StoredPlayer = {
 
 type StoredPlayerSnapshot = Omit<
   StoredPlayer,
-  "position" | "movementVector" | "orientation" | "health" | "combatStatus" | "combatAttributes" | "evolutionState"
+  | "position"
+  | "movementVector"
+  | "orientation"
+  | "health"
+  | "combatStatus"
+  | "combatAttributes"
+  | "evolutionState"
 > &
   Partial<
     Pick<
@@ -239,6 +247,7 @@ type StoredPlayerSnapshot = Omit<
       | "evolutionState"
       | "archetypeKey"
       | "skillState"
+      | "geneFragments"
     >
   >;
 
@@ -273,6 +282,42 @@ type PendingProgressionStream = {
   objectives?: SharedProgressionStream["objectives"];
   kills?: SharedProgressionKillEvent[];
 };
+
+type GeneFragmentCounts = {
+  minor: number;
+  major: number;
+  apex: number;
+};
+
+const createGeneFragmentCounts = (
+  counts?: Partial<GeneFragmentCounts> | null,
+): GeneFragmentCounts => ({
+  minor: Number.isFinite(counts?.minor) ? Math.max(0, Math.trunc(Number(counts!.minor))) : 0,
+  major: Number.isFinite(counts?.major) ? Math.max(0, Math.trunc(Number(counts!.major))) : 0,
+  apex: Number.isFinite(counts?.apex) ? Math.max(0, Math.trunc(Number(counts!.apex))) : 0,
+});
+
+const cloneGeneFragmentCounts = (
+  counts?: GeneFragmentCounts | null,
+): GeneFragmentCounts => ({
+  minor: counts?.minor ?? 0,
+  major: counts?.major ?? 0,
+  apex: counts?.apex ?? 0,
+});
+
+const addGeneFragmentCounts = (
+  base: GeneFragmentCounts,
+  delta?: Partial<GeneFragmentCounts> | null,
+): GeneFragmentCounts => ({
+  minor: Math.max(0, Math.trunc(base.minor + (Number.isFinite(delta?.minor) ? Number(delta!.minor) : 0))),
+  major: Math.max(0, Math.trunc(base.major + (Number.isFinite(delta?.major) ? Number(delta!.major) : 0))),
+  apex: Math.max(0, Math.trunc(base.apex + (Number.isFinite(delta?.apex) ? Number(delta!.apex) : 0))),
+});
+
+const getGeneFragmentTotal = (counts?: Partial<GeneFragmentCounts> | null): number =>
+  (Number.isFinite(counts?.minor) ? Number(counts!.minor) : 0) +
+  (Number.isFinite(counts?.major) ? Number(counts!.major) : 0) +
+  (Number.isFinite(counts?.apex) ? Number(counts!.apex) : 0);
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -1247,6 +1292,7 @@ export class RoomDO {
           geneticMaterial: Number.isFinite(stored.geneticMaterial)
             ? Math.max(0, stored.geneticMaterial)
             : DEFAULT_PLAYER_GENETIC_MATERIAL,
+          geneFragments: createGeneFragmentCounts(stored.geneFragments),
           position: createVector(stored.position),
           movementVector: createVector(stored.movementVector),
           orientation: createOrientation(stored.orientation),
@@ -1628,10 +1674,10 @@ export class RoomDO {
     now: number,
     worldDiff: SharedWorldStateDiff,
     combatLog: CombatLogEntry[],
-  ): { worldChanged: boolean; scoresChanged: boolean; defeated: boolean } {
+  ): { worldChanged: boolean; scoresChanged: boolean; defeated: boolean; playerUpdated: boolean } {
     const appliedDamage = Math.max(0, Math.round(damage));
     if (appliedDamage <= 0) {
-      return { worldChanged: false, scoresChanged: false, defeated: false };
+      return { worldChanged: false, scoresChanged: false, defeated: false, playerUpdated: false };
     }
 
     const nextHealth = Math.max(0, microorganism.health.current - appliedDamage);
@@ -1640,6 +1686,7 @@ export class RoomDO {
       max: microorganism.health.max,
     };
 
+    let playerUpdated = false;
     if (nextHealth === 0) {
       this.microorganisms.delete(microorganism.id);
       this.microorganismBehavior.delete(microorganism.id);
@@ -1652,7 +1699,17 @@ export class RoomDO {
         microorganism.id,
       ];
 
-      this.recordKillProgression(player, { targetId: microorganism.id, dropTier: "minion" });
+      const rewards = this.recordKillProgression(player, {
+        targetId: microorganism.id,
+        dropTier: "minion",
+      });
+      if (
+        (rewards.xpGained ?? 0) > 0 ||
+        (rewards.geneticMaterialGained ?? 0) > 0 ||
+        getGeneFragmentTotal(rewards.geneFragmentsGained) > 0
+      ) {
+        playerUpdated = true;
+      }
 
       const remainsId = `${microorganism.id}-remains`;
       const remains: OrganicMatter = {
@@ -1683,7 +1740,7 @@ export class RoomDO {
         scoreAwarded,
       });
 
-      return { worldChanged: true, scoresChanged: true, defeated: true };
+      return { worldChanged: true, scoresChanged: true, defeated: true, playerUpdated };
     }
 
     worldDiff.upsertMicroorganisms = [
@@ -1699,7 +1756,7 @@ export class RoomDO {
       outcome: "hit",
       remainingHealth: nextHealth,
     });
-    return { worldChanged: true, scoresChanged: false, defeated: false };
+    return { worldChanged: true, scoresChanged: false, defeated: false, playerUpdated };
   }
 
   private tickPlayerSkillCooldowns(player: PlayerInternal, deltaMs: number): boolean {
@@ -1783,6 +1840,9 @@ export class RoomDO {
       }
       if (result.scoresChanged) {
         scoresChanged = true;
+      }
+      if (result.playerUpdated) {
+        updatedPlayers.set(player.id, player);
       }
 
       this.applyStatusToMicroorganism(
@@ -1918,6 +1978,9 @@ export class RoomDO {
           if (result.scoresChanged) {
             scoresChanged = true;
           }
+          if (result.playerUpdated) {
+            updatedPlayers.set(player.id, player);
+          }
           applyStatuses(microorganism, statusDuration);
         }
         break;
@@ -1976,6 +2039,9 @@ export class RoomDO {
           }
           if (result.scoresChanged) {
             scoresChanged = true;
+          }
+          if (result.playerUpdated) {
+            updatedPlayers.set(player.id, player);
           }
           applyStatuses(microorganism, statusDuration);
         }
@@ -2058,6 +2124,9 @@ export class RoomDO {
           if (result.scoresChanged) {
             scoresChanged = true;
           }
+          if (result.playerUpdated) {
+            updatedPlayers.set(player.id, player);
+          }
           this.applyStatusToMicroorganism(microorganism, "FISSURE", 1, statusDuration, now, player.id);
           this.applyStatusToMicroorganism(microorganism, "LEECH", 1, statusDuration, now, player.id);
         }
@@ -2113,6 +2182,9 @@ export class RoomDO {
           }
           if (result.scoresChanged) {
             scoresChanged = true;
+          }
+          if (result.playerUpdated) {
+            updatedPlayers.set(player.id, player);
           }
           this.applyStatusToMicroorganism(
             microorganism,
@@ -2505,9 +2577,11 @@ export class RoomDO {
     }
 
     let totalScore = 0;
+    let totalEnergy = 0;
     for (const { matter } of collectedEntries) {
       const awarded = Math.max(1, Math.round(matter.quantity));
       totalScore += awarded;
+      totalEnergy += awarded;
       combatLog.push({
         timestamp: now,
         attackerId: player.id,
@@ -2523,6 +2597,10 @@ export class RoomDO {
     if (totalScore > 0) {
       player.score = Math.max(0, player.score + totalScore);
       this.markRankingDirty();
+    }
+
+    if (totalEnergy > 0) {
+      player.energy = Math.max(0, player.energy + totalEnergy);
     }
 
     return {
@@ -2727,6 +2805,9 @@ export class RoomDO {
       }
       if (result.scoresChanged) {
         scoresChanged = true;
+      }
+      if (result.playerUpdated) {
+        updatedPlayers.set(player.id, player);
       }
 
       player.combatStatus = createCombatStatusState({
@@ -3310,6 +3391,7 @@ export class RoomDO {
         energy: DEFAULT_PLAYER_ENERGY,
         xp: DEFAULT_PLAYER_XP,
         geneticMaterial: DEFAULT_PLAYER_GENETIC_MATERIAL,
+        geneFragments: createGeneFragmentCounts(),
         position: createVector(spawnPosition),
         movementVector: createVector(),
         orientation: createOrientation(),
@@ -4420,6 +4502,7 @@ export class RoomDO {
       energy: player.energy,
       xp: player.xp,
       geneticMaterial: player.geneticMaterial,
+      geneFragments: cloneGeneFragmentCounts(player.geneFragments),
       lastActiveAt: player.lastActiveAt,
       position: cloneVector(player.position),
       movementVector: cloneVector(player.movementVector),
@@ -4461,7 +4544,7 @@ export class RoomDO {
   private recordKillProgression(
     player: PlayerInternal,
     context: { targetId?: string; dropTier?: SharedProgressionKillEvent["dropTier"]; advantage?: boolean }
-  ): void {
+  ): { xpGained: number; geneticMaterialGained: number; geneFragmentsGained: GeneFragmentCounts } {
     const state = this.ensureProgressionState(player.id);
     const pending = this.queueProgressionStream(player.id);
     const event: SharedProgressionKillEvent = {
@@ -4485,8 +4568,28 @@ export class RoomDO {
       rng: Math.random,
       initialPity: state.dropPity,
     });
+    const xpGained = Math.max(
+      0,
+      Math.round(
+        calculateExperienceFromEvents({ kills: [event] }),
+      ),
+    );
+    if (xpGained > 0) {
+      player.xp = Math.max(0, player.xp + xpGained);
+    }
+    const geneticMaterialGained = Math.max(0, Math.round(dropResults.geneticMaterial ?? 0));
+    if (geneticMaterialGained > 0) {
+      player.geneticMaterial = Math.max(0, player.geneticMaterial + geneticMaterialGained);
+    }
+    const geneFragmentsGained = cloneGeneFragmentCounts(
+      dropResults.fragments as GeneFragmentCounts | undefined,
+    );
+    if (getGeneFragmentTotal(geneFragmentsGained) > 0) {
+      player.geneFragments = addGeneFragmentCounts(player.geneFragments, geneFragmentsGained);
+    }
     state.dropPity = clonePityCounters(dropResults.pity);
     this.invalidateGameStateSnapshot();
+    return { xpGained, geneticMaterialGained, geneFragmentsGained };
   }
 
   private flushPendingProgression(): SharedProgressionState | null {
@@ -4803,6 +4906,7 @@ export class RoomDO {
         energy: player.energy,
         xp: player.xp,
         geneticMaterial: player.geneticMaterial,
+        geneFragments: cloneGeneFragmentCounts(player.geneFragments),
         position: cloneVector(player.position),
         movementVector: cloneVector(player.movementVector),
         orientation: cloneOrientation(player.orientation),

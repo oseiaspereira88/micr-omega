@@ -122,6 +122,10 @@ describe('GameHud touch controls', () => {
   it('forward cycle skill handler to touch controls', () => {
     const onCycleSkill = vi.fn();
 
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'connected', joinError: null });
+    });
+
     render(
       <GameSettingsProvider>
         <GameHud
@@ -149,12 +153,20 @@ describe('GameHud touch controls', () => {
     fireEvent.click(cycleButton);
 
     expect(onCycleSkill).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'idle', joinError: null });
+    });
   });
 });
 
 describe('GameHud sidebar accessibility', () => {
   it('focuses the sidebar when it is opened', async () => {
     const user = userEvent.setup();
+
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'connected', joinError: null });
+    });
 
     render(
       <GameSettingsProvider>
@@ -175,10 +187,18 @@ describe('GameHud sidebar accessibility', () => {
       expect(activeElement).not.toBe(toggleButton);
       expect(sidebar.contains(activeElement)).toBe(true);
     });
+
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'idle', joinError: null });
+    });
   });
 
   it('closes when Escape is pressed and restores focus to the toggle button', async () => {
     const user = userEvent.setup();
+
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'connected', joinError: null });
+    });
 
     render(
       <GameSettingsProvider>
@@ -204,6 +224,10 @@ describe('GameHud sidebar accessibility', () => {
 
     await waitFor(() => expect(toggleButton).toHaveFocus());
     expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
+
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'idle', joinError: null });
+    });
   });
 });
 

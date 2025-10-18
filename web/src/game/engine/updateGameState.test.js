@@ -56,8 +56,10 @@ const createPlayer = (overrides = {}) => ({
   score: overrides.score ?? 0,
   combo: overrides.combo ?? 0,
   energy: overrides.energy ?? 0,
+  dashCharge: overrides.dashCharge ?? 0,
   xp: overrides.xp ?? 0,
   geneticMaterial: overrides.geneticMaterial ?? 0,
+  geneFragments: overrides.geneFragments ?? { minor: 0, major: 0, apex: 0 },
   lastActiveAt: overrides.lastActiveAt ?? 0,
   position: overrides.position ?? { x: 10, y: 12 },
   movementVector: overrides.movementVector ?? { x: 0, y: 0 },
@@ -522,7 +524,14 @@ describe('updateGameState', () => {
       text: `note-${index}`,
     }));
 
-    const localPlayer = createPlayer({ id: 'p1', name: 'Local' });
+    const localPlayer = createPlayer({
+      id: 'p1',
+      name: 'Local',
+      xp: 10,
+      energy: 42,
+      dashCharge: 77,
+      geneFragments: { minor: 4, major: 5, apex: 6 },
+    });
     delete localPlayer.combo;
 
     const sharedState = createSharedState({
@@ -563,7 +572,11 @@ describe('updateGameState', () => {
     expect(result.hudSnapshot.recentRewards).not.toBe(previousHud.recentRewards);
     expect(result.hudSnapshot.dropPity).toEqual(previousHud.dropPity);
     expect(result.hudSnapshot.dropPity).not.toBe(previousHud.dropPity);
-    expect(result.hudSnapshot.geneFragments).toEqual(previousHud.geneFragments);
+    expect(result.hudSnapshot.geneFragments).toEqual({
+      minor: 4,
+      major: 5,
+      apex: 6,
+    });
     expect(result.hudSnapshot.geneFragments).not.toBe(previousHud.geneFragments);
     expect(result.hudSnapshot.stableGenes).toEqual(previousHud.stableGenes);
     expect(result.hudSnapshot.stableGenes).not.toBe(previousHud.stableGenes);
@@ -834,11 +847,12 @@ describe('progression utilities', () => {
       rng: () => 0.01,
     });
 
-    expect(updated.xp.current).toBeGreaterThan(0);
-    expect(updated.geneticMaterial.current).toBeGreaterThan(10);
-    expect(updated.geneFragments.minor + updated.geneFragments.major + updated.geneFragments.apex).toBeGreaterThanOrEqual(0);
+    expect(updated.xp.current).toBe(0);
+    expect(updated.geneticMaterial.current).toBe(10);
+    expect(updated.geneFragments).toEqual({ minor: 0, major: 0, apex: 0 });
     expect(updated.dropPity.fragment).toBeGreaterThanOrEqual(0);
     expect(updated.recentRewards.xp).toBeGreaterThan(0);
+    expect(updated.recentRewards.geneticMaterial).toBeGreaterThan(0);
   });
 
   it('applies progression kills once per sequence when updating game state', () => {
@@ -878,11 +892,11 @@ describe('progression utilities', () => {
       helpers: { rng: () => 0.5 },
     });
 
-    expect(first.hudSnapshot.xp.current).toBeGreaterThan(0);
-    expect(first.hudSnapshot.geneticMaterial.current).toBeGreaterThan(0);
+    expect(first.hudSnapshot.recentRewards.xp).toBeGreaterThan(0);
+    expect(first.hudSnapshot.recentRewards.geneticMaterial).toBeGreaterThan(0);
 
-    const xpAfterFirst = first.hudSnapshot.xp.current;
-    const gmAfterFirst = first.hudSnapshot.geneticMaterial.current;
+    const xpRewardAfterFirst = first.hudSnapshot.recentRewards.xp;
+    const gmRewardAfterFirst = first.hudSnapshot.recentRewards.geneticMaterial;
 
     const second = updateGameState({
       renderState,
@@ -893,8 +907,8 @@ describe('progression utilities', () => {
       helpers: { rng: () => 0.5 },
     });
 
-    expect(second.hudSnapshot.xp.current).toBe(xpAfterFirst);
-    expect(second.hudSnapshot.geneticMaterial.current).toBe(gmAfterFirst);
+    expect(second.hudSnapshot.recentRewards.xp).toBe(xpRewardAfterFirst);
+    expect(second.hudSnapshot.recentRewards.geneticMaterial).toBe(gmRewardAfterFirst);
 
     const nextState = createSharedState({
       progression: {
@@ -922,7 +936,7 @@ describe('progression utilities', () => {
       helpers: { rng: () => 0.5 },
     });
 
-    expect(third.hudSnapshot.xp.current).toBeGreaterThan(xpAfterFirst);
-    expect(third.hudSnapshot.geneticMaterial.current).toBeGreaterThan(gmAfterFirst);
+    expect(third.hudSnapshot.recentRewards.xp).toBeGreaterThan(xpRewardAfterFirst);
+    expect(third.hudSnapshot.recentRewards.geneticMaterial).toBeGreaterThan(gmRewardAfterFirst);
   });
 });
