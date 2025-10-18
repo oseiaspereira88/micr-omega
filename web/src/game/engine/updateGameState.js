@@ -158,6 +158,9 @@ const mergeNumericRecord = (defaults, ...sources) => {
   return result;
 };
 
+const mergeGeneCounters = (...sources) =>
+  mergeNumericRecord({ minor: 0, major: 0, apex: 0 }, ...sources);
+
 const mergeEvolutionSlots = (...sources) => {
   const keys = ['small', 'medium', 'large', 'macro'];
   const result = Object.fromEntries(keys.map((key) => [key, { used: 0, max: 0 }]));
@@ -274,36 +277,12 @@ export const applyProgressionEvents = (
   if (!hudSnapshot || !progression) return hudSnapshot;
 
   const xpGain = calculateExperienceFromEvents(progression, xpConfig);
-  if (xpGain > 0) {
-    const baseXp = hudSnapshot.xp ? { ...hudSnapshot.xp } : { ...DEFAULT_RESOURCE_STUB };
-    baseXp.current = (baseXp.current ?? 0) + xpGain;
-    baseXp.total = (baseXp.total ?? 0) + xpGain;
-    hudSnapshot.xp = baseXp;
-  }
 
   const dropResults = aggregateDrops(progression.kills, {
     dropTables,
     rng,
     initialPity: progression.dropPity ?? hudSnapshot.dropPity,
   });
-
-  if (!hudSnapshot.geneticMaterial) {
-    hudSnapshot.geneticMaterial = { current: 0, total: 0, bonus: 0 };
-  }
-  hudSnapshot.geneticMaterial = {
-    ...hudSnapshot.geneticMaterial,
-    current: (hudSnapshot.geneticMaterial.current ?? 0) + dropResults.geneticMaterial,
-    total: (hudSnapshot.geneticMaterial.total ?? 0) + dropResults.geneticMaterial,
-  };
-
-  const mergeGenes = (target = {}, increments = {}) => ({
-    minor: (target.minor ?? 0) + (increments.minor ?? 0),
-    major: (target.major ?? 0) + (increments.major ?? 0),
-    apex: (target.apex ?? 0) + (increments.apex ?? 0),
-  });
-
-  hudSnapshot.geneFragments = mergeGenes(hudSnapshot.geneFragments, dropResults.fragments);
-  hudSnapshot.stableGenes = mergeGenes(hudSnapshot.stableGenes, dropResults.stableGenes);
   hudSnapshot.dropPity = { ...dropResults.pity };
 
   if (!hudSnapshot.recentRewards) {
@@ -748,6 +727,18 @@ const createRenderPlayer = (sharedPlayer, appearance) => {
   const movementVector = ensureVector(sharedPlayer.movementVector);
   const health = ensureHealth(sharedPlayer.health);
   const forms = resolvePlayerForms(appearance, sharedPlayer);
+  const energy = Number.isFinite(sharedPlayer.energy) ? Math.max(0, sharedPlayer.energy) : 0;
+  const xpValue = Number.isFinite(sharedPlayer.xp) ? Math.max(0, sharedPlayer.xp) : 0;
+  const xpResource = mergeNumericRecord(DEFAULT_RESOURCE_STUB, { current: xpValue, total: xpValue });
+  const geneticMaterialValue = Number.isFinite(sharedPlayer.geneticMaterial)
+    ? Math.max(0, sharedPlayer.geneticMaterial)
+    : 0;
+  const geneticMaterialResource = mergeNumericRecord(
+    { current: 0, total: 0, bonus: 0 },
+    { current: geneticMaterialValue, total: geneticMaterialValue }
+  );
+  const geneFragments = mergeGeneCounters(sharedPlayer.geneFragments);
+  const stableGenes = mergeGeneCounters(sharedPlayer.stableGenes);
 
   return {
     id: sharedPlayer.id,
@@ -768,6 +759,17 @@ const createRenderPlayer = (sharedPlayer, appearance) => {
       : 0,
     speed: Math.sqrt(movementVector.x * movementVector.x + movementVector.y * movementVector.y),
     health,
+    energy,
+    geneFragments,
+    stableGenes,
+    resources: {
+      energy,
+      xp: xpResource,
+      geneticMaterial: geneticMaterialResource,
+      geneFragments,
+      stableGenes,
+      dropPity: mergeNumericRecord({ fragment: 0, stableGene: 0 }),
+    },
     combatStatus: {
       state: sharedPlayer.combatStatus?.state ?? 'idle',
       targetPlayerId: sharedPlayer.combatStatus?.targetPlayerId ?? null,
@@ -861,6 +863,47 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
     } else if (!existing.resistances) {
       existing.resistances = createResistanceSnapshot();
     }
+
+    const previousResources =
+      existing.resources && typeof existing.resources === 'object' ? existing.resources : {};
+    const energyValue = Number.isFinite(player.energy)
+      ? Math.max(0, player.energy)
+      : Math.max(0, previousResources.energy ?? existing.energy ?? 0);
+    const xpValue = Number.isFinite(player.xp) ? Math.max(0, player.xp) : undefined;
+    const xpResource = mergeNumericRecord(
+      DEFAULT_RESOURCE_STUB,
+      previousResources.xp,
+      xpValue !== undefined ? { current: xpValue, total: xpValue } : {}
+    );
+    const geneticMaterialValue = Number.isFinite(player.geneticMaterial)
+      ? Math.max(0, player.geneticMaterial)
+      : undefined;
+    const geneticMaterialResource = mergeNumericRecord(
+      { current: 0, total: 0, bonus: 0 },
+      previousResources.geneticMaterial,
+      geneticMaterialValue !== undefined
+        ? { current: geneticMaterialValue, total: geneticMaterialValue }
+        : {}
+    );
+    const geneFragmentsResource = mergeGeneCounters(previousResources.geneFragments, player.geneFragments);
+    const stableGenesResource = mergeGeneCounters(previousResources.stableGenes, player.stableGenes);
+    const dropPityResource = mergeNumericRecord(
+      { fragment: 0, stableGene: 0 },
+      previousResources.dropPity
+    );
+
+    existing.resources = {
+      ...previousResources,
+      energy: energyValue,
+      xp: xpResource,
+      geneticMaterial: geneticMaterialResource,
+      geneFragments: geneFragmentsResource,
+      stableGenes: stableGenesResource,
+      dropPity: dropPityResource,
+    };
+    existing.energy = energyValue;
+    existing.geneFragments = geneFragmentsResource;
+    existing.stableGenes = stableGenesResource;
 
     const tookDamage =
       previousHealth &&

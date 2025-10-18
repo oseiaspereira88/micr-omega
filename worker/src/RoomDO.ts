@@ -49,6 +49,7 @@ import {
   type PlayerEvolutionAction,
   type ArchetypeKey,
   aggregateDrops,
+  calculateExperienceFromEvents,
   DROP_TABLES,
   TARGET_OPTIONAL_ATTACK_KINDS
 } from "./types";
@@ -211,6 +212,8 @@ type StoredPlayer = {
   energy: number;
   xp: number;
   geneticMaterial: number;
+  geneFragments: GeneCounter;
+  stableGenes: GeneCounter;
   dashCharge: number;
   dashCooldownMs: number;
   position: Vector2;
@@ -245,6 +248,8 @@ type StoredPlayerSnapshot = Omit<
       | "skillState"
       | "dashCharge"
       | "dashCooldownMs"
+      | "geneFragments"
+      | "stableGenes"
     >
   >;
 
@@ -278,6 +283,32 @@ type PendingProgressionStream = {
   damage?: SharedProgressionStream["damage"];
   objectives?: SharedProgressionStream["objectives"];
   kills?: SharedProgressionKillEvent[];
+};
+
+type GeneCounter = { minor: number; major: number; apex: number };
+
+const createGeneCounter = (counter?: Partial<GeneCounter> | null): GeneCounter => ({
+  minor: Math.max(0, Number.isFinite(counter?.minor) ? Number(counter!.minor) : 0),
+  major: Math.max(0, Number.isFinite(counter?.major) ? Number(counter!.major) : 0),
+  apex: Math.max(0, Number.isFinite(counter?.apex) ? Number(counter!.apex) : 0),
+});
+
+const cloneGeneCounter = (counter?: GeneCounter | null): GeneCounter =>
+  createGeneCounter(counter ?? undefined);
+
+const incrementGeneCounter = (target: GeneCounter, increment: Partial<GeneCounter> | undefined) => {
+  if (!increment) {
+    return;
+  }
+  if (Number.isFinite(increment.minor)) {
+    target.minor = Math.max(0, target.minor + Math.max(0, Math.round(increment.minor!)));
+  }
+  if (Number.isFinite(increment.major)) {
+    target.major = Math.max(0, target.major + Math.max(0, Math.round(increment.major!)));
+  }
+  if (Number.isFinite(increment.apex)) {
+    target.apex = Math.max(0, target.apex + Math.max(0, Math.round(increment.apex!)));
+  }
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -1274,6 +1305,8 @@ export class RoomDO {
           geneticMaterial: Number.isFinite(stored.geneticMaterial)
             ? Math.max(0, stored.geneticMaterial)
             : DEFAULT_PLAYER_GENETIC_MATERIAL,
+          geneFragments: createGeneCounter(stored.geneFragments),
+          stableGenes: createGeneCounter(stored.stableGenes),
           dashCharge: normalizeDashCharge(stored.dashCharge),
           dashCooldownMs: normalizeDashCooldown(stored.dashCooldownMs),
           position: createVector(stored.position),
@@ -2740,6 +2773,33 @@ export class RoomDO {
       this.markRankingDirty();
     }
 
+    if (collectedEntries.length > 0) {
+      const energyGain = collectedEntries.reduce((total, { matter }) => {
+        const base = Number.isFinite(matter.quantity) ? Math.round(matter.quantity) : 0;
+        const nutrientBonus = Object.values(matter.nutrients ?? {}).reduce((sum, value) => {
+          if (!Number.isFinite(value)) {
+            return sum;
+          }
+          return sum + Math.max(0, Math.round(value));
+        }, 0);
+        return total + Math.max(0, base) + Math.max(0, nutrientBonus);
+      }, 0);
+
+      if (energyGain > 0) {
+        player.energy = Math.max(0, player.energy + energyGain);
+      }
+
+      const xpGain = Math.max(0, Math.round(totalScore / 2));
+      if (xpGain > 0) {
+        player.xp = Math.max(0, player.xp + xpGain);
+      }
+
+      const mgGain = Math.max(0, Math.round(totalScore / 4));
+      if (mgGain > 0) {
+        player.geneticMaterial = Math.max(0, player.geneticMaterial + mgGain);
+      }
+    }
+
     return {
       playerUpdated: true,
       worldChanged: true,
@@ -3542,6 +3602,8 @@ export class RoomDO {
         energy: DEFAULT_PLAYER_ENERGY,
         xp: DEFAULT_PLAYER_XP,
         geneticMaterial: DEFAULT_PLAYER_GENETIC_MATERIAL,
+        geneFragments: createGeneCounter(),
+        stableGenes: createGeneCounter(),
         dashCharge: DEFAULT_DASH_CHARGE,
         dashCooldownMs: 0,
         position: createVector(spawnPosition),
@@ -4676,6 +4738,8 @@ export class RoomDO {
       energy: player.energy,
       xp: player.xp,
       geneticMaterial: player.geneticMaterial,
+      geneFragments: cloneGeneCounter(player.geneFragments),
+      stableGenes: cloneGeneCounter(player.stableGenes),
       dashCharge: player.dashCharge,
       dashCooldownMs: player.dashCooldownMs,
       lastActiveAt: player.lastActiveAt,
@@ -4743,7 +4807,30 @@ export class RoomDO {
       rng: Math.random,
       initialPity: state.dropPity,
     });
+    const xpGain = Math.round(
+      calculateExperienceFromEvents({ kills: [event] })
+    );
+
+    if (xpGain > 0) {
+      player.xp = Math.max(0, player.xp + xpGain);
+    }
+
+    if (dropResults.geneticMaterial > 0) {
+      player.geneticMaterial = Math.max(0, player.geneticMaterial + dropResults.geneticMaterial);
+    }
+
+    if (!player.geneFragments) {
+      player.geneFragments = createGeneCounter();
+    }
+    if (!player.stableGenes) {
+      player.stableGenes = createGeneCounter();
+    }
+
+    incrementGeneCounter(player.geneFragments, dropResults.fragments);
+    incrementGeneCounter(player.stableGenes, dropResults.stableGenes);
+
     state.dropPity = clonePityCounters(dropResults.pity);
+    pending.dropPity = clonePityCounters(dropResults.pity);
     this.invalidateGameStateSnapshot();
   }
 
@@ -5061,6 +5148,8 @@ export class RoomDO {
         energy: player.energy,
         xp: player.xp,
         geneticMaterial: player.geneticMaterial,
+        geneFragments: cloneGeneCounter(player.geneFragments),
+        stableGenes: cloneGeneCounter(player.stableGenes),
         dashCharge: player.dashCharge,
         dashCooldownMs: player.dashCooldownMs,
         position: cloneVector(player.position),

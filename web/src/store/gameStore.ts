@@ -338,6 +338,14 @@ const clonePlayer = (player: SharedPlayerState): SharedPlayerState => ({
   health: cloneHealth(player.health),
   combatStatus: cloneCombatStatus(player.combatStatus),
   combatAttributes: cloneCombatAttributes(player.combatAttributes),
+  geneFragments:
+    player.geneFragments && typeof player.geneFragments === "object"
+      ? { ...player.geneFragments }
+      : undefined,
+  stableGenes:
+    player.stableGenes && typeof player.stableGenes === "object"
+      ? { ...player.stableGenes }
+      : undefined,
 });
 
 const cloneMicroorganism = (entity: Microorganism): Microorganism => ({

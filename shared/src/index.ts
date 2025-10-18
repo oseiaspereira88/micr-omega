@@ -132,6 +132,12 @@ export const statusEffectEventSchema = z.object({
   sourcePlayerId: playerIdSchema.optional()
 });
 
+const geneCounterSchema = z.object({
+  minor: z.number().finite().nonnegative().default(0),
+  major: z.number().finite().nonnegative().default(0),
+  apex: z.number().finite().nonnegative().default(0),
+});
+
 export const sharedPlayerStateSchema = z.object({
   id: playerIdSchema,
   name: playerNameSchema,
@@ -141,6 +147,8 @@ export const sharedPlayerStateSchema = z.object({
   energy: z.number().finite().nonnegative().default(0),
   xp: z.number().finite().nonnegative().default(0),
   geneticMaterial: z.number().finite().nonnegative().default(0),
+  geneFragments: geneCounterSchema.optional(),
+  stableGenes: geneCounterSchema.optional(),
   dashCharge: z.number().finite().nonnegative().max(100).default(0),
   dashCooldownMs: z.number().finite().nonnegative().default(0),
   lastActiveAt: z.number().finite(),
