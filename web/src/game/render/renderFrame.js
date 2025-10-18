@@ -22,12 +22,27 @@ const mapMicroorganismsToEnemies = (microorganisms = []) =>
     maxHealth: entity.maxHealth ?? entity.health ?? 0,
     boss: Boolean(entity.boss),
     animPhase: entity.animPhase ?? 0,
+    name: entity.name,
+    level: entity.level,
+    species: entity.species,
+    aggression: entity.aggression,
+    attributes: entity.attributes,
+    palette: entity.palette,
+    accentColor: entity.accentColor,
+    detailColor: entity.detailColor,
+    glowColor: entity.glowColor,
+    hpFillColor: entity.hpFillColor,
+    hpBorderColor: entity.hpBorderColor,
+    labelColor: entity.labelColor,
+    labelBackground: entity.labelBackground,
+    label: entity.label,
+    threatTier: entity.threatTier,
   }));
 
 const renderWorldEntities = (ctx, worldView, camera) => {
   if (!ctx || !worldView || !camera) return;
 
-  const { microorganisms = [], organicMatter = [], obstacles = [], roomObjects = [] } = worldView;
+  const { organicMatter = [], obstacles = [], roomObjects = [] } = worldView;
   const viewport = camera.viewport || {};
   const width = viewport.width ?? 0;
   const height = viewport.height ?? 0;
@@ -35,23 +50,6 @@ const renderWorldEntities = (ctx, worldView, camera) => {
   const offsetY = camera.offsetY ?? camera.y - height / 2;
 
   withCameraTransform(ctx, camera, () => {
-    microorganisms.forEach((entity) => {
-      const screenX = entity.x - offsetX;
-      const screenY = entity.y - offsetY;
-      const size = clamp(entity.size ?? 6, 3, 18);
-      const pulse = (Math.sin(entity.animPhase || 0) + 1) * 0.5;
-      entity.animPhase = (entity.animPhase || 0) + 0.04;
-
-      ctx.save();
-      ctx.translate(screenX, screenY);
-      ctx.globalAlpha = 0.5 + pulse * 0.4;
-      ctx.fillStyle = entity.color ?? '#8fb8ff';
-      ctx.beginPath();
-      ctx.arc(0, 0, size, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    });
-
     organicMatter.forEach((entity) => {
       const screenX = entity.x - offsetX;
       const screenY = entity.y - offsetY;

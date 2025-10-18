@@ -54,6 +54,16 @@ const createState = () => ({
         maxHealth: 12,
         animPhase: 0.3,
         boss: true,
+        name: 'Amoeba Nova',
+        level: 9,
+        species: 'amoeba',
+        aggression: 'hostile',
+        attributes: { speed: 1.1 },
+        palette: { base: '#88c0ff', core: '#99d1ff', outer: '#88c0ff', label: '#0c111e' },
+        label: 'Amoeba Nova · Lv 9',
+        labelColor: '#0c111e',
+        hpFillColor: '#8fc6ff',
+        hpBorderColor: '#24354a',
       },
     ],
   },
@@ -103,7 +113,15 @@ describe('renderFrame', () => {
       health: 6,
       maxHealth: 12,
       boss: true,
+      name: 'Amoeba Nova',
+      level: 9,
+      species: 'amoeba',
+      aggression: 'hostile',
+      attributes: { speed: 1.1 },
+      label: 'Amoeba Nova · Lv 9',
     });
     expect(enemyState.enemies[0].animPhase).toBeCloseTo(state.worldView.microorganisms[0].animPhase);
+    expect(enemyState.enemies[0].palette).toMatchObject({ base: '#88c0ff', core: '#99d1ff' });
+    expect(enemyState.enemies[0].labelColor).toBe('#0c111e');
   });
 });
