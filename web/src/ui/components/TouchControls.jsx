@@ -34,6 +34,8 @@ const TouchControls = ({
   onOpenEvolutionMenu,
   canEvolve,
   touchLayout = 'right',
+  className,
+  ...a11yProps
 }) => {
   const dashStatusId = useId();
   const skillStatusId = useId();
@@ -119,7 +121,10 @@ const TouchControls = ({
   };
 
   return (
-    <div className={joinClassNames(styles.touchLayer, layoutClass)}>
+    <div
+      {...a11yProps}
+      className={joinClassNames(styles.touchLayer, layoutClass, className)}
+    >
       <div
         className={styles.joystickZone}
         onPointerDown={handleJoystickPointerStart}

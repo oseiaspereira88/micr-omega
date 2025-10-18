@@ -59,6 +59,10 @@
   color: rgba(255, 255, 255, 0.75);
 }
 
+.hudElementDisabled {
+  pointer-events: none !important;
+}
+
 .sidebar {
   position: absolute;
   top: calc(16px + var(--safe-area-inset-top, 0px));
