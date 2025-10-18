@@ -26,6 +26,7 @@ export interface Observability {
 }
 
 const LOGFLARE_ENDPOINT = "https://api.logflare.app/logs";
+const LOGFLARE_TIMEOUT_MS = 5_000;
 
 const dispatchToLogflare = async (
   bindings: ObservabilityBindings,
@@ -35,6 +36,11 @@ const dispatchToLogflare = async (
   if (!apiToken || !source) {
     return;
   }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, LOGFLARE_TIMEOUT_MS);
 
   try {
     const response = await fetch(LOGFLARE_ENDPOINT, {
@@ -47,7 +53,8 @@ const dispatchToLogflare = async (
         source,
         log_entry: entry,
         metadata: entry
-      })
+      }),
+      signal: controller.signal
     });
 
     if (!response.ok) {
@@ -66,8 +73,17 @@ const dispatchToLogflare = async (
       });
     }
   } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      console.error("[observability] Logflare request timed out", {
+        timeoutMs: LOGFLARE_TIMEOUT_MS,
+        entry
+      });
+      return;
+    }
     // Evita loop infinito de logs
     console.error("[observability] Falha ao enviar log para Logflare", error);
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 
