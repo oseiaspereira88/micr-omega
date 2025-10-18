@@ -1796,17 +1796,56 @@ export class RoomDO {
     let worldChanged = false;
     let scoresChanged = false;
 
+    const origin = { x: player.position.x, y: player.position.y };
     const angle = Number.isFinite(player.orientation.angle) ? player.orientation.angle : 0;
     const dashDistance = Math.max(60, Math.min(240, player.combatAttributes.speed * 0.5));
-    const destination = this.clampPosition({
-      x: player.position.x + Math.cos(angle) * dashDistance,
-      y: player.position.y + Math.sin(angle) * dashDistance,
+    const desiredDestination = this.clampPosition({
+      x: origin.x + Math.cos(angle) * dashDistance,
+      y: origin.y + Math.sin(angle) * dashDistance,
     });
+    const { position: destination, collidedObstacle, collided } = this.computeDashDestination(
+      origin,
+      desiredDestination,
+    );
+    const deltaX = Math.abs(destination.x - origin.x);
+    const deltaY = Math.abs(destination.y - origin.y);
+    const moved = deltaX > 1e-3 || deltaY > 1e-3;
+    const dashBlocked = collided && !moved;
 
-    if (destination.x !== player.position.x || destination.y !== player.position.y) {
-      player.position = destination;
+    player.position = moved ? destination : origin;
+    if (moved) {
       updatedPlayers.set(player.id, player);
       worldChanged = true;
+    }
+
+    if (dashBlocked && collidedObstacle) {
+      combatLog.push({
+        timestamp: now,
+        attackerId: player.id,
+        targetKind: "obstacle",
+        targetObjectId: collidedObstacle.id,
+        damage: 0,
+        outcome: "blocked",
+      });
+    }
+
+    if (dashBlocked) {
+      player.combatStatus = createCombatStatusState({
+        state: "cooldown",
+        targetPlayerId: null,
+        targetObjectId: null,
+        lastAttackAt: now,
+      });
+      const nextCharge = Math.max(0, Math.min(MAX_DASH_CHARGE, player.dashCharge - DASH_CHARGE_COST));
+      if (nextCharge !== player.dashCharge) {
+        player.dashCharge = nextCharge;
+      }
+      const nextCooldown = Math.max(player.dashCooldownMs, DASH_COOLDOWN_MS);
+      if (nextCooldown !== player.dashCooldownMs) {
+        player.dashCooldownMs = nextCooldown;
+      }
+      updatedPlayers.set(player.id, player);
+      return { worldChanged, scoresChanged };
     }
 
     const radius = Math.max(40, player.combatAttributes.range * 0.75);
@@ -2432,6 +2471,10 @@ export class RoomDO {
   }
 
   private isBlockedByObstacle(position: Vector2): boolean {
+    return this.findBlockingObstacle(position) !== null;
+  }
+
+  private findBlockingObstacle(position: Vector2): Obstacle | null {
     for (const obstacle of this.obstacles.values()) {
       const halfWidth = obstacle.size.x / 2 + OBSTACLE_PADDING;
       const halfHeight = obstacle.size.y / 2 + OBSTACLE_PADDING;
@@ -2439,10 +2482,113 @@ export class RoomDO {
         Math.abs(position.x - obstacle.position.x) <= halfWidth &&
         Math.abs(position.y - obstacle.position.y) <= halfHeight
       ) {
-        return true;
+        return obstacle;
       }
     }
-    return false;
+    return null;
+  }
+
+  private computeDashDestination(
+    origin: Vector2,
+    desiredDestination: Vector2,
+  ): { position: Vector2; collidedObstacle: Obstacle | null; collided: boolean } {
+    if (this.positionsEqual(origin, desiredDestination)) {
+      const blocking = this.findBlockingObstacle(origin);
+      return { position: { ...origin }, collidedObstacle: blocking, collided: blocking !== null };
+    }
+
+    const direction = {
+      x: desiredDestination.x - origin.x,
+      y: desiredDestination.y - origin.y,
+    };
+    const totalDistance = Math.sqrt(direction.x ** 2 + direction.y ** 2);
+    if (!Number.isFinite(totalDistance) || totalDistance === 0) {
+      const blocking = this.findBlockingObstacle(origin);
+      return { position: { ...origin }, collidedObstacle: blocking, collided: blocking !== null };
+    }
+
+    const stepSize = 1;
+    const steps = Math.max(1, Math.ceil(totalDistance / stepSize));
+    const normalizedX = direction.x / totalDistance;
+    const normalizedY = direction.y / totalDistance;
+
+    let lastSafe: Vector2 | null = this.isBlockedByObstacle(origin) ? null : { ...origin };
+    let blockedPoint: Vector2 | null = null;
+    let collidedObstacle: Obstacle | null = null;
+    let encounteredCollision = false;
+    const startingObstacle = this.findBlockingObstacle(origin);
+
+    for (let i = 1; i <= steps; i += 1) {
+      const distanceAlong = Math.min(i * stepSize, totalDistance);
+      const candidate = {
+        x: origin.x + normalizedX * distanceAlong,
+        y: origin.y + normalizedY * distanceAlong,
+      };
+
+      const blocked = this.isBlockedByObstacle(candidate);
+      if (!blocked) {
+        lastSafe = { ...candidate };
+        continue;
+      }
+
+      const obstacle = this.findBlockingObstacle(candidate);
+      if (lastSafe === null) {
+        collidedObstacle = obstacle ?? collidedObstacle;
+        continue;
+      }
+
+      encounteredCollision = true;
+      blockedPoint = candidate;
+      collidedObstacle = obstacle ?? collidedObstacle;
+      break;
+    }
+
+    if (!encounteredCollision) {
+      if (lastSafe) {
+        return { position: { ...desiredDestination }, collidedObstacle: null, collided: false };
+      }
+      const blocking = startingObstacle ?? collidedObstacle;
+      return { position: { ...origin }, collidedObstacle: blocking ?? null, collided: blocking !== null };
+    }
+
+    if (!lastSafe) {
+      const blocking = startingObstacle ?? collidedObstacle;
+      return { position: { ...origin }, collidedObstacle: blocking ?? null, collided: blocking !== null };
+    }
+
+    const startedAtSafeOrigin =
+      Math.abs(lastSafe.x - origin.x) <= 1e-3 && Math.abs(lastSafe.y - origin.y) <= 1e-3;
+
+    if (startedAtSafeOrigin) {
+      return { position: { ...origin }, collidedObstacle: collidedObstacle ?? null, collided: true };
+    }
+
+    let low = lastSafe;
+    let high = blockedPoint ?? lastSafe;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const mid = {
+        x: (low.x + high.x) / 2,
+        y: (low.y + high.y) / 2,
+      };
+      if (this.isBlockedByObstacle(mid)) {
+        high = mid;
+      } else {
+        low = mid;
+      }
+    }
+
+    if (this.isBlockedByObstacle(low)) {
+      const blocking = startingObstacle ?? collidedObstacle;
+      return { position: { ...origin }, collidedObstacle: blocking ?? null, collided: blocking !== null };
+    }
+
+    const deltaX = Math.abs(low.x - origin.x);
+    const deltaY = Math.abs(low.y - origin.y);
+    if (deltaX <= 1e-3 && deltaY <= 1e-3) {
+      return { position: { ...origin }, collidedObstacle: collidedObstacle ?? null, collided: true };
+    }
+
+    return { position: { ...low }, collidedObstacle: collidedObstacle ?? null, collided: true };
   }
 
   private distanceSquared(a: Vector2, b: Vector2): number {
