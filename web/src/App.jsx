@@ -1,36 +1,39 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useState } from 'react';
 import GameApp from './GameApp.jsx';
 import MicroWorldConceptScreens from './ui/concepts/MicroWorldConceptScreens.jsx';
 
-const detectConceptMode = () => {
+const detectInitialMode = () => {
   if (typeof window === 'undefined') {
-    return false;
+    return 'concept';
   }
 
   try {
     const search = window.location?.search ?? '';
     const params = new URLSearchParams(search);
-    const toggles = ['ui', 'mode', 'screen'];
+    const explicitMode = params.get('mode');
 
-    for (const key of toggles) {
-      const value = params.get(key);
-      if (typeof value === 'string' && value.toLowerCase() === 'concept') {
-        return true;
+    if (typeof explicitMode === 'string') {
+      const normalized = explicitMode.trim().toLowerCase();
+      if (normalized === 'play' || normalized === 'game') {
+        return 'game';
       }
     }
 
-    const hash = window.location?.hash ?? '';
-    return hash.toLowerCase().includes('concept');
+    return 'concept';
   } catch (error) {
-    return false;
+    return 'concept';
   }
 };
 
 const App = () => {
-  const isConceptMode = useMemo(detectConceptMode, []);
+  const [displayMode, setDisplayMode] = useState(() => detectInitialMode());
 
-  if (isConceptMode) {
-    return <MicroWorldConceptScreens />;
+  const handleConceptComplete = useCallback(() => {
+    setDisplayMode('game');
+  }, []);
+
+  if (displayMode === 'concept') {
+    return <MicroWorldConceptScreens onContinue={handleConceptComplete} />;
   }
 
   return <GameApp />;

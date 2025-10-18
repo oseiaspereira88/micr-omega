@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import styles from './MicroWorldConceptScreens.module.css';
 
 const ScreenPreview = ({ title, orientation = 'desktop', canvasClass, children }) => {
@@ -26,26 +26,11 @@ const ScreenPreview = ({ title, orientation = 'desktop', canvasClass, children }
   );
 };
 
-const MicroWorldConceptScreens = () => {
-  return (
-    <div className={styles.page}>
-      <div className={styles.backgroundAura} />
-      <header className={styles.header}>
-        <div>
-          <p className={styles.kicker}>Micr•Omega — Interface Vision</p>
-          <h1 className={styles.heading}>Evolving Microworlds UI Kit</h1>
-          <p className={styles.subtitle}>
-            Futuristic-bioluminescent aesthetics crafted for a cross-platform multiplayer experience.
-            Each screen blends organic motion, sci-fi clarity, and responsive comfort.
-          </p>
-        </div>
-        <div className={styles.themePalette}>
-          <span className={styles.themeChip}>Dark Flux</span>
-          <span className={`${styles.themeChip} ${styles.themeChipAlt}`}>Luminous Drift</span>
-          <span className={`${styles.themeChip} ${styles.themeChipOutline}`}>Glass Neon</span>
-        </div>
-      </header>
-
+const conceptSteps = [
+  {
+    key: 'splash',
+    label: 'Splash Screen',
+    render: () => (
       <section className={styles.section}>
         <div className={styles.sectionCopy}>
           <h2>Splash Screen</h2>
@@ -108,7 +93,12 @@ const MicroWorldConceptScreens = () => {
           </ScreenPreview>
         </div>
       </section>
-
+    ),
+  },
+  {
+    key: 'menu',
+    label: 'Main Menu',
+    render: () => (
       <section className={styles.section}>
         <div className={styles.sectionCopy}>
           <h2>Main Menu</h2>
@@ -219,7 +209,12 @@ const MicroWorldConceptScreens = () => {
           </ScreenPreview>
         </div>
       </section>
-
+    ),
+  },
+  {
+    key: 'lobby',
+    label: 'Lobby',
+    render: () => (
       <section className={styles.section}>
         <div className={styles.sectionCopy}>
           <h2>Lobby — Seleção de Salas</h2>
@@ -339,6 +334,72 @@ const MicroWorldConceptScreens = () => {
           </ScreenPreview>
         </div>
       </section>
+    ),
+  },
+];
+
+const MicroWorldConceptScreens = ({ onAdvance, onContinue }) => {
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const totalSteps = conceptSteps.length;
+  const safeIndex = Math.min(Math.max(activeStepIndex, 0), totalSteps - 1);
+  const activeStep = conceptSteps[safeIndex] ?? conceptSteps[0];
+  const StepContent = activeStep.render;
+
+  const handleAdvance = useCallback(() => {
+    if (safeIndex < totalSteps - 1) {
+      const nextIndex = safeIndex + 1;
+      setActiveStepIndex(nextIndex);
+      if (typeof onAdvance === 'function') {
+        onAdvance({
+          currentIndex: safeIndex,
+          currentStep: activeStep.key,
+          nextIndex,
+          nextStep: conceptSteps[nextIndex].key,
+        });
+      }
+      return;
+    }
+
+    if (typeof onContinue === 'function') {
+      onContinue({
+        currentIndex: safeIndex,
+        currentStep: activeStep.key,
+      });
+    }
+  }, [safeIndex, totalSteps, onAdvance, onContinue, activeStep]);
+
+  const ctaLabel = safeIndex === totalSteps - 1 ? 'Entrar no jogo' : 'Próximo';
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.backgroundAura} />
+      <header className={styles.header}>
+        <div>
+          <p className={styles.kicker}>Micr•Omega — Interface Vision</p>
+          <h1 className={styles.heading}>Evolving Microworlds UI Kit</h1>
+          <p className={styles.subtitle}>
+            Futuristic-bioluminescent aesthetics crafted for a cross-platform multiplayer experience.
+            Each screen blends organic motion, sci-fi clarity, and responsive comfort.
+          </p>
+        </div>
+        <div className={styles.themePalette}>
+          <span className={styles.themeChip}>Dark Flux</span>
+          <span className={`${styles.themeChip} ${styles.themeChipAlt}`}>Luminous Drift</span>
+          <span className={`${styles.themeChip} ${styles.themeChipOutline}`}>Glass Neon</span>
+        </div>
+      </header>
+      <StepContent />
+      <div className={styles.actionsBar}>
+        <div className={styles.stepMeta}>
+          <span className={styles.stepTitle}>
+            Etapa {safeIndex + 1} de {totalSteps}
+          </span>
+          <span className={styles.stepDescription}>{activeStep.label}</span>
+        </div>
+        <button type="button" className={styles.primaryCta} onClick={handleAdvance}>
+          {ctaLabel}
+        </button>
+      </div>
     </div>
   );
 };
