@@ -20,6 +20,7 @@ export {
   type RoomObject,
   type WorldEntity,
   type RankingEntry,
+  type CombatLogEntry,
   type RankingMessage,
   type JoinMessage,
   type PingMessage,
