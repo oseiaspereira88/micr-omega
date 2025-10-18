@@ -342,6 +342,40 @@ describe('updateGameState', () => {
     expect(result.localPlayerId).toBe('p1');
   });
 
+  it('restores the local player entry when synchronized players are only available in the map', () => {
+    const renderState = createRenderState();
+    const sharedState = createSharedState();
+    const localPlayer = createPlayer({
+      id: 'p1',
+      name: 'Local',
+      position: { x: 25, y: 30 },
+      movementVector: { x: 1, y: 0 },
+    });
+    const remotePlayer = createPlayer({ id: 'p2', name: 'Remote', position: { x: -10, y: 2 } });
+
+    sharedState.remotePlayers = {};
+    sharedState.players = {
+      p1: localPlayer,
+      p2: remotePlayer,
+    };
+
+    const result = updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.25,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    expect(renderState.playerList).toHaveLength(2);
+    const restoredLocalPlayer = renderState.playerList.find((player) => player.id === 'p1');
+    expect(restoredLocalPlayer?.isLocal).toBe(true);
+    expect(renderState.playerList.map((player) => player.id)).toEqual(
+      expect.arrayContaining(['p1', 'p2']),
+    );
+    expect(result.localPlayerId).toBe('p1');
+  });
+
   it('creates a renderer-ready playerList from synchronized players', () => {
     const renderState = createRenderState();
     const localPlayer = createPlayer({
