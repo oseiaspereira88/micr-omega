@@ -27,7 +27,7 @@ import { spawnNebula as createNebulaSpawn } from '../factories/nebulaFactory';
 import { spawnPowerUp as createPowerUpSpawn } from '../factories/powerUpFactory';
 import { spawnOrganicMatter as createOrganicMatterBatch } from '../factories/organicMatterFactory';
 import {
-  findNearestHostileMicroorganismId,
+  findNearestAttackableMicroorganismId,
   resolvePlayerPosition,
 } from '../../utils/targeting';
 import { featureToggles } from '../../config/featureToggles.js';
@@ -1011,10 +1011,11 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
           : []),
       ];
 
-      const targetId = findNearestHostileMicroorganismId({
+      const targetId = findNearestAttackableMicroorganismId({
         playerPosition,
         renderMicroorganisms: renderState?.worldView?.microorganisms,
         sharedMicroorganisms: sharedMicroorganisms.length > 0 ? sharedMicroorganisms : undefined,
+        aggressionPreference: [["hostile"], ["neutral"]],
       });
 
       if (targetId) {

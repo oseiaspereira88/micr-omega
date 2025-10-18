@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   extractPosition,
+  findNearestAttackableMicroorganismId,
   findNearestHostileMicroorganismId,
   resolvePlayerPosition,
 } from "./targeting";
@@ -72,6 +73,35 @@ describe("findNearestHostileMicroorganismId", () => {
     });
 
     expect(result).toBe("a");
+  });
+
+  it("falls back to neutral microorganisms when none hostile are available", () => {
+    const result = findNearestHostileMicroorganismId({
+      playerPosition,
+      renderMicroorganisms: [
+        createMicroorganism({ id: "neutral", x: 1, y: 0, aggression: "neutral" }),
+        createMicroorganism({ id: "passive", x: 2, y: 0, aggression: "passive" }),
+      ],
+    });
+
+    expect(result).toBe("neutral");
+  });
+});
+
+describe("findNearestAttackableMicroorganismId", () => {
+  const playerPosition = { x: 0, y: 0 };
+
+  it("respects aggression preference order", () => {
+    const result = findNearestAttackableMicroorganismId({
+      playerPosition,
+      aggressionPreference: [["neutral"], ["passive"]],
+      sharedMicroorganisms: [
+        createMicroorganism({ id: "passive", x: 1, y: 0, aggression: "passive" }),
+        createMicroorganism({ id: "neutral", x: 3, y: 4, aggression: "neutral" }),
+      ],
+    });
+
+    expect(result).toBe("neutral");
   });
 });
 

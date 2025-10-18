@@ -84,17 +84,46 @@ const dist2 = (a: Vector2, b: Vector2) => {
   return dx * dx + dy * dy;
 };
 
+type MicroorganismAggression = Microorganism["aggression"];
+
 type MicroorganismLike = Pick<Microorganism, "id" | "aggression" | "health" | "position"> & {
   x?: unknown;
   y?: unknown;
 };
 
-const isHostileAndAlive = (entity: MicroorganismLike | null | undefined): entity is MicroorganismLike => {
+const VALID_AGGRESSIONS: ReadonlySet<MicroorganismAggression> = new Set([
+  "passive",
+  "neutral",
+  "hostile",
+]);
+
+const normalizeAggressionSet = (
+  aggressions?: Iterable<MicroorganismAggression> | null
+): ReadonlySet<MicroorganismAggression> | null => {
+  if (!aggressions) {
+    return null;
+  }
+
+  const normalized = new Set<MicroorganismAggression>();
+  for (const aggression of aggressions) {
+    if (VALID_AGGRESSIONS.has(aggression)) {
+      normalized.add(aggression);
+    }
+  }
+
+  return normalized.size > 0 ? normalized : null;
+};
+
+const isAttackableMicroorganism = (
+  entity: MicroorganismLike | null | undefined,
+  allowedAggressions: ReadonlySet<MicroorganismAggression> | null
+): entity is MicroorganismLike => {
   if (!entity || typeof entity.id !== "string" || entity.id.length === 0) {
     return false;
   }
 
-  if (entity.aggression !== "hostile") {
+  const aggression = entity.aggression;
+  if (allowedAggressions && !allowedAggressions.has(aggression)) {
     return false;
   }
 
@@ -176,24 +205,22 @@ const buildExcludeSet = (excludeIds?: Iterable<string> | null) => {
   return set.size > 0 ? set : null;
 };
 
-export const findNearestHostileMicroorganismId = ({
-  playerPosition,
-  renderMicroorganisms,
-  sharedMicroorganisms,
-  excludeIds,
-}: FindNearestOptions = {}): string | null => {
-  const origin = normalizePlayerPosition(playerPosition);
-  if (!origin) {
-    return null;
-  }
-
+const findNearestWithAggressions = (
+  {
+    renderMicroorganisms,
+    sharedMicroorganisms,
+    excludeIds,
+  }: FindNearestOptions = {},
+  origin: Vector2,
+  allowedAggressions: ReadonlySet<MicroorganismAggression> | null,
+  evaluated: Set<string>
+) => {
   const excludeSet = buildExcludeSet(excludeIds);
   let nearestId: string | null = null;
   let nearestDistance = Infinity;
-  const evaluated = new Set<string>();
 
   for (const entity of iterateMicroorganisms(renderMicroorganisms, sharedMicroorganisms)) {
-    if (!isHostileAndAlive(entity)) {
+    if (!isAttackableMicroorganism(entity, allowedAggressions)) {
       continue;
     }
 
@@ -217,6 +244,55 @@ export const findNearestHostileMicroorganismId = ({
 
   return nearestId;
 };
+
+type FindNearestAttackableOptions = FindNearestOptions & {
+  aggressionPreference?: readonly (Iterable<MicroorganismAggression> | null | undefined)[] | null;
+};
+
+export const findNearestAttackableMicroorganismId = ({
+  playerPosition,
+  renderMicroorganisms,
+  sharedMicroorganisms,
+  excludeIds,
+  aggressionPreference,
+}: FindNearestAttackableOptions = {}): string | null => {
+  const origin = normalizePlayerPosition(playerPosition);
+  if (!origin) {
+    return null;
+  }
+
+  const evaluated = new Set<string>();
+  const preferences =
+    aggressionPreference && aggressionPreference.length > 0
+      ? aggressionPreference
+      : [["hostile"], ["neutral"]];
+
+  for (const preference of preferences) {
+    const allowedAggressions = normalizeAggressionSet(preference ?? null);
+    const nearestId = findNearestWithAggressions(
+      {
+        renderMicroorganisms,
+        sharedMicroorganisms,
+        excludeIds,
+      },
+      origin,
+      allowedAggressions,
+      evaluated
+    );
+
+    if (nearestId) {
+      return nearestId;
+    }
+  }
+
+  return null;
+};
+
+export const findNearestHostileMicroorganismId = (options: FindNearestOptions = {}) =>
+  findNearestAttackableMicroorganismId({
+    ...options,
+    aggressionPreference: [["hostile"], ["neutral"]],
+  });
 
 export const resolvePlayerPosition = ({
   renderPlayer,

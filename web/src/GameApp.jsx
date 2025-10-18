@@ -8,7 +8,7 @@ import { useGameSettings } from './store/gameSettings';
 import { buildEvolutionPayload } from './utils/evolution';
 import { sanitizeArchetypeKey, TARGET_OPTIONAL_ATTACK_KINDS } from './utils/messageTypes';
 import {
-  findNearestHostileMicroorganismId,
+  findNearestAttackableMicroorganismId,
   resolvePlayerPosition,
 } from './utils/targeting';
 
@@ -206,10 +206,11 @@ const GameApp = () => {
 
               const nearestId =
                 (renderMicroorganisms?.length ?? 0) > 0 || (sharedMicroorganisms?.length ?? 0) > 0
-                  ? findNearestHostileMicroorganismId({
+                  ? findNearestAttackableMicroorganismId({
                       playerPosition,
                       renderMicroorganisms,
                       sharedMicroorganisms,
+                      aggressionPreference: [["hostile"], ["neutral"]],
                     })
                   : null;
 
