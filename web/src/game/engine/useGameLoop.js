@@ -14,6 +14,7 @@ import { DEFAULT_JOYSTICK_STATE } from '../input/utils';
 import { gameStore } from '../../store/gameStore';
 import { createInitialState } from '../state/initialState';
 import {
+  checkEvolution as checkEvolutionSystem,
   chooseEvolution as chooseEvolutionSystem,
   restartGame as restartGameSystem,
   cycleSkill as cycleSkillSystem,
@@ -1404,6 +1405,72 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
           playSound,
         },
       });
+
+      const state = renderStateRef.current;
+      const hudSnapshot = updateResult?.hudSnapshot ?? null;
+      let shouldSyncProgression = false;
+
+      if (state && hudSnapshot) {
+        const previousXp = state.xp || null;
+        const xpSnapshot = hudSnapshot.xp && typeof hudSnapshot.xp === 'object' ? hudSnapshot.xp : null;
+        if (xpSnapshot) {
+          state.xp = xpSnapshot;
+          if (!state.resources || typeof state.resources !== 'object') {
+            state.resources = { xp: xpSnapshot };
+          } else {
+            state.resources.xp = xpSnapshot;
+          }
+          if (state.organism && typeof state.organism === 'object') {
+            if (!state.organism.resources || typeof state.organism.resources !== 'object') {
+              state.organism.resources = { xp: xpSnapshot };
+            } else {
+              state.organism.resources.xp = xpSnapshot;
+            }
+          }
+          if (!previousXp) {
+            shouldSyncProgression = true;
+          } else if (
+            xpSnapshot.current !== previousXp.current ||
+            xpSnapshot.total !== previousXp.total ||
+            xpSnapshot.next !== previousXp.next
+          ) {
+            shouldSyncProgression = true;
+          }
+        }
+
+        if (Number.isFinite(hudSnapshot.level) && hudSnapshot.level !== state.level) {
+          state.level = hudSnapshot.level;
+          shouldSyncProgression = true;
+        }
+
+        if (hudSnapshot.reroll && typeof hudSnapshot.reroll === 'object') {
+          state.reroll = state.reroll && typeof state.reroll === 'object' ? state.reroll : {};
+          Object.assign(state.reroll, hudSnapshot.reroll);
+        }
+      }
+
+      if (state && shouldSyncProgression) {
+        const helpers = {
+          addNotification: (targetState, text) => {
+            if (!text) return;
+            if (targetState && targetState !== renderStateRef.current) {
+              targetState.notifications = appendNotification(targetState.notifications, text);
+            }
+            pushNotification(text);
+          },
+        };
+
+        checkEvolutionSystem(state, helpers);
+        if (hudSnapshot) {
+          if (typeof hudSnapshot.level === 'number') {
+            hudSnapshot.level = state.level;
+          }
+          if (hudSnapshot.reroll && state.reroll && typeof state.reroll === 'object') {
+            Object.assign(hudSnapshot.reroll, state.reroll);
+          }
+        }
+        syncHudState(state);
+      }
 
       renderState.pendingInputs = updateResult.commands;
       if (updateResult.commands && commandCallbackRef.current) {
