@@ -574,6 +574,10 @@ const App = () => {
     disconnect();
   }, [disconnect, setIsAutoJoinRequested]);
 
+  const handleReconnect = useCallback(() => {
+    connect();
+  }, [connect]);
+
   useEffect(() => {
     if (connectionStatus === 'disconnected') {
       setIsGameActive(false);
@@ -583,7 +587,11 @@ const App = () => {
   return (
     <>
       {isGameActive ? (
-        <MicroOmegaGame settings={resolvedSettings} onQuit={handleQuit} />
+        <MicroOmegaGame
+          settings={resolvedSettings}
+          onQuit={handleQuit}
+          onReconnect={handleReconnect}
+        />
       ) : null}
       {!isGameActive ? (
         <StartScreen onStart={handleStart} onQuit={handleQuit} />

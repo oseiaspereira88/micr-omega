@@ -71,6 +71,7 @@ const GameHud = ({
   onCameraZoomChange,
   onQuit,
   opponents = [],
+  onReconnect,
 }) => {
   const { connectionStatus, joinError } = useGameStore(
     (state) => ({
@@ -86,10 +87,31 @@ const GameHud = ({
   const toggleButtonRef = useRef(null);
   const sidebarId = useId();
   const minimapToggleId = useId();
+  const [isReconnectRequested, setIsReconnectRequested] = useState(false);
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
   }, []);
+
+  const isConnecting =
+    connectionStatus === 'connecting' || connectionStatus === 'reconnecting';
+  const isReconnectLoading = isConnecting || isReconnectRequested;
+  const isReconnectDisabled = !onReconnect || isReconnectLoading;
+
+  useEffect(() => {
+    if (connectionStatus === 'connected' || connectionStatus === 'disconnected') {
+      setIsReconnectRequested(false);
+    }
+  }, [connectionStatus]);
+
+  const handleReconnect = useCallback(() => {
+    if (!onReconnect || isReconnectLoading) {
+      return;
+    }
+
+    setIsReconnectRequested(true);
+    onReconnect();
+  }, [onReconnect, isReconnectLoading]);
 
   useEffect(() => {
     if (isSidebarOpen) {
@@ -290,10 +312,16 @@ const GameHud = ({
   const hudDisabled = showStatusOverlay;
   const statusTitle = statusMessages[connectionStatus] ?? 'Problemas de conexão';
   const statusHint = statusHints[connectionStatus];
+  const reconnectButtonText = isReconnectLoading
+    ? 'Tentando novamente…'
+    : 'Tentar novamente';
+  const reconnectProgressText = isConnecting
+    ? 'Reconectando ao servidor…'
+    : 'Solicitando reconexão…';
 
   const sidebarIsInactive = hudDisabled || !isSidebarOpen;
   const sidebarAriaHidden = sidebarIsInactive ? true : undefined;
-  const sidebarInert = sidebarIsInactive ? true : undefined;
+  const sidebarInert = sidebarIsInactive ? 'true' : undefined;
   const sidebarToggleTabIndex = hudDisabled ? -1 : undefined;
   const sidebarToggleAriaHidden = hudDisabled ? true : undefined;
 
@@ -312,7 +340,7 @@ const GameHud = ({
         aria-hidden={sidebarToggleAriaHidden}
         disabled={hudDisabled}
         aria-disabled={hudDisabled ? true : undefined}
-        inert={hudDisabled ? true : undefined}
+        inert={hudDisabled ? 'true' : undefined}
       >
         {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
       </button>
@@ -335,6 +363,28 @@ const GameHud = ({
               ) : null}
               {statusHint ? (
                 <p className={styles.canvasOverlayHint}>{statusHint}</p>
+              ) : null}
+              {typeof onReconnect === 'function' ? (
+                <div className={styles.canvasOverlayActions}>
+                  <button
+                    type="button"
+                    className={`${styles.canvasOverlayActionButton} ${
+                      isReconnectLoading ? styles.canvasOverlayActionButtonLoading : ''
+                    }`.trim()}
+                    onClick={handleReconnect}
+                    disabled={isReconnectDisabled}
+                    aria-disabled={isReconnectDisabled || undefined}
+                    aria-busy={isReconnectLoading || undefined}
+                    aria-label="Tentar novamente"
+                  >
+                    {reconnectButtonText}
+                  </button>
+                </div>
+              ) : null}
+              {typeof onReconnect === 'function' && isReconnectLoading ? (
+                <p className={styles.canvasOverlayProgress} aria-live="polite">
+                  {reconnectProgressText}
+                </p>
               ) : null}
             </div>
           ) : null}
@@ -431,7 +481,7 @@ const GameHud = ({
         <div
           className={`${styles.mainHud} ${hudDisabled ? styles.hudElementDisabled : ''}`}
           aria-hidden={hudDisabled ? true : undefined}
-          inert={hudDisabled ? true : undefined}
+          inert={hudDisabled ? 'true' : undefined}
         >
           <HudBar
             level={level}
@@ -501,7 +551,7 @@ const GameHud = ({
             touchLayout={settings.touchLayout}
             className={hudDisabled ? styles.hudElementDisabled : undefined}
             aria-hidden={hudDisabled ? true : undefined}
-            inert={hudDisabled ? true : undefined}
+            inert={hudDisabled ? 'true' : undefined}
           />
         ) : null}
       </div>

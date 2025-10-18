@@ -91,7 +91,7 @@ export const formatEvolutionRequirements = (requirements = {}) => {
   return parts.length > 0 ? parts.join(' · ') : 'Nenhum requisito adicional';
 };
 
-const GameCanvas = ({ settings, onQuit }) => {
+const GameCanvas = ({ settings, onQuit, onReconnect }) => {
   const canvasRef = useRef(null);
   const gameState = useGameState();
   const dispatch = useGameDispatch();
@@ -437,6 +437,7 @@ const GameCanvas = ({ settings, onQuit }) => {
         onCameraZoomChange={setCameraZoom}
         onQuit={onQuit}
         opponents={opponents}
+        onReconnect={onReconnect}
       />
 
       {showEvolutionChoice && (

@@ -84,7 +84,7 @@ describe('GameHud connection status overlay', () => {
 
     const { rerender } = render(
       <GameSettingsProvider>
-        <GameHud {...BASE_PROPS} />
+        <GameHud {...BASE_PROPS} onReconnect={vi.fn()} />
       </GameSettingsProvider>
     );
 
@@ -92,12 +92,18 @@ describe('GameHud connection status overlay', () => {
       screen.getByRole('status', { name: /estado da conexão/i })
     ).toHaveTextContent(/conectando ao servidor/i);
 
+    const retryButtonConnecting = screen.getByRole('button', {
+      name: 'Tentar novamente',
+    });
+    expect(retryButtonConnecting).toBeDisabled();
+    expect(retryButtonConnecting).toHaveAttribute('aria-busy', 'true');
+
     act(() => {
       gameStore.setPartial({ connectionStatus: 'reconnecting' });
     });
     rerender(
       <GameSettingsProvider>
-        <GameHud {...BASE_PROPS} />
+        <GameHud {...BASE_PROPS} onReconnect={vi.fn()} />
       </GameSettingsProvider>
     );
     expect(
@@ -109,16 +115,47 @@ describe('GameHud connection status overlay', () => {
     });
     rerender(
       <GameSettingsProvider>
-        <GameHud {...BASE_PROPS} />
+        <GameHud {...BASE_PROPS} onReconnect={vi.fn()} />
       </GameSettingsProvider>
     );
     expect(
       screen.queryByRole('status', { name: /estado da conexão/i })
     ).not.toBeInTheDocument();
   });
+
+  it('permite acionar manualmente a reconexão', async () => {
+    const user = userEvent.setup();
+    const onReconnect = vi.fn();
+
+    act(() => {
+      gameStore.setPartial({
+        connectionStatus: 'disconnected',
+        joinError: 'Conexão perdida',
+      });
+    });
+
+    render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} onReconnect={onReconnect} />
+      </GameSettingsProvider>
+    );
+
+    const retryButton = screen.getByRole('button', { name: 'Tentar novamente' });
+    expect(retryButton).toBeEnabled();
+
+    await user.click(retryButton);
+
+    expect(onReconnect).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('GameHud touch controls', () => {
+  beforeEach(() => {
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'connected', joinError: null });
+    });
+  });
+
   it('forward cycle skill handler to touch controls', () => {
     const onCycleSkill = vi.fn();
 
@@ -153,6 +190,12 @@ describe('GameHud touch controls', () => {
 });
 
 describe('GameHud sidebar accessibility', () => {
+  beforeEach(() => {
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'connected', joinError: null });
+    });
+  });
+
   it('focuses the sidebar when it is opened', async () => {
     const user = userEvent.setup();
 
