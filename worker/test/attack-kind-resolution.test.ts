@@ -6,6 +6,7 @@ import { getDefaultSkillList } from "../src/skills";
 import type {
   CombatLogEntry,
   Microorganism,
+  Obstacle,
   SharedWorldStateDiff,
 } from "../src/types";
 import type { Env } from "../src";
@@ -67,6 +68,8 @@ describe("RoomDO attack kind resolution", () => {
     const player = createTestPlayer("runner");
     roomAny.players.set(player.id, player);
     roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+    roomAny.obstacles = new Map();
+    roomAny.world.obstacles = [];
 
     const microorganism: Microorganism = {
       id: "micro-1",
@@ -109,6 +112,121 @@ describe("RoomDO attack kind resolution", () => {
     expect(remaining?.health.current).toBeLessThan(microorganism.health.max);
     expect(worldDiff.statusEffects).toBeDefined();
     expect(worldDiff.statusEffects?.some((event) => event.status === "KNOCKBACK")).toBe(true);
+  });
+
+  it("shortens dash movement when the path is obstructed by an obstacle", async () => {
+    const { roomAny } = await createRoom();
+    const player = createTestPlayer("skimmer");
+    player.position = { x: -100, y: 0 };
+    player.orientation = { angle: 0 };
+    roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    const obstacle: Obstacle = {
+      id: "wall-1",
+      kind: "obstacle",
+      position: { x: -20, y: 0 },
+      size: { x: 60, y: 120 },
+      impassable: true,
+    };
+
+    roomAny.obstacles = new Map([[obstacle.id, obstacle]]);
+    roomAny.world.obstacles = [obstacle];
+
+    const applied = roomAny.applyPlayerAction(player, {
+      type: "attack",
+      kind: "dash",
+      state: "engaged",
+    });
+    expect(applied).not.toBeNull();
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, typeof player>();
+
+    const result = roomAny.resolvePlayerAttackDuringTick(
+      player,
+      Date.now(),
+      worldDiff,
+      combatLog,
+      updatedPlayers,
+    );
+
+    expect(result.worldChanged).toBe(true);
+    expect(player.position.x).toBeGreaterThan(-100);
+    const padding = 12;
+    const leftBoundary = obstacle.position.x - (obstacle.size.x / 2 + padding);
+    expect(player.position.x).toBeLessThan(leftBoundary);
+    expect(roomAny.isBlockedByObstacle(player.position)).toBe(false);
+    expect(combatLog).toHaveLength(0);
+  });
+
+  it("aborts dash resolution when an obstacle immediately blocks movement", async () => {
+    const { roomAny } = await createRoom();
+    const player = createTestPlayer("blocked");
+    const startX = -62.05;
+    player.position = { x: startX, y: 0 };
+    player.orientation = { angle: 0 };
+    roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    const obstacle: Obstacle = {
+      id: "wall-2",
+      kind: "obstacle",
+      position: { x: -20, y: 0 },
+      size: { x: 60, y: 120 },
+      impassable: true,
+    };
+
+    roomAny.obstacles = new Map([[obstacle.id, obstacle]]);
+    roomAny.world.obstacles = [obstacle];
+
+    const microorganism: Microorganism = {
+      id: "micro-blocked",
+      kind: "microorganism",
+      species: "amoeba",
+      position: { x: -10, y: 0 },
+      movementVector: { x: 0, y: 0 },
+      orientation: { angle: 0 },
+      health: { current: 25, max: 25 },
+      aggression: "hostile",
+      attributes: { speed: 10, damage: 3, resilience: 0 },
+    };
+
+    roomAny.microorganisms = new Map([[microorganism.id, microorganism]]);
+    roomAny.world.microorganisms = [microorganism];
+
+    const applied = roomAny.applyPlayerAction(player, {
+      type: "attack",
+      kind: "dash",
+      state: "engaged",
+    });
+    expect(applied).not.toBeNull();
+
+    const worldDiff: SharedWorldStateDiff = {};
+    const combatLog: CombatLogEntry[] = [];
+    const updatedPlayers = new Map<string, typeof player>();
+
+    const result = roomAny.resolvePlayerAttackDuringTick(
+      player,
+      Date.now(),
+      worldDiff,
+      combatLog,
+      updatedPlayers,
+    );
+
+    expect(result.worldChanged).toBe(false);
+    expect(player.position.x).toBeCloseTo(startX, 2);
+    expect(roomAny.isBlockedByObstacle(player.position)).toBe(false);
+    expect(worldDiff.statusEffects).toBeUndefined();
+    const remaining = roomAny.microorganisms.get(microorganism.id);
+    expect(remaining?.health.current).toBe(microorganism.health.current);
+    expect(combatLog).toHaveLength(1);
+    expect(combatLog[0]).toMatchObject({
+      outcome: "blocked",
+      targetKind: "obstacle",
+      targetObjectId: obstacle.id,
+    });
   });
 
   it("consumes dash charge, applies cooldown and recharges over time", async () => {
