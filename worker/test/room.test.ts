@@ -6,6 +6,7 @@ import {
   openSocket,
   type MessagePayload,
 } from "./utils/miniflare";
+import { MAX_CLIENT_MESSAGE_SIZE_BYTES } from "../src/RoomDO";
 
 describe("RoomDO", () => {
   it("responds with joined payload when a player joins", async () => {
@@ -207,6 +208,60 @@ describe("RoomDO", () => {
           { once: true },
         );
       });
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("accepts messages up to the configured client payload limit", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const joinedPromise = onceMessage<{ type: string }>(socket, "joined");
+
+      const payload = JSON.stringify({ type: "join", name: "Alice" });
+      expect(MAX_CLIENT_MESSAGE_SIZE_BYTES).toBeGreaterThan(payload.length);
+      const paddedPayload = `${" ".repeat(MAX_CLIENT_MESSAGE_SIZE_BYTES - payload.length)}${payload}`;
+
+      expect(paddedPayload.length).toBe(MAX_CLIENT_MESSAGE_SIZE_BYTES);
+
+      socket.send(paddedPayload);
+
+      const joined = await joinedPromise;
+      expect(joined.type).toBe("joined");
+
+      socket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("rejects messages exceeding the client payload limit", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const errorPromise = onceMessage<{ type: string; reason: string }>(socket, "error");
+
+      const oversizedPayload = "x".repeat(MAX_CLIENT_MESSAGE_SIZE_BYTES + 1);
+
+      socket.send(oversizedPayload);
+
+      const error = await errorPromise;
+      expect(error.type).toBe("error");
+      expect(error.reason).toBe("invalid_payload");
+
+      const closeEvent = await new Promise<{ code?: number; reason?: string }>((resolve) => {
+        socket.addEventListener(
+          "close",
+          (event) => {
+            resolve(event as { code?: number; reason?: string });
+          },
+          { once: true },
+        );
+      });
+
+      expect(closeEvent.code).toBe(1009);
+      expect(closeEvent.reason).toBe("invalid_payload");
     } finally {
       await mf.dispose();
     }
