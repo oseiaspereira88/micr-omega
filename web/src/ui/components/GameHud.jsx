@@ -279,20 +279,36 @@ const GameHud = ({
   );
 
   const showStatusOverlay = connectionStatus !== 'connected';
+  const hudDisabled = showStatusOverlay;
   const statusTitle = statusMessages[connectionStatus] ?? 'Problemas de conexão';
   const statusHint = statusHints[connectionStatus];
+
+  const sidebarIsInactive = hudDisabled || !isSidebarOpen;
+  const sidebarAriaHidden = sidebarIsInactive ? true : undefined;
+  const sidebarInert = sidebarIsInactive ? true : undefined;
+  const sidebarToggleTabIndex = hudDisabled
+    ? -1
+    : isSidebarOpen
+    ? undefined
+    : -1;
+  const sidebarToggleAriaHidden = hudDisabled ? true : isSidebarOpen ? undefined : true;
 
   return (
     <>
       <button
         type="button"
-        className={styles.sidebarToggle}
+        className={`${styles.sidebarToggle} ${
+          hudDisabled ? styles.hudElementDisabled : ''
+        }`}
         onClick={handleToggleSidebar}
         aria-expanded={isSidebarOpen}
         aria-controls={sidebarId}
         ref={toggleButtonRef}
-        tabIndex={isSidebarOpen ? undefined : -1}
-        aria-hidden={isSidebarOpen ? undefined : true}
+        tabIndex={sidebarToggleTabIndex}
+        aria-hidden={sidebarToggleAriaHidden}
+        disabled={hudDisabled}
+        aria-disabled={hudDisabled ? true : undefined}
+        inert={hudDisabled ? true : undefined}
       >
         {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
       </button>
@@ -324,12 +340,12 @@ const GameHud = ({
           id={sidebarId}
           className={`${styles.sidebar} ${
             isSidebarOpen ? styles.sidebarOpen : styles.sidebarClosed
-          }`}
+          } ${hudDisabled ? styles.hudElementDisabled : ''}`}
           role="complementary"
           aria-label="Painel lateral do jogo"
-          aria-hidden={isSidebarOpen ? undefined : true}
+          aria-hidden={sidebarAriaHidden}
           tabIndex={-1}
-          inert={isSidebarOpen ? undefined : true}
+          inert={sidebarInert}
           ref={sidebarRef}
         >
           <div className={styles.sidebarSectionGroup} data-sidebar-focus>
@@ -402,7 +418,11 @@ const GameHud = ({
           </div>
         </div>
 
-        <div className={styles.mainHud}>
+        <div
+          className={`${styles.mainHud} ${hudDisabled ? styles.hudElementDisabled : ''}`}
+          aria-hidden={hudDisabled ? true : undefined}
+          inert={hudDisabled ? true : undefined}
+        >
           <HudBar
             level={level}
             score={score}
@@ -469,6 +489,9 @@ const GameHud = ({
             onOpenEvolutionMenu={onOpenEvolutionMenu}
             canEvolve={canEvolve}
             touchLayout={settings.touchLayout}
+            className={hudDisabled ? styles.hudElementDisabled : undefined}
+            aria-hidden={hudDisabled ? true : undefined}
+            inert={hudDisabled ? true : undefined}
           />
         ) : null}
       </div>
