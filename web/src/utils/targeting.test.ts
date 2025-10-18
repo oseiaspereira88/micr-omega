@@ -36,6 +36,13 @@ describe("extractPosition", () => {
   it("supports tuple positions and string coercion", () => {
     expect(extractPosition(["12", 8])).toEqual({ x: 12, y: 8 });
   });
+
+  it("returns null for self-referential position objects", () => {
+    const entity: { position?: unknown } = {};
+    entity.position = entity;
+
+    expect(extractPosition(entity)).toBeNull();
+  });
 });
 
 describe("findNearestHostileMicroorganismId", () => {
