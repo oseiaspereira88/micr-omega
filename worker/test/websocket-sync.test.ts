@@ -1,6 +1,53 @@
 import { describe, expect, it } from "vitest";
 import { createMiniflare, onceMessage, openSocket, waitForRanking } from "./utils/miniflare";
 
+async function waitForPlayerStateDiff(
+  socket: WebSocket,
+  playerId: string,
+  timeoutMs = 5000,
+) {
+  const deadline = Date.now() + timeoutMs;
+  let remaining = timeoutMs;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    if (remaining <= 0) {
+      throw new Error(`Timed out waiting for player ${playerId} state diff`);
+    }
+
+    let diff;
+    try {
+      diff = await onceMessage<{
+        type: string;
+        state: {
+          upsertPlayers?: Array<{
+            id: string;
+            combatStatus?: {
+              state: string | undefined;
+              targetPlayerId: string | null;
+              targetObjectId: string | null;
+            };
+          }>;
+        };
+      }>(socket, "state", remaining);
+    } catch (error) {
+      const remainingAfterError = deadline - Date.now();
+      if (remainingAfterError <= 0) {
+        throw error;
+      }
+      remaining = remainingAfterError;
+      continue;
+    }
+
+    const updatedPlayer = diff.state.upsertPlayers?.find((entry) => entry.id === playerId);
+    if (updatedPlayer) {
+      return { diff, updatedPlayer };
+    }
+
+    remaining = deadline - Date.now();
+  }
+}
+
 describe("RoomDO integration", () => {
   it("rejects unauthorized score actions and keeps ranking unchanged", { timeout: 20000 }, async () => {
     const mf = await createMiniflare();
@@ -231,19 +278,7 @@ describe("RoomDO integration", () => {
 
       await onceMessage<{ type: string }>(socket, "state", 5000);
 
-      const stateDiffPromise = onceMessage<{
-        type: string;
-        state: {
-          upsertPlayers?: {
-            id: string;
-            combatStatus?: {
-              state: string;
-              targetPlayerId: string | null;
-              targetObjectId: string | null;
-            };
-          }[];
-        };
-      }>(socket, "state", 5000);
+      const stateDiffPromise = waitForPlayerStateDiff(socket, joined.playerId, 5000);
 
       const errorPromise = onceMessage<{ type: string }>(socket, "error", 500).catch(
         (err) => err as Error,
@@ -258,10 +293,7 @@ describe("RoomDO integration", () => {
         }),
       );
 
-      const stateDiff = await stateDiffPromise;
-      const updatedPlayer = stateDiff.state.upsertPlayers?.find(
-        (entry) => entry.id === joined.playerId,
-      );
+      const { diff: stateDiff, updatedPlayer } = await stateDiffPromise;
 
       expect(updatedPlayer?.combatStatus?.state).toBe("engaged");
       expect(updatedPlayer?.combatStatus?.targetPlayerId).toBeNull();
