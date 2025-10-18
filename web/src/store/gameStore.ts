@@ -685,6 +685,9 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       }
     }
 
+    const statusEffects = worldDiff?.statusEffects;
+    const statusEffectsChanged = statusEffects !== undefined;
+
     const worldChanged =
       microorganismsResult.changed ||
       organicMatterResult.changed ||
@@ -695,7 +698,8 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       nextRoom !== prev.room ||
       playersResult.changed ||
       worldChanged ||
-      progressionChanged;
+      progressionChanged ||
+      statusEffectsChanged;
 
     if (!stateChanged) {
       return prev;
@@ -721,8 +725,8 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       roomObjects: roomObjectResult.next,
       world: nextWorld,
       progression: progressionChanged ? nextProgression : prev.progression,
-      statusEffects: worldDiff?.statusEffects
-        ? worldDiff.statusEffects.map((event) => ({ ...event }))
+      statusEffects: statusEffectsChanged
+        ? statusEffects.map((event) => ({ ...event }))
         : prev.statusEffects,
     };
   });
