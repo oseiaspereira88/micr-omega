@@ -30,25 +30,23 @@ describe('App display mode flow', () => {
 
     expect(screen.getByTestId('micro-world-onboarding-flow')).toBeInTheDocument();
     expect(screen.getByTestId('splash-screen')).toBeInTheDocument();
-    expect(screen.getByTestId('onboarding-cta')).toHaveTextContent('Próximo');
+    expect(screen.getByText(/Micr•Omega Boot Sequence/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('main-menu-play')).not.toBeInTheDocument();
   });
 
-  it('advances through onboarding steps before entering the game', async () => {
+  it('advances through onboarding stages before entering the game', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     expect(screen.getByTestId('splash-screen')).toBeInTheDocument();
 
-    await user.click(screen.getByTestId('onboarding-cta'));
-    expect(screen.getByTestId('main-menu-screen')).toBeInTheDocument();
+    await screen.findByTestId('main-menu-screen');
 
-    await user.click(screen.getByTestId('onboarding-cta'));
+    await user.click(screen.getByTestId('main-menu-play'));
     expect(screen.getByTestId('lobby-screen')).toBeInTheDocument();
 
-    const finalCta = screen.getByTestId('onboarding-cta');
-    await user.click(finalCta);
-
-    expect(screen.getByTestId('game-app')).toBeInTheDocument();
+    await user.click(screen.getByTestId('lobby-join-public'));
+    expect(await screen.findByTestId('game-app')).toBeInTheDocument();
   });
 
   it('skips concept screens when ?mode=play is present', () => {

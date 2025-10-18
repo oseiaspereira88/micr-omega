@@ -1,0 +1,317 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&display=swap');
+
+.root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 100%;
+  padding: clamp(32px, 6vw, 72px) clamp(24px, 6vw, 96px);
+  overflow: hidden;
+  background: radial-gradient(circle at 20% 20%, rgba(64, 224, 255, 0.18), transparent 55%),
+    radial-gradient(circle at 80% 80%, rgba(94, 66, 255, 0.22), transparent 58%),
+    linear-gradient(135deg, #030917 0%, #05021a 48%, #071a33 100%);
+  color: rgba(231, 247, 255, 0.95);
+  text-align: center;
+  font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+}
+
+.mobile {
+  padding: clamp(24px, 10vw, 48px) 20px;
+}
+
+.mobile .title {
+  font-size: clamp(2.2rem, 10vw, 3.2rem);
+}
+
+.mobile .tagline {
+  font-size: clamp(0.9rem, 4vw, 1.1rem);
+}
+
+.mobile .statusFeed {
+  gap: 10px;
+  letter-spacing: 0.16em;
+}
+
+.glowLayer,
+.gridLayer,
+.orbLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.glowLayer {
+  background: radial-gradient(circle at 40% 30%, rgba(60, 247, 168, 0.18), transparent 60%),
+    radial-gradient(circle at 70% 70%, rgba(74, 224, 255, 0.15), transparent 64%),
+    radial-gradient(circle at 30% 80%, rgba(111, 67, 255, 0.18), transparent 68%);
+  filter: blur(48px);
+  opacity: 0.92;
+}
+
+.gridLayer {
+  background-image: linear-gradient(rgba(74, 224, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(74, 224, 255, 0.12) 1px, transparent 1px);
+  background-size: 120px 120px;
+  opacity: 0.22;
+  transform: perspective(780px) rotateX(68deg);
+  transform-origin: center;
+  animation: drift 22s linear infinite;
+}
+
+@keyframes drift {
+  from {
+    background-position: 0 0, 0 0;
+  }
+  to {
+    background-position: 0 120px, 120px 0;
+  }
+}
+
+.orbLayer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.particle {
+  position: absolute;
+  display: block;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(74, 224, 255, 0.35), rgba(74, 224, 255, 0));
+  filter: blur(1px);
+  animation: pulse 7s ease-in-out infinite;
+}
+
+.particle::after {
+  content: '';
+  position: absolute;
+  inset: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(74, 224, 255, 0.4);
+  opacity: 0.4;
+}
+
+.particleSecondary {
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(circle, rgba(60, 247, 168, 0.35), rgba(60, 247, 168, 0));
+  animation-duration: 9s;
+  animation-delay: 0.8s;
+}
+
+.particleAccent {
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(143, 94, 255, 0.4), rgba(143, 94, 255, 0));
+  animation-duration: 11s;
+  animation-delay: 1.2s;
+}
+
+.particleOne {
+  top: 12%;
+  left: 16%;
+}
+
+.particleTwo {
+  bottom: 14%;
+  right: 18%;
+}
+
+.particleThree {
+  top: 22%;
+  right: 26%;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(0.9) translate3d(0, 0, 0);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1) translate3d(0, 6px, 0);
+    opacity: 1;
+  }
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(16px, 3vw, 28px);
+}
+
+.protocol {
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: clamp(0.78rem, 1vw, 0.95rem);
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: rgba(171, 224, 255, 0.78);
+}
+
+.title {
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  margin: 0;
+  font-size: clamp(2.8rem, 6vw, 4.4rem);
+  letter-spacing: 0.08em;
+}
+
+.tagline {
+  margin: 0;
+  font-size: clamp(1rem, 2vw, 1.35rem);
+  color: rgba(215, 238, 255, 0.82);
+  max-width: min(480px, 90%);
+}
+
+.progressTrack {
+  position: relative;
+  width: min(420px, 70vw);
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(34, 66, 104, 0.55);
+  overflow: hidden;
+  box-shadow: 0 0 18px rgba(74, 224, 255, 0.18) inset;
+}
+
+.progressMeter {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(60, 247, 168, 0.2), rgba(74, 224, 255, 0.75), rgba(60, 247, 168, 0.2));
+  transform-origin: left center;
+  animation: loadSweep 4.6s ease-in-out forwards;
+}
+
+@keyframes loadSweep {
+  0% {
+    transform: scaleX(0.04);
+  }
+  40% {
+    transform: scaleX(0.62);
+  }
+  65% {
+    transform: scaleX(0.78);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+.statusFeed {
+  display: grid;
+  grid-auto-flow: row;
+  gap: 6px;
+  margin-top: clamp(24px, 4vw, 36px);
+  padding: 0;
+  list-style: none;
+  color: rgba(187, 221, 255, 0.8);
+  font-size: clamp(0.85rem, 1.4vw, 1.05rem);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.statusFeed span {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  animation: statusGlow 5.8s ease-in-out infinite;
+}
+
+.statusFeed span::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(74, 224, 255, 0.85);
+  box-shadow: 0 0 12px rgba(74, 224, 255, 0.8);
+}
+
+.statusFeed span:nth-child(2) {
+  animation-delay: 0.6s;
+}
+
+.statusFeed span:nth-child(3) {
+  animation-delay: 1.2s;
+}
+
+@keyframes statusGlow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.footer {
+  margin-top: clamp(28px, 6vw, 64px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  font-size: clamp(0.75rem, 1.2vw, 0.95rem);
+  color: rgba(153, 196, 236, 0.72);
+}
+
+.signature {
+  text-transform: uppercase;
+  letter-spacing: 0.32em;
+}
+
+@media (max-width: 768px) {
+  .root {
+    padding: clamp(32px, 12vw, 56px) 20px;
+  }
+
+  .gridLayer {
+    background-size: 90px 90px;
+    transform: perspective(620px) rotateX(72deg);
+  }
+
+  .particle {
+    width: 160px;
+    height: 160px;
+  }
+
+  .particleSecondary {
+    width: 120px;
+    height: 120px;
+  }
+
+  .particleAccent {
+    width: 96px;
+    height: 96px;
+  }
+
+  .statusFeed {
+    letter-spacing: 0.14em;
+  }
+}
+
+@media (max-width: 520px) {
+  .title {
+    font-size: clamp(2.3rem, 10vw, 3rem);
+  }
+
+  .tagline {
+    font-size: 0.95rem;
+  }
+
+  .statusFeed {
+    gap: 10px;
+  }
+
+  .statusFeed span {
+    flex-direction: column;
+    gap: 8px;
+    letter-spacing: 0.18em;
+  }
+}

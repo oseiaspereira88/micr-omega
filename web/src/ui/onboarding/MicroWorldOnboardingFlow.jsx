@@ -1,135 +1,147 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import SplashScreen from './SplashScreen.jsx';
 import MainMenuScreen from './MainMenuScreen.jsx';
 import LobbyScreen from './LobbyScreen.jsx';
-import conceptStyles from '../concepts/MicroWorldConceptScreens.module.css';
 import styles from './MicroWorldOnboardingFlow.module.css';
 
-const onboardingSteps = [
-  {
-    key: 'splash',
-    title: 'Micr•Omega Activation',
+const STAGE_SEQUENCE = ['splash', 'menu', 'lobby'];
+
+const isTestEnvironment =
+  typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined'
+    ? import.meta.env.MODE === 'test'
+    : false;
+
+const STAGE_METADATA = {
+  splash: {
+    phaseLabel: 'Micr•Omega Boot Sequence',
+    title: 'Sincronizando com o Núcleo',
     description:
-      'Inicie a ligação neural com o centro de comando. Observe a biometria estabilizar enquanto o mundo é gerado.',
-    ctaLabel: 'Próximo',
-    render: () => (
-      <div className={`${styles.viewportCanvas} ${conceptStyles.splashCanvas}`}>
-        <SplashScreen />
-      </div>
-    ),
+      'Aperte os cintos: a ponte neural está estabelecendo o vínculo inicial enquanto as criaturas microscópicas despertam.',
+    timelineLabel: 'Boot',
+    status: 'Calibrando sensores e carregando ambiente.',
+    autoAdvanceAfter: 5200,
   },
-  {
-    key: 'menu',
-    title: 'Escolha seu caminho',
+  menu: {
+    phaseLabel: 'Centro de Comando',
+    title: 'Hangar de Operações',
     description:
-      'Configure seu esquadrão, verifique os destaques da temporada e pulse Play para mergulhar na batalha.',
-    ctaLabel: 'Próximo',
-    render: () => (
-      <div className={`${styles.viewportCanvas} ${conceptStyles.menuCanvas}`}>
-        <MainMenuScreen />
-      </div>
-    ),
+      'Revise seu esquadrão, verifique as recompensas do dia e prepare-se para mergulhar na próxima incursão.',
+    timelineLabel: 'Comando',
+    status: 'Aguardando confirmação do piloto para acessar o lobby.',
   },
-  {
-    key: 'lobby',
-    title: 'Localize a sala ideal',
+  lobby: {
+    phaseLabel: 'Coordenação de Missão',
+    title: 'Lobby Micr•Omega',
     description:
-      'Use filtros de região e modo para encontrar o clã certo. Quando estiver pronto, entre e lidere a evolução.',
-    ctaLabel: 'Entrar no jogo',
-    render: () => (
-      <div className={`${styles.viewportCanvas} ${conceptStyles.lobbyCanvas}`}>
-        <LobbyScreen />
-      </div>
-    ),
+      'Selecione a sala ideal, organize seu time e sincronize as regras de partida antes de iniciar a invasão.',
+    timelineLabel: 'Lobby',
+    status: 'Selecione uma sala pública para avançar para a configuração.',
   },
-];
+};
 
 const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
-  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const [activeStage, setActiveStage] = useState('splash');
 
-  const { activeStep, activeIndex, totalSteps, isFinalStep } = useMemo(() => {
-    const total = onboardingSteps.length;
-    const safeIndex = Math.min(Math.max(activeStepIndex, 0), total - 1);
-    return {
-      activeStep: onboardingSteps[safeIndex],
-      activeIndex: safeIndex,
-      totalSteps: total,
-      isFinalStep: safeIndex === total - 1,
-    };
-  }, [activeStepIndex]);
+  const stageConfig = useMemo(() => STAGE_METADATA[activeStage] ?? STAGE_METADATA.splash, [activeStage]);
 
-  const handleAdvance = useCallback(() => {
-    if (!activeStep) {
-      return;
-    }
-
-    const currentIndex = activeIndex;
-    const nextIndex = currentIndex + 1;
-
-    if (nextIndex < onboardingSteps.length) {
-      setActiveStepIndex(nextIndex);
-      if (typeof onAdvance === 'function') {
-        onAdvance({
-          currentIndex,
-          currentStep: activeStep.key,
-          nextIndex,
-          nextStep: onboardingSteps[nextIndex].key,
-        });
+  const goToStage = useCallback(
+    (nextStage) => {
+      if (!STAGE_SEQUENCE.includes(nextStage)) {
+        return;
       }
-      return;
+
+      setActiveStage((current) => {
+        if (current === nextStage) {
+          return current;
+        }
+        const currentIndex = STAGE_SEQUENCE.indexOf(current);
+        const nextIndex = STAGE_SEQUENCE.indexOf(nextStage);
+
+        if (typeof onAdvance === 'function' && nextIndex !== -1) {
+          onAdvance({
+            currentIndex,
+            currentStep: current,
+            nextIndex,
+            nextStep: nextStage,
+          });
+        }
+
+        return nextStage;
+      });
+    },
+    [onAdvance],
+  );
+
+  useEffect(() => {
+    if (activeStage !== 'splash') {
+      return undefined;
     }
 
+    const { autoAdvanceAfter = 5200 } = STAGE_METADATA.splash;
+    const splashDelay = isTestEnvironment ? 50 : autoAdvanceAfter;
+
+    const timer = setTimeout(() => {
+      goToStage('menu');
+    }, Math.max(0, splashDelay));
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [activeStage, goToStage]);
+
+  const handlePlay = useCallback(() => {
+    goToStage('lobby');
+  }, [goToStage]);
+
+  const handleEnterPublic = useCallback(() => {
     if (typeof onComplete === 'function') {
       onComplete({
-        currentIndex,
-        currentStep: activeStep.key,
+        currentStage: 'lobby',
+        currentIndex: STAGE_SEQUENCE.indexOf('lobby'),
       });
     }
-  }, [activeStep, activeIndex, onAdvance, onComplete]);
+  }, [onComplete]);
 
-  if (!activeStep) {
-    return null;
-  }
+  const timelineItems = useMemo(
+    () =>
+      STAGE_SEQUENCE.map((key) => ({
+        key,
+        label: STAGE_METADATA[key]?.timelineLabel ?? key,
+        active: key === activeStage,
+      })),
+    [activeStage],
+  );
 
   return (
     <div className={styles.flowRoot} data-testid="micro-world-onboarding-flow">
-      <div className={styles.aura} />
+      <div className={styles.backgroundLayer} />
       <header className={styles.header}>
-        <p className={styles.kicker}>Micr•Omega Protocol</p>
-        <h1 className={styles.heading}>{activeStep.title}</h1>
-        <p className={styles.subheading}>{activeStep.description}</p>
+        <span className={styles.phaseLabel}>{stageConfig.phaseLabel}</span>
+        <h1 className={styles.title}>{stageConfig.title}</h1>
+        <p className={styles.description}>{stageConfig.description}</p>
       </header>
-      <div className={styles.stage}>
-        <div className={styles.viewport} data-testid="onboarding-stage">
-          {activeStep.render()}
+      <div className={styles.stageArea}>
+        <div className={styles.stageShell}>
+          <div className={styles.stageGlow} />
+          <div className={styles.stageContent}>
+            {activeStage === 'splash' && <SplashScreen />}
+            {activeStage === 'menu' && <MainMenuScreen onPlay={handlePlay} />}
+            {activeStage === 'lobby' && <LobbyScreen onJoinPublic={handleEnterPublic} />}
+          </div>
         </div>
       </div>
-      <div className={styles.controls}>
-        <div className={styles.stepMeta}>
-          <span className={styles.stepLabel}>
-            Etapa {activeIndex + 1} de {totalSteps}
-          </span>
-          <span className={styles.stepTitle}>{activeStep.title}</span>
+      <div className={styles.statusRow}>
+        <div className={styles.statusPrimary}>
+          <strong>Sequência atual</strong>
+          <span>{stageConfig.status}</span>
         </div>
-        <div className={styles.progressTrack}>
-          {onboardingSteps.map((step) => {
-            const isActive = step.key === activeStep.key;
-            return (
-              <span
-                key={step.key}
-                className={`${styles.progressDot} ${isActive ? styles.progressDotActive : ''}`.trim()}
-              />
-            );
-          })}
+        <div className={styles.statusTimeline}>
+          {timelineItems.map((item) => (
+            <span key={item.key} data-active={item.active ? 'true' : 'false'}>
+              {item.label}
+            </span>
+          ))}
         </div>
-        <button
-          type="button"
-          className={styles.primaryCta}
-          onClick={handleAdvance}
-          data-testid="onboarding-cta"
-        >
-          {activeStep.ctaLabel ?? (isFinalStep ? 'Entrar no jogo' : 'Próximo')}
-        </button>
       </div>
     </div>
   );
