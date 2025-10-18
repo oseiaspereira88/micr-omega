@@ -77,6 +77,7 @@ const RESET_DELAY_MS = 10_000;
 const RECONNECT_WINDOW_MS = 30_000;
 const INACTIVE_TIMEOUT_MS = 45_000;
 export const MAX_PLAYERS = 100;
+export const MAX_CLIENT_MESSAGE_SIZE_BYTES = 16 * 1024;
 
 const MAX_COMBO_MULTIPLIER = 50;
 
@@ -2954,6 +2955,20 @@ export class RoomDO {
     socket.addEventListener("message", (event) => {
       const data = typeof event.data === "string" ? event.data : String(event.data);
       const now = Date.now();
+
+      if (data.length > MAX_CLIENT_MESSAGE_SIZE_BYTES) {
+        this.observability.log("warn", "client_payload_invalid", {
+          stage: "size",
+          length: data.length,
+          category: "protocol_error"
+        });
+        this.observability.recordMetric("protocol_errors", 1, {
+          type: "payload_too_large"
+        });
+        this.send(socket, { type: "error", reason: "invalid_payload" });
+        socket.close(1009, "invalid_payload");
+        return;
+      }
 
       const perConnectionLimiter = this.getConnectionLimiter(socket);
       if (!perConnectionLimiter.consume(now)) {
