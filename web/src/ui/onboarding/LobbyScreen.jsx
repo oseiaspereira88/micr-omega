@@ -4,6 +4,13 @@ import styles from './LobbyScreen.module.css';
 const LobbyScreen = ({ variant = 'desktop', onJoinPublic, onCreateRoom }) => {
   const testId = variant === 'mobile' ? 'lobby-screen-mobile' : 'lobby-screen';
   const className = [styles.root, variant === 'mobile' ? styles.mobile : ''].filter(Boolean).join(' ');
+  const isCreateRoomEnabled = typeof onCreateRoom === 'function';
+  const createButtonClassName = [
+    styles.createButton,
+    !isCreateRoomEnabled ? styles.createButtonDisabled : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div className={className} data-testid={testId}>
@@ -12,9 +19,20 @@ const LobbyScreen = ({ variant = 'desktop', onJoinPublic, onCreateRoom }) => {
         <aside className={styles.sidebar}>
           <h3>Criar Sala</h3>
           <p>Monte partidas privadas com regras avançadas e convide o seu esquadrão.</p>
-          <button type="button" className={styles.createButton} onClick={onCreateRoom}>
+          <button
+            type="button"
+            className={createButtonClassName}
+            onClick={isCreateRoomEnabled ? onCreateRoom : undefined}
+            disabled={!isCreateRoomEnabled}
+            aria-disabled={!isCreateRoomEnabled}
+          >
             Criar nova sala
           </button>
+          {!isCreateRoomEnabled && (
+            <p className={styles.createButtonNotice} role="status">
+              Em breve: conecte-se a uma sala pública enquanto preparamos a criação privada.
+            </p>
+          )}
           <div className={styles.statusCard}>
             <span>🏓 Ping médio: 22ms</span>
             <span>Conexão estável</span>

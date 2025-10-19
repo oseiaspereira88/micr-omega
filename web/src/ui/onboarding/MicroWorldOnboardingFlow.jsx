@@ -41,6 +41,7 @@ const STAGE_METADATA = {
 
 const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
   const [activeStage, setActiveStage] = useState('splash');
+  const [createRoomNotice, setCreateRoomNotice] = useState(null);
 
   const stageConfig = useMemo(() => STAGE_METADATA[activeStage] ?? STAGE_METADATA.splash, [activeStage]);
 
@@ -102,6 +103,24 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
     }
   }, [onComplete]);
 
+  const handleCreateRoom = useCallback(() => {
+    setCreateRoomNotice('Criação de salas privadas chegará em breve. Enquanto isso, use as salas públicas!');
+  }, []);
+
+  useEffect(() => {
+    if (!createRoomNotice) {
+      return undefined;
+    }
+
+    const timeout = setTimeout(() => {
+      setCreateRoomNotice(null);
+    }, 4000);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [createRoomNotice]);
+
   const timelineItems = useMemo(
     () =>
       STAGE_SEQUENCE.map((key) => ({
@@ -126,10 +145,17 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
           <div className={styles.stageContent}>
             {activeStage === 'splash' && <SplashScreen />}
             {activeStage === 'menu' && <MainMenuScreen onPlay={handlePlay} />}
-            {activeStage === 'lobby' && <LobbyScreen onJoinPublic={handleEnterPublic} />}
+            {activeStage === 'lobby' && (
+              <LobbyScreen onJoinPublic={handleEnterPublic} onCreateRoom={handleCreateRoom} />
+            )}
           </div>
         </div>
       </div>
+      {createRoomNotice && (
+        <div className={styles.feedbackToast} role="status" aria-live="polite">
+          {createRoomNotice}
+        </div>
+      )}
       <div className={styles.statusRow}>
         <div className={styles.statusPrimary}>
           <strong>Sequência atual</strong>
