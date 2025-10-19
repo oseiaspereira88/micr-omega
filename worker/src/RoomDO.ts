@@ -4819,6 +4819,9 @@ export class RoomDO {
     this.socketsByPlayer.delete(playerId);
 
     this.setPlayerConnectionState(player, false);
+    this.markRankingDirty();
+    const rankingMessage: RankingMessage = { type: "ranking", ranking: this.getRanking() };
+    this.broadcast(rankingMessage, socket);
     player.movementVector = createVector();
     player.combatStatus = createCombatStatusState();
     player.lastSeenAt = Date.now();

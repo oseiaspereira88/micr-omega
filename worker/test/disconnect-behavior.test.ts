@@ -49,8 +49,39 @@ describe("RoomDO disconnect behavior", () => {
         sessionCount: 0,
       };
 
+      const survivor = {
+        id: "player-2",
+        name: "Bob",
+        score: 42,
+        combo: 1,
+        energy: 100,
+        xp: 0,
+        geneticMaterial: 0,
+        dashCharge: 100,
+        dashCooldownMs: 0,
+        position: { x: 10, y: 10 },
+        movementVector: { x: 0, y: 0 },
+        orientation: { angle: 0 },
+        health: { current: 100, max: 100 },
+        combatStatus: {
+          state: "idle",
+          targetPlayerId: null,
+          targetObjectId: null,
+          lastAttackAt: null,
+        },
+        combatAttributes: { attack: 1, defense: 1, speed: 1, range: 1 },
+        connected: true,
+        lastActiveAt: now,
+        lastSeenAt: now,
+        connectedAt: now,
+        totalSessionDurationMs: 0,
+        sessionCount: 0,
+      };
+
       roomAny.players.set(player.id, player);
+      roomAny.players.set(survivor.id, survivor);
       roomAny.nameToPlayerId.set(player.name.toLowerCase(), player.id);
+      roomAny.nameToPlayerId.set(survivor.name.toLowerCase(), survivor.id);
       roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
 
       const socket = {
@@ -78,9 +109,25 @@ describe("RoomDO disconnect behavior", () => {
         lastAttackAt: null,
       });
 
-      expect(roomAny.getConnectedPlayersCount()).toBe(0);
+      expect(roomAny.getConnectedPlayersCount()).toBe(1);
 
-      expect(broadcastSpy).toHaveBeenCalledWith(
+      expect(broadcastSpy).toHaveBeenNthCalledWith(
+        1,
+        {
+          type: "ranking",
+          ranking: [
+            {
+              playerId: survivor.id,
+              name: survivor.name,
+              score: survivor.score,
+            },
+          ],
+        },
+        socket,
+      );
+
+      expect(broadcastSpy).toHaveBeenNthCalledWith(
+        2,
         expect.objectContaining({
           type: "state",
           mode: "diff",
