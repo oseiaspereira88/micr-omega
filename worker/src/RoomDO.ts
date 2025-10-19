@@ -1,6 +1,12 @@
 import type { Env } from "./index";
 import { createObservability, serializeError, type Observability } from "./observability";
 import {
+  ORGANIC_COLLECTION_ENERGY_MULTIPLIER,
+  ORGANIC_COLLECTION_MG_MULTIPLIER,
+  ORGANIC_COLLECTION_SCORE_MULTIPLIER,
+  ORGANIC_COLLECTION_XP_MULTIPLIER,
+} from "./config/balance";
+import {
   PROTOCOL_VERSION,
   RANKING_SORT_LOCALE,
   RANKING_SORT_OPTIONS,
@@ -3415,7 +3421,12 @@ export class RoomDO {
 
     let totalScore = 0;
     for (const { matter } of collectedEntries) {
-      const awarded = Math.max(1, Math.round(matter.quantity));
+      const rawAwarded = Math.max(1, Math.round(matter.quantity));
+      const scaledAwarded = Math.max(
+        0,
+        Math.round(rawAwarded * ORGANIC_COLLECTION_SCORE_MULTIPLIER)
+      );
+      const awarded = rawAwarded > 0 ? Math.max(1, scaledAwarded) : 0;
       totalScore += awarded;
       combatLog.push({
         timestamp: now,
@@ -3435,7 +3446,7 @@ export class RoomDO {
     }
 
     if (collectedEntries.length > 0) {
-      const energyGain = collectedEntries.reduce((total, { matter }) => {
+      const rawEnergyGain = collectedEntries.reduce((total, { matter }) => {
         const base = Number.isFinite(matter.quantity) ? Math.round(matter.quantity) : 0;
         const nutrientBonus = Object.values(matter.nutrients ?? {}).reduce((sum, value) => {
           if (!Number.isFinite(value)) {
@@ -3445,17 +3456,29 @@ export class RoomDO {
         }, 0);
         return total + Math.max(0, base) + Math.max(0, nutrientBonus);
       }, 0);
+      const energyGain = Math.max(
+        0,
+        Math.round(rawEnergyGain * ORGANIC_COLLECTION_ENERGY_MULTIPLIER)
+      );
 
       if (energyGain > 0) {
         player.energy = Math.max(0, player.energy + energyGain);
       }
 
-      const xpGain = Math.max(0, Math.round(totalScore / 2));
+      const baseXpGain = Math.round(totalScore / 2);
+      const xpGain = Math.max(
+        0,
+        Math.round(baseXpGain * ORGANIC_COLLECTION_XP_MULTIPLIER)
+      );
       if (xpGain > 0) {
         player.xp = Math.max(0, player.xp + xpGain);
       }
 
-      const mgGain = Math.max(0, Math.round(totalScore / 4));
+      const baseMgGain = Math.round(totalScore / 4);
+      const mgGain = Math.max(
+        0,
+        Math.round(baseMgGain * ORGANIC_COLLECTION_MG_MULTIPLIER)
+      );
       if (mgGain > 0) {
         player.geneticMaterial = Math.max(0, player.geneticMaterial + mgGain);
       }
