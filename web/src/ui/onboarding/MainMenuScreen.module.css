@@ -217,6 +217,8 @@
   display: inline-flex;
   justify-content: center;
   align-items: center;
+  flex-direction: column;
+  gap: 4px;
   padding: 12px 18px;
   border-radius: 14px;
   border: 1px solid rgba(74, 224, 255, 0.24);
@@ -229,11 +231,38 @@
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.storeButton:hover,
-.storeButton:focus-visible {
+.storeButton:not(:disabled):hover,
+.storeButton:not(:disabled):focus-visible {
   transform: translateY(-1px);
   background: rgba(14, 36, 62, 0.85);
   outline: none;
+}
+
+.storeButtonLabel {
+  font-weight: 600;
+}
+
+.storeButtonMeta {
+  display: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(199, 228, 255, 0.55);
+}
+
+.storeButtonDisabled,
+.storeButton:disabled {
+  cursor: not-allowed;
+  transform: none;
+  background: rgba(10, 24, 46, 0.42);
+  border-color: rgba(74, 224, 255, 0.12);
+  color: rgba(199, 228, 255, 0.45);
+  box-shadow: none;
+}
+
+.storeButton:disabled .storeButtonMeta,
+.storeButtonDisabled .storeButtonMeta {
+  display: block;
 }
 
 .footer {

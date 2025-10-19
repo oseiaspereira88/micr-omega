@@ -110,6 +110,10 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
     }
   }, [activeStage]);
 
+  const pushFeedbackNotice = useCallback((message) => {
+    setFeedbackNotice(message);
+  }, [setFeedbackNotice]);
+
   const handlePlay = useCallback(() => {
     goToStage('lobby');
   }, [goToStage]);
@@ -129,8 +133,8 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
   }, [onComplete]);
 
   const handleCreateRoom = useCallback(() => {
-    setFeedbackNotice('Criação de salas privadas chegará em breve. Enquanto isso, use as salas públicas!');
-  }, []);
+    pushFeedbackNotice('Criação de salas privadas chegará em breve. Enquanto isso, use as salas públicas!');
+  }, [pushFeedbackNotice]);
 
   const handleUnlockRoom = useCallback((roomId) => {
     const roomNameMap = {
@@ -139,10 +143,26 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
     };
     const resolvedName = roomNameMap[roomId] ?? 'Sala premium';
 
-    setFeedbackNotice(
+    pushFeedbackNotice(
       `${resolvedName} requer acesso à loja premium, que ainda não está disponível nesta versão de prévia.`,
     );
-  }, []);
+  }, [pushFeedbackNotice]);
+
+  const handleOpenSettings = useCallback(() => {
+    pushFeedbackNotice('As configurações avançadas estarão disponíveis em breve.');
+  }, [pushFeedbackNotice]);
+
+  const handleOpenStore = useCallback(() => {
+    pushFeedbackNotice('A loja virtual será habilitada em uma atualização futura.');
+  }, [pushFeedbackNotice]);
+
+  const handleOpenMissions = useCallback(() => {
+    pushFeedbackNotice('O painel de missões está em construção. Fique de olho nas próximas builds!');
+  }, [pushFeedbackNotice]);
+
+  const handleOpenFriends = useCallback(() => {
+    pushFeedbackNotice('A lista de amigos estará disponível em breve.');
+  }, [pushFeedbackNotice]);
 
   useEffect(() => {
     if (!feedbackNotice) {
@@ -193,7 +213,15 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
           <div className={styles.stageGlow} />
           <div className={styles.stageContent}>
             {activeStage === 'splash' && <SplashScreen />}
-            {activeStage === 'menu' && <MainMenuScreen onPlay={handlePlay} />}
+            {activeStage === 'menu' && (
+              <MainMenuScreen
+                onPlay={handlePlay}
+                onOpenSettings={handleOpenSettings}
+                onOpenStore={handleOpenStore}
+                onOpenMissions={handleOpenMissions}
+                onOpenFriends={handleOpenFriends}
+              />
+            )}
             {activeStage === 'lobby' && (
               <LobbyScreen
                 onJoinPublic={handleEnterPublic}

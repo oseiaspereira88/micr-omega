@@ -1,9 +1,43 @@
 import React from 'react';
 import styles from './MainMenuScreen.module.css';
 
-const MainMenuScreen = ({ variant = 'desktop', onPlay }) => {
+const MainMenuScreen = ({
+  variant = 'desktop',
+  onPlay,
+  onOpenSettings,
+  onOpenStore,
+  onOpenMissions,
+  onOpenFriends,
+}) => {
   const testId = variant === 'mobile' ? 'main-menu-screen-mobile' : 'main-menu-screen';
   const className = [styles.root, variant === 'mobile' ? styles.mobile : ''].filter(Boolean).join(' ');
+
+  const storeActions = [
+    {
+      key: 'settings',
+      label: 'Configurações',
+      onClick: onOpenSettings,
+      testId: 'main-menu-settings',
+    },
+    {
+      key: 'store',
+      label: 'Loja',
+      onClick: onOpenStore,
+      testId: 'main-menu-store',
+    },
+    {
+      key: 'missions',
+      label: 'Missões',
+      onClick: onOpenMissions,
+      testId: 'main-menu-missions',
+    },
+    {
+      key: 'friends',
+      label: 'Amigos',
+      onClick: onOpenFriends,
+      testId: 'main-menu-friends',
+    },
+  ];
 
   return (
     <div className={className} data-testid={testId}>
@@ -62,18 +96,32 @@ const MainMenuScreen = ({ variant = 'desktop', onPlay }) => {
             </div>
           </div>
           <div className={styles.storeActions}>
-            <button type="button" className={styles.storeButton}>
-              Configurações
-            </button>
-            <button type="button" className={styles.storeButton}>
-              Loja
-            </button>
-            <button type="button" className={styles.storeButton}>
-              Missões
-            </button>
-            <button type="button" className={styles.storeButton}>
-              Amigos
-            </button>
+            {storeActions.map((action) => {
+                const isDisabled = typeof action.onClick !== 'function';
+                const buttonClassName = [
+                  styles.storeButton,
+                  isDisabled ? styles.storeButtonDisabled : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ');
+
+                return (
+                  <button
+                    key={action.key}
+                    type="button"
+                    className={buttonClassName}
+                    data-testid={action.testId}
+                    onClick={isDisabled ? undefined : action.onClick}
+                    disabled={isDisabled}
+                    aria-disabled={isDisabled || undefined}
+                  >
+                    <span className={styles.storeButtonLabel}>{action.label}</span>
+                    <span className={styles.storeButtonMeta} aria-hidden={isDisabled ? undefined : true}>
+                      Em breve
+                    </span>
+                  </button>
+                );
+              })}
           </div>
           <div className={styles.footer}>
             <span>v1.3.0</span>
