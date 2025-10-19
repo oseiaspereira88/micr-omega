@@ -1081,7 +1081,10 @@ const mapMicroorganisms = (entities = [], previous = new Map()) =>
       palette,
     } = createMicroorganismPalette(baseColor);
     const maxHealth = Math.max(1, entity.health?.max ?? entity.health?.current ?? 1);
-    const health = Math.max(0, Math.min(maxHealth, entity.health?.current ?? maxHealth));
+    const currentHealth = Math.max(
+      0,
+      Math.min(maxHealth, entity.health?.current ?? maxHealth)
+    );
     const level = Math.max(0, Math.floor(Number.isFinite(entity.level) ? entity.level : entity.evolutionLevel ?? 1));
     const boss = Boolean(entity?.boss || entity?.tier === 'boss' || entity?.classification === 'boss');
     const threatTier = getThreatTier(level, boss);
@@ -1097,7 +1100,7 @@ const mapMicroorganisms = (entities = [], previous = new Map()) =>
       y: entity.position?.y ?? 0,
       vx: entity.movementVector?.x ?? 0,
       vy: entity.movementVector?.y ?? 0,
-      size: Math.max(4, Math.sqrt(Math.max(1, entity.health?.max ?? 1)) * 2),
+      size: Math.max(4, Math.sqrt(Math.max(1, maxHealth)) * 2),
       color,
       coreColor,
       outerColor,
@@ -1110,7 +1113,8 @@ const mapMicroorganisms = (entities = [], previous = new Map()) =>
       labelColor,
       labelBackground,
       palette,
-      health,
+      health: { current: currentHealth, max: maxHealth },
+      healthValue: currentHealth,
       maxHealth,
       boss,
       opacity: 0.6,

@@ -782,7 +782,8 @@ describe('updateGameState', () => {
       vy: 0.4,
       color: '#ffa3d0',
       outerColor: '#ffa3d0',
-      health: 3,
+      health: { current: 3, max: 9 },
+      healthValue: 3,
       maxHealth: 9,
       boss: true,
       opacity: 0.6,
@@ -821,7 +822,8 @@ describe('updateGameState', () => {
     expect(updatedMicroorganism.animPhase).toBeCloseTo(initialPhase, 5);
     expect(updatedMicroorganism.vx).toBeCloseTo(0.3, 5);
     expect(updatedMicroorganism.vy).toBeCloseTo(-0.1, 5);
-    expect(updatedMicroorganism.health).toBe(1);
+    expect(updatedMicroorganism.health).toEqual({ current: 1, max: 9 });
+    expect(updatedMicroorganism.healthValue).toBe(1);
 
     expect(renderState.worldView.obstacles[0]).toMatchObject({
       id: 'wall-1',
