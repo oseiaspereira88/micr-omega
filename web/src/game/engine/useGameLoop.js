@@ -1442,9 +1442,32 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
           }
         }
 
-        if (Number.isFinite(hudSnapshot.level) && hudSnapshot.level !== state.level) {
-          state.level = hudSnapshot.level;
-          shouldSyncProgression = true;
+        const pendingLevel = Number.isFinite(state.pendingEvolutionLevel)
+          ? state.pendingEvolutionLevel
+          : null;
+        const confirmedLevel = Number.isFinite(state.confirmedLevel)
+          ? state.confirmedLevel
+          : Number.isFinite(state.level)
+          ? state.level
+          : 1;
+
+        if (Number.isFinite(hudSnapshot.level)) {
+          const snapshotLevel = hudSnapshot.level;
+          state.confirmedLevel = Math.max(confirmedLevel, snapshotLevel);
+
+          if (pendingLevel && snapshotLevel < pendingLevel) {
+            hudSnapshot.level = pendingLevel;
+          } else if (snapshotLevel !== state.level) {
+            state.level = snapshotLevel;
+            if (pendingLevel && snapshotLevel >= pendingLevel) {
+              state.pendingEvolutionLevel = null;
+            }
+            shouldSyncProgression = true;
+          } else if (pendingLevel && snapshotLevel >= pendingLevel) {
+            state.pendingEvolutionLevel = null;
+          }
+        } else if (pendingLevel) {
+          hudSnapshot.level = pendingLevel;
         }
 
         if (hudSnapshot.reroll && typeof hudSnapshot.reroll === 'object') {
@@ -1469,11 +1492,56 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
           if (typeof hudSnapshot.level === 'number') {
             hudSnapshot.level = state.level;
           }
+          hudSnapshot.confirmedLevel = Number.isFinite(state.confirmedLevel)
+            ? state.confirmedLevel
+            : state.level;
+          const existingBag =
+            hudSnapshot.resourceBag && typeof hudSnapshot.resourceBag === 'object'
+              ? { ...hudSnapshot.resourceBag }
+              : {};
+          hudSnapshot.resourceBag = {
+            ...existingBag,
+            level: state.level,
+          };
           if (hudSnapshot.reroll && state.reroll && typeof state.reroll === 'object') {
             Object.assign(hudSnapshot.reroll, state.reroll);
           }
         }
         syncHudState(state);
+      }
+
+      if (state && hudSnapshot) {
+        const pendingLevel = Number.isFinite(state.pendingEvolutionLevel)
+          ? state.pendingEvolutionLevel
+          : null;
+
+        if (pendingLevel) {
+          if (!Number.isFinite(hudSnapshot.level) || hudSnapshot.level < pendingLevel) {
+            hudSnapshot.level = pendingLevel;
+          }
+        }
+
+        if (typeof hudSnapshot.confirmedLevel !== 'number') {
+          hudSnapshot.confirmedLevel = Number.isFinite(state.confirmedLevel)
+            ? state.confirmedLevel
+            : Number.isFinite(state.level)
+            ? state.level
+            : pendingLevel ?? 1;
+        }
+
+        if (!hudSnapshot.resourceBag || typeof hudSnapshot.resourceBag !== 'object') {
+          hudSnapshot.resourceBag = { level: Number.isFinite(state.level) ? state.level : pendingLevel ?? 1 };
+        } else if (
+          !Number.isFinite(hudSnapshot.resourceBag.level) ||
+          hudSnapshot.resourceBag.level < (Number.isFinite(state.level) ? state.level : pendingLevel ?? 1)
+        ) {
+          hudSnapshot.resourceBag = {
+            ...hudSnapshot.resourceBag,
+            level: Number.isFinite(state.level) ? state.level : pendingLevel ?? 1,
+          };
+        }
+
+        hudSnapshot.showEvolutionChoice = Boolean(state.showEvolutionChoice);
       }
 
       renderState.pendingInputs = updateResult.commands;

@@ -483,6 +483,47 @@ describe('updateGameState', () => {
     );
   });
 
+  it('keeps the highest known level when server snapshot is stale', () => {
+    const renderState = createRenderState();
+    renderState.hudSnapshot = {
+      level: 3,
+      confirmedLevel: 3,
+      xp: { current: 0, next: 120, total: 0, level: 3 },
+      geneticMaterial: { current: 0, total: 0 },
+      characteristicPoints: { total: 0, available: 0, spent: 0, perLevel: [] },
+      evolutionSlots: {
+        small: { used: 0, max: 0 },
+        medium: { used: 0, max: 0 },
+        large: { used: 0, max: 0 },
+        macro: { used: 0, max: 0 },
+      },
+      reroll: { baseCost: 25, cost: 25, count: 0, pity: 0 },
+      dropPity: { fragment: 0, stableGene: 0 },
+      recentRewards: { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 },
+      resourceBag: { level: 3 },
+    };
+
+    const localPlayer = createPlayer({ id: 'p1', name: 'Local' });
+    localPlayer.resources = { level: 1 };
+
+    const sharedState = createSharedState({
+      playerId: 'p1',
+      players: [localPlayer],
+    });
+
+    const { hudSnapshot } = updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    expect(hudSnapshot.level).toBe(3);
+    expect(hudSnapshot.confirmedLevel).toBeGreaterThanOrEqual(3);
+    expect(hudSnapshot.resourceBag.level).toBe(3);
+  });
+
   it('persists HUD data between frames and normalizes short hex colors', () => {
     const renderState = createRenderState();
     const previousHud = {
