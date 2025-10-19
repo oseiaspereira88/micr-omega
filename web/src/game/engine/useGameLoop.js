@@ -1418,25 +1418,56 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
         const previousXp = state.xp || null;
         const xpSnapshot = hudSnapshot.xp && typeof hudSnapshot.xp === 'object' ? hudSnapshot.xp : null;
         if (xpSnapshot) {
-          state.xp = xpSnapshot;
-          if (!state.resources || typeof state.resources !== 'object') {
-            state.resources = { xp: xpSnapshot };
-          } else {
-            state.resources.xp = xpSnapshot;
-          }
-          if (state.organism && typeof state.organism === 'object') {
-            if (!state.organism.resources || typeof state.organism.resources !== 'object') {
-              state.organism.resources = { xp: xpSnapshot };
-            } else {
-              state.organism.resources.xp = xpSnapshot;
+          const xpPayload = { ...xpSnapshot };
+          state.xp = xpPayload;
+
+          const syncTargetResources = (target) => {
+            if (!target || typeof target !== 'object') {
+              return;
             }
+
+            if (!target.resources || typeof target.resources !== 'object') {
+              target.resources = { xp: { ...xpPayload } };
+              return;
+            }
+
+            const targetXp =
+              target.resources.xp && typeof target.resources.xp === 'object'
+                ? target.resources.xp
+                : (target.resources.xp = {});
+
+            Object.assign(targetXp, xpPayload);
+          };
+
+          if (!state.resources || typeof state.resources !== 'object') {
+            state.resources = { xp: xpPayload };
+          } else if (!state.resources.xp || typeof state.resources.xp !== 'object') {
+            state.resources.xp = xpPayload;
+          } else {
+            Object.assign(state.resources.xp, xpPayload);
           }
+
+          if (state.organism && typeof state.organism === 'object') {
+            syncTargetResources(state.organism);
+          }
+
+          const localRenderPlayer =
+            updateResult.localPlayerId && state.playersById && typeof state.playersById.get === 'function'
+              ? state.playersById.get(updateResult.localPlayerId)
+              : null;
+          syncTargetResources(localRenderPlayer);
+
+          if (Array.isArray(state.playerList) && state.playerList.length > 0 && updateResult.localPlayerId) {
+            const listEntry = state.playerList.find((player) => player?.id === updateResult.localPlayerId);
+            syncTargetResources(listEntry);
+          }
+
           if (!previousXp) {
             shouldSyncProgression = true;
           } else if (
-            xpSnapshot.current !== previousXp.current ||
-            xpSnapshot.total !== previousXp.total ||
-            xpSnapshot.next !== previousXp.next
+            xpPayload.current !== previousXp.current ||
+            xpPayload.total !== previousXp.total ||
+            xpPayload.next !== previousXp.next
           ) {
             shouldSyncProgression = true;
           }
