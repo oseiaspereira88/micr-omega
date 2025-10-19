@@ -1,7 +1,19 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import styles from './LobbyScreen.module.css';
 
-const LobbyScreen = ({ variant = 'desktop', onJoinPublic, onCreateRoom }) => {
+const filterDefinitions = [
+  { id: 'region', label: 'Região', value: 'Global' },
+  { id: 'language', label: 'Idioma', value: 'PT-BR' },
+  { id: 'mode', label: 'Modo', value: 'Co-op' },
+];
+
+const LobbyScreen = ({
+  variant = 'desktop',
+  onJoinPublic,
+  onCreateRoom,
+  onFilterChange,
+  initialActiveFilters,
+}) => {
   const testId = variant === 'mobile' ? 'lobby-screen-mobile' : 'lobby-screen';
   const className = [styles.root, variant === 'mobile' ? styles.mobile : ''].filter(Boolean).join(' ');
   const isCreateRoomEnabled = typeof onCreateRoom === 'function';
@@ -11,6 +23,48 @@ const LobbyScreen = ({ variant = 'desktop', onJoinPublic, onCreateRoom }) => {
   ]
     .filter(Boolean)
     .join(' ');
+
+  const defaultActiveFilters = useMemo(
+    () =>
+      filterDefinitions.reduce(
+        (acc, filter) => ({
+          ...acc,
+          [filter.id]: filter.id === 'region',
+        }),
+        {},
+      ),
+    [],
+  );
+
+  const [activeFilters, setActiveFilters] = useState(() => ({
+    ...defaultActiveFilters,
+    ...(initialActiveFilters ?? {}),
+  }));
+
+  useEffect(() => {
+    if (!initialActiveFilters) {
+      return;
+    }
+
+    setActiveFilters((prev) => ({
+      ...defaultActiveFilters,
+      ...prev,
+      ...initialActiveFilters,
+    }));
+  }, [defaultActiveFilters, initialActiveFilters]);
+
+  useEffect(() => {
+    if (onFilterChange) {
+      onFilterChange(activeFilters);
+    }
+  }, [activeFilters, onFilterChange]);
+
+  const handleFilterToggle = (filterId) => {
+    setActiveFilters((prev) => ({
+      ...prev,
+      [filterId]: !prev[filterId],
+    }));
+  };
 
   return (
     <div className={className} data-testid={testId}>
@@ -44,9 +98,21 @@ const LobbyScreen = ({ variant = 'desktop', onJoinPublic, onCreateRoom }) => {
         </aside>
         <section className={styles.rooms}>
           <div className={styles.filters}>
-            <span className={`${styles.filterChip} ${styles.filterChipActive}`}>Região: Global</span>
-            <span className={styles.filterChip}>Idioma: PT-BR</span>
-            <span className={styles.filterChip}>Modo: Co-op</span>
+            {filterDefinitions.map((filter) => {
+              const isActive = Boolean(activeFilters[filter.id]);
+
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  className={`${styles.filterChip} ${isActive ? styles.filterChipActive : styles.filterChipInactive}`}
+                  onClick={() => handleFilterToggle(filter.id)}
+                  aria-pressed={isActive}
+                >
+                  {`${filter.label}: ${filter.value}`}
+                </button>
+              );
+            })}
           </div>
           <div className={styles.roomList}>
             <article className={styles.roomCard}>
