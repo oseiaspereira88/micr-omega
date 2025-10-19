@@ -14,11 +14,11 @@ describe('ArchetypeSelection', () => {
       />,
     );
 
-    const options = screen.getAllByRole('button');
+    const options = screen.getAllByRole('radio');
     expect(options).toHaveLength(2);
     expect(screen.getByText('Vírus')).toBeInTheDocument();
     expect(screen.getByText('Alga')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /vírus/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('radio', { name: /vírus/i })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('associa o título ao diálogo para acessibilidade', () => {
@@ -45,14 +45,14 @@ describe('ArchetypeSelection', () => {
       />,
     );
 
-    const virusButton = screen.getByRole('button', { name: /vírus/i });
-    virusButton.focus();
+    const virusRadio = screen.getByRole('radio', { name: /vírus/i });
+    virusRadio.focus();
 
-    fireEvent.keyDown(virusButton, { key: 'ArrowRight' });
+    fireEvent.keyDown(virusRadio, { key: 'ArrowRight' });
 
     expect(handleSelect).toHaveBeenCalledWith('algae');
 
-    const algaeButton = screen.getByRole('button', { name: /alga/i });
-    expect(algaeButton.className).toContain('cardSelected');
+    const algaeRadio = screen.getByRole('radio', { name: /alga/i });
+    expect(algaeRadio.className).toContain('cardSelected');
   });
 });
