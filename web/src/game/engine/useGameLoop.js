@@ -177,21 +177,51 @@ const DENSITY_SCALE = {
   high: 1.4,
 };
 
-const collectSharedDamagePopups = (sharedState) => {
-  const rootPopups = Array.isArray(sharedState?.damagePopups) ? sharedState.damagePopups : [];
-  const worldPopups = Array.isArray(sharedState?.world?.damagePopups)
-    ? sharedState.world.damagePopups
+const filterExpiredDamagePopups = (collection, now) => {
+  if (!Array.isArray(collection) || collection.length === 0) {
+    return [];
+  }
+
+  return collection.filter((popup) => {
+    if (!popup || typeof popup !== 'object') {
+      return false;
+    }
+
+    const createdAt = Number.isFinite(popup.createdAt) ? popup.createdAt : now;
+    const lifetimeSeconds = Number.isFinite(popup.lifetime) ? popup.lifetime : DEFAULT_POPUP_LIFETIME;
+    const resolvedLifetime = Math.max(0.25, lifetimeSeconds);
+
+    return createdAt + resolvedLifetime * 1000 > now;
+  });
+};
+
+const collectSharedDamagePopups = (sharedState, now) => {
+  const hasRootCollection = Array.isArray(sharedState?.damagePopups);
+  const hasWorldCollection = Array.isArray(sharedState?.world?.damagePopups);
+
+  const filteredRoot = hasRootCollection
+    ? filterExpiredDamagePopups(sharedState.damagePopups, now)
     : [];
-
-  if (rootPopups.length === 0) {
-    return worldPopups;
+  if (hasRootCollection) {
+    sharedState.damagePopups = filteredRoot;
   }
 
-  if (worldPopups.length === 0) {
-    return rootPopups;
+  const filteredWorld = hasWorldCollection
+    ? filterExpiredDamagePopups(sharedState.world.damagePopups, now)
+    : [];
+  if (hasWorldCollection) {
+    sharedState.world.damagePopups = filteredWorld;
   }
 
-  return [...rootPopups, ...worldPopups];
+  if (filteredRoot.length === 0) {
+    return filteredWorld;
+  }
+
+  if (filteredWorld.length === 0) {
+    return filteredRoot;
+  }
+
+  return [...filteredRoot, ...filteredWorld];
 };
 
 const DEFAULT_POPUP_LIFETIME = 1;
@@ -217,7 +247,8 @@ const syncDamagePopups = (renderState, sharedState, deltaSeconds) => {
   if (!renderState) return;
 
   const { list, index } = ensureRenderPopupStructures(renderState);
-  const incoming = collectSharedDamagePopups(sharedState);
+  const now = Date.now();
+  const incoming = collectSharedDamagePopups(sharedState, now);
 
   incoming.forEach((rawPopup) => {
     if (!rawPopup || typeof rawPopup !== 'object') {
