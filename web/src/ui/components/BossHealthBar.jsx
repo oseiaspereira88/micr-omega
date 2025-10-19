@@ -6,7 +6,20 @@ const toSafeNumber = (value, fallback) => {
   return Number.isFinite(numeric) ? numeric : fallback;
 };
 
-const BossHealthBar = ({ active, health, maxHealth }) => {
+const DEFAULT_BOSS_NAME = 'Mega-organismo';
+
+const resolveBossName = (value) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+  }
+
+  return DEFAULT_BOSS_NAME;
+};
+
+const BossHealthBar = ({ active, health, maxHealth, name }) => {
   if (!active) {
     return null;
   }
@@ -15,7 +28,7 @@ const BossHealthBar = ({ active, health, maxHealth }) => {
   const safeMaxHealth = Math.max(1, toSafeNumber(maxHealth, Math.max(1, safeHealth || 1)));
   const rawPercent = (safeHealth / safeMaxHealth) * 100;
   const percent = Math.max(0, Math.min(100, Number.isFinite(rawPercent) ? rawPercent : 0));
-  const bossName = 'Mega-organismo';
+  const bossName = resolveBossName(name);
 
   return (
     <div className={styles.container}>

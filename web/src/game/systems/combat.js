@@ -12,6 +12,23 @@ import {
 } from './statusEffects';
 import { pushDamagePopup } from '../state/damagePopups';
 
+const resolveBossName = (enemy) => {
+  if (!enemy || typeof enemy !== 'object') return null;
+
+  const candidates = [enemy.name, enemy.label, enemy.species];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string') {
+      const trimmed = candidate.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
+    }
+  }
+
+  return null;
+};
+
 export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   if (!state || !enemy) return false;
 
@@ -173,11 +190,13 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   }
 
   if (enemy.boss) {
+    const resolvedName = resolveBossName(enemy) ?? state.boss?.name ?? null;
     state.boss = {
       active: true,
       health: enemy.health,
       maxHealth: enemy.maxHealth,
-      color: enemy.color
+      color: enemy.color,
+      name: resolvedName,
     };
   }
 
@@ -336,11 +355,13 @@ export const performAttack = (state, helpers = {}) => {
       }
 
       if (enemy.boss && enemy.health > 0) {
+        const resolvedName = resolveBossName(enemy) ?? state.boss?.name ?? null;
         state.boss = {
           active: true,
           health: Math.max(0, enemy.health),
           maxHealth: enemy.maxHealth,
-          color: enemy.color
+          color: enemy.color,
+          name: resolvedName,
         };
       }
     }

@@ -46,6 +46,7 @@ const GameHud = ({
   bossActive,
   bossHealth,
   bossMaxHealth,
+  bossName,
   element,
   affinity,
   elementLabel,
@@ -236,6 +237,46 @@ const GameHud = ({
   const handleToggleMinimap = useCallback(() => {
     updateSettings({ showMinimap: !isMinimapEnabled });
   }, [isMinimapEnabled, updateSettings]);
+
+  const resolvedBossName = useMemo(() => {
+    if (typeof bossName === 'string') {
+      const trimmed = bossName.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
+    }
+
+    if (Array.isArray(opponents) && opponents.length > 0) {
+      const bossCandidate = opponents.find((opponent) => {
+        if (!opponent || typeof opponent !== 'object') {
+          return false;
+        }
+
+        if (opponent.boss === true) {
+          return true;
+        }
+
+        const classification = typeof opponent.classification === 'string'
+          ? opponent.classification.toLowerCase()
+          : '';
+        if (classification === 'boss') {
+          return true;
+        }
+
+        const tier = typeof opponent.tier === 'string' ? opponent.tier.toLowerCase() : '';
+        return tier === 'boss';
+      });
+
+      if (bossCandidate && typeof bossCandidate.name === 'string') {
+        const trimmed = bossCandidate.name.trim();
+        if (trimmed.length > 0) {
+          return trimmed;
+        }
+      }
+    }
+
+    return undefined;
+  }, [bossName, opponents]);
 
   const opponentSummaries = useMemo(() => {
     if (!Array.isArray(opponents) || opponents.length === 0) {
@@ -498,7 +539,12 @@ const GameHud = ({
             isMinimized={isMinimapEnabled}
           />
 
-          <BossHealthBar active={bossActive} health={bossHealth} maxHealth={bossMaxHealth} />
+          <BossHealthBar
+            active={bossActive}
+            health={bossHealth}
+            maxHealth={bossMaxHealth}
+            name={resolvedBossName}
+          />
 
           <SkillWheel
             currentSkill={currentSkill}
