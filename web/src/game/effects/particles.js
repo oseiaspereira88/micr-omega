@@ -33,6 +33,11 @@ export const createParticle = (x, y, colorOrOptions, legacySize = 3) => {
     orientation,
     angularVelocity = 0,
     stretch = 1,
+    glowStrength = 0,
+    glowColor,
+    pulseSpeed = 0,
+    pulseAmplitude = 0.2,
+    pulsePhase,
   } = options;
 
   const random = typeof rng === 'function' ? rng : Math.random;
@@ -56,6 +61,11 @@ export const createParticle = (x, y, colorOrOptions, legacySize = 3) => {
     orientation: Number.isFinite(orientation) ? orientation : baseAngle,
     angularVelocity: clampNumber(angularVelocity, 0),
     stretch: Number.isFinite(stretch) ? stretch : 1,
+    glowStrength: Number.isFinite(glowStrength) ? Math.max(0, glowStrength) : 0,
+    glowColor: typeof glowColor === 'string' ? glowColor : undefined,
+    pulseSpeed: Number.isFinite(pulseSpeed) ? pulseSpeed : 0,
+    pulseAmplitude: Number.isFinite(pulseAmplitude) ? Math.max(0, pulseAmplitude) : 0.2,
+    pulsePhase: Number.isFinite(pulsePhase) ? pulsePhase : randomRange(0, Math.PI * 2, random),
   };
 };
 
