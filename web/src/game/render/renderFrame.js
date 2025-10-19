@@ -9,35 +9,41 @@ import { withCameraTransform } from './utils/cameraHelpers.js';
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const mapMicroorganismsToEnemies = (microorganisms = []) =>
-  microorganisms.map((entity) => ({
-    id: entity.id,
-    x: entity.x,
-    y: entity.y,
-    size: entity.size,
-    color: entity.color,
-    coreColor: entity.coreColor ?? entity.color,
-    outerColor: entity.outerColor ?? entity.color,
-    shadowColor: entity.shadowColor ?? entity.outerColor ?? entity.color,
-    health: entity.health ?? entity.maxHealth ?? 0,
-    maxHealth: entity.maxHealth ?? entity.health ?? 0,
-    boss: Boolean(entity.boss),
-    animPhase: entity.animPhase ?? 0,
-    name: entity.name,
-    level: entity.level,
-    species: entity.species,
-    aggression: entity.aggression,
-    attributes: entity.attributes,
-    palette: entity.palette,
-    accentColor: entity.accentColor,
-    detailColor: entity.detailColor,
-    glowColor: entity.glowColor,
-    hpFillColor: entity.hpFillColor,
-    hpBorderColor: entity.hpBorderColor,
-    labelColor: entity.labelColor,
-    labelBackground: entity.labelBackground,
-    label: entity.label,
-    threatTier: entity.threatTier,
-  }));
+  microorganisms.map((entity) => {
+    const enemy = {
+      id: entity.id,
+      x: entity.x,
+      y: entity.y,
+      size: entity.size,
+      color: entity.color,
+      coreColor: entity.coreColor ?? entity.color,
+      outerColor: entity.outerColor ?? entity.color,
+      shadowColor: entity.shadowColor ?? entity.outerColor ?? entity.color,
+      health: entity.health ?? entity.maxHealth ?? 0,
+      maxHealth: entity.maxHealth ?? entity.health ?? 0,
+      boss: Boolean(entity.boss),
+      animPhase: entity.animPhase ?? 0,
+      name: entity.name,
+      level: entity.level,
+      species: entity.species,
+      aggression: entity.aggression,
+      attributes: entity.attributes,
+      palette: entity.palette,
+      accentColor: entity.accentColor,
+      detailColor: entity.detailColor,
+      glowColor: entity.glowColor,
+      hpFillColor: entity.hpFillColor,
+      hpBorderColor: entity.hpBorderColor,
+      labelColor: entity.labelColor,
+      labelBackground: entity.labelBackground,
+      label: entity.label,
+      threatTier: entity.threatTier,
+    };
+
+    enemy.sourceEntity = entity;
+
+    return enemy;
+  });
 
 const renderWorldEntities = (ctx, worldView, camera) => {
   if (!ctx || !worldView || !camera) return;

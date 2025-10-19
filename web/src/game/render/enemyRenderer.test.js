@@ -133,4 +133,21 @@ describe('enemyRenderer', () => {
     expect(ctx.createLinearGradient).toHaveBeenCalledTimes(2);
     expect(ctx.quadraticCurveTo).toHaveBeenCalled();
   });
+
+  it('persists animation phase updates back to the source entity when provided', () => {
+    const source = { animPhase: 0 };
+    const enemy = {
+      id: 'enemy-3',
+      x: 0,
+      y: 0,
+      size: 12,
+      animPhase: 0.5,
+      sourceEntity: source,
+    };
+
+    enemyRenderer.render(ctx, { enemies: [enemy] }, camera);
+
+    expect(enemy.animPhase).toBeGreaterThan(0.5);
+    expect(source.animPhase).toBe(enemy.animPhase);
+  });
 });
