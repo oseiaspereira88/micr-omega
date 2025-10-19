@@ -41,7 +41,7 @@ const STAGE_METADATA = {
 
 const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
   const [activeStage, setActiveStage] = useState('splash');
-  const [createRoomNotice, setCreateRoomNotice] = useState(null);
+  const [feedbackNotice, setFeedbackNotice] = useState(null);
 
   const stageConfig = useMemo(() => STAGE_METADATA[activeStage] ?? STAGE_METADATA.splash, [activeStage]);
 
@@ -104,22 +104,34 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
   }, [onComplete]);
 
   const handleCreateRoom = useCallback(() => {
-    setCreateRoomNotice('Criação de salas privadas chegará em breve. Enquanto isso, use as salas públicas!');
+    setFeedbackNotice('Criação de salas privadas chegará em breve. Enquanto isso, use as salas públicas!');
+  }, []);
+
+  const handleUnlockRoom = useCallback((roomId) => {
+    const roomNameMap = {
+      'cluster-sinaptico': 'Cluster Sináptico',
+      'ninho-lumen': 'Ninho Lúmen',
+    };
+    const resolvedName = roomNameMap[roomId] ?? 'Sala premium';
+
+    setFeedbackNotice(
+      `${resolvedName} requer acesso à loja premium, que ainda não está disponível nesta versão de prévia.`,
+    );
   }, []);
 
   useEffect(() => {
-    if (!createRoomNotice) {
+    if (!feedbackNotice) {
       return undefined;
     }
 
     const timeout = setTimeout(() => {
-      setCreateRoomNotice(null);
+      setFeedbackNotice(null);
     }, 4000);
 
     return () => {
       clearTimeout(timeout);
     };
-  }, [createRoomNotice]);
+  }, [feedbackNotice]);
 
   const timelineItems = useMemo(
     () =>
@@ -146,14 +158,18 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
             {activeStage === 'splash' && <SplashScreen />}
             {activeStage === 'menu' && <MainMenuScreen onPlay={handlePlay} />}
             {activeStage === 'lobby' && (
-              <LobbyScreen onJoinPublic={handleEnterPublic} onCreateRoom={handleCreateRoom} />
+              <LobbyScreen
+                onJoinPublic={handleEnterPublic}
+                onCreateRoom={handleCreateRoom}
+                onUnlockRoom={handleUnlockRoom}
+              />
             )}
           </div>
         </div>
       </div>
-      {createRoomNotice && (
+      {feedbackNotice && (
         <div className={styles.feedbackToast} role="status" aria-live="polite">
-          {createRoomNotice}
+          {feedbackNotice}
         </div>
       )}
       <div className={styles.statusRow}>

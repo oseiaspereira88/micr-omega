@@ -13,6 +13,7 @@ const LobbyScreen = ({
   onCreateRoom,
   onFilterChange,
   initialActiveFilters,
+  onUnlockRoom,
 }) => {
   const testId = variant === 'mobile' ? 'lobby-screen-mobile' : 'lobby-screen';
   const className = [styles.root, variant === 'mobile' ? styles.mobile : ''].filter(Boolean).join(' ');
@@ -23,6 +24,32 @@ const LobbyScreen = ({
   ]
     .filter(Boolean)
     .join(' ');
+  const isUnlockEnabled = typeof onUnlockRoom === 'function';
+  const unlockButtonClassName = [
+    styles.unlockButton,
+    !isUnlockEnabled ? styles.unlockButtonDisabled : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const premiumAvailabilityMessage =
+    'Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível.';
+
+  const lockedRooms = [
+    {
+      id: 'cluster-sinaptico',
+      title: 'Cluster Sináptico',
+      description: 'Modos mutantes exclusivos com bônus de XP',
+      players: '8 / 12',
+      price: '120💎',
+    },
+    {
+      id: 'ninho-lumen',
+      title: 'Ninho Lúmen',
+      description: 'Experiência narrativa cooperativa por capítulos',
+      players: '2 / 6',
+      price: '95💎',
+    },
+  ];
 
   const defaultActiveFilters = useMemo(
     () =>
@@ -133,28 +160,41 @@ const LobbyScreen = ({
                 </button>
               </div>
             </article>
-            <article className={styles.roomCard}>
-              <div>
-                <h4>Cluster Sináptico</h4>
-                <p>Modos mutantes exclusivos com bônus de XP</p>
-              </div>
-              <div className={styles.roomMeta}>
-                <span>Jogadores: 8 / 12</span>
-                <span className={styles.locked}>🔒 Premium</span>
-                <button type="button" className={styles.unlockButton}>Desbloquear 120💎</button>
-              </div>
-            </article>
-            <article className={styles.roomCard}>
-              <div>
-                <h4>Ninho Lúmen</h4>
-                <p>Experiência narrativa cooperativa por capítulos</p>
-              </div>
-              <div className={styles.roomMeta}>
-                <span>Jogadores: 2 / 6</span>
-                <span className={styles.locked}>🔒 Premium</span>
-                <button type="button" className={styles.unlockButton}>Desbloquear 95💎</button>
-              </div>
-            </article>
+            {lockedRooms.map((room) => (
+              <article key={room.id} className={styles.roomCard}>
+                <div>
+                  <h4>{room.title}</h4>
+                  <p>{room.description}</p>
+                </div>
+                <div className={styles.roomMeta}>
+                  <span>{`Jogadores: ${room.players}`}</span>
+                  <span className={styles.locked}>🔒 Premium</span>
+                  <button
+                    type="button"
+                    className={unlockButtonClassName}
+                    onClick={
+                      isUnlockEnabled
+                        ? () => {
+                            onUnlockRoom(room.id);
+                          }
+                        : undefined
+                    }
+                    disabled={!isUnlockEnabled}
+                    aria-disabled={!isUnlockEnabled}
+                    title={
+                      isUnlockEnabled
+                        ? `Desbloquear ${room.price}`
+                        : premiumAvailabilityMessage
+                    }
+                  >
+                    {`Desbloquear ${room.price}`}
+                  </button>
+                  {!isUnlockEnabled && (
+                    <span className={styles.unlockButtonHint}>{premiumAvailabilityMessage}</span>
+                  )}
+                </div>
+              </article>
+            ))}
           </div>
         </section>
       </div>
