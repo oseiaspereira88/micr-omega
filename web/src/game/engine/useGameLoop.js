@@ -1600,6 +1600,10 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
           ) {
             shouldSyncProgression = true;
           }
+
+          if (!shouldSyncProgression && xpPayload.next > 0 && xpPayload.current >= xpPayload.next) {
+            shouldSyncProgression = true;
+          }
         }
 
         const pendingLevel = Number.isFinite(state.pendingEvolutionLevel)

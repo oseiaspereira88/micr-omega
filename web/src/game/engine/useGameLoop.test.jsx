@@ -17,12 +17,14 @@ const mocks = vi.hoisted(() => {
     soundEffectsFactory: vi.fn(() => ({ playSound: vi.fn() })),
     restartGame: vi.fn(),
     selectArchetype: vi.fn(),
+    checkEvolution: vi.fn(),
     gameStoreState: {},
     gameStoreListeners: listeners,
     addNotification: vi.fn((notifications = [], text) => [
       ...notifications,
       { id: `mock-${notifications.length}`, text },
     ]),
+    actualSystems: null,
   };
 });
 
@@ -45,10 +47,15 @@ vi.mock('../ui/notifications', () => ({
 
 vi.mock('../systems', async (importOriginal) => {
   const actual = await importOriginal();
+  mocks.actualSystems = actual;
+  if (typeof actual.checkEvolution === 'function') {
+    mocks.checkEvolution.mockImplementation((...args) => actual.checkEvolution(...args));
+  }
   return {
     ...actual,
     restartGame: (...args) => mocks.restartGame(...args),
     selectArchetype: (...args) => mocks.selectArchetype(...args),
+    checkEvolution: (...args) => mocks.checkEvolution(...args),
   };
 });
 
@@ -112,8 +119,21 @@ describe('useGameLoop timing safeguards', () => {
     mocks.soundEffectsFactory.mockClear();
     mocks.selectArchetype.mockClear();
     mocks.addNotification.mockClear();
+    mocks.checkEvolution.mockClear();
     performanceNowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    if (typeof mocks.actualSystems?.checkEvolution === 'function') {
+      mocks.checkEvolution.mockImplementation((...args) =>
+        mocks.actualSystems.checkEvolution(...args)
+      );
+    }
+
+    mocks.updateGameState.mockImplementation(() => ({
+      commands: [],
+      localPlayerId: null,
+      hudSnapshot: null,
+    }));
 
     originalRequestAnimationFrame = window.requestAnimationFrame;
     originalCancelAnimationFrame = window.cancelAnimationFrame;
@@ -268,6 +288,68 @@ describe('useGameLoop timing safeguards', () => {
         }),
       })
     );
+  });
+
+  it('rechecks evolution when the XP snapshot still exceeds the next threshold', async () => {
+    const canvas = createCanvas();
+    const dispatch = vi.fn();
+    const xpSnapshot = { current: 900, total: 1000, next: 100 };
+    let capturedState = null;
+
+    mocks.checkEvolution.mockImplementation((state) => {
+      state.level = (Number(state.level) || 1) + 1;
+    });
+
+    mocks.updateGameState.mockImplementation(({ renderState }) => {
+      capturedState = renderState;
+      return {
+        commands: [],
+        localPlayerId: null,
+        hudSnapshot: {
+          xp: { ...xpSnapshot },
+          level: renderState?.level ?? 1,
+        },
+      };
+    });
+
+    render(<HookWrapper canvas={canvas} dispatch={dispatch} />);
+
+    try {
+      await waitFor(() => {
+        expect(typeof rafCallback).toBe('function');
+        expect(mocks.checkEvolution).toHaveBeenCalledTimes(1);
+      });
+
+      expect(capturedState?.level).toBe(2);
+
+      act(() => {
+        rafCallback(16);
+      });
+
+      expect(mocks.checkEvolution).toHaveBeenCalledTimes(2);
+      expect(capturedState?.level).toBe(3);
+
+      act(() => {
+        rafCallback(32);
+      });
+
+      expect(mocks.checkEvolution).toHaveBeenCalledTimes(3);
+      expect(capturedState?.level).toBe(4);
+    } finally {
+      if (typeof mocks.actualSystems?.checkEvolution === 'function') {
+        mocks.checkEvolution.mockImplementation((...args) =>
+          mocks.actualSystems.checkEvolution(...args)
+        );
+      } else {
+        mocks.checkEvolution.mockReset();
+      }
+
+      mocks.updateGameState.mockImplementation(() => ({
+        commands: [],
+        localPlayerId: null,
+        hudSnapshot: null,
+      }));
+    }
   });
 
   it('targets the nearest microorganism when queuing attacks without an active target', async () => {
