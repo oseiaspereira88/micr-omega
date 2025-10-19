@@ -371,7 +371,11 @@ export const enemyRenderer = {
         drawLabel(ctx, enemy, size, palette);
 
         const phaseSpeed = 0.035 + computeLevelIntensity(enemy) * 0.035 + (enemy.boss ? 0.02 : 0);
-        enemy.animPhase = (enemy.animPhase ?? 0) + phaseSpeed;
+        const nextAnimPhase = (enemy.animPhase ?? 0) + phaseSpeed;
+        enemy.animPhase = nextAnimPhase;
+        if (enemy.sourceEntity) {
+          enemy.sourceEntity.animPhase = nextAnimPhase;
+        }
 
         ctx.restore();
       });
