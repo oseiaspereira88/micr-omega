@@ -370,6 +370,10 @@ const cloneOrganicMatter = (matter: OrganicMatter): OrganicMatter => ({
   ...matter,
   position: cloneVector(matter.position),
   nutrients: { ...matter.nutrients },
+  tags: {
+    nutrients: Array.isArray(matter.tags?.nutrients) ? [...matter.tags.nutrients] : [],
+    attributes: Array.isArray(matter.tags?.attributes) ? [...matter.tags.attributes] : [],
+  },
 });
 
 const cloneObstacle = (obstacle: Obstacle): Obstacle => ({

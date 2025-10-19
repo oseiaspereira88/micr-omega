@@ -210,12 +210,22 @@ export const microorganismSchema = z.object({
     .default({})
 });
 
+const organicMatterTagSchema = z.string().trim().min(1);
+
+const organicMatterTagsSchema = z
+  .object({
+    nutrients: z.array(organicMatterTagSchema).default([]),
+    attributes: z.array(organicMatterTagSchema).default([])
+  })
+  .default({ nutrients: [], attributes: [] });
+
 export const organicMatterSchema = z.object({
   id: worldObjectIdSchema,
   kind: z.literal("organic_matter"),
   position: vector2Schema,
   quantity: z.number().finite().nonnegative(),
-  nutrients: z.record(z.string().trim().min(1), z.number().finite()).default({})
+  nutrients: z.record(z.string().trim().min(1), z.number().finite()).default({}),
+  tags: organicMatterTagsSchema
 });
 
 export const obstacleSchema = z.object({

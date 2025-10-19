@@ -50,6 +50,16 @@ export const createOrganicMatter = (typeKey, typeConfig, options = {}) => {
     rotation: overrides.rotation ?? random() * Math.PI * 2,
     pulsePhase: overrides.pulsePhase ?? random() * Math.PI * 2,
     glowIntensity: overrides.glowIntensity ?? random() * 0.5 + 0.5,
+    tags:
+      overrides.tags ?? {
+        nutrients: Array.isArray(typeConfig.tags?.nutrients)
+          ? [...typeConfig.tags.nutrients]
+          : [],
+        attributes: Array.isArray(typeConfig.tags?.attributes)
+          ? [...typeConfig.tags.attributes]
+          : [],
+      },
+    attributeBuff: overrides.attributeBuff ?? typeConfig.attributeBuff ?? null,
     ...(layoutInfo ? { layout: layoutInfo } : {}),
     ...overrides
   };

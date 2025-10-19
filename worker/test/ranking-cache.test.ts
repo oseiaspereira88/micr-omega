@@ -84,6 +84,7 @@ describe("RoomDO ranking cache", () => {
       position: { x: 0, y: 0 },
       quantity: 5,
       nutrients: {},
+      tags: { nutrients: [], attributes: [] },
     };
 
     roomAny.world.organicMatter = [matter];

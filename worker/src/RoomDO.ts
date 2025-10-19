@@ -414,6 +414,42 @@ const cloneOrientation = (orientation: OrientationState): OrientationState =>
     ? { angle: orientation.angle }
     : { angle: orientation.angle, tilt: orientation.tilt };
 
+const sanitizeStringTagArray = (values: unknown): string[] => {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  const sanitized: string[] = [];
+  for (const value of values) {
+    if (typeof value !== "string") {
+      continue;
+    }
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      continue;
+    }
+    sanitized.push(trimmed);
+  }
+  return sanitized;
+};
+
+const sanitizeOrganicMatterTags = (
+  tags: OrganicMatter["tags"] | null | undefined,
+  nutrients: OrganicMatter["nutrients"] | null | undefined,
+): OrganicMatter["tags"] => {
+  const nutrientTags = sanitizeStringTagArray(tags?.nutrients);
+  const attributeTags = sanitizeStringTagArray(tags?.attributes);
+  if (nutrientTags.length === 0 && nutrients) {
+    for (const key of Object.keys(nutrients)) {
+      const trimmed = typeof key === "string" ? key.trim() : "";
+      if (trimmed.length === 0) {
+        continue;
+      }
+      nutrientTags.push(trimmed);
+    }
+  }
+  return { nutrients: nutrientTags, attributes: attributeTags };
+};
+
 const DEFAULT_MAX_HEALTH = 100;
 
 const createHealthState = (health?: HealthState): HealthState => {
@@ -822,11 +858,7 @@ const cloneWorldState = (world: SharedWorldState): SharedWorldState => ({
     health: cloneHealthState(entity.health),
     attributes: { ...entity.attributes },
   })),
-  organicMatter: world.organicMatter.map((matter) => ({
-    ...matter,
-    position: cloneVector(matter.position),
-    nutrients: { ...matter.nutrients },
-  })),
+  organicMatter: world.organicMatter.map((matter) => cloneOrganicMatter(matter)),
   obstacles: world.obstacles.map((obstacle) => ({
     ...obstacle,
     position: cloneVector(obstacle.position),
@@ -878,6 +910,7 @@ const cloneOrganicMatter = (matter: OrganicMatter): OrganicMatter => ({
   ...matter,
   position: cloneVector(matter.position),
   nutrients: { ...matter.nutrients },
+  tags: sanitizeOrganicMatterTags(matter.tags, matter.nutrients),
 });
 
 type InitialMicroorganismTemplate = {
@@ -1000,6 +1033,7 @@ const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
       position: { x: 140, y: -120 },
       quantity: 24,
       nutrients: { carbon: 10, nitrogen: 4 },
+      tags: { nutrients: ["carbon", "nitrogen"], attributes: ["attack"] },
     },
     {
       id: "organic-beta",
@@ -1007,6 +1041,7 @@ const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
       position: { x: -260, y: 200 },
       quantity: 18,
       nutrients: { carbon: 6 },
+      tags: { nutrients: ["carbon"], attributes: ["defense"] },
     },
     {
       id: "organic-gamma",
@@ -1014,6 +1049,7 @@ const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
       position: { x: 80, y: 40 },
       quantity: 30,
       nutrients: { phosphorus: 5 },
+      tags: { nutrients: ["phosphorus"], attributes: ["speed"] },
     },
   ],
   obstacles: [
@@ -1043,6 +1079,7 @@ type WorldGenerationOptions = {
 type PendingOrganicRespawnTemplate = {
   quantity: number;
   nutrients: OrganicMatter["nutrients"];
+  tags: OrganicMatter["tags"];
 };
 
 type PendingOrganicRespawnGroup = {
@@ -1966,11 +2003,15 @@ export class RoomDO {
   }
 
   private addOrganicMatterEntity(matter: OrganicMatter): void {
+    const normalized: OrganicMatter = {
+      ...matter,
+      tags: sanitizeOrganicMatterTags(matter.tags, matter.nutrients),
+    };
     const index = this.world.organicMatter.length;
-    this.world.organicMatter.push(matter);
-    this.organicMatter.set(matter.id, matter);
-    this.organicMatterOrder.set(matter.id, index);
-    this.addOrganicMatterToIndex(matter);
+    this.world.organicMatter.push(normalized);
+    this.organicMatter.set(normalized.id, normalized);
+    this.organicMatterOrder.set(normalized.id, index);
+    this.addOrganicMatterToIndex(normalized);
   }
 
   private removeOrganicMatterEntity(id: string): OrganicMatter | undefined {
@@ -2240,6 +2281,10 @@ export class RoomDO {
         position: cloneVector(microorganism.position),
         quantity: Math.max(5, Math.round(microorganism.health.max / 2)),
         nutrients: { residue: microorganism.health.max },
+        tags: sanitizeOrganicMatterTags(
+          { nutrients: ["residue"], attributes: [] },
+          { residue: microorganism.health.max },
+        ),
       };
       this.addOrganicMatterEntity(remains);
       worldDiff.upsertOrganicMatter = [
@@ -3535,6 +3580,7 @@ export class RoomDO {
         templates.push({
           quantity: Math.max(1, Math.round(entry.matter.quantity)),
           nutrients: { ...entry.matter.nutrients },
+          tags: sanitizeOrganicMatterTags(entry.matter.tags, entry.matter.nutrients),
         });
       }
 
@@ -3717,6 +3763,7 @@ export class RoomDO {
           position: spawnPosition,
           quantity,
           nutrients: { ...template.nutrients },
+          tags: sanitizeOrganicMatterTags(template.tags, template.nutrients),
         };
 
         this.addOrganicMatterEntity(matter);

@@ -125,6 +125,7 @@ const createSharedState = (overrides = {}) => ({
         position: { x: -40, y: 12 },
         quantity: 9,
         nutrients: {},
+        tags: { nutrients: [], attributes: [] },
       },
     ],
     obstacles: [
@@ -746,6 +747,7 @@ describe('updateGameState', () => {
             position: { x: 8, y: 12 },
             quantity: 4,
             nutrients: {},
+            tags: { nutrients: [], attributes: [] },
           },
         ],
         obstacles: [
