@@ -118,9 +118,6 @@ const MICRO_STEERING_ANGLES = [Math.PI / 6, Math.PI / 4, Math.PI / 3] as const;
 
 const ORGANIC_MATTER_CELL_SIZE = PLAYER_COLLECT_RADIUS;
 const ORGANIC_RESPAWN_DELAY_RANGE_MS = { min: 1_200, max: 3_600 } as const;
-const ORGANIC_RESPAWN_CLUSTER_RADIUS = 70;
-const ORGANIC_RESPAWN_SCATTER_MIN = 20;
-
 const ORGANIC_CLUSTER_PATTERNS = [
   [
     { offset: { x: 0, y: 0 }, quantityFactor: 1.2 },
@@ -1021,12 +1018,17 @@ type WorldGenerationOptions = {
   primarySpawn?: Vector2 | null;
 };
 
-type PendingOrganicRespawn = {
-  template: {
-    quantity: number;
-    nutrients: OrganicMatter["nutrients"];
-  };
-  position: Vector2;
+type PendingOrganicRespawnTemplate = {
+  quantity: number;
+  nutrients: OrganicMatter["nutrients"];
+};
+
+type PendingOrganicRespawnGroup = {
+  anchor: Vector2;
+  clusterShape: typeof ORGANIC_CLUSTER_PATTERNS[number];
+  size: number;
+  templates: PendingOrganicRespawnTemplate[];
+  delayRangeMs: { min: number; max: number };
   respawnAt: number;
 };
 
@@ -1355,7 +1357,7 @@ export class RoomDO {
   private roomObjects = new Map<string, RoomObject>();
   private entitySequence = 0;
   private organicMatterRespawnRng: () => number = Math.random;
-  private organicRespawnQueue: PendingOrganicRespawn[] = [];
+  private organicRespawnQueue: PendingOrganicRespawnGroup[] = [];
   private obstacles = new Map<string, Obstacle>();
   private microorganismBehavior = new Map<string, MicroorganismBehaviorState>();
   private microorganismStatusEffects = new Map<string, StatusCollection>();
@@ -3363,7 +3365,7 @@ export class RoomDO {
       ...removedIds,
     ];
 
-    const pendingRespawns: PendingOrganicRespawn[] = [];
+    const pendingRespawnGroups: PendingOrganicRespawnGroup[] = [];
     const rng = this.organicMatterRespawnRng;
     let index = 0;
     while (index < collectedEntries.length) {
@@ -3375,42 +3377,45 @@ export class RoomDO {
         break;
       }
 
+      const patternIndex = Math.floor(rng() * ORGANIC_CLUSTER_PATTERNS.length);
+      const clusterShape =
+        ORGANIC_CLUSTER_PATTERNS[patternIndex] ?? ORGANIC_CLUSTER_PATTERNS[0];
+      const templates: PendingOrganicRespawnTemplate[] = [];
+
       for (let clusterIndex = 0; clusterIndex < clusterSize; clusterIndex += 1) {
         const entry = collectedEntries[index + clusterIndex];
         if (!entry) {
           break;
         }
 
-        const scatterAngle = rng() * Math.PI * 2;
-        const scatterDistance = ORGANIC_RESPAWN_SCATTER_MIN + rng() * ORGANIC_RESPAWN_CLUSTER_RADIUS;
-        const scatterX = Math.cos(scatterAngle) * scatterDistance;
-        const scatterY = Math.sin(scatterAngle) * scatterDistance;
-        const candidatePosition = this.clampPosition({
-          x: anchor.x + scatterX,
-          y: anchor.y + scatterY,
-        });
-
-        const template: PendingOrganicRespawn["template"] = {
+        templates.push({
           quantity: Math.max(1, Math.round(entry.matter.quantity)),
           nutrients: { ...entry.matter.nutrients },
-        };
-
-        const delayBase = ORGANIC_RESPAWN_DELAY_RANGE_MS.min;
-        const delayVariance = ORGANIC_RESPAWN_DELAY_RANGE_MS.max - ORGANIC_RESPAWN_DELAY_RANGE_MS.min;
-        const delay = delayBase + rng() * delayVariance + clusterIndex * 90;
-
-        pendingRespawns.push({
-          template,
-          position: candidatePosition,
-          respawnAt: now + Math.max(delay, ORGANIC_RESPAWN_DELAY_RANGE_MS.min),
         });
       }
 
-      index += clusterSize;
+      if (templates.length === 0) {
+        break;
+      }
+
+      const delayRangeMs = ORGANIC_RESPAWN_DELAY_RANGE_MS;
+      const delayVariance = Math.max(0, delayRangeMs.max - delayRangeMs.min);
+      const delay = delayRangeMs.min + rng() * delayVariance;
+
+      pendingRespawnGroups.push({
+        anchor,
+        clusterShape,
+        size: templates.length,
+        templates,
+        delayRangeMs,
+        respawnAt: now + Math.max(delay, delayRangeMs.min),
+      });
+
+      index += templates.length;
     }
 
-    if (pendingRespawns.length > 0) {
-      this.organicRespawnQueue.push(...pendingRespawns);
+    if (pendingRespawnGroups.length > 0) {
+      this.organicRespawnQueue.push(...pendingRespawnGroups);
     }
 
     let totalScore = 0;
@@ -3473,8 +3478,8 @@ export class RoomDO {
       return;
     }
 
-    const ready: PendingOrganicRespawn[] = [];
-    const pending: PendingOrganicRespawn[] = [];
+    const ready: PendingOrganicRespawnGroup[] = [];
+    const pending: PendingOrganicRespawnGroup[] = [];
     for (const entry of this.organicRespawnQueue) {
       if (entry.respawnAt <= now) {
         ready.push(entry);
@@ -3489,36 +3494,58 @@ export class RoomDO {
     }
 
     const generatedIds = new Set<string>();
-    for (const entry of ready) {
-      let spawnPosition = entry.position;
-      if (this.isBlockedByObstacle(spawnPosition)) {
-        const fallback = this.findOrganicMatterRespawnPosition(spawnPosition, 12);
-        if (fallback) {
-          spawnPosition = fallback;
-        } else {
-          spawnPosition = this.clampPosition(spawnPosition);
+    for (const group of ready) {
+      const pattern = group.clusterShape;
+      const spawnCount = Math.min(group.size, group.templates.length);
+      for (let index = 0; index < spawnCount; index += 1) {
+        const template = group.templates[index];
+        if (!template) {
+          continue;
         }
+
+        const shape = pattern[index % pattern.length] ?? {
+          offset: { x: 0, y: 0 },
+          quantityFactor: 1,
+        };
+        let spawnPosition = this.clampPosition({
+          x: group.anchor.x + shape.offset.x,
+          y: group.anchor.y + shape.offset.y,
+        });
+
+        if (this.isBlockedByObstacle(spawnPosition)) {
+          const fallback = this.findOrganicMatterRespawnPosition(spawnPosition, 12);
+          if (fallback) {
+            spawnPosition = fallback;
+          } else {
+            spawnPosition = this.clampPosition(spawnPosition);
+          }
+        }
+
+        const id = this.createEntityId(
+          "organic",
+          (candidate) => this.organicMatter.has(candidate) || generatedIds.has(candidate),
+        );
+        generatedIds.add(id);
+
+        const quantity = Math.max(
+          1,
+          Math.round(template.quantity * (shape.quantityFactor ?? 1)),
+        );
+
+        const matter: OrganicMatter = {
+          id,
+          kind: "organic_matter",
+          position: spawnPosition,
+          quantity,
+          nutrients: { ...template.nutrients },
+        };
+
+        this.addOrganicMatterEntity(matter);
+        worldDiff.upsertOrganicMatter = [
+          ...(worldDiff.upsertOrganicMatter ?? []),
+          cloneOrganicMatter(matter),
+        ];
       }
-
-      const id = this.createEntityId(
-        "organic",
-        (candidate) => this.organicMatter.has(candidate) || generatedIds.has(candidate),
-      );
-      generatedIds.add(id);
-
-      const matter: OrganicMatter = {
-        id,
-        kind: "organic_matter",
-        position: spawnPosition,
-        quantity: Math.max(1, Math.round(entry.template.quantity)),
-        nutrients: { ...entry.template.nutrients },
-      };
-
-      this.addOrganicMatterEntity(matter);
-      worldDiff.upsertOrganicMatter = [
-        ...(worldDiff.upsertOrganicMatter ?? []),
-        cloneOrganicMatter(matter),
-      ];
     }
   }
 

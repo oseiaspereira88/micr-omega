@@ -210,4 +210,123 @@ describe("RoomDO progression resource updates", () => {
     expect(player.geneticMaterial).toBe(mgAfterCollection - 5);
     expect(successUpdates.has(player.id)).toBe(true);
   });
+
+  it("queues organic respawn groups using the configured delay window", async () => {
+    const { roomAny } = await createRoom();
+    const player = createTestPlayer("gatherer");
+    player.position = { x: 0, y: 0 };
+    roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    const matterA: OrganicMatter = {
+      id: "organic-a",
+      kind: "organic_matter",
+      position: { x: 10, y: 0 },
+      quantity: 12,
+      nutrients: { carbon: 2 },
+    };
+    const matterB: OrganicMatter = {
+      id: "organic-b",
+      kind: "organic_matter",
+      position: { x: -10, y: 0 },
+      quantity: 8,
+      nutrients: { nitrogen: 1 },
+    };
+    const matterC: OrganicMatter = {
+      id: "organic-c",
+      kind: "organic_matter",
+      position: { x: 0, y: 12 },
+      quantity: 10,
+      nutrients: { sulfur: 1 },
+    };
+
+    roomAny.addOrganicMatterEntity(matterA);
+    roomAny.addOrganicMatterEntity(matterB);
+    roomAny.addOrganicMatterEntity(matterC);
+
+    const anchor = { x: 160, y: -20 };
+    roomAny.findOrganicMatterRespawnPosition = vi.fn().mockReturnValue(anchor);
+
+    const rngValues = [0.3, 0.2, 0.75];
+    roomAny.organicMatterRespawnRng = vi
+      .fn(() => (rngValues.length > 0 ? rngValues.shift()! : 0.5));
+
+    const collectionDiff: SharedWorldStateDiff = {};
+    const collectionLog: CombatLogEntry[] = [];
+    const now = 25_000;
+
+    roomAny.handleCollectionsDuringTick(player, collectionDiff, collectionLog, now);
+
+    expect(roomAny.organicRespawnQueue).toHaveLength(1);
+    const group = roomAny.organicRespawnQueue[0];
+    expect(group.size).toBe(3);
+    expect(group.templates).toHaveLength(3);
+    const delay = group.respawnAt - now;
+    expect(delay).toBeGreaterThanOrEqual(group.delayRangeMs.min);
+    expect(delay).toBeLessThanOrEqual(group.delayRangeMs.max);
+    expect(group.clusterShape.length).toBeGreaterThanOrEqual(group.size);
+  });
+
+  it("respawns entire organic groups together once their delay elapses", async () => {
+    const { roomAny } = await createRoom();
+    const player = createTestPlayer("sprinter");
+    player.position = { x: 0, y: 0 };
+    roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    const matterA: OrganicMatter = {
+      id: "organic-d",
+      kind: "organic_matter",
+      position: { x: 6, y: 0 },
+      quantity: 6,
+      nutrients: {},
+    };
+    const matterB: OrganicMatter = {
+      id: "organic-e",
+      kind: "organic_matter",
+      position: { x: -6, y: 0 },
+      quantity: 7,
+      nutrients: {},
+    };
+    const matterC: OrganicMatter = {
+      id: "organic-f",
+      kind: "organic_matter",
+      position: { x: 0, y: 6 },
+      quantity: 9,
+      nutrients: {},
+    };
+
+    roomAny.addOrganicMatterEntity(matterA);
+    roomAny.addOrganicMatterEntity(matterB);
+    roomAny.addOrganicMatterEntity(matterC);
+
+    const anchor = { x: -140, y: 40 };
+    roomAny.findOrganicMatterRespawnPosition = vi.fn().mockReturnValue(anchor);
+
+    const rngValues = [0.25, 0.6, 0.4];
+    roomAny.organicMatterRespawnRng = vi
+      .fn(() => (rngValues.length > 0 ? rngValues.shift()! : 0.5));
+
+    const collectionDiff: SharedWorldStateDiff = {};
+    const collectionLog: CombatLogEntry[] = [];
+    const now = 40_000;
+
+    roomAny.handleCollectionsDuringTick(player, collectionDiff, collectionLog, now);
+
+    expect(roomAny.organicRespawnQueue).toHaveLength(1);
+    const group = roomAny.organicRespawnQueue[0];
+
+    const prematureDiff: SharedWorldStateDiff = {};
+    roomAny.processOrganicRespawnQueue(group.respawnAt - 1, prematureDiff);
+    expect(prematureDiff.upsertOrganicMatter).toBeUndefined();
+    expect(roomAny.organicRespawnQueue).toHaveLength(1);
+
+    const respawnDiff: SharedWorldStateDiff = {};
+    roomAny.processOrganicRespawnQueue(group.respawnAt, respawnDiff);
+
+    expect(respawnDiff.upsertOrganicMatter).toHaveLength(group.size);
+    const spawnedIds = new Set(respawnDiff.upsertOrganicMatter!.map((matter) => matter.id));
+    expect(spawnedIds.size).toBe(group.size);
+    expect(roomAny.organicRespawnQueue).toHaveLength(0);
+  });
 });
