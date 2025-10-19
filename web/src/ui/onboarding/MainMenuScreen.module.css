@@ -13,15 +13,131 @@
 }
 
 .mobile {
-  padding: clamp(18px, 5vw, 32px);
+  min-height: 100dvh;
+  padding-block: clamp(16px, 4vw, 24px);
+  padding-inline: clamp(18px, 6vw, 28px);
+  align-items: stretch;
+  justify-content: center;
 }
 
 .mobile .shell {
   grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  align-content: start;
+  justify-items: stretch;
+  gap: clamp(16px, 5vw, 24px);
+  min-height: 100%;
+  width: min(100%, 520px);
+}
+
+.mobile .primary,
+.mobile .secondary {
+  padding: clamp(14px, 4.5vw, 20px);
+  gap: clamp(12px, 3.8vw, 18px);
 }
 
 .mobile .secondary {
+  min-height: 0;
   order: -1;
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  align-content: start;
+}
+
+.mobile .badgeRow,
+.mobile .feed,
+.mobile .storeActions {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: clamp(12px, 4vw, 16px);
+  padding-block: 2px 4px;
+  margin: 0 -4px;
+  padding-inline: 4px;
+  scroll-snap-type: x proximity;
+}
+
+.mobile .badge,
+.mobile .feedItem,
+.mobile .storeButton {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+.mobile .badge {
+  min-width: min(180px, 70vw);
+  padding: 10px 14px;
+  gap: 4px;
+}
+
+.mobile .feedItem {
+  padding: 10px 14px;
+  min-width: min(220px, 75vw);
+}
+
+.mobile .storeButton {
+  min-width: min(150px, 60vw);
+  padding: 10px 14px;
+  border-radius: 12px;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+
+.mobile .profile {
+  gap: 12px;
+}
+
+.mobile .avatar {
+  width: 64px;
+  height: 64px;
+}
+
+.mobile .playButton {
+  padding: 14px clamp(28px, 10vw, 36px);
+  font-size: clamp(1rem, 4vw, 1.25rem);
+  letter-spacing: 0.2em;
+}
+
+.mobile .badge strong {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+}
+
+.mobile .banner {
+  padding: 14px 16px;
+  gap: 4px;
+}
+
+.mobile .banner span {
+  font-size: 0.85rem;
+}
+
+.mobile .feed {
+  gap: clamp(10px, 3vw, 14px);
+}
+
+.mobile .feedItem {
+  font-size: 0.82rem;
+}
+
+.mobile .feedItem strong {
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+}
+
+.mobile .storeButtonLabel {
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+}
+
+.mobile .storeButtonMeta {
+  font-size: 0.68rem;
+}
+
+.mobile .footer {
+  gap: 8px;
+  letter-spacing: 0.18em;
+  font-size: 0.75rem;
 }
 
 .mobile .playButton {
