@@ -54,6 +54,7 @@ export const createInitialState = ({ archetypeKey } = {}) => {
     projectiles: [],
     effects: [],
     statusEffects: [],
+    damagePopups: [],
 
     // Fundo dinâmico
     backgroundLayers: [],

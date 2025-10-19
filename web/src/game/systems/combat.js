@@ -10,6 +10,7 @@ import {
   shouldTriggerPhagocytosis,
   tickStatusEffects,
 } from './statusEffects';
+import { pushDamagePopup } from '../state/damagePopups';
 
 export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   if (!state || !enemy) return false;
@@ -25,6 +26,12 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
       enemy.health = Math.max(0, enemy.health - normalizedDamage);
       const color = STATUS_METADATA[status]?.color ?? enemy.color;
       createEffect?.(state, enemy.x, enemy.y, getStatusEffectVisual(status), color);
+      pushDamagePopup(state, {
+        x: enemy.x,
+        y: enemy.y,
+        value: normalizedDamage,
+        variant: 'status',
+      });
     },
   });
 
@@ -263,6 +270,20 @@ export const performAttack = (state, helpers = {}) => {
 
       enemy.vx += (dx / dist) * 5;
       enemy.vy += (dy / dist) * 5;
+
+      const popupVariant = criticalHit
+        ? 'critical'
+        : damageResult.relation === 'advantage'
+        ? 'advantage'
+        : damageResult.relation === 'disadvantage'
+        ? 'resisted'
+        : 'normal';
+      pushDamagePopup(state, {
+        x: enemy.x,
+        y: enemy.y,
+        value: damage,
+        variant: popupVariant,
+      });
 
       if (criticalHit) {
         addNotification?.(state, '✨ Crítico!');
