@@ -1575,25 +1575,16 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
             }
 
             if (!target.resources || typeof target.resources !== 'object') {
-              target.resources = { xp: { ...xpPayload } };
-              return;
+              target.resources = {};
             }
 
-            const targetXp =
-              target.resources.xp && typeof target.resources.xp === 'object'
-                ? target.resources.xp
-                : (target.resources.xp = {});
-
-            Object.assign(targetXp, xpPayload);
+            target.resources.xp = xpPayload;
           };
 
           if (!state.resources || typeof state.resources !== 'object') {
-            state.resources = { xp: xpPayload };
-          } else if (!state.resources.xp || typeof state.resources.xp !== 'object') {
-            state.resources.xp = xpPayload;
-          } else {
-            Object.assign(state.resources.xp, xpPayload);
+            state.resources = {};
           }
+          state.resources.xp = xpPayload;
 
           if (state.organism && typeof state.organism === 'object') {
             syncTargetResources(state.organism);
@@ -1672,6 +1663,22 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
         checkEvolutionSystem(state, helpers);
         if (hudSnapshot) {
+          if (state.xp && typeof state.xp === 'object') {
+            if (!hudSnapshot.xp || typeof hudSnapshot.xp !== 'object') {
+              hudSnapshot.xp = { ...state.xp };
+            } else {
+              Object.assign(hudSnapshot.xp, state.xp);
+            }
+
+            if (!hudSnapshot.resourceBag || typeof hudSnapshot.resourceBag !== 'object') {
+              hudSnapshot.resourceBag = {};
+            }
+            const bagXp =
+              hudSnapshot.resourceBag.xp && typeof hudSnapshot.resourceBag.xp === 'object'
+                ? hudSnapshot.resourceBag.xp
+                : (hudSnapshot.resourceBag.xp = {});
+            Object.assign(bagXp, state.xp);
+          }
           if (typeof hudSnapshot.level === 'number') {
             hudSnapshot.level = state.level;
           }
