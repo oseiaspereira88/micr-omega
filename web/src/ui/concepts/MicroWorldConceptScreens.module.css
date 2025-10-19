@@ -155,6 +155,7 @@
   box-shadow: 0 24px 64px rgba(5, 12, 28, 0.55);
   backdrop-filter: blur(18px);
   z-index: 1;
+  gap: clamp(16px, 3vw, 32px);
 }
 
 .stepMeta {
@@ -175,6 +176,80 @@
 .stepDescription {
   font-size: 1.05rem;
   color: rgba(230, 245, 255, 0.9);
+}
+
+.stepControls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 220px;
+}
+
+.secondaryCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(74, 224, 255, 0.35);
+  background: rgba(12, 28, 52, 0.65);
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: 0.92rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(214, 236, 255, 0.92);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.secondaryCta:hover:not([aria-disabled='true']),
+.secondaryCta:focus-visible:not([aria-disabled='true']) {
+  transform: translateY(-2px);
+  background: rgba(20, 44, 78, 0.8);
+  box-shadow: 0 16px 32px rgba(32, 166, 255, 0.25);
+  outline: none;
+}
+
+.secondaryCta[disabled],
+.secondaryCta[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.5;
+  background: rgba(12, 28, 52, 0.4);
+  border-color: rgba(74, 224, 255, 0.18);
+  box-shadow: none;
+  transform: none;
+}
+
+.stepIndicators {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stepIndicator {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(74, 224, 255, 0.35);
+  background: rgba(12, 28, 52, 0.4);
+  box-shadow: 0 0 8px rgba(74, 224, 255, 0.2);
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stepIndicator:hover,
+.stepIndicator:focus-visible {
+  outline: none;
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 0 14px rgba(74, 224, 255, 0.4);
+}
+
+.stepIndicatorActive {
+  background: linear-gradient(130deg, rgba(60, 247, 168, 0.95), rgba(74, 224, 255, 0.95));
+  box-shadow: 0 0 16px rgba(60, 247, 168, 0.45);
+  border-color: rgba(74, 224, 255, 0.6);
 }
 
 .primaryCta {
@@ -239,9 +314,25 @@
 @media (max-width: 768px) {
   .actionsBar {
     padding: 20px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stepControls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .stepIndicators {
+    justify-content: center;
   }
 
   .primaryCta {
+    width: 100%;
+  }
+
+  .secondaryCta {
     width: 100%;
   }
 }
