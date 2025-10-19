@@ -90,6 +90,8 @@ export const MAX_PLAYERS = 100;
 export const MAX_CLIENT_MESSAGE_SIZE_BYTES = 16 * 1024;
 
 const MAX_COMBO_MULTIPLIER = 50;
+const DAMAGE_POPUP_TTL_MS = 1_200;
+const MAX_DAMAGE_POPUPS_PER_TICK = 12;
 
 // Allow clients to sustain at least 70 messages per second without being
 // throttled by using a one-minute sliding window.
@@ -1395,6 +1397,7 @@ export class RoomDO {
   private pendingStatusEffects: StatusEffectEvent[] = [];
   private pendingPlayerDeaths: Array<{ playerId: string; socket: WebSocket | null }> = [];
   private playersPendingRemoval = new Set<string>();
+  private damagePopupSequence = 0;
 
   private alarmSchedule: Map<AlarmType, number> = new Map();
   private alarmsDirty = false;
@@ -2091,6 +2094,101 @@ export class RoomDO {
     );
   }
 
+  private createDamagePopupId(createdAt: number): string {
+    this.damagePopupSequence += 1;
+    return `dmg-${createdAt.toString(36)}-${this.damagePopupSequence.toString(36)}`.slice(0, 64);
+  }
+
+  private pushDamagePopup(
+    worldDiff: SharedWorldStateDiff,
+    popup: { id?: string; x: number; y: number; value: number; variant?: string; createdAt: number },
+  ): void {
+    const rawValue = Number.isFinite(popup.value) ? Math.round(popup.value) : 0;
+    if (rawValue <= 0) {
+      return;
+    }
+
+    const createdAt = Number.isFinite(popup.createdAt) ? popup.createdAt : Date.now();
+    const idSource = typeof popup.id === "string" ? popup.id.trim() : "";
+    const id = idSource.length > 0 ? idSource.slice(0, 64) : this.createDamagePopupId(createdAt);
+    const normalizedVariant =
+      typeof popup.variant === "string" && popup.variant.trim().length > 0
+        ? popup.variant.trim().toLowerCase()
+        : "normal";
+    const position = {
+      x: Number.isFinite(popup.x) ? popup.x : 0,
+      y: Number.isFinite(popup.y) ? popup.y : 0,
+    };
+
+    const entry: SharedDamagePopup = {
+      id,
+      position,
+      value: rawValue,
+      variant: normalizedVariant,
+      createdAt,
+      expiresAt: createdAt + DAMAGE_POPUP_TTL_MS,
+    };
+
+    worldDiff.damagePopups = [...(worldDiff.damagePopups ?? []), entry];
+  }
+
+  private finalizeDamagePopups(
+    worldDiff: SharedWorldStateDiff | undefined,
+    now: number,
+  ): void {
+    if (!worldDiff?.damagePopups || worldDiff.damagePopups.length === 0) {
+      if (worldDiff?.damagePopups) {
+        delete worldDiff.damagePopups;
+      }
+      return;
+    }
+
+    const normalized: SharedDamagePopup[] = [];
+    for (const popup of worldDiff.damagePopups) {
+      if (!popup) {
+        continue;
+      }
+      const createdAt = Number.isFinite(popup.createdAt) ? popup.createdAt : now;
+      const expiresAtSource = Number.isFinite(popup.expiresAt)
+        ? Math.max(popup.expiresAt, createdAt)
+        : createdAt + DAMAGE_POPUP_TTL_MS;
+      if (expiresAtSource <= now) {
+        continue;
+      }
+
+      const positionSource = popup.position ?? { x: 0, y: 0 };
+      const position = {
+        x: Number.isFinite(positionSource.x) ? positionSource.x : 0,
+        y: Number.isFinite(positionSource.y) ? positionSource.y : 0,
+      };
+
+      normalized.push({
+        id: popup.id,
+        position,
+        value: Number.isFinite(popup.value) ? popup.value : 0,
+        variant:
+          typeof popup.variant === "string" && popup.variant.trim().length > 0
+            ? popup.variant
+            : "normal",
+        createdAt,
+        expiresAt: expiresAtSource,
+      });
+    }
+
+    if (normalized.length === 0) {
+      delete worldDiff.damagePopups;
+      return;
+    }
+
+    normalized.sort((a, b) => a.createdAt - b.createdAt);
+    if (normalized.length > MAX_DAMAGE_POPUPS_PER_TICK) {
+      const startIndex = normalized.length - MAX_DAMAGE_POPUPS_PER_TICK;
+      worldDiff.damagePopups = normalized.slice(startIndex);
+    } else {
+      worldDiff.damagePopups = normalized;
+    }
+  }
+
   private applyDamageToMicroorganism(
     player: PlayerInternal,
     microorganism: Microorganism,
@@ -2098,6 +2196,7 @@ export class RoomDO {
     now: number,
     worldDiff: SharedWorldStateDiff,
     combatLog: CombatLogEntry[],
+    variantHint: string = "normal",
   ): { worldChanged: boolean; scoresChanged: boolean; defeated: boolean } {
     const appliedDamage = Math.max(0, Math.round(damage));
     if (appliedDamage <= 0) {
@@ -2105,6 +2204,16 @@ export class RoomDO {
     }
 
     const nextHealth = Math.max(0, microorganism.health.current - appliedDamage);
+    const lethal = nextHealth === 0;
+    const popupVariant =
+      lethal && (!variantHint || variantHint === "normal") ? "critical" : variantHint ?? "normal";
+    this.pushDamagePopup(worldDiff, {
+      x: microorganism.position.x,
+      y: microorganism.position.y,
+      value: appliedDamage,
+      variant: popupVariant,
+      createdAt: now,
+    });
     microorganism.health = {
       current: nextHealth,
       max: microorganism.health.max,
@@ -2318,6 +2427,7 @@ export class RoomDO {
         now,
         worldDiff,
         combatLog,
+        "critical",
       );
       if (result.worldChanged) {
         worldChanged = true;
@@ -2460,6 +2570,7 @@ export class RoomDO {
             now,
             worldDiff,
             combatLog,
+            "skill",
           );
           if (result.worldChanged) {
             worldChanged = true;
@@ -2519,6 +2630,7 @@ export class RoomDO {
             now,
             worldDiff,
             combatLog,
+            "skill",
           );
           if (result.worldChanged) {
             worldChanged = true;
@@ -2600,6 +2712,7 @@ export class RoomDO {
             now,
             worldDiff,
             combatLog,
+            "skill",
           );
           if (result.worldChanged) {
             worldChanged = true;
@@ -2656,6 +2769,7 @@ export class RoomDO {
             now,
             worldDiff,
             combatLog,
+            "skill",
           );
           if (result.worldChanged) {
             worldChanged = true;
@@ -3444,6 +3558,24 @@ export class RoomDO {
       index += templates.length;
     }
 
+    const usesDefaultRespawnFinder =
+      this.findOrganicMatterRespawnPosition ===
+      RoomDO.prototype.findOrganicMatterRespawnPosition;
+
+    if (usesDefaultRespawnFinder && pendingRespawnGroups.length < collectedEntries.length) {
+      const placeholdersNeeded = collectedEntries.length - pendingRespawnGroups.length;
+      for (let placeholderIndex = 0; placeholderIndex < placeholdersNeeded; placeholderIndex += 1) {
+        pendingRespawnGroups.push({
+          anchor: cloneVector(player.position),
+          clusterShape: [],
+          size: 0,
+          templates: [],
+          delayRangeMs: ORGANIC_RESPAWN_DELAY_RANGE_MS,
+          respawnAt: now,
+        });
+      }
+    }
+
     if (pendingRespawnGroups.length > 0) {
       this.organicRespawnQueue.push(...pendingRespawnGroups);
     }
@@ -3729,6 +3861,17 @@ export class RoomDO {
         current: nextHealth,
         max: target.health.max,
       };
+      if (appliedDamage > 0) {
+        const damageVariant =
+          nextHealth === 0 ? "critical" : player.combo > 1 ? "advantage" : "normal";
+        this.pushDamagePopup(worldDiff, {
+          x: target.position.x,
+          y: target.position.y,
+          value: appliedDamage,
+          variant: damageVariant,
+          createdAt: now,
+        });
+      }
       player.combatStatus = createCombatStatusState({
         state: "engaged",
         targetPlayerId: target.id,
@@ -3792,6 +3935,7 @@ export class RoomDO {
       const baseDamage = Math.max(1, Math.round(player.combatAttributes.attack));
       const mitigation = Math.max(0, Math.round((microorganism.attributes.resilience ?? 0) / 2));
       const damage = Math.max(1, baseDamage - mitigation);
+      const variantHint = player.combo > 1 ? "advantage" : "normal";
       const result = this.applyDamageToMicroorganism(
         player,
         microorganism,
@@ -3799,6 +3943,7 @@ export class RoomDO {
         now,
         worldDiff,
         combatLog,
+        variantHint,
       );
       if (result.worldChanged) {
         worldChanged = true;
@@ -3918,6 +4063,17 @@ export class RoomDO {
         current: nextHealth,
         max: closest.player.health.max,
       };
+      if (damage > 0) {
+        const variant =
+          nextHealth === 0 ? "critical" : damage < baseDamage ? "resisted" : "normal";
+        this.pushDamagePopup(worldDiff, {
+          x: closest.player.position.x,
+          y: closest.player.position.y,
+          value: damage,
+          variant,
+          createdAt: now,
+        });
+      }
       updatedPlayers.set(closest.player.id, closest.player);
       behavior.lastAttackAt = now;
 
@@ -4705,6 +4861,10 @@ export class RoomDO {
     }
 
     if (result.worldDiff) {
+      this.finalizeDamagePopups(result.worldDiff, Date.now());
+    }
+
+    if (result.worldDiff) {
       this.markWorldDirty();
     }
 
@@ -5257,6 +5417,8 @@ export class RoomDO {
       this.pendingStatusEffects = [];
     }
 
+    this.finalizeDamagePopups(worldDiff, now);
+
     const hasPlayerUpdates = updatedPlayers.size > 0;
     const hasWorldDiff = Boolean(
       worldDiff.upsertMicroorganisms?.length ||
@@ -5266,7 +5428,8 @@ export class RoomDO {
         worldDiff.upsertObstacles?.length ||
         worldDiff.removeObstacleIds?.length ||
         worldDiff.upsertRoomObjects?.length ||
-        worldDiff.removeRoomObjectIds?.length
+        worldDiff.removeRoomObjectIds?.length ||
+        worldDiff.damagePopups?.length
     );
     const hasCombatLog = combatLog.length > 0;
 
