@@ -39,6 +39,24 @@ export const orientationSchema = z.object({
   tilt: z.number().finite().optional()
 });
 
+const damagePopupIdSchema = z.string().trim().min(1).max(64);
+
+const damagePopupVariantSchema = z.string().trim().min(1).max(32);
+
+export const sharedDamagePopupSchema = z
+  .object({
+    id: damagePopupIdSchema,
+    position: vector2Schema,
+    value: z.number().finite(),
+    variant: damagePopupVariantSchema,
+    createdAt: z.number().finite(),
+    expiresAt: z.number().finite(),
+  })
+  .refine((popup) => popup.expiresAt >= popup.createdAt, {
+    message: "damage_popup_expired",
+    path: ["expiresAt"],
+  });
+
 export const healthSchema = z
   .object({
     current: z.number().finite().nonnegative(),
@@ -228,7 +246,8 @@ export const sharedWorldStateSchema = z.object({
   microorganisms: z.array(microorganismSchema),
   organicMatter: z.array(organicMatterSchema),
   obstacles: z.array(obstacleSchema),
-  roomObjects: z.array(roomObjectSchema)
+  roomObjects: z.array(roomObjectSchema),
+  damagePopups: z.array(sharedDamagePopupSchema).optional().default([])
 });
 
 export const sharedWorldStateDiffSchema = z.object({
@@ -240,7 +259,8 @@ export const sharedWorldStateDiffSchema = z.object({
   removeObstacleIds: z.array(worldObjectIdSchema).optional(),
   upsertRoomObjects: z.array(roomObjectSchema).optional(),
   removeRoomObjectIds: z.array(worldObjectIdSchema).optional(),
-  statusEffects: z.array(statusEffectEventSchema).optional()
+  statusEffects: z.array(statusEffectEventSchema).optional(),
+  damagePopups: z.array(sharedDamagePopupSchema).optional()
 });
 
 const progressionPitySchema = z.object({
@@ -304,7 +324,8 @@ export const sharedGameStateSchema = z.object({
   roundEndsAt: z.number().finite().nullable(),
   players: z.array(sharedPlayerStateSchema),
   world: sharedWorldStateSchema,
-  progression: sharedProgressionStateSchema.optional()
+  progression: sharedProgressionStateSchema.optional(),
+  damagePopups: z.array(sharedDamagePopupSchema).optional().default([])
 });
 
 export const combatLogEntrySchema = z.object({
@@ -334,7 +355,8 @@ export const sharedGameStateDiffSchema = z.object({
   removedPlayerIds: z.array(playerIdSchema).optional(),
   world: sharedWorldStateDiffSchema.optional(),
   combatLog: z.array(combatLogEntrySchema).optional(),
-  progression: sharedProgressionStateSchema.optional()
+  progression: sharedProgressionStateSchema.optional(),
+  damagePopups: z.array(sharedDamagePopupSchema).optional()
 });
 
 export type SharedProgressionStream = z.infer<typeof sharedProgressionStreamSchema>;
@@ -825,6 +847,7 @@ export type SharedGameState = z.infer<typeof sharedGameStateSchema>;
 export type SharedGameStateDiff = z.infer<typeof sharedGameStateDiffSchema>;
 export type SharedWorldState = z.infer<typeof sharedWorldStateSchema>;
 export type SharedWorldStateDiff = z.infer<typeof sharedWorldStateDiffSchema>;
+export type SharedDamagePopup = z.infer<typeof sharedDamagePopupSchema>;
 export type StatusEffectEvent = z.infer<typeof statusEffectEventSchema>;
 export type CombatLogEntry = z.infer<typeof combatLogEntrySchema>;
 export type Microorganism = z.infer<typeof microorganismSchema>;

@@ -36,7 +36,9 @@ const snapshot = (): GameStoreState => {
       organicMatter: emptyOrganic.all,
       obstacles: emptyObstacles.all,
       roomObjects: emptyRoomObjects.all,
+      damagePopups: [],
     },
+    damagePopups: [],
   };
 };
 

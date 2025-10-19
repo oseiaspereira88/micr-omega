@@ -12,6 +12,7 @@ import {
   SharedGameStateDiff,
   SharedPlayerState,
   SharedWorldState,
+  SharedDamagePopup,
   SharedProgressionState,
   SharedProgressionStream,
   Vector2,
@@ -72,6 +73,7 @@ type WorldCollections = {
   organicMatter: EntityCollection<OrganicMatter>;
   obstacles: EntityCollection<Obstacle>;
   roomObjects: EntityCollection<RoomObject>;
+  damagePopups: SharedDamagePopup[];
 };
 
 type DerivedSynchronizedState = Pick<
@@ -86,6 +88,7 @@ type DerivedSynchronizedState = Pick<
   | "world"
   | "progression"
   | "combatLog"
+  | "damagePopups"
 >;
 
 const createEmptyEntityCollection = <T extends { id: string }>(): EntityCollection<T> => ({
@@ -220,6 +223,7 @@ const createEmptyWorldCollections = (): WorldCollections => ({
   organicMatter: createEmptyEntityCollection<OrganicMatter>(),
   obstacles: createEmptyEntityCollection<Obstacle>(),
   roomObjects: createEmptyEntityCollection<RoomObject>(),
+  damagePopups: [],
 });
 
 const buildWorldFromCollections = (collections: WorldCollections): SharedWorldState => ({
@@ -227,11 +231,13 @@ const buildWorldFromCollections = (collections: WorldCollections): SharedWorldSt
   organicMatter: collections.organicMatter.all,
   obstacles: collections.obstacles.all,
   roomObjects: collections.roomObjects.all,
+  damagePopups: collections.damagePopups,
 });
 
 const deriveSynchronizedStateFromFullSnapshot = (
   state: SharedGameState,
 ): DerivedSynchronizedState => {
+  const now = Date.now();
   const remotePlayers = createEntityCollectionFromArray(state.players, clonePlayer);
   const worldCollections: WorldCollections = {
     microorganisms: createEntityCollectionFromArray(
@@ -241,6 +247,7 @@ const deriveSynchronizedStateFromFullSnapshot = (
     organicMatter: createEntityCollectionFromArray(state.world.organicMatter, cloneOrganicMatter),
     obstacles: createEntityCollectionFromArray(state.world.obstacles, cloneObstacle),
     roomObjects: createEntityCollectionFromArray(state.world.roomObjects, cloneRoomObject),
+    damagePopups: cloneDamagePopups(state.world.damagePopups, now),
   };
 
   return {
@@ -261,6 +268,7 @@ const deriveSynchronizedStateFromFullSnapshot = (
     combatLog: cloneCombatLogEntries(
       (state as SharedGameState & { combatLog?: CombatLogEntry[] | undefined }).combatLog,
     ),
+    damagePopups: cloneDamagePopups(state.damagePopups, now),
   };
 };
 
@@ -293,6 +301,7 @@ export interface GameStoreState {
   progression: SharedProgressionState;
   statusEffects: StatusEffectEvent[];
   combatLog: CombatLogEntry[];
+  damagePopups: SharedDamagePopup[];
 }
 
 const cloneVector = (vector: Vector2): Vector2 => ({ x: vector.x, y: vector.y });
@@ -376,6 +385,149 @@ const cloneRoomObject = (object: RoomObject): RoomObject => ({
   state: object.state ? { ...object.state } : undefined,
 });
 
+const areDamagePopupArraysEqual = (
+  a: readonly SharedDamagePopup[],
+  b: readonly SharedDamagePopup[],
+): boolean => {
+  if (a === b) {
+    return true;
+  }
+
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  for (let index = 0; index < a.length; index += 1) {
+    const left = a[index]!;
+    const right = b[index]!;
+    if (
+      left.id !== right.id ||
+      left.value !== right.value ||
+      left.variant !== right.variant ||
+      left.createdAt !== right.createdAt ||
+      left.expiresAt !== right.expiresAt ||
+      left.position.x !== right.position.x ||
+      left.position.y !== right.position.y
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const normalizeDamagePopup = (
+  popup: SharedDamagePopup | null | undefined,
+  now: number,
+): SharedDamagePopup | null => {
+  if (!popup || typeof popup !== "object") {
+    return null;
+  }
+
+  const createdAt = Number.isFinite(popup.createdAt) ? popup.createdAt : now;
+  const expiresAtSource = Number.isFinite(popup.expiresAt) ? popup.expiresAt : createdAt;
+  const expiresAt = Math.max(expiresAtSource, createdAt);
+  if (expiresAt <= now) {
+    return null;
+  }
+
+  const positionSource = popup.position;
+  const position: Vector2 = positionSource
+    ? {
+        x: Number.isFinite(positionSource.x) ? positionSource.x : 0,
+        y: Number.isFinite(positionSource.y) ? positionSource.y : 0,
+      }
+    : { x: 0, y: 0 };
+
+  return {
+    id: popup.id,
+    position,
+    value: Number.isFinite(popup.value) ? popup.value : 0,
+    variant:
+      typeof popup.variant === "string" && popup.variant.length > 0
+        ? popup.variant
+        : "normal",
+    createdAt,
+    expiresAt,
+  };
+};
+
+const cloneDamagePopups = (
+  popups: readonly SharedDamagePopup[] | null | undefined,
+  now: number,
+): SharedDamagePopup[] => {
+  if (!popups || popups.length === 0) {
+    return [];
+  }
+
+  const next: SharedDamagePopup[] = [];
+  for (const popup of popups) {
+    const normalized = normalizeDamagePopup(popup, now);
+    if (normalized) {
+      next.push({
+        ...normalized,
+        position: cloneVector(normalized.position),
+      });
+    }
+  }
+
+  return next;
+};
+
+const pruneDamagePopupCollection = (
+  popups: SharedDamagePopup[],
+  now: number,
+): { next: SharedDamagePopup[]; changed: boolean } => {
+  if (popups.length === 0) {
+    return { next: popups, changed: false };
+  }
+
+  let changed = false;
+  const next: SharedDamagePopup[] = [];
+  for (const popup of popups) {
+    const normalized = normalizeDamagePopup(popup, now);
+    if (!normalized) {
+      changed = true;
+      continue;
+    }
+
+    const identical =
+      normalized.value === popup.value &&
+      normalized.variant === popup.variant &&
+      normalized.createdAt === popup.createdAt &&
+      normalized.expiresAt === popup.expiresAt &&
+      normalized.position.x === popup.position.x &&
+      normalized.position.y === popup.position.y;
+
+    next.push(identical ? popup : { ...normalized, position: cloneVector(normalized.position) });
+    if (!identical) {
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    return { next: popups, changed: false };
+  }
+
+  return { next, changed: true };
+};
+
+const resolveDamagePopupUpdate = (
+  prev: SharedDamagePopup[],
+  incoming: readonly SharedDamagePopup[] | null | undefined,
+  now: number,
+): { next: SharedDamagePopup[]; changed: boolean } => {
+  if (incoming !== undefined && incoming !== null) {
+    const cloned = cloneDamagePopups(incoming, now);
+    if (areDamagePopupArraysEqual(prev, cloned)) {
+      return { next: prev, changed: false };
+    }
+    return { next: cloned, changed: true };
+  }
+
+  return pruneDamagePopupCollection(prev, now);
+};
+
 const cloneCombatLogEntries = (
   entries?: readonly CombatLogEntry[] | null,
 ): CombatLogEntry[] => {
@@ -421,6 +573,7 @@ const createEmptySynchronizedState = () => {
     world: buildWorldFromCollections(worldCollections),
     progression: cloneProgressionState(),
     combatLog: [],
+    damagePopups: [],
   };
 };
 
@@ -455,6 +608,7 @@ const initialState: GameStoreState = {
   progression: cloneProgressionState(emptySyncState.progression),
   statusEffects: [],
   combatLog: [],
+  damagePopups: [],
 };
 
 type GameStoreListener = () => void;
@@ -646,6 +800,7 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
     );
 
     const worldDiff = diff.world;
+    const now = Date.now();
     const microorganismsResult = applyEntityCollectionDiff(
       prev.microorganisms,
       worldDiff?.upsertMicroorganisms,
@@ -669,6 +824,18 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       worldDiff?.upsertRoomObjects,
       worldDiff?.removeRoomObjectIds,
       cloneRoomObject,
+    );
+
+    const worldDamagePopupsResult = resolveDamagePopupUpdate(
+      prev.world.damagePopups ?? [],
+      worldDiff?.damagePopups,
+      now,
+    );
+
+    const damagePopupsResult = resolveDamagePopupUpdate(
+      prev.damagePopups,
+      diff.damagePopups,
+      now,
     );
 
     let nextProgression = prev.progression;
@@ -729,7 +896,8 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       microorganismsResult.changed ||
       organicMatterResult.changed ||
       obstacleResult.changed ||
-      roomObjectResult.changed;
+      roomObjectResult.changed ||
+      worldDamagePopupsResult.changed;
 
     const stateChanged =
       nextRoom !== prev.room ||
@@ -737,7 +905,8 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
       worldChanged ||
       progressionChanged ||
       statusEffectsChanged ||
-      combatLogChanged;
+      combatLogChanged ||
+      damagePopupsResult.changed;
 
     if (!stateChanged) {
       return prev;
@@ -749,8 +918,11 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
           organicMatter: organicMatterResult.next,
           obstacles: obstacleResult.next,
           roomObjects: roomObjectResult.next,
+          damagePopups: worldDamagePopupsResult.next,
         })
-      : prev.world;
+      : worldDamagePopupsResult.changed
+        ? { ...prev.world, damagePopups: worldDamagePopupsResult.next }
+        : prev.world;
 
     return {
       ...prev,
@@ -767,6 +939,7 @@ const applyStateDiff = (diff: SharedGameStateDiff) => {
         ? statusEffects.map((event) => ({ ...event }))
         : prev.statusEffects,
       combatLog: nextCombatLog,
+      damagePopups: damagePopupsResult.changed ? damagePopupsResult.next : prev.damagePopups,
     };
   });
 };
@@ -854,6 +1027,7 @@ const resetGameState = () => {
       world: emptyState.world,
       statusEffects: [],
       combatLog: emptyState.combatLog,
+      damagePopups: emptyState.damagePopups,
     };
   });
 };

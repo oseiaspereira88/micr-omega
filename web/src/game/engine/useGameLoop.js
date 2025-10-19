@@ -188,10 +188,14 @@ const filterExpiredDamagePopups = (collection, now) => {
     }
 
     const createdAt = Number.isFinite(popup.createdAt) ? popup.createdAt : now;
-    const lifetimeSeconds = Number.isFinite(popup.lifetime) ? popup.lifetime : DEFAULT_POPUP_LIFETIME;
-    const resolvedLifetime = Math.max(0.25, lifetimeSeconds);
+    const expiresAt = Number.isFinite(popup.expiresAt)
+      ? Math.max(popup.expiresAt, createdAt)
+      : createdAt + Math.max(
+          0.25,
+          Number.isFinite(popup.lifetime) ? popup.lifetime : DEFAULT_POPUP_LIFETIME,
+        ) * 1000;
 
-    return createdAt + resolvedLifetime * 1000 > now;
+    return expiresAt > now;
   });
 };
 
@@ -256,24 +260,36 @@ const syncDamagePopups = (renderState, sharedState, deltaSeconds) => {
     }
 
     const explicitId = typeof rawPopup.id === 'string' && rawPopup.id ? rawPopup.id : null;
-    const fallbackParts = [
-      Number(rawPopup.createdAt) || 0,
-      Math.round(rawPopup.x ?? 0),
-      Math.round(rawPopup.y ?? 0),
-      Math.round(rawPopup.value ?? 0),
-    ];
+    const createdAt = Number.isFinite(rawPopup.createdAt) ? rawPopup.createdAt : now;
+    const positionSource = rawPopup.position || {};
+    const popupX = Number.isFinite(positionSource.x)
+      ? positionSource.x
+      : Number.isFinite(rawPopup.x)
+        ? rawPopup.x
+        : 0;
+    const popupY = Number.isFinite(positionSource.y)
+      ? positionSource.y
+      : Number.isFinite(rawPopup.y)
+        ? rawPopup.y
+        : 0;
+    const value = Number.isFinite(rawPopup.value) ? rawPopup.value : 0;
+    const fallbackParts = [Number(createdAt) || 0, Math.round(popupX), Math.round(popupY), Math.round(value)];
     const fallbackId = fallbackParts.join('-');
     const id = explicitId || fallbackId;
 
     if (!index.has(id)) {
-      const lifetime = Number.isFinite(rawPopup.lifetime)
-        ? Math.max(0.25, rawPopup.lifetime)
-        : DEFAULT_POPUP_LIFETIME;
+      const expiresAt = Number.isFinite(rawPopup.expiresAt)
+        ? Math.max(rawPopup.expiresAt, createdAt)
+        : createdAt + Math.max(
+            0.25,
+            Number.isFinite(rawPopup.lifetime) ? rawPopup.lifetime : DEFAULT_POPUP_LIFETIME,
+          ) * 1000;
+      const lifetime = expiresAt > createdAt ? (expiresAt - createdAt) / 1000 : DEFAULT_POPUP_LIFETIME;
       const entry = {
         id,
-        x: Number.isFinite(rawPopup.x) ? rawPopup.x : 0,
-        y: Number.isFinite(rawPopup.y) ? rawPopup.y : 0,
-        value: Number.isFinite(rawPopup.value) ? Math.round(rawPopup.value) : 0,
+        x: Number.isFinite(popupX) ? popupX : 0,
+        y: Number.isFinite(popupY) ? popupY : 0,
+        value: Number.isFinite(value) ? Math.round(value) : 0,
         variant:
           typeof rawPopup.variant === 'string' && rawPopup.variant.length > 0
             ? rawPopup.variant

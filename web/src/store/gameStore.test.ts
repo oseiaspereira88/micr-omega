@@ -17,6 +17,7 @@ const createWorld = (): SharedWorldState => ({
   organicMatter: [],
   obstacles: [],
   roomObjects: [],
+  damagePopups: [],
 });
 
 const createPlayerState = (
@@ -93,9 +94,11 @@ const createFreshState = (): GameStoreState => {
       organicMatter: emptyOrganic.all,
       obstacles: emptyObstacles.all,
       roomObjects: emptyRoomObjects.all,
+      damagePopups: [],
     },
     progression: { players: {} },
     combatLog: [],
+    damagePopups: [],
   };
 };
 
@@ -139,6 +142,7 @@ describe("gameStore", () => {
         }),
       ],
       world: fullWorld,
+      damagePopups: [],
     };
 
     gameStore.actions.applyFullState(fullState);
@@ -244,6 +248,7 @@ describe("gameStore", () => {
       ],
       world: createWorld(),
       combatLog: [firstEntry],
+      damagePopups: [],
     } satisfies SharedGameState & { combatLog: CombatLogEntry[] };
 
     gameStore.actions.applyFullState(fullStateWithLog);
@@ -338,6 +343,7 @@ describe("gameStore", () => {
       roundEndsAt: 200,
       players: [oldPlayer],
       world: oldWorld,
+      damagePopups: [],
     };
 
     const oldRanking: RankingEntry[] = [
@@ -386,6 +392,7 @@ describe("gameStore", () => {
       roundEndsAt: 600,
       players: [newPlayer],
       world: newWorld,
+      damagePopups: [],
     };
 
     const newRanking: RankingEntry[] = [
@@ -420,6 +427,7 @@ describe("gameStore", () => {
       roundEndsAt: 20_000,
       players: [],
       world: createWorld(),
+      damagePopups: [],
     };
 
     gameStore.actions.applyFullState(fullState);
@@ -483,6 +491,7 @@ describe("gameStore", () => {
       roundEndsAt: 10,
       players,
       world,
+      damagePopups: [],
     };
 
     gameStore.actions.applyFullState(fullState);

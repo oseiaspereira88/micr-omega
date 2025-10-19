@@ -385,8 +385,9 @@ describe('useGameLoop timing safeguards', () => {
         },
       },
       remotePlayers: { byId: {} },
-      world: { microorganisms: sharedMicroorganisms },
+      world: { microorganisms: sharedMicroorganisms, damagePopups: [] },
       microorganisms: { all: sharedMicroorganisms, byId: {}, indexById: new Map() },
+      damagePopups: [],
     };
 
     const renderMicroorganisms = [
@@ -480,7 +481,7 @@ describe('useGameLoop timing safeguards', () => {
           },
         },
       },
-      world: { microorganisms: [] },
+      world: { microorganisms: [], damagePopups: [] },
       microorganisms: { all: [], byId: {}, indexById: new Map() },
     };
 

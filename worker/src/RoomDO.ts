@@ -30,6 +30,7 @@ import {
   type SharedGameStateDiff,
   type SharedWorldState,
   type SharedWorldStateDiff,
+  type SharedDamagePopup,
   type StatusEffectEvent,
   type SharedProgressionState,
   type SharedProgressionStream,
@@ -798,6 +799,15 @@ const clonePityCounters = (pity: { fragment: number; stableGene: number }) => ({
   stableGene: pity.stableGene,
 });
 
+const cloneDamagePopup = (popup: SharedDamagePopup): SharedDamagePopup => ({
+  id: popup.id,
+  position: cloneVector(popup.position),
+  value: popup.value,
+  variant: popup.variant,
+  createdAt: popup.createdAt,
+  expiresAt: popup.expiresAt,
+});
+
 const cloneWorldState = (world: SharedWorldState): SharedWorldState => ({
   microorganisms: world.microorganisms.map((entity) => ({
     ...entity,
@@ -823,6 +833,9 @@ const cloneWorldState = (world: SharedWorldState): SharedWorldState => ({
     position: cloneVector(object.position),
     state: object.state ? { ...object.state } : undefined,
   })),
+  damagePopups: Array.isArray(world.damagePopups)
+    ? world.damagePopups.map(cloneDamagePopup)
+    : [],
 });
 
 type StoredMicroorganism = Omit<Microorganism, "name" | "level"> &
@@ -1015,6 +1028,7 @@ const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
     },
   ],
   roomObjects: [],
+  damagePopups: [],
 };
 
 type WorldGenerationOptions = {
@@ -1279,6 +1293,13 @@ const normalizeStoredWorldState = (
     : [];
   let changed = !Array.isArray(world.microorganisms);
 
+  const damagePopupsSource = Array.isArray(world.damagePopups)
+    ? (world.damagePopups as SharedDamagePopup[])
+    : [];
+  if (!Array.isArray(world.damagePopups)) {
+    changed = true;
+  }
+
   const microorganisms = microorganismsSource.map((entity, index) => {
     const result = normalizeStoredMicroorganism(entity, index);
     if (result.changed) {
@@ -1286,6 +1307,8 @@ const normalizeStoredWorldState = (
     }
     return result.entity;
   });
+
+  const damagePopups = damagePopupsSource.map((popup) => cloneDamagePopup(popup));
 
   if (!changed) {
     return { world: world as SharedWorldState, changed: false };
@@ -1295,6 +1318,7 @@ const normalizeStoredWorldState = (
     world: {
       ...world,
       microorganisms,
+      damagePopups,
     },
     changed: true,
   };
