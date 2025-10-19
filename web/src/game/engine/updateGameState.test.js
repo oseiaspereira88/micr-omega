@@ -99,8 +99,10 @@ const createSharedState = (overrides = {}) => ({
     ],
   },
   players: undefined,
-  world: overrides.world ?? {
-    microorganisms: [
+  world: overrides.world
+    ? { damagePopups: [], ...overrides.world }
+    : {
+      microorganisms: [
       {
         id: 'micro-1',
         kind: 'microorganism',
@@ -143,8 +145,10 @@ const createSharedState = (overrides = {}) => ({
         state: {},
       },
     ],
-  },
+      damagePopups: [],
+    },
   progression: overrides.progression ?? { players: {} },
+  damagePopups: overrides.damagePopups ?? [],
 });
 
 describe('ensureHealth', () => {

@@ -229,7 +229,8 @@ describe("serverMessageSchema", () => {
           microorganisms: [],
           organicMatter: [],
           obstacles: [],
-          roomObjects: []
+          roomObjects: [],
+          damagePopups: []
         }
       }
     };
@@ -290,7 +291,9 @@ describe("useGameSocket", () => {
       organicMatter: [],
       obstacles: [],
       roomObjects: [],
+      damagePopups: [],
     },
+    damagePopups: [],
   });
 
   const setupSocketConnection = (
