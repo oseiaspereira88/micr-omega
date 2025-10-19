@@ -1423,10 +1423,16 @@ const buildHudSnapshot = (
     safeNumber(safePreviousHud.maxHealth, 1)
   );
 
-  const level = safeNumber(
+  const previousLevel = safeNumber(safePreviousHud.level, xp.level);
+  const previousConfirmedLevel = Number.isFinite(safePreviousHud.confirmedLevel)
+    ? safePreviousHud.confirmedLevel
+    : previousLevel;
+  const levelCandidate = safeNumber(
     resourceBag.level ?? localPlayer?.level ?? xp.level,
-    safeNumber(safePreviousHud.level, xp.level)
+    xp.level
   );
+  const level = Math.max(levelCandidate, previousLevel, previousConfirmedLevel);
+  const confirmedLevel = Math.max(previousConfirmedLevel, levelCandidate, xp.level);
 
   const snapshot = {
     energy,
@@ -1468,6 +1474,23 @@ const buildHudSnapshot = (
     statusEffects,
     elementLabel: ELEMENT_LABELS[element] ?? element,
     affinityLabel: AFFINITY_LABELS[affinity] ?? affinity,
+  };
+
+  snapshot.confirmedLevel = confirmedLevel;
+
+  const previousBag =
+    safePreviousHud.resourceBag && typeof safePreviousHud.resourceBag === 'object'
+      ? safePreviousHud.resourceBag
+      : null;
+  const normalizedBag =
+    resourceBag && typeof resourceBag === 'object'
+      ? resourceBag
+      : {};
+
+  snapshot.resourceBag = {
+    ...(previousBag ? { ...previousBag } : {}),
+    ...normalizedBag,
+    level,
   };
 
   if (safePreviousHud.archetypeSelection) {

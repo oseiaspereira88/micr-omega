@@ -19,6 +19,10 @@ const mocks = vi.hoisted(() => {
     selectArchetype: vi.fn(),
     gameStoreState: {},
     gameStoreListeners: listeners,
+    addNotification: vi.fn((notifications = [], text) => [
+      ...notifications,
+      { id: `mock-${notifications.length}`, text },
+    ]),
   };
 });
 
@@ -34,10 +38,19 @@ vi.mock('../audio/soundEffects', () => ({
   createSoundEffects: (...args) => mocks.soundEffectsFactory(...args),
 }));
 
-vi.mock('../systems', () => ({
-  restartGame: (...args) => mocks.restartGame(...args),
-  selectArchetype: (...args) => mocks.selectArchetype(...args),
+vi.mock('../ui/notifications', () => ({
+  addNotification: (...args) => mocks.addNotification(...args),
+  default: (...args) => mocks.addNotification(...args),
 }));
+
+vi.mock('../systems', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    restartGame: (...args) => mocks.restartGame(...args),
+    selectArchetype: (...args) => mocks.selectArchetype(...args),
+  };
+});
 
 vi.mock('../../store/gameStore', () => ({
   gameStore: {
@@ -98,6 +111,7 @@ describe('useGameLoop timing safeguards', () => {
     mocks.renderFrame.mockClear();
     mocks.soundEffectsFactory.mockClear();
     mocks.selectArchetype.mockClear();
+    mocks.addNotification.mockClear();
     performanceNowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -445,6 +459,158 @@ describe('useGameLoop timing safeguards', () => {
       hudSnapshot: null,
     }));
     mocks.gameStoreState = {};
+  });
+});
+
+describe('useGameLoop evolution confirmation flow', () => {
+  let originalRequestAnimationFrame;
+  let originalCancelAnimationFrame;
+  let rafCallback;
+  let rafId;
+
+  beforeEach(() => {
+    mocks.updateGameState.mockReset();
+    mocks.renderFrame.mockClear();
+    mocks.soundEffectsFactory.mockClear();
+    mocks.addNotification.mockClear();
+
+    originalRequestAnimationFrame = window.requestAnimationFrame;
+    originalCancelAnimationFrame = window.cancelAnimationFrame;
+    rafCallback = undefined;
+    rafId = 0;
+
+    window.requestAnimationFrame = vi.fn((callback) => {
+      rafCallback = callback;
+      rafId += 1;
+      return rafId;
+    });
+
+    window.cancelAnimationFrame = vi.fn();
+  });
+
+  afterEach(() => {
+    if (originalRequestAnimationFrame) {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+    } else {
+      delete window.requestAnimationFrame;
+    }
+
+    if (originalCancelAnimationFrame) {
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
+    } else {
+      delete window.cancelAnimationFrame;
+    }
+  });
+
+  it('keeps the evolution UI open and avoids duplicate level toasts while awaiting confirmation', async () => {
+    const snapshots = [
+      {
+        commands: { movement: null, attacks: [] },
+        localPlayerId: 'p1',
+        hudSnapshot: {
+          xp: { current: 180, total: 180, next: 120, level: 1 },
+          level: 1,
+          reroll: { baseCost: 25, cost: 25, count: 0, pity: 0 },
+          evolutionMenu: { activeTier: 'small', options: { small: [], medium: [], large: [], macro: [] } },
+          notifications: [],
+          showEvolutionChoice: false,
+        },
+      },
+      {
+        commands: { movement: null, attacks: [] },
+        localPlayerId: 'p1',
+        hudSnapshot: {
+          xp: { current: 40, total: 220, next: 180, level: 2 },
+          level: 1,
+          reroll: { baseCost: 25, cost: 25, count: 0, pity: 0 },
+          evolutionMenu: { activeTier: 'small', options: { small: [], medium: [], large: [], macro: [] } },
+          notifications: [],
+          showEvolutionChoice: false,
+        },
+      },
+      {
+        commands: { movement: null, attacks: [] },
+        localPlayerId: 'p1',
+        hudSnapshot: {
+          xp: { current: 10, total: 230, next: 200, level: 2 },
+          level: 2,
+          reroll: { baseCost: 25, cost: 25, count: 0, pity: 0 },
+          evolutionMenu: { activeTier: 'small', options: { small: [], medium: [], large: [], macro: [] } },
+          notifications: [],
+          showEvolutionChoice: false,
+        },
+      },
+    ];
+
+    let callIndex = 0;
+    mocks.updateGameState.mockImplementation(() => {
+      const frame = snapshots[Math.min(callIndex, snapshots.length - 1)];
+      callIndex += 1;
+      return frame;
+    });
+
+    const canvas = createCanvas();
+    const dispatch = vi.fn();
+    const onReady = vi.fn();
+
+    render(<HookWrapper canvas={canvas} dispatch={dispatch} onReady={onReady} />);
+
+    await waitFor(() => {
+      expect(typeof rafCallback).toBe('function');
+    });
+
+    const firstFrame = rafCallback;
+    act(() => {
+      firstFrame(0);
+    });
+
+    await waitFor(() => {
+      expect(dispatch).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(onReady).toHaveBeenCalled();
+    });
+
+    const api = onReady.mock.calls[0][0];
+
+    act(() => {
+      api.inputActions.openEvolutionMenu();
+    });
+
+    const secondFrame = rafCallback;
+    act(() => {
+      secondFrame(16);
+    });
+
+    const thirdFrame = rafCallback;
+    act(() => {
+      thirdFrame(32);
+    });
+
+    const syncPayloads = dispatch.mock.calls
+      .filter(([action]) => action?.type === 'SYNC_STATE')
+      .map(([action]) => action.payload);
+
+    expect(syncPayloads.length).toBeGreaterThanOrEqual(3);
+
+    const firstLevelTwoIndex = syncPayloads.findIndex((payload) => payload.level >= 2);
+    expect(firstLevelTwoIndex).toBeGreaterThanOrEqual(0);
+
+    const afterLevelUp = syncPayloads.slice(firstLevelTwoIndex);
+    expect(afterLevelUp.every((payload) => payload.level >= 2)).toBe(true);
+
+    const openPayload = afterLevelUp.find((payload) => payload.showEvolutionChoice);
+    expect(openPayload).toBeDefined();
+    expect(openPayload.level).toBe(2);
+
+    const finalPayload = afterLevelUp[afterLevelUp.length - 1];
+    expect(finalPayload.level).toBe(2);
+    expect(finalPayload.showEvolutionChoice).toBe(true);
+    expect(finalPayload.resourceBag.level).toBe(2);
+
+    const toastAdditions = mocks.addNotification.mock.calls.filter(([, text]) => text === '⬆️ Nível 2');
+    expect(toastAdditions).toHaveLength(1);
   });
 });
 

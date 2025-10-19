@@ -73,6 +73,17 @@ const ensureResourceReferences = (state) => {
       large: 0,
     };
   }
+
+  const safeLevel = Number.isFinite(state.level) ? state.level : 1;
+  if (!Number.isFinite(state.confirmedLevel)) {
+    state.confirmedLevel = safeLevel;
+  }
+  if (!Number.isFinite(state.pendingEvolutionLevel)) {
+    state.pendingEvolutionLevel = null;
+  }
+  if (!Number.isFinite(state.lastLevelToast)) {
+    state.lastLevelToast = state.confirmedLevel;
+  }
 };
 
 const recalcPointsAndSlots = (state) => {
@@ -461,6 +472,22 @@ export const checkEvolution = (state, helpers = {}) => {
     xpState.next = threshold;
     recalcPointsAndSlots(state);
 
+    if (!Number.isFinite(state.pendingEvolutionLevel) || state.pendingEvolutionLevel < state.level) {
+      state.pendingEvolutionLevel = state.level;
+    }
+
+    if (!Number.isFinite(state.lastLevelToast) && Number.isFinite(state.confirmedLevel)) {
+      state.lastLevelToast = state.confirmedLevel;
+    }
+
+    if (Number.isFinite(state.lastLevelToast) && state.level > state.lastLevelToast) {
+      helpers.addNotification?.(state, `⬆️ Nível ${state.level}`);
+      state.lastLevelToast = state.level;
+    } else if (!Number.isFinite(state.lastLevelToast)) {
+      state.lastLevelToast = state.level;
+      helpers.addNotification?.(state, `⬆️ Nível ${state.level}`);
+    }
+
     if (state.level % LARGE_SLOT_INTERVAL === 0) {
       pushTier(state, 'large');
     } else if (state.level % MEDIUM_SLOT_INTERVAL === 0) {
@@ -484,7 +511,6 @@ export const checkEvolution = (state, helpers = {}) => {
   if (leveledUp) {
     state.reroll.cost = state.reroll.baseCost ?? BASE_REROLL_COST;
     state.reroll.count = 0;
-    helpers.addNotification?.(state, `⬆️ Nível ${state.level}`);
   }
 
   helpers.syncState?.(state);
@@ -722,6 +748,9 @@ export const restartGame = (state, helpers = {}) => {
     health: baseState.health,
     maxHealth: baseState.maxHealth,
     level: 1,
+    confirmedLevel: baseState.confirmedLevel,
+    pendingEvolutionLevel: baseState.pendingEvolutionLevel,
+    lastLevelToast: baseState.lastLevelToast,
     score: 0,
     canEvolve: false,
     showEvolutionChoice: false,

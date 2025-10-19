@@ -86,6 +86,9 @@ export const createInitialState = ({ archetypeKey } = {}) => {
     comboTimer: 0,
 
     showEvolutionChoice: false,
+    pendingEvolutionLevel: null,
+    confirmedLevel: 1,
+    lastLevelToast: 1,
     archetypeSelection: buildArchetypeSelection(archetypeKey),
     selectedArchetype: archetypeKey ?? null,
     evolutionType: 'evolution',

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AFFINITY_TYPES, ELEMENT_TYPES } from '../../shared/combat';
 import { createInitialState } from '../state/initialState';
@@ -47,6 +47,10 @@ const helpers = {
   syncState: vi.fn(),
 };
 
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
 describe('checkEvolution', () => {
   it('levels up and enqueues tiers when XP exceeds thresholds', () => {
     const state = createState();
@@ -58,6 +62,31 @@ describe('checkEvolution', () => {
     expect(state.xp.current).toBeGreaterThanOrEqual(0);
     expect(state.progressionQueue).toContain('medium');
     expect(state.characteristicPoints.available).toBeGreaterThan(0);
+    expect(state.pendingEvolutionLevel).toBe(2);
+  });
+
+  it('emits a single level-up notification per evolution and keeps pending level', () => {
+    const state = createState();
+    state.xp.current = state.xp.next + 10;
+
+    checkEvolution(state, helpers);
+
+    const levelToasts = helpers.addNotification.mock.calls
+      .map(([, message]) => message)
+      .filter((message) => typeof message === 'string' && message.startsWith('⬆️'));
+
+    expect(levelToasts).toEqual(['⬆️ Nível 2']);
+    expect(state.pendingEvolutionLevel).toBe(2);
+
+    helpers.addNotification.mockClear();
+
+    checkEvolution(state, helpers);
+
+    const repeatedToasts = helpers.addNotification.mock.calls
+      .map(([, message]) => message)
+      .filter((message) => typeof message === 'string' && message.startsWith('⬆️'));
+
+    expect(repeatedToasts).toHaveLength(0);
   });
 });
 
