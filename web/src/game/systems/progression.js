@@ -10,8 +10,24 @@ const MEDIUM_SLOT_INTERVAL = 2;
 const LARGE_SLOT_INTERVAL = 5;
 const SMALL_EVOLUTION_POINT_COST = 1;
 
+const sanitizeThresholds = (thresholds) => {
+  if (!Array.isArray(thresholds)) return [];
+
+  let previous = 0;
+  return thresholds.map((value, index) => {
+    const fallback = index === 0 ? 0 : previous;
+    const normalized = Number.isFinite(value) ? value : fallback;
+    const sanitized = Math.max(fallback, normalized);
+    previous = sanitized;
+    return sanitized;
+  });
+};
+
 const getXpRequirementForLevel = (xpState = {}, level = 1) => {
-  const thresholds = Array.isArray(xpState.thresholds) ? xpState.thresholds : [];
+  const thresholds = sanitizeThresholds(xpState.thresholds);
+  if (thresholds.length > 0) {
+    xpState.thresholds = thresholds;
+  }
   if (thresholds.length > level) {
     const previous = thresholds[level - 1] ?? 0;
     const next = thresholds[level] ?? previous;
