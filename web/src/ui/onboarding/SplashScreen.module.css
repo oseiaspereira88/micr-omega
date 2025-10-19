@@ -39,14 +39,14 @@
 }
 
 .mobile {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  gap: clamp(32px, 8vw, 56px);
-  padding: clamp(48px, 18vw, 140px) clamp(24px, 10vw, 60px);
-  min-height: 100%;
-  height: 100%;
+  display: grid;
+  grid-auto-rows: max-content;
+  place-content: center;
+  justify-items: center;
+  gap: clamp(16px, 6vh, 32px);
+  padding-block: clamp(24px, 8vh, 48px);
+  padding-inline: clamp(24px, 9vw, 52px);
+  min-height: 100dvh;
 }
 
 .visualCluster {
@@ -67,13 +67,28 @@
 }
 
 .mobile .visualCluster {
-  width: min(440px, 90vw);
-  max-width: 440px;
+  width: min(320px, 70vw);
+  max-width: 320px;
 }
 
 .mobile .copyBlock {
-  gap: clamp(14px, 6vw, 20px);
-  width: min(100%, 420px);
+  gap: clamp(12px, 5vh, 18px);
+  width: min(320px, 80vw);
+}
+
+.mobile .title {
+  font-size: clamp(2rem, 10vw, 2.6rem);
+  letter-spacing: 0.14em;
+}
+
+.mobile .tagline {
+  font-size: clamp(0.9rem, 4vw, 1.1rem);
+  letter-spacing: 0.3em;
+}
+
+.mobile .status {
+  font-size: clamp(0.85rem, 3.5vw, 1.05rem);
+  letter-spacing: 0.24em;
 }
 
 .orbital {
