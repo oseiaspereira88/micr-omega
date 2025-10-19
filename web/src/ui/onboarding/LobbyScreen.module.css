@@ -5,6 +5,7 @@
   display: flex;
   width: 100%;
   height: 100%;
+  min-height: 100%;
   padding: clamp(24px, 4vw, 48px);
   background: linear-gradient(145deg, rgba(5, 16, 38, 0.92), rgba(6, 12, 28, 0.92));
   color: rgba(224, 242, 255, 0.94);
@@ -30,6 +31,15 @@
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr);
   gap: clamp(24px, 3vw, 36px);
   width: 100%;
+}
+
+.mobileShell {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(18px, 4vw, 26px);
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -119,6 +129,25 @@
   font-size: 0.92rem;
 }
 
+.sidebarHighlights {
+  display: grid;
+  gap: 12px;
+}
+
+.sidebarHighlightsMobile {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 1fr);
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin: 4px -6px 0;
+  padding-inline: 6px;
+  scrollbar-width: none;
+}
+
+.sidebarHighlightsMobile::-webkit-scrollbar {
+  display: none;
+}
+
 .rooms {
   border-radius: 24px;
   background: rgba(8, 18, 36, 0.82);
@@ -131,10 +160,35 @@
   gap: clamp(18px, 2.3vw, 26px);
 }
 
+.mobileRooms {
+  flex: 1;
+  padding: clamp(18px, 5vw, 26px);
+  gap: clamp(16px, 4vw, 22px);
+  overflow: hidden;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.mobileFilters {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin: 0 -6px;
+  padding-inline: 6px;
+  gap: 10px;
+  scrollbar-width: none;
+}
+
+.mobileFilters::-webkit-scrollbar {
+  display: none;
+}
+
+.mobileFilters .filterChip {
+  flex: 0 0 auto;
 }
 
 .filterChip {
@@ -177,6 +231,15 @@
 .roomList {
   display: grid;
   gap: clamp(14px, 2vw, 18px);
+}
+
+.mobileRoomList {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 6px;
+  margin-right: -6px;
+  display: grid;
+  gap: clamp(14px, 4vw, 20px);
 }
 
 .roomCard {
@@ -287,49 +350,66 @@
 
 .mobile {
   padding: clamp(18px, 5vw, 32px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(18px, 4vw, 28px);
+  min-height: 100%;
+  height: 100%;
 }
 
-.mobile .shell {
-  grid-template-columns: 1fr;
+.mobileSidebar {
+  order: 0;
+  gap: clamp(16px, 4vw, 22px);
+  padding: clamp(18px, 5vw, 26px);
 }
 
-.mobile .sidebar {
-  order: 2;
+.mobileSidebar .createButton {
+  width: 100%;
 }
 
-.mobile .roomCard {
+.mobileSidebar .createButtonNotice {
+  font-size: clamp(0.78rem, 3.4vw, 0.92rem);
+}
+
+.mobileSidebar .statusCard {
+  min-width: 0;
+  padding: 14px 16px;
+  font-size: 0.85rem;
+}
+
+.mobileRooms .roomCard {
   grid-template-columns: 1fr;
   text-align: left;
 }
 
-.mobile .roomMeta {
+.mobileRooms .roomMeta {
   justify-items: start;
   text-align: left;
 }
 
-.mobile .joinButton,
-.mobile .unlockButton {
+.mobileRooms .joinButton,
+.mobileRooms .unlockButton {
   width: 100%;
   justify-self: stretch;
 }
 
 @media (max-width: 900px) {
-  .shell {
+  .shell:not(.mobileShell) {
     grid-template-columns: 1fr;
   }
 
-  .sidebar {
+  .sidebar:not(.mobileSidebar) {
     order: 2;
   }
 }
 
 @media (max-width: 560px) {
-  .filters {
+  .filters:not(.mobileFilters) {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .filterChip {
+  .filters:not(.mobileFilters) .filterChip {
     text-align: center;
   }
 

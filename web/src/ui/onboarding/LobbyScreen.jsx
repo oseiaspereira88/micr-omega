@@ -17,6 +17,23 @@ const LobbyScreen = ({
 }) => {
   const testId = variant === 'mobile' ? 'lobby-screen-mobile' : 'lobby-screen';
   const className = [styles.root, variant === 'mobile' ? styles.mobile : ''].filter(Boolean).join(' ');
+  const shellClassName = [styles.shell, variant === 'mobile' ? styles.mobileShell : ''].filter(Boolean).join(' ');
+  const sidebarClassName = [styles.sidebar, variant === 'mobile' ? styles.mobileSidebar : '']
+    .filter(Boolean)
+    .join(' ');
+  const highlightsClassName = [
+    styles.sidebarHighlights,
+    variant === 'mobile' ? styles.sidebarHighlightsMobile : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const roomsClassName = [styles.rooms, variant === 'mobile' ? styles.mobileRooms : ''].filter(Boolean).join(' ');
+  const filtersClassName = [styles.filters, variant === 'mobile' ? styles.mobileFilters : '']
+    .filter(Boolean)
+    .join(' ');
+  const roomListClassName = [styles.roomList, variant === 'mobile' ? styles.mobileRoomList : '']
+    .filter(Boolean)
+    .join(' ');
   const isCreateRoomEnabled = typeof onCreateRoom === 'function';
   const createButtonClassName = [
     styles.createButton,
@@ -96,8 +113,8 @@ const LobbyScreen = ({
   return (
     <div className={className} data-testid={testId}>
       <div className={styles.backdrop} />
-      <div className={styles.shell}>
-        <aside className={styles.sidebar}>
+      <div className={shellClassName}>
+        <aside className={sidebarClassName}>
           <h3>Criar Sala</h3>
           <p>Monte partidas privadas com regras avançadas e convide o seu esquadrão.</p>
           <button
@@ -114,17 +131,19 @@ const LobbyScreen = ({
               Em breve: conecte-se a uma sala pública enquanto preparamos a criação privada.
             </p>
           )}
-          <div className={styles.statusCard}>
-            <span>🏓 Ping médio: 22ms</span>
-            <span>Conexão estável</span>
-          </div>
-          <div className={styles.statusCard}>
-            <span>🔥 3 salas premium disponíveis</span>
-            <span>Atualizadas a cada 5 min</span>
+          <div className={highlightsClassName}>
+            <div className={styles.statusCard}>
+              <span>🏓 Ping médio: 22ms</span>
+              <span>Conexão estável</span>
+            </div>
+            <div className={styles.statusCard}>
+              <span>🔥 3 salas premium disponíveis</span>
+              <span>Atualizadas a cada 5 min</span>
+            </div>
           </div>
         </aside>
-        <section className={styles.rooms}>
-          <div className={styles.filters}>
+        <section className={roomsClassName}>
+          <div className={filtersClassName}>
             {filterDefinitions.map((filter) => {
               const isActive = Boolean(activeFilters[filter.id]);
 
@@ -141,7 +160,7 @@ const LobbyScreen = ({
               );
             })}
           </div>
-          <div className={styles.roomList}>
+          <div className={roomListClassName}>
             <article className={styles.roomCard}>
               <div>
                 <h4>Sala Pública — Gratuita</h4>
