@@ -39,7 +39,14 @@ const STAGE_METADATA = {
   },
 };
 
-const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
+const MicroWorldOnboardingFlow = ({
+  onAdvance,
+  onComplete,
+  onOpenSettings,
+  onOpenStore,
+  onOpenMissions,
+  onOpenFriends,
+}) => {
   const [activeStage, setActiveStage] = useState('splash');
 
   const stageConfig = useMemo(() => STAGE_METADATA[activeStage] ?? STAGE_METADATA.splash, [activeStage]);
@@ -125,7 +132,15 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
           <div className={styles.stageGlow} />
           <div className={styles.stageContent}>
             {activeStage === 'splash' && <SplashScreen />}
-            {activeStage === 'menu' && <MainMenuScreen onPlay={handlePlay} />}
+            {activeStage === 'menu' && (
+              <MainMenuScreen
+                onPlay={handlePlay}
+                onOpenSettings={onOpenSettings}
+                onOpenStore={onOpenStore}
+                onOpenMissions={onOpenMissions}
+                onOpenFriends={onOpenFriends}
+              />
+            )}
             {activeStage === 'lobby' && <LobbyScreen onJoinPublic={handleEnterPublic} />}
           </div>
         </div>

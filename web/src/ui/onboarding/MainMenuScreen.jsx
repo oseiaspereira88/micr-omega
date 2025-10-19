@@ -1,9 +1,40 @@
 import React from 'react';
 import styles from './MainMenuScreen.module.css';
 
-const MainMenuScreen = ({ variant = 'desktop', onPlay }) => {
+const MainMenuScreen = ({
+  variant = 'desktop',
+  onPlay,
+  onOpenSettings,
+  onOpenStore,
+  onOpenMissions,
+  onOpenFriends,
+}) => {
   const testId = variant === 'mobile' ? 'main-menu-screen-mobile' : 'main-menu-screen';
   const className = [styles.root, variant === 'mobile' ? styles.mobile : ''].filter(Boolean).join(' ');
+  const secondaryActions = [
+    {
+      key: 'settings',
+      label: 'Configurações',
+      handler: onOpenSettings,
+    },
+    {
+      key: 'store',
+      label: 'Loja',
+      handler: onOpenStore,
+    },
+    {
+      key: 'missions',
+      label: 'Missões',
+      handler: onOpenMissions,
+    },
+    {
+      key: 'friends',
+      label: 'Amigos',
+      handler: onOpenFriends,
+    },
+  ];
+
+  const isPlayEnabled = typeof onPlay === 'function';
 
   return (
     <div className={className} data-testid={testId}>
@@ -23,9 +54,11 @@ const MainMenuScreen = ({ variant = 'desktop', onPlay }) => {
             type="button"
             className={styles.playButton}
             data-testid="main-menu-play"
-            onClick={onPlay}
+            onClick={isPlayEnabled ? onPlay : undefined}
+            disabled={!isPlayEnabled}
           >
             Play
+            {!isPlayEnabled && <span className={styles.buttonSoon}>Em breve</span>}
           </button>
           <div className={styles.badgeRow}>
             <div className={styles.badge}>
@@ -62,18 +95,23 @@ const MainMenuScreen = ({ variant = 'desktop', onPlay }) => {
             </div>
           </div>
           <div className={styles.storeActions}>
-            <button type="button" className={styles.storeButton}>
-              Configurações
-            </button>
-            <button type="button" className={styles.storeButton}>
-              Loja
-            </button>
-            <button type="button" className={styles.storeButton}>
-              Missões
-            </button>
-            <button type="button" className={styles.storeButton}>
-              Amigos
-            </button>
+            {secondaryActions.map((action) => {
+              const isEnabled = typeof action.handler === 'function';
+
+              return (
+                <button
+                  key={action.key}
+                  type="button"
+                  className={styles.storeButton}
+                  data-testid={`main-menu-${action.key}`}
+                  onClick={isEnabled ? action.handler : undefined}
+                  disabled={!isEnabled}
+                >
+                  <span className={styles.storeButtonLabel}>{action.label}</span>
+                  {!isEnabled && <span className={styles.storeButtonSoon}>Em breve</span>}
+                </button>
+              );
+            })}
           </div>
           <div className={styles.footer}>
             <span>v1.3.0</span>
