@@ -88,6 +88,66 @@ describe("RoomDO reconnection status handling", () => {
     }
   });
 
+  it("retains idle players that reconnect within the grace window", async () => {
+    const originalWebSocket = globalThis.WebSocket;
+    const websocketMock = { OPEN: 1, CLOSING: 2, CLOSED: 3 } as const;
+    (globalThis as any).WebSocket = websocketMock;
+
+    vi.useFakeTimers();
+
+    let removeSpy: ReturnType<typeof vi.spyOn> | null = null;
+
+    try {
+      const initialTime = 500_000;
+      vi.setSystemTime(initialTime);
+
+      const mockState = new MockDurableObjectState();
+      const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+      const roomAny = room as any;
+      await roomAny.ready;
+
+      roomAny.scheduleWorldTick = vi.fn();
+      roomAny.maybeStartGame = vi.fn().mockResolvedValue(undefined);
+      roomAny.broadcast = vi.fn();
+      roomAny.send = vi.fn();
+      removeSpy = vi.spyOn(roomAny, "removePlayer");
+
+      const joinSocket = createMockSocket();
+      const playerId = await roomAny.handleJoin(joinSocket, { type: "join", name: "Idle" });
+      expect(playerId).toBeTruthy();
+
+      const player = roomAny.players.get(playerId!);
+      expect(player).toBeDefined();
+      if (!player) {
+        throw new Error("player not created");
+      }
+
+      const inactivityTimeoutMs = 45_000;
+      player.lastActiveAt = initialTime - inactivityTimeoutMs - 1_000;
+
+      await roomAny.handleDisconnect(joinSocket, player.id);
+
+      const reconnectTime = initialTime + 1_000;
+      vi.setSystemTime(reconnectTime);
+
+      const reconnectSocket = createMockSocket();
+      const result = await roomAny.handleJoin(reconnectSocket, {
+        type: "join",
+        name: player.name,
+        playerId: player.id,
+        reconnectToken: player.reconnectToken,
+      });
+
+      expect(result).toBe(player.id);
+      expect(removeSpy).not.toHaveBeenCalled();
+      expect(roomAny.players.get(player.id)).toBeDefined();
+    } finally {
+      removeSpy?.mockRestore();
+      vi.useRealTimers();
+      (globalThis as any).WebSocket = originalWebSocket;
+    }
+  });
+
   it("restores previous reconnect token when snapshot flush fails", async () => {
     const originalWebSocket = globalThis.WebSocket;
     const websocketMock = { OPEN: 1, CLOSING: 2, CLOSED: 3 } as const;

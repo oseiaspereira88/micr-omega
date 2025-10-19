@@ -5565,7 +5565,9 @@ export class RoomDO {
       if (player.connected) {
         continue;
       }
-      if (reference - player.lastSeenAt > RECONNECT_WINDOW_MS || reference - player.lastActiveAt > INACTIVE_TIMEOUT_MS) {
+      const seenDelta = reference - player.lastSeenAt;
+      const activeDelta = reference - player.lastActiveAt;
+      if (seenDelta > RECONNECT_WINDOW_MS && activeDelta > INACTIVE_TIMEOUT_MS) {
         await this.removePlayer(player.id, "inactive");
         removedSomeone = true;
       }
