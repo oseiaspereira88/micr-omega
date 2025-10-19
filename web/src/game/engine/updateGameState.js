@@ -2,6 +2,8 @@ import { aggregateDrops, calculateExperienceFromEvents, XP_DISTRIBUTION } from '
 import { DROP_TABLES } from '../config/enemyTemplates';
 import { archetypePalettes } from '../config/archetypePalettes';
 import { HOSTILITY_MATRIX } from '../config/ecosystem';
+import { organicMatterTypes } from '../config/organicMatterTypes';
+import { createOrganicMatter } from '../entities/organicMatter';
 import { resolveNpcCombat } from '../systems/ai';
 import {
   AFFINITY_LABELS,
@@ -1130,13 +1132,39 @@ const mapMicroorganisms = (entities = [], previous = new Map()) =>
     };
   });
 
+const DEFAULT_ORGANIC_TYPE =
+  Object.prototype.hasOwnProperty.call(organicMatterTypes, 'protein')
+    ? 'protein'
+    : Object.keys(organicMatterTypes)[0] ?? 'protein';
+
 const mapOrganicMatter = (entities = []) =>
-  entities.map((entity) => ({
-    id: entity.id,
-    x: entity.position?.x ?? 0,
-    y: entity.position?.y ?? 0,
-    quantity: entity.quantity ?? 0,
-  }));
+  entities.map((entity) => {
+    const resolvedType =
+      entity.appearance?.type && organicMatterTypes[entity.appearance.type]
+        ? entity.appearance.type
+        : DEFAULT_ORGANIC_TYPE;
+    const typeConfig = organicMatterTypes[resolvedType] ?? organicMatterTypes[DEFAULT_ORGANIC_TYPE] ?? {};
+    const descriptor =
+      createOrganicMatter(resolvedType, typeConfig, {
+        x: entity.position?.x ?? 0,
+        y: entity.position?.y ?? 0,
+        seed: entity.appearance?.seed,
+        clusterSeed: entity.appearance?.clusterSeed,
+        clusterIndex: entity.appearance?.clusterIndex,
+      }) || {
+        x: entity.position?.x ?? 0,
+        y: entity.position?.y ?? 0,
+        type: resolvedType,
+      };
+
+    return {
+      id: entity.id,
+      quantity: entity.quantity ?? 0,
+      nutrients: { ...(entity.nutrients ?? {}) },
+      appearance: entity.appearance ? { ...entity.appearance } : undefined,
+      ...descriptor,
+    };
+  });
 
 const mapObstacles = (entities = []) =>
   entities.map((entity) => ({

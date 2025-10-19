@@ -829,7 +829,10 @@ describe('updateGameState', () => {
       height: 48,
       orientation: Math.PI / 6,
     });
-    expect(renderState.worldView.organicMatter[0]).toMatchObject({ id: 'nutrient-1', quantity: 4 });
+    const organicMatter = renderState.worldView.organicMatter[0];
+    expect(organicMatter).toMatchObject({ id: 'nutrient-1', quantity: 4, type: expect.any(String) });
+    expect(typeof organicMatter.color).toBe('string');
+    expect(typeof organicMatter.size).toBe('number');
     expect(renderState.worldView.roomObjects[0]).toMatchObject({ id: 'console-1', type: 'control' });
   });
 

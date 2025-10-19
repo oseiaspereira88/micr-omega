@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export { createMulberry32, combineSeeds, normalizeSeedValue, toSeedValue } from "./random";
+
 export const PROTOCOL_VERSION = "1.1.0" as const;
 
 export const RANKING_SORT_LOCALE = "pt-BR" as const;
@@ -192,12 +194,20 @@ export const microorganismSchema = z.object({
     .default({})
 });
 
+export const organicAppearanceSchema = z.object({
+  type: z.string().trim().min(1).max(32).optional(),
+  seed: z.number().int().nonnegative().max(0xffffffff).optional(),
+  clusterSeed: z.number().int().nonnegative().max(0xffffffff).optional(),
+  clusterIndex: z.number().int().nonnegative().optional(),
+});
+
 export const organicMatterSchema = z.object({
   id: worldObjectIdSchema,
   kind: z.literal("organic_matter"),
   position: vector2Schema,
   quantity: z.number().finite().nonnegative(),
-  nutrients: z.record(z.string().trim().min(1), z.number().finite()).default({})
+  nutrients: z.record(z.string().trim().min(1), z.number().finite()).default({}),
+  appearance: organicAppearanceSchema.optional()
 });
 
 export const obstacleSchema = z.object({
@@ -828,6 +838,7 @@ export type SharedWorldStateDiff = z.infer<typeof sharedWorldStateDiffSchema>;
 export type StatusEffectEvent = z.infer<typeof statusEffectEventSchema>;
 export type CombatLogEntry = z.infer<typeof combatLogEntrySchema>;
 export type Microorganism = z.infer<typeof microorganismSchema>;
+export type OrganicMatterAppearance = z.infer<typeof organicAppearanceSchema>;
 export type OrganicMatter = z.infer<typeof organicMatterSchema>;
 export type Obstacle = z.infer<typeof obstacleSchema>;
 export type RoomObject = z.infer<typeof roomObjectSchema>;

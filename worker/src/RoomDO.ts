@@ -51,8 +51,10 @@ import {
   aggregateDrops,
   calculateExperienceFromEvents,
   DROP_TABLES,
-  TARGET_OPTIONAL_ATTACK_KINDS
+  TARGET_OPTIONAL_ATTACK_KINDS,
+  toSeedValue
 } from "./types";
+import { planOrganicCluster } from "./organic";
 import {
   SKILL_KEYS,
   cloneSkillCooldowns,
@@ -860,6 +862,7 @@ const cloneOrganicMatter = (matter: OrganicMatter): OrganicMatter => ({
   ...matter,
   position: cloneVector(matter.position),
   nutrients: { ...matter.nutrients },
+  appearance: matter.appearance ? { ...matter.appearance } : undefined,
 });
 
 type InitialMicroorganismTemplate = {
@@ -1025,6 +1028,7 @@ type PendingOrganicRespawn = {
   template: {
     quantity: number;
     nutrients: OrganicMatter["nutrients"];
+    appearance?: OrganicMatter["appearance"];
   };
   position: Vector2;
   respawnAt: number;
@@ -1102,6 +1106,14 @@ const createInitialWorldState = (options: WorldGenerationOptions = {}): SharedWo
     const sinAngle = Math.sin(angle);
     const pattern =
       ORGANIC_CLUSTER_PATTERNS[index % ORGANIC_CLUSTER_PATTERNS.length] ?? ORGANIC_CLUSTER_PATTERNS[0];
+    const clusterSeed = hashString(`${matter.id}:${index}`);
+    const plan = planOrganicCluster(clusterSeed, {
+      remaining: pattern.length,
+      scatterMin: ORGANIC_RESPAWN_SCATTER_MIN,
+      scatterRadius: ORGANIC_RESPAWN_CLUSTER_RADIUS,
+      sizeOverride: pattern.length,
+      fallbackType: matter.appearance?.type,
+    });
 
     return pattern.map((entry, offsetIndex) => {
       const rotatedOffset = {
@@ -1122,12 +1134,21 @@ const createInitialWorldState = (options: WorldGenerationOptions = {}): SharedWo
       });
       const quantityBase = Math.max(4, matter.quantity);
       const quantity = Math.max(3, Math.round(quantityBase * entry.quantityFactor));
+      const planEntry = plan.entries[offsetIndex];
+      const fallbackType = plan.entries[0]?.appearance.type ?? "protein";
+      const appearance = planEntry?.appearance ?? {
+        type: fallbackType,
+        seed: hashString(`${matter.id}:${index}:${offsetIndex}`) >>> 0,
+        clusterSeed: clusterSeed >>> 0,
+        clusterIndex: offsetIndex,
+      };
 
       return {
         ...matter,
         id: offsetIndex === 0 ? matter.id : `${matter.id}-cluster-${offsetIndex}`,
         position,
         quantity,
+        appearance,
       };
     });
   });
@@ -3365,26 +3386,37 @@ export class RoomDO {
 
     const pendingRespawns: PendingOrganicRespawn[] = [];
     const rng = this.organicMatterRespawnRng;
+    const delayBase = ORGANIC_RESPAWN_DELAY_RANGE_MS.min;
+    const delayVariance = ORGANIC_RESPAWN_DELAY_RANGE_MS.max - ORGANIC_RESPAWN_DELAY_RANGE_MS.min;
     let index = 0;
     while (index < collectedEntries.length) {
       const remaining = collectedEntries.length - index;
-      const baseSize = Math.min(remaining, Math.floor(rng() * 3) + 3);
-      const clusterSize = Math.max(1, baseSize);
+      const firstEntry = collectedEntries[index];
+      const clusterSeed = toSeedValue(rng());
+      const plan = planOrganicCluster(clusterSeed, {
+        remaining,
+        scatterMin: ORGANIC_RESPAWN_SCATTER_MIN,
+        scatterRadius: ORGANIC_RESPAWN_CLUSTER_RADIUS,
+        fallbackType: firstEntry?.matter.appearance?.type,
+      });
       const anchor = this.findOrganicMatterRespawnPosition(player.position, 18);
       if (!anchor) {
         break;
       }
 
-      for (let clusterIndex = 0; clusterIndex < clusterSize; clusterIndex += 1) {
+      for (let clusterIndex = 0; clusterIndex < plan.size; clusterIndex += 1) {
         const entry = collectedEntries[index + clusterIndex];
         if (!entry) {
           break;
         }
 
-        const scatterAngle = rng() * Math.PI * 2;
-        const scatterDistance = ORGANIC_RESPAWN_SCATTER_MIN + rng() * ORGANIC_RESPAWN_CLUSTER_RADIUS;
-        const scatterX = Math.cos(scatterAngle) * scatterDistance;
-        const scatterY = Math.sin(scatterAngle) * scatterDistance;
+        const planEntry = plan.entries[clusterIndex] ?? plan.entries[0];
+        if (!planEntry) {
+          continue;
+        }
+
+        const scatterX = Math.cos(planEntry.scatterAngle) * planEntry.scatterDistance;
+        const scatterY = Math.sin(planEntry.scatterAngle) * planEntry.scatterDistance;
         const candidatePosition = this.clampPosition({
           x: anchor.x + scatterX,
           y: anchor.y + scatterY,
@@ -3393,11 +3425,10 @@ export class RoomDO {
         const template: PendingOrganicRespawn["template"] = {
           quantity: Math.max(1, Math.round(entry.matter.quantity)),
           nutrients: { ...entry.matter.nutrients },
+          appearance: planEntry.appearance,
         };
 
-        const delayBase = ORGANIC_RESPAWN_DELAY_RANGE_MS.min;
-        const delayVariance = ORGANIC_RESPAWN_DELAY_RANGE_MS.max - ORGANIC_RESPAWN_DELAY_RANGE_MS.min;
-        const delay = delayBase + rng() * delayVariance + clusterIndex * 90;
+        const delay = delayBase + planEntry.delayFactor * delayVariance + clusterIndex * 90;
 
         pendingRespawns.push({
           template,
@@ -3406,7 +3437,7 @@ export class RoomDO {
         });
       }
 
-      index += clusterSize;
+      index += plan.size;
     }
 
     if (pendingRespawns.length > 0) {
@@ -3512,6 +3543,9 @@ export class RoomDO {
         position: spawnPosition,
         quantity: Math.max(1, Math.round(entry.template.quantity)),
         nutrients: { ...entry.template.nutrients },
+        appearance: entry.template.appearance
+          ? { ...entry.template.appearance }
+          : undefined,
       };
 
       this.addOrganicMatterEntity(matter);

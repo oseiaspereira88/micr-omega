@@ -2,8 +2,7 @@ import { WORLD_SIZE } from '@micr-omega/shared';
 
 import { organicMatterTypes as defaultOrganicMatterTypes } from '../config/organicMatterTypes';
 import { createOrganicMatter } from '../entities/organicMatter';
-
-const getRandom = (rng = Math.random) => (typeof rng === 'function' ? rng : Math.random);
+import { createSeededRandom, toSeedValue } from '../utils/random';
 
 const pickRandom = (items = [], random) => {
   if (!items.length) return undefined;
@@ -15,9 +14,10 @@ export const spawnOrganicMatter = ({
   count = 1,
   worldSize = WORLD_SIZE,
   types = defaultOrganicMatterTypes,
-  rng = Math.random
+  rng = Math.random,
+  seed
 } = {}) => {
-  const random = getRandom(rng);
+  const random = createSeededRandom({ rng, seed });
   const availableTypes = Object.keys(types || {});
   if (!availableTypes.length || count <= 0) return [];
 
@@ -28,19 +28,23 @@ export const spawnOrganicMatter = ({
     const type = types[typeKey];
     if (!type) continue;
 
-    const isCluster = random() > 0.35;
-    const clusterSize = isCluster ? Math.floor(random() * 4) + 4 : 1;
+    const groupSeed = toSeedValue(random());
+    const groupRandom = createSeededRandom({ seed: groupSeed });
+    const isCluster = groupRandom() > 0.35;
+    const clusterSize = isCluster ? Math.floor(groupRandom() * 4) + 4 : 1;
     const baseX = random() * worldSize;
     const baseY = random() * worldSize;
 
     for (let j = 0; j < clusterSize; j++) {
       const scatterScale = isCluster ? 70 : 25;
-      const offsetX = (random() - 0.5) * scatterScale;
-      const offsetY = (random() - 0.5) * scatterScale;
+      const offsetX = (groupRandom() - 0.5) * scatterScale;
+      const offsetY = (groupRandom() - 0.5) * scatterScale;
       const organic = createOrganicMatter(typeKey, type, {
         x: baseX + offsetX,
         y: baseY + offsetY,
-        rng: random
+        rng: groupRandom,
+        clusterSeed: groupSeed,
+        clusterIndex: j
       });
 
       if (organic) {

@@ -107,5 +107,9 @@ export {
   sanitizePlayerName,
   sanitizeAbilityId,
   sanitizePlayerId,
-  sanitizeArchetypeKey
+  sanitizeArchetypeKey,
+  createMulberry32,
+  combineSeeds,
+  normalizeSeedValue,
+  toSeedValue
 } from "@micr-omega/shared";

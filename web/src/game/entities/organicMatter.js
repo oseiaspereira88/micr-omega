@@ -1,4 +1,4 @@
-const getRandom = (rng = Math.random) => (typeof rng === 'function' ? rng : Math.random);
+import { createSeededRandom } from '../utils/random';
 
 const pickRandom = (items = [], random) => {
   if (!items.length) return undefined;
@@ -13,10 +13,13 @@ export const createOrganicMatter = (typeKey, typeConfig, options = {}) => {
     x = 0,
     y = 0,
     rng = Math.random,
+    seed,
+    clusterSeed,
+    clusterIndex,
     ...overrides
   } = options;
 
-  const random = getRandom(rng);
+  const random = createSeededRandom({ rng, seed, clusterSeed, clusterIndex });
   const sizeRange = typeConfig.sizes || [1, 1];
   const size = overrides.size ?? (sizeRange[0] + random() * (sizeRange[1] - sizeRange[0]));
 
