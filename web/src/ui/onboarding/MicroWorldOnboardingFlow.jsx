@@ -5,6 +5,7 @@ import LobbyScreen from './LobbyScreen.jsx';
 import styles from './MicroWorldOnboardingFlow.module.css';
 
 const STAGE_SEQUENCE = ['splash', 'menu', 'lobby'];
+const HIDE_STATUS_CARD_STAGES = new Set(['splash', 'lobby']);
 
 const isTestEnvironment =
   typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined'
@@ -188,6 +189,8 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
     [activeStage],
   );
 
+  const shouldShowStatusCard = !HIDE_STATUS_CARD_STAGES.has(activeStage);
+
   return (
     <div className={styles.flowRoot} data-testid="micro-world-onboarding-flow">
       <div className={styles.backgroundLayer} />
@@ -237,34 +240,36 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
           {feedbackNotice}
         </div>
       )}
-      <div className={styles.statusRow}>
-        <div className={styles.statusPrimary}>
-          <strong>Sequência atual</strong>
-          <span>{stageConfig.status}</span>
-        </div>
-        <nav className={styles.statusTimeline} aria-label="Progresso das etapas">
-          <ol className={styles.timelineList}>
-            {timelineItems.map((item, index) => {
-              const ariaLabel = `Etapa ${index + 1} de ${timelineItems.length}: ${item.label}`;
+      {shouldShowStatusCard && (
+        <div className={styles.statusRow}>
+          <div className={styles.statusPrimary}>
+            <strong>Sequência atual</strong>
+            <span>{stageConfig.status}</span>
+          </div>
+          <nav className={styles.statusTimeline} aria-label="Progresso das etapas">
+            <ol className={styles.timelineList}>
+              {timelineItems.map((item, index) => {
+                const ariaLabel = `Etapa ${index + 1} de ${timelineItems.length}: ${item.label}`;
 
-              return (
-                <li
-                  key={item.key}
-                  className={styles.timelineItem}
-                  data-active={item.active ? 'true' : 'false'}
-                  aria-current={item.active ? 'step' : undefined}
-                >
-                  <span aria-hidden="true">{item.label}</span>
-                  <span className={styles.visuallyHidden}>
-                    {ariaLabel}
-                    {item.active ? ' (etapa atual)' : ''}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        </nav>
-      </div>
+                return (
+                  <li
+                    key={item.key}
+                    className={styles.timelineItem}
+                    data-active={item.active ? 'true' : 'false'}
+                    aria-current={item.active ? 'step' : undefined}
+                  >
+                    <span aria-hidden="true">{item.label}</span>
+                    <span className={styles.visuallyHidden}>
+                      {ariaLabel}
+                      {item.active ? ' (etapa atual)' : ''}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+        </div>
+      )}
     </div>
   );
 };
