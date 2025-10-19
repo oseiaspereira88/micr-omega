@@ -609,15 +609,35 @@ export const openEvolutionMenu = (state, helpers = {}) => {
     return state;
   }
 
-  const tier = queue.shift();
+  const originalTier = queue.shift();
+  let tier = originalTier;
   const options = {
     small: buildEvolutionOptions(state, helpers, 'small'),
     medium: buildEvolutionOptions(state, helpers, 'medium'),
     large: buildEvolutionOptions(state, helpers, 'large'),
   };
-  const activeOptions = options[tier] || [];
+  let activeOptions = options[tier] || [];
 
-  if (activeOptions.length === 0) {
+  const hasAvailableOption = activeOptions.some((option) => option?.available);
+
+  if (!hasAvailableOption) {
+    const tierOrder = ['small', 'medium', 'large'];
+    for (const candidate of tierOrder) {
+      if (candidate === tier) continue;
+      const candidateOptions = options[candidate] || [];
+      if (candidateOptions.some((option) => option?.available)) {
+        queue.unshift(originalTier);
+        tier = candidate;
+        activeOptions = candidateOptions;
+        break;
+      }
+    }
+  }
+
+  const hasValidOptions =
+    activeOptions.length > 0 && activeOptions.some((option) => option?.available);
+
+  if (!hasValidOptions) {
     helpers.addNotification?.(state, 'Nenhuma evolução disponível no momento.');
     state.canEvolve = false;
     return state;
