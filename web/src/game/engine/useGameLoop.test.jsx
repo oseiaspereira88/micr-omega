@@ -612,6 +612,86 @@ describe('useGameLoop evolution confirmation flow', () => {
     const toastAdditions = mocks.addNotification.mock.calls.filter(([, text]) => text === '⬆️ Nível 2');
     expect(toastAdditions).toHaveLength(1);
   });
+
+  it('emits only one level-up toast when the XP snapshot stabilizes after leveling', async () => {
+    const snapshots = [
+      {
+        commands: { movement: null, attacks: [] },
+        localPlayerId: 'player-1',
+        hudSnapshot: {
+          xp: { current: 90, total: 90, next: 100, level: 1 },
+          level: 1,
+          reroll: { baseCost: 25, cost: 25, count: 0, pity: 0 },
+          evolutionMenu: { activeTier: 'small', options: { small: [], medium: [], large: [], macro: [] } },
+          notifications: [],
+          showEvolutionChoice: false,
+        },
+      },
+      {
+        commands: { movement: null, attacks: [] },
+        localPlayerId: 'player-1',
+        hudSnapshot: {
+          xp: { current: 10, total: 110, next: 150, level: 2 },
+          level: 2,
+          reroll: { baseCost: 25, cost: 25, count: 0, pity: 0 },
+          evolutionMenu: { activeTier: 'small', options: { small: [], medium: [], large: [], macro: [] } },
+          notifications: [],
+          showEvolutionChoice: false,
+        },
+      },
+      {
+        commands: { movement: null, attacks: [] },
+        localPlayerId: 'player-1',
+        hudSnapshot: {
+          xp: { current: 10, total: 110, next: 150, level: 2 },
+          level: 2,
+          reroll: { baseCost: 25, cost: 25, count: 0, pity: 0 },
+          evolutionMenu: { activeTier: 'small', options: { small: [], medium: [], large: [], macro: [] } },
+          notifications: [],
+          showEvolutionChoice: false,
+        },
+      },
+    ];
+
+    let callIndex = 0;
+    mocks.updateGameState.mockImplementation(() => {
+      const frame = snapshots[Math.min(callIndex, snapshots.length - 1)];
+      callIndex += 1;
+      return frame;
+    });
+
+    const canvas = createCanvas();
+    const dispatch = vi.fn();
+
+    render(<HookWrapper canvas={canvas} dispatch={dispatch} />);
+
+    await waitFor(() => {
+      expect(typeof rafCallback).toBe('function');
+    });
+
+    const firstFrame = rafCallback;
+    act(() => {
+      firstFrame(0);
+    });
+
+    const secondFrame = rafCallback;
+    act(() => {
+      secondFrame(16);
+    });
+
+    const thirdFrame = rafCallback;
+    act(() => {
+      thirdFrame(32);
+    });
+
+    await waitFor(() => {
+      const levelUpToasts = mocks.addNotification.mock.calls.filter(([, text]) => text === '⬆️ Nível 2');
+      expect(levelUpToasts.length).toBeGreaterThan(0);
+    });
+
+    const toastAdditions = mocks.addNotification.mock.calls.filter(([, text]) => text === '⬆️ Nível 2');
+    expect(toastAdditions).toHaveLength(1);
+  });
 });
 
 describe('setActiveEvolutionTier', () => {
