@@ -91,6 +91,7 @@ const ensureResourceReferences = (state) => {
   }
 
   const safeLevel = Number.isFinite(state.level) ? state.level : 1;
+  state.level = safeLevel;
   if (!Number.isFinite(state.confirmedLevel)) {
     state.confirmedLevel = safeLevel;
   }
