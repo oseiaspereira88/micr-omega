@@ -9,6 +9,43 @@ const REROLL_GROWTH_FACTOR = 1.6;
 const MEDIUM_SLOT_INTERVAL = 2;
 const LARGE_SLOT_INTERVAL = 5;
 const SMALL_EVOLUTION_POINT_COST = 1;
+const MIN_THRESHOLD_STEP = 50;
+const MAX_LEVEL_UPS_PER_TICK = 25;
+
+const sanitizeThresholds = (thresholds = []) => {
+  if (!Array.isArray(thresholds)) {
+    return [];
+  }
+
+  let lastValue = 0;
+  return thresholds.map((raw, index) => {
+    const numeric = Number.isFinite(raw) ? raw : lastValue + MIN_THRESHOLD_STEP;
+    const sanitized = index === 0
+      ? Math.max(0, numeric)
+      : Math.max(numeric, lastValue + MIN_THRESHOLD_STEP);
+    lastValue = sanitized;
+    return sanitized;
+  });
+};
+
+const normalizeXpState = (state, safeLevel) => {
+  const xpState = state.xp || { current: 0, total: 0, next: 120, level: safeLevel };
+
+  xpState.current = Number.isFinite(xpState.current) ? Math.max(0, xpState.current) : 0;
+  const normalizedTotal = Number.isFinite(xpState.total) ? Math.max(0, xpState.total) : 0;
+  xpState.total = Math.max(normalizedTotal, xpState.current);
+  xpState.level = Number.isFinite(xpState.level)
+    ? Math.max(1, safeLevel, xpState.level)
+    : Math.max(1, safeLevel);
+  xpState.thresholds = sanitizeThresholds(xpState.thresholds);
+
+  const requirement = getXpRequirementForLevel(xpState, xpState.level);
+  const nextCandidate = Number.isFinite(xpState.next) ? xpState.next : requirement;
+  xpState.next = Math.max(requirement, nextCandidate, MIN_THRESHOLD_STEP);
+
+  state.xp = xpState;
+  return xpState;
+};
 
 const getXpRequirementForLevel = (xpState = {}, level = 1) => {
   const thresholds = Array.isArray(xpState.thresholds) ? xpState.thresholds : [];
@@ -457,13 +494,14 @@ export const checkEvolution = (state, helpers = {}) => {
   if (!state) return state;
   ensureResourceReferences(state);
 
-  const xpState = state.xp || { current: 0, next: 120, total: 0, level: state.level };
-  xpState.next = xpState.next ?? getXpRequirementForLevel(xpState, state.level);
+  const safeLevel = Number.isFinite(state.level) ? state.level : 1;
+  const xpState = normalizeXpState(state, safeLevel);
 
   let threshold = xpState.next;
   let leveledUp = false;
+  let loopCount = 0;
 
-  while (xpState.current >= threshold) {
+  while (xpState.current >= threshold && loopCount < MAX_LEVEL_UPS_PER_TICK) {
     xpState.current -= threshold;
     xpState.total = (xpState.total ?? 0) + threshold;
     state.level += 1;
@@ -497,6 +535,32 @@ export const checkEvolution = (state, helpers = {}) => {
     }
 
     leveledUp = true;
+    loopCount += 1;
+  }
+
+  if (!leveledUp) {
+    const targetLevel = Number.isFinite(state.level)
+      ? state.level
+      : Number.isFinite(state.confirmedLevel)
+        ? state.confirmedLevel
+        : null;
+
+    if (targetLevel !== null) {
+      const baselineToast = Number.isFinite(state.lastLevelToast)
+        ? state.lastLevelToast
+        : Number.isFinite(state.confirmedLevel)
+          ? state.confirmedLevel
+          : targetLevel - 1;
+
+      if (!Number.isFinite(state.lastLevelToast)) {
+        state.lastLevelToast = baselineToast;
+      }
+
+      if (targetLevel > baselineToast) {
+        helpers.addNotification?.(state, `⬆️ Nível ${targetLevel}`);
+        state.lastLevelToast = targetLevel;
+      }
+    }
   }
 
   if (!leveledUp && ensureQueue(state).length === 0) {

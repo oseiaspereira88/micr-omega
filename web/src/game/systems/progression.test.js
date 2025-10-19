@@ -65,6 +65,45 @@ describe('checkEvolution', () => {
     expect(state.pendingEvolutionLevel).toBe(2);
   });
 
+  it('normalizes zero or negative XP requirements to avoid runaway leveling', () => {
+    const state = createState();
+    state.xp.current = 200;
+    state.xp.next = 0;
+
+    checkEvolution(state, helpers);
+
+    expect(state.level).toBe(2);
+    expect(state.xp.next).toBeGreaterThan(0);
+    expect(state.xp.current).toBeGreaterThanOrEqual(0);
+    expect(state.pendingEvolutionLevel).toBe(2);
+
+    const levelToasts = helpers.addNotification.mock.calls
+      .map(([, message]) => message)
+      .filter((message) => typeof message === 'string' && message.startsWith('⬆️'));
+
+    expect(levelToasts).toEqual(['⬆️ Nível 2']);
+  });
+
+  it('restores safe defaults when XP snapshots contain invalid data', () => {
+    const state = createState();
+    state.level = 4;
+    state.xp = {
+      current: -25,
+      total: -10,
+      next: -5,
+      level: 0,
+      thresholds: [0, 0, -40, 100, 90],
+    };
+
+    checkEvolution(state, helpers);
+
+    expect(state.xp.current).toBe(0);
+    expect(state.xp.total).toBe(0);
+    expect(state.xp.level).toBe(4);
+    expect(state.xp.next).toBeGreaterThanOrEqual(50);
+    expect(state.xp.thresholds).toEqual([0, 50, 100, 150, 200]);
+  });
+
   it('emits a single level-up notification per evolution and keeps pending level', () => {
     const state = createState();
     state.xp.current = state.xp.next + 10;
