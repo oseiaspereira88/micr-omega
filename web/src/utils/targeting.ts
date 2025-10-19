@@ -89,6 +89,7 @@ type MicroorganismAggression = Microorganism["aggression"];
 type MicroorganismLike = Pick<Microorganism, "id" | "aggression" | "health" | "position"> & {
   x?: unknown;
   y?: unknown;
+  healthValue?: unknown;
 };
 
 const VALID_AGGRESSIONS: ReadonlySet<MicroorganismAggression> = new Set([
@@ -127,12 +128,27 @@ const isAttackableMicroorganism = (
     return false;
   }
 
-  const health = entity.health;
-  if (!health || typeof health.current !== "number" || !Number.isFinite(health.current)) {
+  const rawHealth = entity.health;
+  let currentHealth: number | null = null;
+
+  if (typeof rawHealth === "number") {
+    currentHealth = Number.isFinite(rawHealth) ? rawHealth : null;
+  } else if (rawHealth && typeof rawHealth === "object") {
+    const candidate = (rawHealth as { current?: unknown }).current;
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      currentHealth = candidate;
+    }
+  }
+
+  if (currentHealth === null && typeof entity.healthValue === "number") {
+    currentHealth = Number.isFinite(entity.healthValue) ? entity.healthValue : null;
+  }
+
+  if (currentHealth === null) {
     return false;
   }
 
-  return health.current > 0;
+  return currentHealth > 0;
 };
 
 type IterableLike<T> = readonly T[] | Iterable<T> | null | undefined;
