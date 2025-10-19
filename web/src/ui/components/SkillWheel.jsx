@@ -98,7 +98,13 @@ const SkillWheel = ({
           }}
         />
       </div>
-      <span className={styles.visuallyHidden}>Estado da habilidade: {readinessStatus}</span>
+      <span
+        className={styles.visuallyHidden}
+        role="status"
+        aria-live="polite"
+      >
+        Estado da habilidade: {readinessStatus}
+      </span>
 
       {currentSkill?.applies?.length ? (
         <div className={styles.statusList}>
