@@ -12,6 +12,7 @@ import {
 import { DROP_TABLES } from '../config/enemyTemplates';
 import { archetypePalettes } from '../config/archetypePalettes';
 import { AFFINITY_TYPES, ELEMENT_TYPES } from '../../shared/combat';
+import * as aiModule from '../systems/ai';
 
 const createRenderState = () => ({
   camera: {
@@ -917,6 +918,115 @@ describe('updateGameState', () => {
     expect(Array.isArray(renderState.worldView.microorganisms[0].scars)).toBe(true);
     expect(drops.length).toBeGreaterThan(0);
     expect(renderState.aiMemory).toBeDefined();
+  });
+
+  it('spawns advantage effects and popups for NPC combat events', () => {
+    const renderState = createRenderState();
+    const sharedState = createSharedState({
+      world: {
+        biome: 'delta',
+        microorganisms: [
+          {
+            id: 'npc-attacker',
+            species: 'amoeba',
+            position: { x: 0, y: 0 },
+            movementVector: { x: 0, y: 0 },
+            health: { current: 6, max: 6 },
+            element: ELEMENT_TYPES.ACID,
+          },
+          {
+            id: 'npc-target',
+            species: 'bacteria',
+            position: { x: 30, y: -12 },
+            movementVector: { x: 0, y: 0 },
+            health: { current: 6, max: 6 },
+            element: ELEMENT_TYPES.KINETIC,
+          },
+        ],
+      },
+    });
+
+    const createEffect = vi.fn();
+    const createParticle = vi.fn();
+    const aiSpy = vi.spyOn(aiModule, 'resolveNpcCombat').mockReturnValue({
+      world: sharedState.world,
+      events: [
+        {
+          type: 'attack',
+          attackerId: 'npc-attacker',
+          targetId: 'npc-target',
+          damage: 5,
+          relation: 'advantage',
+        },
+      ],
+      drops: [],
+      memory: { threatManagers: {} },
+    });
+
+    try {
+      updateGameState({
+        renderState,
+        sharedState,
+        delta: 0.16,
+        movementIntent: { x: 0, y: 0 },
+        actionBuffer: { attacks: [] },
+        helpers: { createEffect, createParticle },
+      });
+    } finally {
+      aiSpy.mockRestore();
+    }
+
+    expect(createEffect).toHaveBeenCalledWith(30, -12, 'advantage', '#70d6ff');
+    expect(createParticle).toHaveBeenCalled();
+    expect(createParticle.mock.calls[0][2]).toBe('#c8efff');
+    expect(sharedState.damagePopups).toHaveLength(1);
+    expect(sharedState.damagePopups[0]).toMatchObject({ variant: 'advantage', value: 5 });
+  });
+
+  it('uses local attack metadata to emit critical visuals', () => {
+    const renderState = createRenderState();
+    const sharedState = createSharedState();
+
+    const createEffect = vi.fn();
+    const createParticle = vi.fn();
+    const aiSpy = vi.spyOn(aiModule, 'resolveNpcCombat').mockReturnValue({
+      world: sharedState.world,
+      events: [],
+      drops: [],
+      memory: { threatManagers: {} },
+    });
+
+    let result;
+    try {
+      result = updateGameState({
+        renderState,
+        sharedState,
+        delta: 0.016,
+        movementIntent: { x: 0, y: 0 },
+        actionBuffer: {
+          attacks: [
+            {
+              kind: 'basic',
+              timestamp: 123,
+              targetObjectId: 'micro-1',
+              state: 'engaged',
+              damage: 42,
+              critical: true,
+            },
+          ],
+        },
+        helpers: { createEffect, createParticle },
+      });
+    } finally {
+      aiSpy.mockRestore();
+    }
+
+    expect(result.commands.attacks[0]).toMatchObject({ critical: true });
+    expect(createEffect).toHaveBeenCalledWith(100, 200, 'critical', '#ffd166');
+    expect(createParticle).toHaveBeenCalled();
+    expect(createParticle.mock.calls[0][2]).toBe('#ffe6a3');
+    expect(sharedState.damagePopups).toHaveLength(1);
+    expect(sharedState.damagePopups[0]).toMatchObject({ variant: 'critical', value: 42 });
   });
 });
 

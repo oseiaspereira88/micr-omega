@@ -121,6 +121,158 @@ const DEFAULT_RESOURCE_STUB = {
   level: 1,
 };
 
+const DAMAGE_VISUAL_VARIANTS = {
+  normal: {
+    effectType: 'normal',
+    popupVariant: 'normal',
+    effectColor: '#ff5f73',
+    particleColor: '#ffb6c6',
+  },
+  critical: {
+    effectType: 'critical',
+    popupVariant: 'critical',
+    effectColor: '#ffd166',
+    particleColor: '#ffe6a3',
+  },
+  advantage: {
+    effectType: 'advantage',
+    popupVariant: 'advantage',
+    effectColor: '#70d6ff',
+    particleColor: '#c8efff',
+  },
+  resisted: {
+    effectType: 'resisted',
+    popupVariant: 'resisted',
+    effectColor: '#d5d9e6',
+    particleColor: '#eef1ff',
+  },
+};
+
+const normalizeVariantKey = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const key = value.trim().toLowerCase();
+  return key && DAMAGE_VISUAL_VARIANTS[key] ? key : null;
+};
+
+const resolveImpactVariant = (payload = {}) => {
+  const explicitVariant = normalizeVariantKey(payload.variant);
+  if (explicitVariant) {
+    return explicitVariant;
+  }
+
+  if (payload.critical === true) {
+    return 'critical';
+  }
+
+  const relation = normalizeVariantKey(payload.relation);
+  if (relation === 'advantage') {
+    return 'advantage';
+  }
+  if (relation === 'disadvantage' || relation === 'resisted') {
+    return 'resisted';
+  }
+
+  return 'normal';
+};
+
+const getImpactVisualProfile = (payload) => {
+  const variant = resolveImpactVariant(payload);
+  return DAMAGE_VISUAL_VARIANTS[variant] ?? DAMAGE_VISUAL_VARIANTS.normal;
+};
+
+const ensureSharedDamagePopupsBuffer = (sharedState) => {
+  if (!sharedState) {
+    return null;
+  }
+
+  if (!Array.isArray(sharedState.damagePopups)) {
+    sharedState.damagePopups = [];
+  }
+
+  return sharedState.damagePopups;
+};
+
+const pushSharedDamagePopup = (sharedState, payload = {}, fallbackVariant = 'normal') => {
+  const collection = ensureSharedDamagePopupsBuffer(sharedState);
+  if (!collection) {
+    return;
+  }
+
+  const createdAt = Date.now();
+  collection.push({
+    id: `impact-${createdAt.toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    x: Number.isFinite(payload.x) ? payload.x : 0,
+    y: Number.isFinite(payload.y) ? payload.y : 0,
+    value: Number.isFinite(payload.value) ? Math.max(0, Math.round(payload.value)) : 0,
+    variant: typeof payload.variant === 'string' && payload.variant
+      ? payload.variant
+      : fallbackVariant,
+    lifetime: Number.isFinite(payload.lifetime) && payload.lifetime > 0 ? payload.lifetime : 1,
+    createdAt,
+  });
+};
+
+const spawnImpactParticles = (helpers, x, y, color, count = 6) => {
+  if (typeof helpers?.createParticle !== 'function') {
+    return;
+  }
+
+  for (let i = 0; i < count; i += 1) {
+    const jitterX = x + (Math.random() - 0.5) * 18;
+    const jitterY = y + (Math.random() - 0.5) * 18;
+    const size = 2 + Math.random() * 2.4;
+    helpers.createParticle(jitterX, jitterY, color, size);
+  }
+};
+
+const spawnImpactVisuals = ({ helpers, sharedState, x, y, damage, profile }) => {
+  if (!profile) {
+    return;
+  }
+
+  if (typeof helpers?.createEffect === 'function') {
+    helpers.createEffect(x, y, profile.effectType, profile.effectColor);
+  }
+
+  spawnImpactParticles(helpers, x, y, profile.particleColor);
+
+  if (sharedState) {
+    pushSharedDamagePopup(sharedState, { x, y, value: damage, variant: profile.popupVariant }, profile.popupVariant);
+  }
+};
+
+const resolveEntityPosition = (
+  identifiers = {},
+  { playersById, microorganismIndex, fallback } = {}
+) => {
+  const candidateIds = [identifiers.targetObjectId, identifiers.targetId, identifiers.targetPlayerId];
+
+  for (const id of candidateIds) {
+    if (!id) continue;
+    if (microorganismIndex && microorganismIndex.has(id)) {
+      const micro = microorganismIndex.get(id);
+      return { x: micro.x ?? 0, y: micro.y ?? 0 };
+    }
+    if (playersById && typeof playersById.get === 'function') {
+      const player = playersById.get(id);
+      if (player) {
+        const position = player.renderPosition || player.position;
+        if (position) {
+          return { x: position.x ?? 0, y: position.y ?? 0 };
+        }
+      }
+    }
+  }
+
+  if (fallback && Number.isFinite(fallback.x) && Number.isFinite(fallback.y)) {
+    return { x: fallback.x, y: fallback.y };
+  }
+
+  return null;
+};
+
 const hexToRgb = (hex) => {
   const normalized = normalizeHexColor(hex ?? DEFAULT_SPECIES_COLOR);
   const match = /^#([0-9a-fA-F]{6})$/.exec(normalized);
@@ -1618,6 +1770,18 @@ const collectCommands = (renderState, movementIntent, actionBuffer) => {
         normalized.damage = attack.damage;
       }
 
+      if (typeof attack?.variant === 'string' && attack.variant) {
+        normalized.variant = attack.variant;
+      }
+
+      if (typeof attack?.relation === 'string' && attack.relation) {
+        normalized.relation = attack.relation;
+      }
+
+      if (typeof attack?.critical === 'boolean') {
+        normalized.critical = attack.critical;
+      }
+
       if (attack?.resultingHealth && typeof attack.resultingHealth === 'object') {
         normalized.resultingHealth = { ...attack.resultingHealth };
       }
@@ -1667,27 +1831,75 @@ export const updateGameState = ({
   renderState.aiMemory = aiResult?.memory ?? { threatManagers: {} };
   const worldSnapshot = aiResult?.world ?? sharedState.world;
   updateWorldView(renderState, worldSnapshot);
+  const microorganismIndex = Array.isArray(renderState.worldView?.microorganisms)
+    ? new Map(renderState.worldView.microorganisms.map((entity) => [entity.id, entity]))
+    : new Map();
   if (aiResult?.events?.length && typeof helpers.onNpcEvents === 'function') {
     helpers.onNpcEvents(aiResult.events, worldSnapshot);
+  }
+  if (Array.isArray(aiResult?.events)) {
+    aiResult.events.forEach((event) => {
+      if (!event || event.type !== 'attack') {
+        return;
+      }
+
+      const position = resolveEntityPosition(
+        { targetId: event.targetId },
+        { playersById: renderState.playersById, microorganismIndex }
+      );
+
+      if (!position) {
+        return;
+      }
+
+      const profile = getImpactVisualProfile(event);
+      const damage = Number.isFinite(event?.damage) ? event.damage : 0;
+      spawnImpactVisuals({
+        helpers,
+        sharedState,
+        x: position.x,
+        y: position.y,
+        damage,
+        profile,
+      });
+    });
   }
   if (aiResult?.drops?.length && typeof helpers.onNpcDrops === 'function') {
     helpers.onNpcDrops(aiResult.drops, worldSnapshot);
   }
 
-  if (typeof helpers.createEffect === 'function' && localRenderPlayer?.combatStatus?.state === 'engaged') {
-    const now = Date.now();
-    if (!localRenderPlayer.lastAttackVisual || now - localRenderPlayer.lastAttackVisual > 450) {
-      helpers.createEffect(
-        localRenderPlayer.renderPosition.x,
-        localRenderPlayer.renderPosition.y,
-        'pulse',
-        localRenderPlayer.palette.base
-      );
-      localRenderPlayer.lastAttackVisual = now;
-    }
-  }
-
   const commands = collectCommands(renderState, movementIntent, actionBuffer);
+
+  if (commands.attacks.length > 0) {
+    commands.attacks.forEach((attack) => {
+      if (!attack || (attack.state && attack.state !== 'engaged')) {
+        return;
+      }
+
+      const position = resolveEntityPosition(
+        { targetObjectId: attack.targetObjectId, targetPlayerId: attack.targetPlayerId },
+        {
+          playersById: renderState.playersById,
+          microorganismIndex,
+          fallback: localRenderPlayer?.renderPosition || localRenderPlayer?.position || null,
+        }
+      );
+
+      if (!position) {
+        return;
+      }
+
+      const profile = getImpactVisualProfile(attack);
+      spawnImpactVisuals({
+        helpers,
+        sharedState,
+        x: position.x,
+        y: position.y,
+        damage: attack.damage,
+        profile,
+      });
+    });
+  }
 
   if (
     localRenderPlayer &&
