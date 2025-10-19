@@ -12,6 +12,9 @@ export const createOrganicMatter = (typeKey, typeConfig, options = {}) => {
   const {
     x = 0,
     y = 0,
+    localX: legacyLocalX,
+    localY: legacyLocalY,
+    layout,
     rng = Math.random,
     ...overrides
   } = options;
@@ -20,9 +23,19 @@ export const createOrganicMatter = (typeKey, typeConfig, options = {}) => {
   const sizeRange = typeConfig.sizes || [1, 1];
   const size = overrides.size ?? (sizeRange[0] + random() * (sizeRange[1] - sizeRange[0]));
 
+  const layoutLocalX = layout?.localX ?? legacyLocalX ?? 0;
+  const layoutLocalY = layout?.localY ?? legacyLocalY ?? 0;
+  const absoluteX = x + layoutLocalX;
+  const absoluteY = y + layoutLocalY;
+  const layoutInfo = layout
+    ? { ...layout, localX: layoutLocalX, localY: layoutLocalY }
+    : legacyLocalX !== undefined || legacyLocalY !== undefined
+      ? { localX: layoutLocalX, localY: layoutLocalY }
+      : undefined;
+
   return {
-    x,
-    y,
+    x: absoluteX,
+    y: absoluteY,
     vx: overrides.vx ?? (random() - 0.5) * 0.2,
     vy: overrides.vy ?? (random() - 0.5) * 0.2,
     size,
@@ -35,6 +48,7 @@ export const createOrganicMatter = (typeKey, typeConfig, options = {}) => {
     rotation: overrides.rotation ?? random() * Math.PI * 2,
     pulsePhase: overrides.pulsePhase ?? random() * Math.PI * 2,
     glowIntensity: overrides.glowIntensity ?? random() * 0.5 + 0.5,
+    ...(layoutInfo ? { layout: layoutInfo } : {}),
     ...overrides
   };
 };
