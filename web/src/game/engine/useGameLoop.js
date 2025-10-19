@@ -177,6 +177,101 @@ const DENSITY_SCALE = {
   high: 1.4,
 };
 
+const collectSharedDamagePopups = (sharedState) => {
+  const rootPopups = Array.isArray(sharedState?.damagePopups) ? sharedState.damagePopups : [];
+  const worldPopups = Array.isArray(sharedState?.world?.damagePopups)
+    ? sharedState.world.damagePopups
+    : [];
+
+  if (rootPopups.length === 0) {
+    return worldPopups;
+  }
+
+  if (worldPopups.length === 0) {
+    return rootPopups;
+  }
+
+  return [...rootPopups, ...worldPopups];
+};
+
+const DEFAULT_POPUP_LIFETIME = 1;
+const POPUP_RISE_DISTANCE = 28;
+
+const ensureRenderPopupStructures = (renderState) => {
+  if (!renderState) {
+    return { list: [], index: new Map() };
+  }
+
+  if (!Array.isArray(renderState.damagePopups)) {
+    renderState.damagePopups = [];
+  }
+
+  if (!(renderState.damagePopupIndex instanceof Map)) {
+    renderState.damagePopupIndex = new Map();
+  }
+
+  return { list: renderState.damagePopups, index: renderState.damagePopupIndex };
+};
+
+const syncDamagePopups = (renderState, sharedState, deltaSeconds) => {
+  if (!renderState) return;
+
+  const { list, index } = ensureRenderPopupStructures(renderState);
+  const incoming = collectSharedDamagePopups(sharedState);
+
+  incoming.forEach((rawPopup) => {
+    if (!rawPopup || typeof rawPopup !== 'object') {
+      return;
+    }
+
+    const explicitId = typeof rawPopup.id === 'string' && rawPopup.id ? rawPopup.id : null;
+    const fallbackParts = [
+      Number(rawPopup.createdAt) || 0,
+      Math.round(rawPopup.x ?? 0),
+      Math.round(rawPopup.y ?? 0),
+      Math.round(rawPopup.value ?? 0),
+    ];
+    const fallbackId = fallbackParts.join('-');
+    const id = explicitId || fallbackId;
+
+    if (!index.has(id)) {
+      const lifetime = Number.isFinite(rawPopup.lifetime)
+        ? Math.max(0.25, rawPopup.lifetime)
+        : DEFAULT_POPUP_LIFETIME;
+      const entry = {
+        id,
+        x: Number.isFinite(rawPopup.x) ? rawPopup.x : 0,
+        y: Number.isFinite(rawPopup.y) ? rawPopup.y : 0,
+        value: Number.isFinite(rawPopup.value) ? Math.round(rawPopup.value) : 0,
+        variant:
+          typeof rawPopup.variant === 'string' && rawPopup.variant.length > 0
+            ? rawPopup.variant
+            : 'normal',
+        lifetime,
+        elapsed: 0,
+        offset: 0,
+        opacity: 1,
+      };
+      index.set(id, entry);
+      list.push(entry);
+    }
+  });
+
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    const popup = list[i];
+    const lifetime = Math.max(0.25, Number.isFinite(popup.lifetime) ? popup.lifetime : DEFAULT_POPUP_LIFETIME);
+    popup.elapsed = (popup.elapsed ?? 0) + deltaSeconds;
+    const progress = lifetime > 0 ? Math.min(1, popup.elapsed / lifetime) : 1;
+    popup.offset = progress * POPUP_RISE_DISTANCE;
+    popup.opacity = Math.max(0, 1 - progress);
+
+    if (popup.elapsed >= lifetime) {
+      list.splice(i, 1);
+      index.delete(popup.id);
+    }
+  }
+};
+
 const createInitialRenderState = () => ({
   camera: {
     x: 0,
@@ -214,6 +309,8 @@ const createInitialRenderState = () => ({
   localArchetypeSelection: null,
   localSelectedArchetype: null,
   combatIndicators: [],
+  damagePopups: [],
+  damagePopupIndex: new Map(),
   pendingInputs: {
     movement: null,
     attacks: [],
@@ -1411,6 +1508,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
       });
 
       const state = renderStateRef.current;
+      syncDamagePopups(state, sharedState, delta);
       const hudSnapshot = updateResult?.hudSnapshot ?? null;
       let shouldSyncProgression = false;
 
@@ -1631,6 +1729,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
           combatIndicators: renderState.combatIndicators,
           effects: renderState.effects,
           particles: renderState.particles,
+          damagePopups: renderState.damagePopups,
           localPlayerId: updateResult.localPlayerId,
           pulsePhase: renderState.pulsePhase,
         },

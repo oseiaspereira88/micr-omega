@@ -24,6 +24,30 @@
   transform: none;
 }
 
+.variantCritical {
+  background: linear-gradient(135deg, rgba(76, 0, 0, 0.85), rgba(160, 30, 30, 0.85));
+  color: #ffe8a3;
+  box-shadow: 0 10px 24px rgba(160, 30, 30, 0.45);
+}
+
+.variantAdvantage {
+  background: linear-gradient(135deg, rgba(20, 60, 100, 0.85), rgba(30, 110, 160, 0.85));
+  color: #dff4ff;
+  box-shadow: 0 10px 24px rgba(30, 110, 160, 0.4);
+}
+
+.variantResisted {
+  background: linear-gradient(135deg, rgba(32, 38, 48, 0.85), rgba(58, 65, 80, 0.85));
+  color: #f1f3f8;
+  box-shadow: 0 10px 24px rgba(24, 28, 36, 0.4);
+}
+
+.variantStatus {
+  background: linear-gradient(135deg, rgba(120, 70, 20, 0.85), rgba(160, 110, 30, 0.85));
+  color: #fff5e1;
+  box-shadow: 0 10px 24px rgba(120, 70, 20, 0.42);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .notification {
     animation: notificationFade 2s ease forwards;

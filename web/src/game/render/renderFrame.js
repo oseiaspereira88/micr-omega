@@ -264,7 +264,10 @@ export const renderFrame = (ctx, state, camera, assets = {}) => {
   renderWorldEntities(ctx, state.worldView, extendedCamera);
   enemyRenderer.render(
     ctx,
-    { enemies: mapMicroorganismsToEnemies(state.worldView?.microorganisms) },
+    {
+      enemies: mapMicroorganismsToEnemies(state.worldView?.microorganisms),
+      damagePopups: Array.isArray(state.damagePopups) ? state.damagePopups : [],
+    },
     extendedCamera
   );
   organismRenderer.render(

@@ -4,6 +4,52 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, Number.isFinite(v
 const clamp01 = (value) => clamp(value, 0, 1);
 const TAU = Math.PI * 2;
 
+const DAMAGE_POPUP_STYLES = {
+  normal: {
+    font: '600 14px "Exo 2", sans-serif',
+    color: '#ff5f73',
+    shadow: 'rgba(0, 0, 0, 0.55)',
+    shadowBlur: 8,
+  },
+  critical: {
+    font: '700 18px "Exo 2", sans-serif',
+    color: '#ffd166',
+    shadow: 'rgba(255, 129, 0, 0.65)',
+    shadowBlur: 12,
+  },
+  advantage: {
+    font: '600 16px "Exo 2", sans-serif',
+    color: '#70d6ff',
+    shadow: 'rgba(16, 92, 160, 0.6)',
+    shadowBlur: 10,
+  },
+  resisted: {
+    font: '600 13px "Exo 2", sans-serif',
+    color: '#d5d9e6',
+    shadow: 'rgba(30, 36, 50, 0.55)',
+    shadowBlur: 8,
+  },
+  status: {
+    font: '600 13px "Exo 2", sans-serif',
+    color: '#ffb86c',
+    shadow: 'rgba(120, 60, 0, 0.55)',
+    shadowBlur: 8,
+  },
+};
+
+const getDamagePopupStyle = (variant) => {
+  if (typeof variant === 'string') {
+    const normalized = variant.trim().toLowerCase();
+    if (normalized === 'dot') {
+      return DAMAGE_POPUP_STYLES.status;
+    }
+    if (DAMAGE_POPUP_STYLES[normalized]) {
+      return DAMAGE_POPUP_STYLES[normalized];
+    }
+  }
+  return DAMAGE_POPUP_STYLES.normal;
+};
+
 const DEFAULT_COLORS = {
   base: '#8fb8ff',
   label: '#f8fbff',
@@ -329,7 +375,8 @@ export const enemyRenderer = {
     if (!ctx) return;
 
     const enemies = Array.isArray(state?.enemies) ? state.enemies : [];
-    if (enemies.length === 0) return;
+    const damagePopups = Array.isArray(state?.damagePopups) ? state.damagePopups : [];
+    if (enemies.length === 0 && damagePopups.length === 0) return;
 
     const { offsetX, offsetY } = getCameraOffsets(camera, ctx);
 
@@ -373,6 +420,36 @@ export const enemyRenderer = {
         const phaseSpeed = 0.035 + computeLevelIntensity(enemy) * 0.035 + (enemy.boss ? 0.02 : 0);
         enemy.animPhase = (enemy.animPhase ?? 0) + phaseSpeed;
 
+        ctx.restore();
+      });
+
+      damagePopups.forEach((popup) => {
+        if (!popup || !Number.isFinite(popup.x) || !Number.isFinite(popup.y)) {
+          return;
+        }
+
+        const opacity = clamp01(popup.opacity ?? 1);
+        if (opacity <= 0) {
+          return;
+        }
+
+        const style = getDamagePopupStyle(popup.variant);
+        const riseOffset = Number.isFinite(popup.offset) ? popup.offset : 0;
+        const screenX = popup.x - offsetX;
+        const screenY = popup.y - offsetY - riseOffset;
+        const value = Number.isFinite(popup.value) ? Math.round(popup.value) : 0;
+
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        ctx.translate(screenX, screenY);
+        ctx.font = style.font;
+        ctx.fillStyle = style.color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = style.shadow;
+        ctx.shadowBlur = style.shadowBlur ?? 8;
+        ctx.lineWidth = 2;
+        ctx.fillText(String(value), 0, 0);
         ctx.restore();
       });
     });
