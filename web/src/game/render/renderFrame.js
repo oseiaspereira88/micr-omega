@@ -185,7 +185,10 @@ const drawMinimap = (ctx, state, camera, options = {}) => {
     const y = projectCoordinate(entity?.y);
     const magnitude = Number.isFinite(entity?.quantity) ? entity.quantity : 0;
     const radius = Math.max(1.5, Math.min(4, (magnitude / 6) * scale));
-    drawCircle(x, y, radius, 'rgba(255, 214, 94, 0.9)', 0.9);
+    const buffColor = entity?.attributeBuff?.color;
+    const fillColor = buffColor ?? 'rgba(255, 214, 94, 0.9)';
+    const alpha = buffColor ? 1 : 0.9;
+    drawCircle(x, y, radius, fillColor, alpha);
   });
 
   roomObjects.forEach((object) => {

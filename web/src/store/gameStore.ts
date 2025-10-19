@@ -361,6 +361,17 @@ const cloneOrganicMatter = (matter: OrganicMatter): OrganicMatter => ({
   ...matter,
   position: cloneVector(matter.position),
   nutrients: { ...matter.nutrients },
+  nutrientTags:
+    Array.isArray(matter.nutrientTags) && matter.nutrientTags.length > 0
+      ? [...matter.nutrientTags]
+      : Object.keys(matter.nutrients ?? {}),
+  attributeTags:
+    Array.isArray(matter.attributeTags) && matter.attributeTags.length > 0
+      ? [...matter.attributeTags]
+      : matter.attributeBuff?.type
+        ? [matter.attributeBuff.type]
+        : [],
+  attributeBuff: matter.attributeBuff ? { ...matter.attributeBuff } : undefined,
 });
 
 const cloneObstacle = (obstacle: Obstacle): Obstacle => ({

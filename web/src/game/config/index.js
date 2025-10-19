@@ -4,7 +4,11 @@ export { createSkills } from './skills';
 export { smallEvolutions } from './smallEvolutions';
 export { mediumEvolutions } from './mediumEvolutions';
 export { majorEvolutions } from './majorEvolutions';
-export { organicMatterTypes } from './organicMatterTypes';
+export {
+  organicMatterTypes,
+  organicAttributeBuffMetadata,
+  organicAttributeBuffPresets,
+} from './organicMatterTypes';
 export { enemyTemplates } from './enemyTemplates';
 export { obstacleTypes } from './obstacleTypes';
 export { nebulaTypes } from './nebulaTypes';

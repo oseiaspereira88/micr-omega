@@ -192,6 +192,25 @@ export const environmentRenderer = {
         ctx.arc(0, 0, matter.size * pulse, 0, Math.PI * 2);
         ctx.fill();
 
+        if (matter.attributeBuff) {
+          const buffColor = matter.attributeBuff.color || '#FFFFFF';
+          ctx.globalAlpha = 0.95;
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = buffColor;
+          ctx.beginPath();
+          ctx.arc(0, 0, matter.size * (pulse + 0.35), 0, Math.PI * 2);
+          ctx.stroke();
+
+          if (matter.attributeBuff.icon) {
+            ctx.fillStyle = buffColor;
+            ctx.globalAlpha = 0.92;
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(matter.attributeBuff.icon, 0, 1);
+          }
+        }
+
         ctx.globalAlpha = 1;
         ctx.shadowBlur = 0;
         ctx.restore();

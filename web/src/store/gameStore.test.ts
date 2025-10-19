@@ -208,6 +208,9 @@ describe("gameStore", () => {
         position: { x: 3, y: 4 },
         quantity: 12,
         nutrients: { protein: 5 },
+        nutrientTags: ["protein"],
+        attributeTags: [],
+        attributeBuff: undefined,
       },
     ]);
     expect(updated.microorganisms.all).toHaveLength(0);

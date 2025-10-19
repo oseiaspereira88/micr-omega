@@ -19,6 +19,18 @@ export const createOrganicMatter = (typeKey, typeConfig, options = {}) => {
   const random = getRandom(rng);
   const sizeRange = typeConfig.sizes || [1, 1];
   const size = overrides.size ?? (sizeRange[0] + random() * (sizeRange[1] - sizeRange[0]));
+  const baseNutrients = typeof typeConfig.nutrients === 'object' ? { ...typeConfig.nutrients } : {};
+  const nutrientTags = Array.isArray(typeConfig.nutrientTags)
+    ? [...typeConfig.nutrientTags]
+    : Object.keys(baseNutrients);
+  const attributeBuff = typeConfig.attributeBuff
+    ? { ...typeConfig.attributeBuff }
+    : undefined;
+  const attributeTags = Array.isArray(typeConfig.attributeTags)
+    ? [...typeConfig.attributeTags]
+    : attributeBuff?.type
+      ? [attributeBuff.type]
+      : [];
 
   return {
     x,
@@ -35,6 +47,11 @@ export const createOrganicMatter = (typeKey, typeConfig, options = {}) => {
     rotation: overrides.rotation ?? random() * Math.PI * 2,
     pulsePhase: overrides.pulsePhase ?? random() * Math.PI * 2,
     glowIntensity: overrides.glowIntensity ?? random() * 0.5 + 0.5,
+    nutrients: overrides.nutrients ?? baseNutrients,
+    nutrientTags: overrides.nutrientTags ?? nutrientTags,
+    attributeBuff: overrides.attributeBuff ?? attributeBuff,
+    attributeTags:
+      overrides.attributeTags ?? (Array.isArray(attributeTags) ? [...attributeTags] : []),
     ...overrides
   };
 };

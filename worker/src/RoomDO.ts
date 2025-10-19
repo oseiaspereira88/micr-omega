@@ -860,6 +860,17 @@ const cloneOrganicMatter = (matter: OrganicMatter): OrganicMatter => ({
   ...matter,
   position: cloneVector(matter.position),
   nutrients: { ...matter.nutrients },
+  nutrientTags:
+    Array.isArray(matter.nutrientTags) && matter.nutrientTags.length > 0
+      ? [...matter.nutrientTags]
+      : Object.keys(matter.nutrients ?? {}),
+  attributeTags:
+    Array.isArray(matter.attributeTags) && matter.attributeTags.length > 0
+      ? [...matter.attributeTags]
+      : matter.attributeBuff?.type
+        ? [matter.attributeBuff.type]
+        : [],
+  attributeBuff: matter.attributeBuff ? { ...matter.attributeBuff } : undefined,
 });
 
 type InitialMicroorganismTemplate = {
@@ -982,6 +993,17 @@ const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
       position: { x: 140, y: -120 },
       quantity: 24,
       nutrients: { carbon: 10, nitrogen: 4 },
+      nutrientTags: ["carbon", "nitrogen"],
+      attributeTags: ["attack"],
+      attributeBuff: {
+        type: "attack",
+        amount: 3,
+        durationMs: 15000,
+        color: "#FF6B9D",
+        icon: "⚔️",
+        label: "Ferocity Boost",
+        description: "Temporarily amplifies attack damage.",
+      },
     },
     {
       id: "organic-beta",
@@ -989,6 +1011,17 @@ const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
       position: { x: -260, y: 200 },
       quantity: 18,
       nutrients: { carbon: 6 },
+      nutrientTags: ["carbon"],
+      attributeTags: ["defense"],
+      attributeBuff: {
+        type: "defense",
+        amount: 2,
+        durationMs: 12000,
+        color: "#57D5FF",
+        icon: "🛡️",
+        label: "Shell Shield",
+        description: "Bolsters defensive resilience for a short time.",
+      },
     },
     {
       id: "organic-gamma",
@@ -996,6 +1029,17 @@ const INITIAL_WORLD_TEMPLATE: SharedWorldState = {
       position: { x: 80, y: 40 },
       quantity: 30,
       nutrients: { phosphorus: 5 },
+      nutrientTags: ["phosphorus"],
+      attributeTags: ["speed"],
+      attributeBuff: {
+        type: "speed",
+        amount: 4,
+        durationMs: 10000,
+        color: "#00FFB5",
+        icon: "💨",
+        label: "Velocity Burst",
+        description: "Greatly increases movement speed.",
+      },
     },
   ],
   obstacles: [
@@ -1025,6 +1069,9 @@ type PendingOrganicRespawn = {
   template: {
     quantity: number;
     nutrients: OrganicMatter["nutrients"];
+    nutrientTags?: OrganicMatter["nutrientTags"];
+    attributeTags?: OrganicMatter["attributeTags"];
+    attributeBuff?: OrganicMatter["attributeBuff"];
   };
   position: Vector2;
   respawnAt: number;
@@ -2093,12 +2140,15 @@ export class RoomDO {
       this.recordKillProgression(player, { targetId: microorganism.id, dropTier: "minion" });
 
       const remainsId = `${microorganism.id}-remains`;
+      const residueNutrients = { residue: microorganism.health.max };
       const remains: OrganicMatter = {
         id: remainsId,
         kind: "organic_matter",
         position: cloneVector(microorganism.position),
         quantity: Math.max(5, Math.round(microorganism.health.max / 2)),
-        nutrients: { residue: microorganism.health.max },
+        nutrients: residueNutrients,
+        nutrientTags: Object.keys(residueNutrients),
+        attributeTags: [],
       };
       this.addOrganicMatterEntity(remains);
       worldDiff.upsertOrganicMatter = [
@@ -3393,6 +3443,19 @@ export class RoomDO {
         const template: PendingOrganicRespawn["template"] = {
           quantity: Math.max(1, Math.round(entry.matter.quantity)),
           nutrients: { ...entry.matter.nutrients },
+          nutrientTags:
+            Array.isArray(entry.matter.nutrientTags) && entry.matter.nutrientTags.length > 0
+              ? [...entry.matter.nutrientTags]
+              : Object.keys(entry.matter.nutrients ?? {}),
+          attributeTags:
+            Array.isArray(entry.matter.attributeTags) && entry.matter.attributeTags.length > 0
+              ? [...entry.matter.attributeTags]
+              : entry.matter.attributeBuff?.type
+                ? [entry.matter.attributeBuff.type]
+                : [],
+          attributeBuff: entry.matter.attributeBuff
+            ? { ...entry.matter.attributeBuff }
+            : undefined,
         };
 
         const delayBase = ORGANIC_RESPAWN_DELAY_RANGE_MS.min;
@@ -3512,6 +3575,19 @@ export class RoomDO {
         position: spawnPosition,
         quantity: Math.max(1, Math.round(entry.template.quantity)),
         nutrients: { ...entry.template.nutrients },
+        nutrientTags:
+          Array.isArray(entry.template.nutrientTags) && entry.template.nutrientTags.length > 0
+            ? [...entry.template.nutrientTags]
+            : Object.keys(entry.template.nutrients ?? {}),
+        attributeTags:
+          Array.isArray(entry.template.attributeTags) && entry.template.attributeTags.length > 0
+            ? [...entry.template.attributeTags]
+            : entry.template.attributeBuff?.type
+              ? [entry.template.attributeBuff.type]
+              : [],
+        attributeBuff: entry.template.attributeBuff
+          ? { ...entry.template.attributeBuff }
+          : undefined,
       };
 
       this.addOrganicMatterEntity(matter);

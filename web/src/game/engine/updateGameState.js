@@ -1136,6 +1136,18 @@ const mapOrganicMatter = (entities = []) =>
     x: entity.position?.x ?? 0,
     y: entity.position?.y ?? 0,
     quantity: entity.quantity ?? 0,
+    nutrients: { ...(entity.nutrients ?? {}) },
+    nutrientTags:
+      Array.isArray(entity.nutrientTags) && entity.nutrientTags.length > 0
+        ? [...entity.nutrientTags]
+        : Object.keys(entity.nutrients ?? {}),
+    attributeTags:
+      Array.isArray(entity.attributeTags) && entity.attributeTags.length > 0
+        ? [...entity.attributeTags]
+        : entity.attributeBuff?.type
+          ? [entity.attributeBuff.type]
+          : [],
+    attributeBuff: entity.attributeBuff ? { ...entity.attributeBuff } : undefined,
   }));
 
 const mapObstacles = (entities = []) =>

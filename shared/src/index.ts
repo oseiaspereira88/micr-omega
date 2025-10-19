@@ -192,12 +192,27 @@ export const microorganismSchema = z.object({
     .default({})
 });
 
+const organicMatterAttributeBuffSchema = z
+  .object({
+    type: z.enum(["attack", "defense", "speed", "range"]),
+    amount: z.number().finite(),
+    durationMs: z.number().finite().nonnegative().optional(),
+    color: z.string().trim().min(1),
+    icon: z.string().trim().min(1).optional(),
+    label: z.string().trim().min(1).optional(),
+    description: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
 export const organicMatterSchema = z.object({
   id: worldObjectIdSchema,
   kind: z.literal("organic_matter"),
   position: vector2Schema,
   quantity: z.number().finite().nonnegative(),
-  nutrients: z.record(z.string().trim().min(1), z.number().finite()).default({})
+  nutrients: z.record(z.string().trim().min(1), z.number().finite()).default({}),
+  nutrientTags: z.array(z.string().trim().min(1)).default([]),
+  attributeTags: z.array(z.string().trim().min(1)).default([]),
+  attributeBuff: organicMatterAttributeBuffSchema.optional(),
 });
 
 export const obstacleSchema = z.object({
