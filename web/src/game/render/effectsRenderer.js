@@ -126,6 +126,11 @@ export const effectsRenderer = {
           p.orientation = (p.orientation ?? 0) + p.angularVelocity;
         }
 
+        if (Number.isFinite(p.pulseSpeed) && p.pulseSpeed !== 0 && delta > 0) {
+          p.pulsePhase = Number.isFinite(p.pulsePhase) ? p.pulsePhase : 0;
+          p.pulsePhase += p.pulseSpeed * delta;
+        }
+
         if (p.life <= 0) {
           return;
         }
@@ -144,13 +149,42 @@ export const effectsRenderer = {
           ctx.scale(stretch, 1);
         }
 
-        ctx.globalCompositeOperation = p.blend || previousComposite;
+        const baseAlpha = Math.max(0, Math.min(1, p.life));
+        const baseComposite = p.blend || previousComposite;
+        const pulseAmplitude = Number.isFinite(p.pulseAmplitude) ? Math.max(0, p.pulseAmplitude) : 0;
+        const pulseFactor =
+          pulseAmplitude > 0 && Number.isFinite(p.pulsePhase)
+            ? 1 + pulseAmplitude * Math.sin(p.pulsePhase)
+            : 1;
+        const renderSize = Math.max(0.5, p.size * pulseFactor);
+        const glowStrength = Number.isFinite(p.glowStrength) ? Math.max(0, p.glowStrength) : 0;
+        const glowColor = typeof p.glowColor === 'string' ? p.glowColor : p.color;
+
+        if (glowStrength > 0) {
+          const layerCount = Math.max(1, Math.min(5, Math.round(glowStrength * 2)));
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = glowColor;
+          ctx.shadowBlur = Math.max(10, glowStrength * 18);
+          ctx.shadowColor = glowColor;
+
+          for (let layer = layerCount; layer >= 1; layer -= 1) {
+            const t = layer / layerCount;
+            const layerAlpha = baseAlpha * 0.35 * t;
+            if (layerAlpha <= 0.001) continue;
+            ctx.globalAlpha = Math.max(0, Math.min(1, layerAlpha));
+            ctx.beginPath();
+            ctx.arc(0, 0, renderSize * (1 + t * glowStrength * 0.6), 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        ctx.globalCompositeOperation = baseComposite;
         ctx.fillStyle = p.color;
-        ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = p.color;
+        ctx.shadowBlur = glowStrength > 0 ? Math.max(6, glowStrength * 8) : 8;
+        ctx.shadowColor = glowColor;
+        ctx.globalAlpha = baseAlpha;
         ctx.beginPath();
-        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+        ctx.arc(0, 0, renderSize, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
         ctx.globalCompositeOperation = previousComposite;
