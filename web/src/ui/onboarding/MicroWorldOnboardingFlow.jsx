@@ -94,6 +94,26 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
     goToStage('lobby');
   }, [goToStage]);
 
+  const pushFeedback = useCallback((message) => {
+    setFeedbackNotice(message);
+  }, [setFeedbackNotice]);
+
+  const handleOpenSettings = useCallback(() => {
+    pushFeedback('Painel de configurações será habilitado em breve nesta simulação.');
+  }, [pushFeedback]);
+
+  const handleOpenStore = useCallback(() => {
+    pushFeedback('A loja estelar está em construção. Volte após a próxima sincronização.');
+  }, [pushFeedback]);
+
+  const handleOpenMissions = useCallback(() => {
+    pushFeedback('Missões narrativas adicionais serão liberadas em uma atualização futura.');
+  }, [pushFeedback]);
+
+  const handleOpenFriends = useCallback(() => {
+    pushFeedback('A central de esquadrões sociais está quase pronta. Convites em breve!');
+  }, [pushFeedback]);
+
   const handleEnterPublic = useCallback(() => {
     if (typeof onComplete === 'function') {
       onComplete({
@@ -156,7 +176,15 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
           <div className={styles.stageGlow} />
           <div className={styles.stageContent}>
             {activeStage === 'splash' && <SplashScreen />}
-            {activeStage === 'menu' && <MainMenuScreen onPlay={handlePlay} />}
+            {activeStage === 'menu' && (
+              <MainMenuScreen
+                onPlay={handlePlay}
+                onOpenSettings={handleOpenSettings}
+                onOpenStore={handleOpenStore}
+                onOpenMissions={handleOpenMissions}
+                onOpenFriends={handleOpenFriends}
+              />
+            )}
             {activeStage === 'lobby' && (
               <LobbyScreen
                 onJoinPublic={handleEnterPublic}
