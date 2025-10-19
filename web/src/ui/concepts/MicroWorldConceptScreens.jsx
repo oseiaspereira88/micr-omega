@@ -135,6 +135,15 @@ const MicroWorldConceptScreens = ({ onAdvance, onContinue }) => {
   const activeStep = conceptSteps[safeIndex] ?? conceptSteps[0];
   const StepContent = activeStep.render;
 
+  const handlePrevious = useCallback(() => {
+    if (safeIndex === 0) {
+      return;
+    }
+
+    const previousIndex = safeIndex - 1;
+    setActiveStepIndex(previousIndex);
+  }, [safeIndex, setActiveStepIndex]);
+
   const handleAdvance = useCallback(() => {
     if (safeIndex < totalSteps - 1) {
       const nextIndex = safeIndex + 1;
@@ -156,9 +165,11 @@ const MicroWorldConceptScreens = ({ onAdvance, onContinue }) => {
         currentStep: activeStep.key,
       });
     }
-  }, [safeIndex, totalSteps, onAdvance, onContinue, activeStep]);
+  }, [safeIndex, totalSteps, onAdvance, onContinue, activeStep, setActiveStepIndex]);
 
   const ctaLabel = safeIndex === totalSteps - 1 ? 'Entrar no jogo' : 'Próximo';
+
+  const isFirstStep = safeIndex === 0;
 
   return (
     <div className={styles.page}>
@@ -186,7 +197,39 @@ const MicroWorldConceptScreens = ({ onAdvance, onContinue }) => {
           </span>
           <span className={styles.stepDescription}>{activeStep.label}</span>
         </div>
-        <button type="button" className={styles.primaryCta} onClick={handleAdvance}>
+        <div className={styles.stepControls}>
+          <button
+            type="button"
+            className={styles.secondaryCta}
+            onClick={handlePrevious}
+            disabled={isFirstStep}
+            aria-label="Voltar para a etapa anterior"
+            aria-disabled={isFirstStep}
+          >
+            Anterior
+          </button>
+          <div className={styles.stepIndicators} role="group" aria-label="Selecionar etapa">
+            {conceptSteps.map((step, index) => {
+              const isActive = index === safeIndex;
+              return (
+                <button
+                  key={step.key}
+                  type="button"
+                  className={`${styles.stepIndicator} ${isActive ? styles.stepIndicatorActive : ''}`}
+                  onClick={() => setActiveStepIndex(index)}
+                  aria-label={`Ir para ${step.label}`}
+                  aria-current={isActive ? 'step' : undefined}
+                />
+              );
+            })}
+          </div>
+        </div>
+        <button
+          type="button"
+          className={styles.primaryCta}
+          onClick={handleAdvance}
+          aria-label={ctaLabel}
+        >
           {ctaLabel}
         </button>
       </div>
