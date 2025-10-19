@@ -224,11 +224,21 @@ export const worldEntitySchema = z.discriminatedUnion("kind", [
   roomObjectSchema
 ]);
 
+export const damagePopupSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  x: z.number().finite(),
+  y: z.number().finite(),
+  value: z.number().finite(),
+  variant: z.string().trim().min(1).max(32).optional(),
+  createdAt: z.number().finite(),
+});
+
 export const sharedWorldStateSchema = z.object({
   microorganisms: z.array(microorganismSchema),
   organicMatter: z.array(organicMatterSchema),
   obstacles: z.array(obstacleSchema),
-  roomObjects: z.array(roomObjectSchema)
+  roomObjects: z.array(roomObjectSchema),
+  damagePopups: z.array(damagePopupSchema).optional(),
 });
 
 export const sharedWorldStateDiffSchema = z.object({
@@ -240,7 +250,8 @@ export const sharedWorldStateDiffSchema = z.object({
   removeObstacleIds: z.array(worldObjectIdSchema).optional(),
   upsertRoomObjects: z.array(roomObjectSchema).optional(),
   removeRoomObjectIds: z.array(worldObjectIdSchema).optional(),
-  statusEffects: z.array(statusEffectEventSchema).optional()
+  statusEffects: z.array(statusEffectEventSchema).optional(),
+  damagePopups: z.array(damagePopupSchema).optional(),
 });
 
 const progressionPitySchema = z.object({
@@ -825,6 +836,7 @@ export type SharedGameState = z.infer<typeof sharedGameStateSchema>;
 export type SharedGameStateDiff = z.infer<typeof sharedGameStateDiffSchema>;
 export type SharedWorldState = z.infer<typeof sharedWorldStateSchema>;
 export type SharedWorldStateDiff = z.infer<typeof sharedWorldStateDiffSchema>;
+export type DamagePopup = z.infer<typeof damagePopupSchema>;
 export type StatusEffectEvent = z.infer<typeof statusEffectEventSchema>;
 export type CombatLogEntry = z.infer<typeof combatLogEntrySchema>;
 export type Microorganism = z.infer<typeof microorganismSchema>;
