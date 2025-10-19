@@ -111,6 +111,16 @@
   overflow: hidden;
 }
 
+.button:focus-visible:not(:disabled):not(.disabled),
+.attackButton:focus-visible:not(:disabled):not(.disabled),
+.dashButton:focus-visible:not(:disabled):not(.disabled),
+.skillButton:focus-visible:not(:disabled):not(.disabled),
+.cycleSkillButton:focus-visible:not(:disabled):not(.disabled),
+.evolveButton:focus-visible:not(:disabled):not(.disabled) {
+  outline: 3px solid #00ffe1;
+  outline-offset: 4px;
+}
+
 .attackButton {
   bottom: calc(15px + var(--safe-area-inset-bottom, 0px));
   width: 70px;
