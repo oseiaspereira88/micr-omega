@@ -458,9 +458,23 @@ export const checkEvolution = (state, helpers = {}) => {
   ensureResourceReferences(state);
 
   const xpState = state.xp || { current: 0, next: 120, total: 0, level: state.level };
-  xpState.next = xpState.next ?? getXpRequirementForLevel(xpState, state.level);
+  const safeLevel = Number.isFinite(state.level) ? state.level : 1;
 
-  let threshold = xpState.next;
+  xpState.current = Number.isFinite(xpState.current) ? xpState.current : 0;
+  xpState.total = Number.isFinite(xpState.total) ? xpState.total : 0;
+  xpState.level = Number.isFinite(xpState.level) ? xpState.level : safeLevel;
+
+  const normalizedThreshold = (() => {
+    const requirement = getXpRequirementForLevel(xpState, safeLevel);
+    if (Number.isFinite(xpState.next) && xpState.next > 0) {
+      return xpState.next;
+    }
+    return requirement;
+  })();
+
+  xpState.next = normalizedThreshold;
+
+  let threshold = normalizedThreshold;
   let leveledUp = false;
 
   while (xpState.current >= threshold) {
@@ -497,6 +511,31 @@ export const checkEvolution = (state, helpers = {}) => {
     }
 
     leveledUp = true;
+  }
+
+  if (!leveledUp) {
+    const targetLevel = Number.isFinite(state.level)
+      ? state.level
+      : Number.isFinite(state.confirmedLevel)
+        ? state.confirmedLevel
+        : null;
+
+    if (targetLevel !== null) {
+      const baselineToast = Number.isFinite(state.lastLevelToast)
+        ? state.lastLevelToast
+        : Number.isFinite(state.confirmedLevel)
+          ? state.confirmedLevel
+          : targetLevel - 1;
+
+      if (!Number.isFinite(state.lastLevelToast)) {
+        state.lastLevelToast = baselineToast;
+      }
+
+      if (targetLevel > baselineToast) {
+        helpers.addNotification?.(state, `⬆️ Nível ${targetLevel}`);
+        state.lastLevelToast = targetLevel;
+      }
+    }
   }
 
   if (!leveledUp && ensureQueue(state).length === 0) {
