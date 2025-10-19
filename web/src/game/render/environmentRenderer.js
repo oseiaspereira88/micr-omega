@@ -3,6 +3,7 @@ import {
   getCameraViewMetrics,
   withCameraTransform,
 } from './utils/cameraHelpers.js';
+import { generateOrganicShapeOffsets } from './organicShapeGenerators.js';
 
 const ensureViewport = (camera) => camera?.viewport || {};
 
@@ -181,16 +182,66 @@ export const environmentRenderer = {
         ctx.translate(screenX, screenY);
         ctx.rotate(matter.rotation || 0);
 
-        const pulse = Math.sin(matter.pulsePhase || 0) * 0.1 + 1;
+        const baseSize = Number.isFinite(matter.size) ? matter.size : 10;
+        const shapeScale = Number.isFinite(matter.shapeScale) ? matter.shapeScale : 1;
+        const baseRadius = Math.max(2, baseSize * shapeScale);
+        const shapeKey = matter.shape ?? 'sphere';
+        const computeSeed = () => {
+          if (Number.isFinite(matter.shapeSeed)) {
+            return matter.shapeSeed;
+          }
+          if (typeof matter.id === 'string') {
+            let hash = 0;
+            for (let i = 0; i < matter.id.length; i += 1) {
+              hash = (hash * 31 + matter.id.charCodeAt(i)) & 0xffffffff;
+            }
+            return Math.abs(hash % 10_000) / 10_000 || 0.5;
+          }
+          const composite =
+            (Number.isFinite(matter.x) ? matter.x : 0) * 0.017 +
+            (Number.isFinite(matter.y) ? matter.y : 0) * 0.031 +
+            (Number.isFinite(matter.quantity) ? matter.quantity : 0) * 0.0071;
+          return Math.abs(Math.sin(composite) * 9_812.345) % 1;
+        };
+        const offsets = generateOrganicShapeOffsets(shapeKey, baseRadius, computeSeed());
+        const pulseBase = Math.sin(matter.pulsePhase || 0) * 0.1 + 1;
+        const color = matter.color ?? '#f0e17a';
+        const glow = Math.max(0.4, matter.glowIntensity ?? 1);
+        const segments = offsets?.length ? offsets : [{ x: 0, y: 0, radius: baseRadius, stretch: 1, rotation: 0 }];
 
-        ctx.shadowBlur = 20 * (matter.glowIntensity ?? 1);
-        ctx.shadowColor = matter.color;
-        ctx.fillStyle = matter.color;
-        ctx.globalAlpha = 0.85;
+        ctx.shadowBlur = 20 * glow;
+        ctx.shadowColor = color;
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.82;
 
-        ctx.beginPath();
-        ctx.arc(0, 0, matter.size * pulse, 0, Math.PI * 2);
-        ctx.fill();
+        segments.forEach((segment, index) => {
+          const offsetXLocal = Number.isFinite(segment?.x) ? segment.x : 0;
+          const offsetYLocal = Number.isFinite(segment?.y) ? segment.y : 0;
+          const localRadius = Number.isFinite(segment?.radius) ? segment.radius : baseRadius;
+          const stretch = Number.isFinite(segment?.stretch) ? segment.stretch : 1;
+          const rotation = Number.isFinite(segment?.rotation) ? segment.rotation : 0;
+          const pulse = pulseBase + Math.sin((matter.pulsePhase || 0) + index * 0.7) * 0.06;
+          const radiusX = Math.max(1.5, localRadius * pulse);
+          const radiusY = Math.max(1, radiusX * stretch);
+
+          ctx.save();
+          ctx.translate(offsetXLocal, offsetYLocal);
+          if (rotation) {
+            ctx.rotate(rotation);
+          }
+          ctx.beginPath();
+          ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
+
+        if (baseRadius > 4) {
+          ctx.globalAlpha = 0.4;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.beginPath();
+          ctx.ellipse(0, -baseRadius * 0.25, baseRadius * 0.6, baseRadius * 0.35, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
         ctx.globalAlpha = 1;
         ctx.shadowBlur = 0;

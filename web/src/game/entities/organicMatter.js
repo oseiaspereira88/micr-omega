@@ -28,6 +28,8 @@ export const createOrganicMatter = (typeKey, typeConfig, options = {}) => {
     size,
     color: overrides.color ?? pickRandom(typeConfig.colors || ['#FFFFFF'], random),
     shape: overrides.shape ?? pickRandom(typeConfig.shapes || ['sphere'], random),
+    shapeSeed: overrides.shapeSeed ?? random(),
+    shapeScale: overrides.shapeScale ?? (0.85 + random() * 0.35),
     type: typeKey,
     energy: overrides.energy ?? typeConfig.energy,
     health: overrides.health ?? typeConfig.health,
