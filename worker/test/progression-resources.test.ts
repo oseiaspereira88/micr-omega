@@ -3,6 +3,12 @@ import type { DurableObjectState } from "@cloudflare/workers-types";
 
 import { RoomDO } from "../src/RoomDO";
 import { getDefaultSkillList } from "../src/skills";
+import {
+  ORGANIC_COLLECTION_ENERGY_MULTIPLIER,
+  ORGANIC_COLLECTION_MG_MULTIPLIER,
+  ORGANIC_COLLECTION_SCORE_MULTIPLIER,
+  ORGANIC_COLLECTION_XP_MULTIPLIER,
+} from "../src/config/balance";
 import type {
   CombatLogEntry,
   Microorganism,
@@ -142,6 +148,10 @@ describe("RoomDO progression resource updates", () => {
       aggression: "neutral",
       attributes: { speed: 12, damage: 3, resilience: 0 },
     };
+    const remainsTemplate = {
+      quantity: Math.max(5, Math.round(microorganism.health.max / 2)),
+      nutrients: { residue: microorganism.health.max },
+    };
 
     roomAny.microorganisms = new Map([[microorganism.id, microorganism]]);
     roomAny.world.microorganisms = [microorganism];
@@ -191,12 +201,83 @@ describe("RoomDO progression resource updates", () => {
     };
     roomAny.addOrganicMatterEntity(matter);
 
+    const scoreBeforeCollection = player.score;
+    const xpBeforeCollection = player.xp;
+    const mgBeforeCollection = player.geneticMaterial;
+    const energyBeforeCollection = player.energy;
+
+    const collectedMatter = [
+      { quantity: matter.quantity, nutrients: matter.nutrients },
+      remainsTemplate,
+    ];
+    const baselineScoreGain = collectedMatter.reduce((sum, entry) => {
+      const raw = Math.max(1, Math.round(entry.quantity));
+      return sum + raw;
+    }, 0);
+    const expectedScoreGain = collectedMatter.reduce((sum, entry) => {
+      const raw = Math.max(1, Math.round(entry.quantity));
+      const scaled = Math.max(
+        1,
+        Math.round(raw * ORGANIC_COLLECTION_SCORE_MULTIPLIER),
+      );
+      return sum + scaled;
+    }, 0);
+    const baselineEnergyGain = collectedMatter.reduce((sum, entry) => {
+      const base = Math.max(0, Math.round(entry.quantity));
+      const nutrientBonus = Object.values(entry.nutrients ?? {}).reduce(
+        (nutrientSum, value) => {
+          if (!Number.isFinite(value)) {
+            return nutrientSum;
+          }
+          return nutrientSum + Math.max(0, Math.round(value));
+        },
+        0,
+      );
+      return sum + base + nutrientBonus;
+    }, 0);
+    const expectedEnergyGain = Math.max(
+      0,
+      Math.round(baselineEnergyGain * ORGANIC_COLLECTION_ENERGY_MULTIPLIER),
+    );
+    const baselineXpGain = Math.round(baselineScoreGain / 2);
+    const baseXpGainAfterScaling = Math.round(expectedScoreGain / 2);
+    const expectedXpGain = Math.max(
+      0,
+      Math.round(baseXpGainAfterScaling * ORGANIC_COLLECTION_XP_MULTIPLIER),
+    );
+    const baselineMgGain = Math.round(baselineScoreGain / 4);
+    const baseMgGainAfterScaling = Math.round(expectedScoreGain / 4);
+    const expectedMgGain = Math.max(
+      0,
+      Math.round(baseMgGainAfterScaling * ORGANIC_COLLECTION_MG_MULTIPLIER),
+    );
+
     const collectionDiff: SharedWorldStateDiff = {};
     const collectionLog: CombatLogEntry[] = [];
     roomAny.handleCollectionsDuringTick(player, collectionDiff, collectionLog, now);
+    expect(collectionLog).toHaveLength(collectedMatter.length);
 
-    expect(player.energy).toBeGreaterThanOrEqual(70);
-    expect(player.xp).toBeGreaterThan(0);
+    const scoreGain = player.score - scoreBeforeCollection;
+    const logScoreTotal = collectionLog.reduce(
+      (sum, entry) => sum + Math.max(0, entry.scoreAwarded ?? 0),
+      0,
+    );
+    expect(scoreGain).toBe(logScoreTotal);
+    expect(scoreGain).toBe(expectedScoreGain);
+    expect(scoreGain).toBeLessThan(baselineScoreGain);
+
+    const energyGain = player.energy - energyBeforeCollection;
+    expect(energyGain).toBe(expectedEnergyGain);
+    expect(energyGain).toBeLessThan(baselineEnergyGain);
+    expect(player.energy).toBeGreaterThanOrEqual(24);
+
+    const xpGain = player.xp - xpBeforeCollection;
+    expect(xpGain).toBe(expectedXpGain);
+    expect(xpGain).toBeLessThan(baselineXpGain);
+
+    const mgGain = player.geneticMaterial - mgBeforeCollection;
+    expect(mgGain).toBe(expectedMgGain);
+    expect(mgGain).toBeLessThan(baselineMgGain);
     expect(player.geneticMaterial).toBeGreaterThanOrEqual(5);
 
     const successDiff: SharedWorldStateDiff = {};
