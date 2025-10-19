@@ -102,6 +102,19 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
     }
   }, [onComplete]);
 
+  const handleUnlockRoom = useCallback((roomId) => {
+    const message =
+      'A loja premium ainda não está disponível neste protótipo. Tente novamente mais tarde.';
+
+    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(message);
+    }
+
+    if (typeof console !== 'undefined' && typeof console.info === 'function') {
+      console.info(`[Micr•Omega] Unlock attempt for room: ${roomId}`);
+    }
+  }, []);
+
   const timelineItems = useMemo(
     () =>
       STAGE_SEQUENCE.map((key) => ({
@@ -126,7 +139,9 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
           <div className={styles.stageContent}>
             {activeStage === 'splash' && <SplashScreen />}
             {activeStage === 'menu' && <MainMenuScreen onPlay={handlePlay} />}
-            {activeStage === 'lobby' && <LobbyScreen onJoinPublic={handleEnterPublic} />}
+            {activeStage === 'lobby' && (
+              <LobbyScreen onJoinPublic={handleEnterPublic} onUnlockRoom={handleUnlockRoom} />
+            )}
           </div>
         </div>
       </div>

@@ -1,9 +1,13 @@
 import React from 'react';
 import styles from './LobbyScreen.module.css';
 
-const LobbyScreen = ({ variant = 'desktop', onJoinPublic, onCreateRoom }) => {
+const LobbyScreen = ({ variant = 'desktop', onJoinPublic, onCreateRoom, onUnlockRoom }) => {
   const testId = variant === 'mobile' ? 'lobby-screen-mobile' : 'lobby-screen';
   const className = [styles.root, variant === 'mobile' ? styles.mobile : ''].filter(Boolean).join(' ');
+  const canUnlockPremium = typeof onUnlockRoom === 'function';
+  const unlockTooltip = canUnlockPremium
+    ? 'Desbloqueie esta sala premium utilizando seus créditos.'
+    : 'Ative a loja para desbloquear salas premium.';
 
   return (
     <div className={className} data-testid={testId}>
@@ -57,7 +61,18 @@ const LobbyScreen = ({ variant = 'desktop', onJoinPublic, onCreateRoom }) => {
               <div className={styles.roomMeta}>
                 <span>Jogadores: 8 / 12</span>
                 <span className={styles.locked}>🔒 Premium</span>
-                <button type="button" className={styles.unlockButton}>Desbloquear 120💎</button>
+                <button
+                  type="button"
+                  className={`${styles.unlockButton} ${!canUnlockPremium ? styles.unlockButtonDisabled : ''}`}
+                  disabled={!canUnlockPremium}
+                  title={unlockTooltip}
+                  onClick={() => onUnlockRoom?.('cluster-sinaptico')}
+                >
+                  Desbloquear 120💎
+                </button>
+                {!canUnlockPremium && (
+                  <span className={styles.unlockRequirement}>Ative a loja para liberar salas premium.</span>
+                )}
               </div>
             </article>
             <article className={styles.roomCard}>
@@ -68,7 +83,18 @@ const LobbyScreen = ({ variant = 'desktop', onJoinPublic, onCreateRoom }) => {
               <div className={styles.roomMeta}>
                 <span>Jogadores: 2 / 6</span>
                 <span className={styles.locked}>🔒 Premium</span>
-                <button type="button" className={styles.unlockButton}>Desbloquear 95💎</button>
+                <button
+                  type="button"
+                  className={`${styles.unlockButton} ${!canUnlockPremium ? styles.unlockButtonDisabled : ''}`}
+                  disabled={!canUnlockPremium}
+                  title={unlockTooltip}
+                  onClick={() => onUnlockRoom?.('ninho-lumen')}
+                >
+                  Desbloquear 95💎
+                </button>
+                {!canUnlockPremium && (
+                  <span className={styles.unlockRequirement}>Ative a loja para liberar salas premium.</span>
+                )}
               </div>
             </article>
           </div>
