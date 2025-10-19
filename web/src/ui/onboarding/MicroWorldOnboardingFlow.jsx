@@ -161,13 +161,28 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
           <strong>Sequência atual</strong>
           <span>{stageConfig.status}</span>
         </div>
-        <div className={styles.statusTimeline}>
-          {timelineItems.map((item) => (
-            <span key={item.key} data-active={item.active ? 'true' : 'false'}>
-              {item.label}
-            </span>
-          ))}
-        </div>
+        <nav className={styles.statusTimeline} aria-label="Progresso das etapas">
+          <ol className={styles.timelineList}>
+            {timelineItems.map((item, index) => {
+              const ariaLabel = `Etapa ${index + 1} de ${timelineItems.length}: ${item.label}`;
+
+              return (
+                <li
+                  key={item.key}
+                  className={styles.timelineItem}
+                  data-active={item.active ? 'true' : 'false'}
+                  aria-current={item.active ? 'step' : undefined}
+                >
+                  <span aria-hidden="true">{item.label}</span>
+                  <span className={styles.visuallyHidden}>
+                    {ariaLabel}
+                    {item.active ? ' (etapa atual)' : ''}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
       </div>
     </div>
   );
