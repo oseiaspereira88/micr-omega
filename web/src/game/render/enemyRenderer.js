@@ -35,6 +35,12 @@ const DAMAGE_POPUP_STYLES = {
     shadow: 'rgba(120, 60, 0, 0.55)',
     shadowBlur: 8,
   },
+  skill: {
+    font: '700 15px "Exo 2", sans-serif',
+    color: '#5cf2c7',
+    shadow: 'rgba(28, 86, 66, 0.6)',
+    shadowBlur: 10,
+  },
 };
 
 const getDamagePopupStyle = (variant) => {
