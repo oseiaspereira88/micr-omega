@@ -88,41 +88,53 @@ const GameHud = ({
   const sidebarId = useId();
   const minimapToggleId = useId();
 
+  const showStatusOverlay = connectionStatus !== 'connected';
+  const hudDisabled = showStatusOverlay;
+  const sidebarIsInactive = hudDisabled || !isSidebarOpen;
+  const sidebarInert = sidebarIsInactive ? 'true' : undefined;
+
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
   }, []);
 
   useEffect(() => {
-    if (isSidebarOpen) {
-      const sidebar = sidebarRef.current;
-      if (!sidebar) {
-        return;
-      }
-
-      const focusableSelectors = [
-        'a[href]',
-        'button:not([disabled])',
-        'input:not([disabled])',
-        'select:not([disabled])',
-        'textarea:not([disabled])',
-        '[tabindex]:not([tabindex="-1"])',
-      ].join(', ');
-
-      const focusableElements = sidebar.querySelectorAll(focusableSelectors);
-      const focusTarget = focusableElements.length
-        ? focusableElements[0]
-        : sidebar;
-
-      if (typeof focusTarget.focus === 'function') {
-        focusTarget.focus({ preventScroll: true });
+    if (sidebarIsInactive) {
+      if (!hudDisabled && toggleButtonRef.current) {
+        toggleButtonRef.current.focus({ preventScroll: true });
+      } else if (
+        document.activeElement &&
+        sidebarRef.current?.contains(document.activeElement)
+      ) {
+        if (typeof document.activeElement.blur === 'function') {
+          document.activeElement.blur();
+        }
       }
       return;
     }
 
-    if (toggleButtonRef.current) {
-      toggleButtonRef.current.focus({ preventScroll: true });
+    const sidebar = sidebarRef.current;
+    if (!sidebar) {
+      return;
     }
-  }, [isSidebarOpen]);
+
+    const focusableSelectors = [
+      'a[href]',
+      'button:not([disabled])',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(', ');
+
+    const focusableElements = sidebar.querySelectorAll(focusableSelectors);
+    const focusTarget = focusableElements.length
+      ? focusableElements[0]
+      : sidebar;
+
+    if (typeof focusTarget.focus === 'function') {
+      focusTarget.focus({ preventScroll: true });
+    }
+  }, [sidebarIsInactive, hudDisabled]);
 
   useEffect(() => {
     const sidebar = sidebarRef.current;
@@ -198,7 +210,7 @@ const GameHud = ({
       }
     };
 
-    if (!isSidebarOpen) {
+    if (sidebarIsInactive) {
       focusableElements.forEach(applyHiddenAttributes);
 
       return () => {
@@ -209,10 +221,10 @@ const GameHud = ({
     focusableElements.forEach(restoreHiddenAttributes);
 
     return undefined;
-  }, [isSidebarOpen]);
+  }, [sidebarIsInactive]);
 
   useEffect(() => {
-    if (!isSidebarOpen) {
+    if (sidebarIsInactive) {
       return;
     }
 
@@ -228,7 +240,7 @@ const GameHud = ({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isSidebarOpen]);
+  }, [sidebarIsInactive]);
 
   const { settings, updateSettings } = useGameSettings();
   const isMinimapEnabled = Boolean(settings?.showMinimap);
@@ -287,8 +299,6 @@ const GameHud = ({
     [],
   );
 
-  const showStatusOverlay = connectionStatus !== 'connected';
-  const hudDisabled = showStatusOverlay;
   const statusTitle = statusMessages[connectionStatus] ?? 'Problemas de conexão';
   const statusHint = statusHints[connectionStatus];
   const isReconnectInProgress =
@@ -306,9 +316,7 @@ const GameHud = ({
     onReconnect();
   }, [isReconnectInProgress, onReconnect]);
 
-  const sidebarIsInactive = hudDisabled || !isSidebarOpen;
-  const sidebarAriaHidden = hudDisabled ? true : undefined;
-  const sidebarInert = sidebarIsInactive ? 'true' : undefined;
+  const sidebarAriaHidden = sidebarIsInactive ? true : undefined;
 
   return (
     <>
@@ -386,7 +394,7 @@ const GameHud = ({
           aria-label="Painel lateral do jogo"
           aria-hidden={sidebarAriaHidden}
           tabIndex={-1}
-          inert={sidebarInert ? 'true' : undefined}
+          inert={sidebarInert}
           ref={sidebarRef}
         >
           <div className={styles.sidebarSectionGroup} data-sidebar-focus>
