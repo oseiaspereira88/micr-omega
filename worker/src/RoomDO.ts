@@ -120,6 +120,34 @@ const ORGANIC_MATTER_CELL_SIZE = PLAYER_COLLECT_RADIUS;
 const ORGANIC_RESPAWN_DELAY_RANGE_MS = { min: 1_200, max: 3_600 } as const;
 const ORGANIC_RESPAWN_CLUSTER_RADIUS = 70;
 const ORGANIC_RESPAWN_SCATTER_MIN = 20;
+const ORGANIC_RESPAWN_ANCHOR_SPREAD = Math.max(PLAYER_COLLECT_RADIUS * 0.6, 1);
+const ORGANIC_RESPAWN_ANCHOR_INCREMENT = PLAYER_COLLECT_RADIUS * 0.35;
+const ORGANIC_RESPAWN_ANCHOR_BASE_MIN = PLAYER_COLLECT_RADIUS * 1.1;
+const ORGANIC_RESPAWN_ANCHOR_ANGLE_JITTER = Math.PI / 6;
+const ORGANIC_RESPAWN_SCATTER_ANGLE_JITTER = Math.PI / 4;
+
+type RespawnDistanceBand = { min: number; max: number };
+
+type OrganicRespawnPlacement = {
+  origin: Vector2;
+  distanceBands: readonly RespawnDistanceBand[];
+  angleJitter?: number;
+};
+
+const buildAnchorBands = (): RespawnDistanceBand[] => {
+  const bands: RespawnDistanceBand[] = [];
+  const bandCount = 6;
+  for (let index = 0; index < bandCount; index += 1) {
+    const min = ORGANIC_RESPAWN_ANCHOR_BASE_MIN + index * ORGANIC_RESPAWN_ANCHOR_INCREMENT;
+    bands.push({ min, max: min + ORGANIC_RESPAWN_ANCHOR_SPREAD });
+  }
+  return bands;
+};
+
+const ORGANIC_RESPAWN_ANCHOR_BANDS = buildAnchorBands();
+const ORGANIC_RESPAWN_SCATTER_BANDS: readonly RespawnDistanceBand[] = [
+  { min: ORGANIC_RESPAWN_SCATTER_MIN, max: ORGANIC_RESPAWN_SCATTER_MIN + ORGANIC_RESPAWN_CLUSTER_RADIUS },
+];
 
 const ORGANIC_CLUSTER_PATTERNS = [
   [
@@ -1028,6 +1056,7 @@ type PendingOrganicRespawn = {
   };
   position: Vector2;
   respawnAt: number;
+  placement?: OrganicRespawnPlacement;
 };
 
 const clampToWorldBounds = (position: Vector2): Vector2 => ({
@@ -2687,15 +2716,52 @@ export class RoomDO {
     return { worldChanged, scoresChanged };
   }
 
-  private findOrganicMatterRespawnPosition(origin: Vector2, attempts = 12): Vector2 | null {
+  private findOrganicMatterRespawnPosition(
+    origin: Vector2,
+    attempts = 12,
+    options: {
+      distanceBands?: readonly RespawnDistanceBand[];
+      angleJitter?: number;
+    } = {},
+  ): Vector2 | null {
     const rng = this.organicMatterRespawnRng;
-    const minimumDistance = PLAYER_COLLECT_RADIUS * 1.1;
-    const distanceSpread = Math.max(PLAYER_COLLECT_RADIUS * 0.6, 1);
+    const suppliedBands = options.distanceBands ?? ORGANIC_RESPAWN_ANCHOR_BANDS;
+    const normalizedBands = suppliedBands
+      .map((band) => {
+        const min = Number.isFinite(band.min) ? Math.max(0, band.min) : 0;
+        const maxCandidate = Number.isFinite(band.max) ? Math.max(min, band.max) : min;
+        return { min, max: maxCandidate };
+      })
+      .filter((band) => band.max > 0);
+
+    const distanceBands =
+      normalizedBands.length > 0
+        ? normalizedBands
+        : [
+            {
+              min: ORGANIC_RESPAWN_ANCHOR_BASE_MIN,
+              max: ORGANIC_RESPAWN_ANCHOR_BASE_MIN + ORGANIC_RESPAWN_ANCHOR_SPREAD,
+            },
+          ];
+
+    const angleJitter = Math.max(
+      0,
+      Number.isFinite(options.angleJitter) ? (options.angleJitter as number) : ORGANIC_RESPAWN_ANCHOR_ANGLE_JITTER,
+    );
+    const baseAngle = rng() * Math.PI * 2;
+    const angleStep = (Math.PI * 2) / Math.max(1, attempts);
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
-      const angle = rng() * Math.PI * 2;
-      const radialOffset = attempt * PLAYER_COLLECT_RADIUS * 0.35;
-      const distance = minimumDistance + radialOffset + rng() * distanceSpread;
+      const bandIndex = Math.min(attempt, distanceBands.length - 1);
+      const band = distanceBands[bandIndex]!;
+      const spread = Math.max(0, band.max - band.min);
+      const distance = band.min + rng() * spread;
+      if (distance <= 0) {
+        continue;
+      }
+
+      const jitter = angleJitter > 0 ? (rng() * 2 - 1) * angleJitter : 0;
+      const angle = baseAngle + angleStep * attempt + jitter;
       const candidate = this.clampPosition({
         x: origin.x + Math.cos(angle) * distance,
         y: origin.y + Math.sin(angle) * distance,
@@ -2705,18 +2771,21 @@ export class RoomDO {
         continue;
       }
 
-      if (this.distanceSquared(origin, candidate) < PLAYER_COLLECT_RADIUS ** 2) {
+      if (!Number.isFinite(candidate.x) || !Number.isFinite(candidate.y)) {
         continue;
       }
 
       return candidate;
     }
 
+    const fallbackBand = distanceBands[distanceBands.length - 1]!;
+    const fallbackDistance = Math.max(1, fallbackBand.max, fallbackBand.min);
     const fallback = this.clampPosition({
-      x: origin.x + minimumDistance + attempts * PLAYER_COLLECT_RADIUS * 0.35,
+      x: origin.x + fallbackDistance,
       y: origin.y,
     });
-    if (!this.isBlockedByObstacle(fallback) && this.distanceSquared(origin, fallback) >= PLAYER_COLLECT_RADIUS ** 2) {
+
+    if (!this.isBlockedByObstacle(fallback)) {
       return fallback;
     }
 
@@ -3365,15 +3434,25 @@ export class RoomDO {
 
     const pendingRespawns: PendingOrganicRespawn[] = [];
     const rng = this.organicMatterRespawnRng;
+    const anchorOptions = {
+      distanceBands: ORGANIC_RESPAWN_ANCHOR_BANDS,
+      angleJitter: ORGANIC_RESPAWN_ANCHOR_ANGLE_JITTER,
+    } as const;
     let index = 0;
     while (index < collectedEntries.length) {
       const remaining = collectedEntries.length - index;
       const baseSize = Math.min(remaining, Math.floor(rng() * 3) + 3);
       const clusterSize = Math.max(1, baseSize);
-      const anchor = this.findOrganicMatterRespawnPosition(player.position, 18);
+      const anchor = this.findOrganicMatterRespawnPosition(player.position, 18, anchorOptions);
       if (!anchor) {
         break;
       }
+
+      const scatterPlacement: OrganicRespawnPlacement = {
+        origin: anchor,
+        distanceBands: ORGANIC_RESPAWN_SCATTER_BANDS,
+        angleJitter: ORGANIC_RESPAWN_SCATTER_ANGLE_JITTER,
+      };
 
       for (let clusterIndex = 0; clusterIndex < clusterSize; clusterIndex += 1) {
         const entry = collectedEntries[index + clusterIndex];
@@ -3381,8 +3460,18 @@ export class RoomDO {
           break;
         }
 
-        const scatterAngle = rng() * Math.PI * 2;
-        const scatterDistance = ORGANIC_RESPAWN_SCATTER_MIN + rng() * ORGANIC_RESPAWN_CLUSTER_RADIUS;
+        const scatterBand = scatterPlacement.distanceBands[0] ?? {
+          min: ORGANIC_RESPAWN_SCATTER_MIN,
+          max: ORGANIC_RESPAWN_SCATTER_MIN + ORGANIC_RESPAWN_CLUSTER_RADIUS,
+        };
+        const scatterRange = Math.max(0, scatterBand.max - scatterBand.min);
+        const scatterDistance = scatterBand.min + rng() * scatterRange;
+        const baseAngle = rng() * Math.PI * 2;
+        const scatterJitter =
+          scatterPlacement.angleJitter && scatterPlacement.angleJitter > 0
+            ? (rng() * 2 - 1) * scatterPlacement.angleJitter
+            : 0;
+        const scatterAngle = baseAngle + scatterJitter;
         const scatterX = Math.cos(scatterAngle) * scatterDistance;
         const scatterY = Math.sin(scatterAngle) * scatterDistance;
         const candidatePosition = this.clampPosition({
@@ -3403,6 +3492,7 @@ export class RoomDO {
           template,
           position: candidatePosition,
           respawnAt: now + Math.max(delay, ORGANIC_RESPAWN_DELAY_RANGE_MS.min),
+          placement: scatterPlacement,
         });
       }
 
@@ -3492,7 +3582,18 @@ export class RoomDO {
     for (const entry of ready) {
       let spawnPosition = entry.position;
       if (this.isBlockedByObstacle(spawnPosition)) {
-        const fallback = this.findOrganicMatterRespawnPosition(spawnPosition, 12);
+        const placement = entry.placement;
+        const fallbackOrigin = placement?.origin ?? spawnPosition;
+        const fallback = this.findOrganicMatterRespawnPosition(
+          fallbackOrigin,
+          12,
+          placement
+            ? {
+                distanceBands: placement.distanceBands,
+                angleJitter: placement.angleJitter,
+              }
+            : undefined,
+        );
         if (fallback) {
           spawnPosition = fallback;
         } else {

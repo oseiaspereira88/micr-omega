@@ -229,6 +229,44 @@ describe("RoomDO distance-sensitive behaviour", () => {
     expect(roomAny.world.organicMatter).toHaveLength(originalCount);
   });
 
+  it("respects respawn distance bands when falling back from blocked spawns", async () => {
+    const { roomAny } = await createRoom();
+    const now = Date.now();
+
+    const placement = {
+      origin: { x: 200, y: 0 },
+      distanceBands: [{ min: 80, max: 90 }],
+      angleJitter: 0,
+    } as const;
+
+    const rngValues = [0, 0];
+    roomAny.organicMatterRespawnRng = () => {
+      const next = rngValues.shift();
+      return next !== undefined ? next : 0.5;
+    };
+
+    roomAny.organicRespawnQueue = [
+      {
+        template: { quantity: 5, nutrients: {} },
+        position: { x: 0, y: 0 },
+        respawnAt: now - 1,
+        placement,
+      },
+    ];
+
+    const diff: SharedWorldStateDiff = {};
+    (roomAny as any).processOrganicRespawnQueue(now, diff);
+
+    const upserted = diff.upsertOrganicMatter ?? [];
+    expect(upserted).toHaveLength(1);
+    const spawned = upserted[0]!;
+    const dx = spawned.position.x - placement.origin.x;
+    const dy = spawned.position.y - placement.origin.y;
+    const distance = Math.hypot(dx, dy);
+    expect(distance).toBeGreaterThanOrEqual(placement.distanceBands[0]!.min);
+    expect(distance).toBeLessThanOrEqual(placement.distanceBands[0]!.max);
+  });
+
   it("resolves player attacks when targets are within range", async () => {
     const { roomAny } = await createRoom();
 
