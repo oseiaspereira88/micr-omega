@@ -230,7 +230,11 @@ const ArchetypeSelection = ({
           características.
         </p>
 
-        <div className={styles.grid}>
+        <div
+          className={styles.grid}
+          role="radiogroup"
+          aria-labelledby={titleId}
+        >
           {options.map((entry, index) => {
             const isSelected = selected === entry.key;
             const isActive = activeKey === entry.key;
@@ -245,7 +249,8 @@ const ArchetypeSelection = ({
                 type="button"
                 className={`${styles.card} ${isSelected || isActive ? styles.cardSelected : ''}`}
                 onClick={() => handleCardSelect(entry.key)}
-                aria-pressed={isSelected}
+                role="radio"
+                aria-checked={isSelected}
                 onKeyDown={(event) => handleCardKeyDown(event, index)}
                 onFocus={() => setActiveKey(entry.key)}
                 ref={setOptionRef(entry.key)}
