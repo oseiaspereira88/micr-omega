@@ -524,6 +524,57 @@ describe('updateGameState', () => {
     expect(hudSnapshot.resourceBag.level).toBe(3);
   });
 
+  it('keeps the confirmed XP when the resource bag lags behind', () => {
+    const renderState = createRenderState();
+    renderState.hudSnapshot = {
+      level: 4,
+      confirmedLevel: 4,
+      xp: { current: 50, next: 180, total: 450, level: 4 },
+      geneticMaterial: { current: 0, total: 0 },
+      characteristicPoints: { total: 0, available: 0, spent: 0, perLevel: [] },
+      evolutionSlots: {
+        small: { used: 0, max: 0 },
+        medium: { used: 0, max: 0 },
+        large: { used: 0, max: 0 },
+        macro: { used: 0, max: 0 },
+      },
+      reroll: { baseCost: 25, cost: 25, count: 0, pity: 0 },
+      dropPity: { fragment: 0, stableGene: 0 },
+      recentRewards: { xp: 0, geneticMaterial: 0, fragments: 0, stableGenes: 0 },
+      resourceBag: {
+        level: 4,
+        xp: { current: 50, next: 180, total: 450, level: 4 },
+      },
+    };
+
+    const localPlayer = createPlayer({ id: 'p1', name: 'Local' });
+    localPlayer.resources = {
+      level: 4,
+      xp: { current: 10, next: 120, total: 300, level: 3 },
+    };
+
+    const sharedState = createSharedState({
+      playerId: 'p1',
+      players: [localPlayer],
+    });
+
+    const { hudSnapshot } = updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    expect(hudSnapshot.xp).toEqual({ current: 50, next: 180, total: 450, level: 4 });
+    expect(hudSnapshot.resourceBag.xp).toEqual({
+      current: 50,
+      next: 180,
+      total: 450,
+      level: 4,
+    });
+  });
+
   it('persists HUD data between frames and normalizes short hex colors', () => {
     const renderState = createRenderState();
     const previousHud = {
@@ -623,7 +674,7 @@ describe('updateGameState', () => {
       'note-6',
     ]);
     expect(result.hudSnapshot.notifications).not.toBe(renderState.notifications);
-    expect(result.hudSnapshot.xp).toMatchObject({ current: 0, total: 0 });
+    expect(result.hudSnapshot.xp).toMatchObject({ current: 10, total: 10 });
     expect(result.hudSnapshot.xp).not.toBe(previousHud.xp);
     expect(result.hudSnapshot.geneticMaterial).toMatchObject({ current: 0, total: 0 });
     expect(result.hudSnapshot.statusEffects).toEqual(previousHud.statusEffects);

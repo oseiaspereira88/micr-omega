@@ -1180,16 +1180,34 @@ const buildHudSnapshot = (
   const safePreviousHud = previousHud ?? {};
   const resourceBag = localPlayer?.resources || {};
 
-  const xp = mergeNumericRecord(
-    DEFAULT_RESOURCE_STUB,
-    safePreviousHud?.xp,
-    resourceBag.xp,
-    localPlayer?.xp
+  const sanitizeXpRecord = (record = {}) => ({
+    current: safeNumber(record.current, 0),
+    next: safeNumber(record.next, DEFAULT_RESOURCE_STUB.next),
+    total: safeNumber(record.total, 0),
+    level: safeNumber(record.level, DEFAULT_RESOURCE_STUB.level),
+  });
+
+  const previousXp = sanitizeXpRecord(
+    mergeNumericRecord(DEFAULT_RESOURCE_STUB, safePreviousHud?.xp)
   );
-  xp.current = safeNumber(xp.current, 0);
-  xp.next = safeNumber(xp.next, DEFAULT_RESOURCE_STUB.next);
-  xp.total = safeNumber(xp.total, 0);
-  xp.level = safeNumber(xp.level, DEFAULT_RESOURCE_STUB.level);
+  const candidateXp = sanitizeXpRecord(
+    mergeNumericRecord(DEFAULT_RESOURCE_STUB, resourceBag.xp, localPlayer?.xp)
+  );
+
+  const candidateIsFresher = () => {
+    if (candidateXp.level !== previousXp.level) {
+      return candidateXp.level > previousXp.level;
+    }
+    if (candidateXp.total !== previousXp.total) {
+      return candidateXp.total > previousXp.total;
+    }
+    if (candidateXp.current !== previousXp.current) {
+      return candidateXp.current > previousXp.current;
+    }
+    return true;
+  };
+
+  const xp = candidateIsFresher() ? candidateXp : previousXp;
 
   const geneticMaterial = mergeNumericRecord(
     { current: 0, total: 0, bonus: 0 },
@@ -1500,17 +1518,25 @@ const buildHudSnapshot = (
 
   const previousBag =
     safePreviousHud.resourceBag && typeof safePreviousHud.resourceBag === 'object'
-      ? safePreviousHud.resourceBag
+      ? { ...safePreviousHud.resourceBag }
       : null;
   const normalizedBag =
     resourceBag && typeof resourceBag === 'object'
-      ? resourceBag
+      ? { ...resourceBag }
       : {};
 
+  if (previousBag && typeof previousBag.xp === 'object') {
+    previousBag.xp = { ...previousBag.xp };
+  }
+  if (typeof normalizedBag.xp === 'object') {
+    normalizedBag.xp = { ...normalizedBag.xp };
+  }
+
   snapshot.resourceBag = {
-    ...(previousBag ? { ...previousBag } : {}),
+    ...(previousBag ?? {}),
     ...normalizedBag,
     level,
+    xp: { ...xp },
   };
 
   if (safePreviousHud.archetypeSelection) {
