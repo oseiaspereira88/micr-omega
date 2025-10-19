@@ -340,13 +340,19 @@ const GameHud = ({
         >
           {showStatusOverlay ? (
             <div className={styles.canvasOverlayContent}>
-              <h2 className={styles.canvasOverlayTitle}>{statusTitle}</h2>
-              {joinError ? (
-                <p className={styles.canvasOverlayMessage}>{joinError}</p>
-              ) : null}
-              {statusHint ? (
-                <p className={styles.canvasOverlayHint}>{statusHint}</p>
-              ) : null}
+              <div
+                className={styles.canvasOverlayStatus}
+                role="status"
+                aria-live={joinError ? 'assertive' : 'polite'}
+              >
+                <h2 className={styles.canvasOverlayTitle}>{statusTitle}</h2>
+                {joinError ? (
+                  <p className={styles.canvasOverlayMessage}>{joinError}</p>
+                ) : null}
+                {statusHint ? (
+                  <p className={styles.canvasOverlayHint}>{statusHint}</p>
+                ) : null}
+              </div>
               {showReconnectButton ? (
                 <div className={styles.canvasOverlayActions}>
                   <button
