@@ -494,8 +494,9 @@ export const checkEvolution = (state, helpers = {}) => {
   if (!state) return state;
   ensureResourceReferences(state);
 
-  const safeLevel = Number.isFinite(state.level) ? state.level : 1;
+  const safeLevel = Number.isFinite(state.level) ? Math.max(1, state.level) : 1;
   const xpState = normalizeXpState(state, safeLevel);
+  state.level = xpState.level;
 
   let threshold = xpState.next;
   let leveledUp = false;
