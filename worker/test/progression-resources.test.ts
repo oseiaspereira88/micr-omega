@@ -198,6 +198,7 @@ describe("RoomDO progression resource updates", () => {
       position: { x: 0, y: 0 },
       quantity: 60,
       nutrients: { carbon: 10 },
+      tags: { nutrients: ["carbon"], attributes: [] },
     };
     roomAny.addOrganicMatterEntity(matter);
 
@@ -305,6 +306,7 @@ describe("RoomDO progression resource updates", () => {
       position: { x: 10, y: 0 },
       quantity: 12,
       nutrients: { carbon: 2 },
+      tags: { nutrients: ["carbon"], attributes: [] },
     };
     const matterB: OrganicMatter = {
       id: "organic-b",
@@ -312,6 +314,7 @@ describe("RoomDO progression resource updates", () => {
       position: { x: -10, y: 0 },
       quantity: 8,
       nutrients: { nitrogen: 1 },
+      tags: { nutrients: ["nitrogen"], attributes: [] },
     };
     const matterC: OrganicMatter = {
       id: "organic-c",
@@ -319,6 +322,7 @@ describe("RoomDO progression resource updates", () => {
       position: { x: 0, y: 12 },
       quantity: 10,
       nutrients: { sulfur: 1 },
+      tags: { nutrients: ["sulfur"], attributes: [] },
     };
 
     roomAny.addOrganicMatterEntity(matterA);
@@ -361,6 +365,7 @@ describe("RoomDO progression resource updates", () => {
       position: { x: 6, y: 0 },
       quantity: 6,
       nutrients: {},
+      tags: { nutrients: [], attributes: [] },
     };
     const matterB: OrganicMatter = {
       id: "organic-e",
@@ -368,6 +373,7 @@ describe("RoomDO progression resource updates", () => {
       position: { x: -6, y: 0 },
       quantity: 7,
       nutrients: {},
+      tags: { nutrients: [], attributes: [] },
     };
     const matterC: OrganicMatter = {
       id: "organic-f",
@@ -375,6 +381,7 @@ describe("RoomDO progression resource updates", () => {
       position: { x: 0, y: 6 },
       quantity: 9,
       nutrients: {},
+      tags: { nutrients: [], attributes: [] },
     };
 
     roomAny.addOrganicMatterEntity(matterA);

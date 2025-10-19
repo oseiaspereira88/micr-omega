@@ -190,6 +190,7 @@ describe("gameStore", () => {
             position: { x: 3, y: 4 },
             quantity: 12,
             nutrients: { protein: 5 },
+            tags: { nutrients: ["protein"], attributes: [] },
           },
         ],
         removeMicroorganismIds: ["micro-1"],
@@ -212,6 +213,7 @@ describe("gameStore", () => {
         position: { x: 3, y: 4 },
         quantity: 12,
         nutrients: { protein: 5 },
+        tags: { nutrients: ["protein"], attributes: [] },
       },
     ]);
     expect(updated.microorganisms.all).toHaveLength(0);

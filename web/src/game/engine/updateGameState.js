@@ -1,5 +1,6 @@
 import { aggregateDrops, calculateExperienceFromEvents, XP_DISTRIBUTION } from '@micr-omega/shared';
 import { DROP_TABLES } from '../config/enemyTemplates';
+import { getOrganicMatterAttributePreset } from '../config/organicMatterTypes';
 import { archetypePalettes } from '../config/archetypePalettes';
 import { HOSTILITY_MATRIX } from '../config/ecosystem';
 import { resolveNpcCombat } from '../systems/ai';
@@ -1286,13 +1287,39 @@ const mapMicroorganisms = (entities = [], previous = new Map()) =>
     };
   });
 
+const sanitizeTagArray = (values) => {
+  if (!Array.isArray(values)) return [];
+  return values
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter((value) => value.length > 0);
+};
+
 const mapOrganicMatter = (entities = []) =>
-  entities.map((entity) => ({
-    id: entity.id,
-    x: entity.position?.x ?? 0,
-    y: entity.position?.y ?? 0,
-    quantity: entity.quantity ?? 0,
-  }));
+  entities.map((entity) => {
+    const nutrientTags = sanitizeTagArray(entity.tags?.nutrients);
+    const attributeTags = sanitizeTagArray(entity.tags?.attributes);
+    const attributeKey = attributeTags[0] ?? null;
+    const preset = attributeKey ? getOrganicMatterAttributePreset(attributeKey) : null;
+
+    const iconFallback = attributeKey ? attributeKey.slice(0, 3).toUpperCase() : null;
+
+    return {
+      id: entity.id,
+      x: entity.position?.x ?? 0,
+      y: entity.position?.y ?? 0,
+      quantity: entity.quantity ?? 0,
+      nutrients: { ...(entity.nutrients || {}) },
+      tags: {
+        nutrients: nutrientTags,
+        attributes: attributeTags,
+      },
+      attributeKey,
+      attributeLabel: preset?.label ?? attributeKey ?? null,
+      attributeDescription: preset?.description ?? null,
+      attributeColor: preset?.color ?? null,
+      attributeIcon: preset?.icon ?? iconFallback,
+    };
+  });
 
 const mapObstacles = (entities = []) =>
   entities.map((entity) => ({

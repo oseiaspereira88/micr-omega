@@ -105,6 +105,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
       position: { x: 60, y: 0 },
       quantity: 5,
       nutrients: {},
+      tags: { nutrients: [], attributes: [] },
     };
     const farMatter: OrganicMatter = {
       id: "matter-far",
@@ -112,6 +113,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
       position: { x: 70, y: 0 },
       quantity: 5,
       nutrients: {},
+      tags: { nutrients: [], attributes: [] },
     };
 
     roomAny.world.organicMatter = [nearMatter, farMatter];
@@ -175,6 +177,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
         position: { x: 40, y: 0 },
         quantity: 4,
         nutrients: {},
+        tags: { nutrients: [], attributes: [] },
       },
       {
         id: "matter-two",
@@ -182,6 +185,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
         position: { x: -30, y: 10 },
         quantity: 6,
         nutrients: {},
+        tags: { nutrients: [], attributes: [] },
       },
       {
         id: "matter-three",
@@ -189,6 +193,7 @@ describe("RoomDO distance-sensitive behaviour", () => {
         position: { x: 0, y: -45 },
         quantity: 8,
         nutrients: {},
+        tags: { nutrients: [], attributes: [] },
       },
     ];
 

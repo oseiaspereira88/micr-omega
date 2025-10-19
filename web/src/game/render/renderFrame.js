@@ -62,17 +62,72 @@ const renderWorldEntities = (ctx, worldView, camera) => {
       const screenY = entity.y - offsetY;
       const quantity = clamp(entity.quantity ?? 0, 0, 100);
       const radius = 6 + Math.sqrt(quantity);
+      const attributeColor =
+        typeof entity.attributeColor === 'string' && entity.attributeColor.trim().length > 0
+          ? entity.attributeColor
+          : null;
+      const hasBuff = Boolean(attributeColor || (entity.attributeKey && entity.attributeKey.length > 0));
+      const fillColor = attributeColor ?? '#f0e17a';
+      const strokeColor = attributeColor ?? '#d4c25a';
+      const icon = typeof entity.attributeIcon === 'string' ? entity.attributeIcon : null;
+      const label = typeof entity.attributeLabel === 'string' ? entity.attributeLabel : null;
 
       ctx.save();
       ctx.translate(screenX, screenY);
-      ctx.globalAlpha = 0.85;
-      ctx.fillStyle = '#f0e17a';
+
+      if (hasBuff) {
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = attributeColor ?? '#f0e17a';
+      }
+
+      ctx.globalAlpha = hasBuff ? 0.92 : 0.85;
+      ctx.fillStyle = fillColor;
       ctx.beginPath();
       ctx.arc(0, 0, radius, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#d4c25a';
-      ctx.lineWidth = 2;
+
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = hasBuff ? 3 : 2;
+      ctx.strokeStyle = strokeColor;
       ctx.stroke();
+
+      if (hasBuff && icon) {
+        const innerRadius = Math.max(4, radius * 0.55);
+        ctx.globalAlpha = 0.95;
+        ctx.fillStyle = 'rgba(10, 19, 36, 0.85)';
+        ctx.beginPath();
+        ctx.arc(0, 0, innerRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(icon, 0, 0);
+      }
+
+      if (hasBuff && (label || entity.attributeKey)) {
+        const text = label || entity.attributeKey?.toUpperCase() || '';
+        ctx.font = 'bold 10px Inter, sans-serif';
+        const textWidth = ctx.measureText(text).width;
+        const padding = 6;
+        const boxWidth = textWidth + padding * 2;
+        const boxHeight = 16;
+        const boxY = -radius - boxHeight - 4;
+
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = 'rgba(10, 19, 36, 0.85)';
+        ctx.fillRect(-boxWidth / 2, boxY, boxWidth, boxHeight);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-boxWidth / 2, boxY, boxWidth, boxHeight);
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 0, boxY + boxHeight / 2);
+      }
+
       ctx.restore();
     });
 
