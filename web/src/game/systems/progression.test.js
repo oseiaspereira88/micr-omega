@@ -107,6 +107,16 @@ describe('checkEvolution', () => {
 
     expect(repeatedToasts).toHaveLength(0);
   });
+
+  it('sanitizes missing XP thresholds while preserving level requirements', () => {
+    const state = createState();
+    state.xp.thresholds = [null, 120, 280];
+
+    checkEvolution(state, helpers);
+
+    expect(state.xp.thresholds[0]).toBe(0);
+    expect(state.xp.next).toBe(120);
+  });
 });
 
 describe('selectArchetype', () => {
