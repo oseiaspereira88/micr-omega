@@ -900,6 +900,276 @@ describe('useGameLoop evolution confirmation flow', () => {
   });
 });
 
+describe('useGameLoop combat log feedback', () => {
+  let originalRequestAnimationFrame;
+  let originalCancelAnimationFrame;
+  let rafCallback;
+  let performanceNowSpy;
+
+  const notifyStoreSubscribers = () => {
+    for (const listener of mocks.gameStoreListeners) {
+      listener();
+    }
+  };
+
+  beforeEach(() => {
+    mocks.updateGameState.mockClear();
+    mocks.renderFrame.mockClear();
+    mocks.soundEffectsFactory.mockClear();
+    mocks.gameStoreListeners.clear();
+    mocks.gameStoreState = {};
+
+    performanceNowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+
+    originalRequestAnimationFrame = window.requestAnimationFrame;
+    originalCancelAnimationFrame = window.cancelAnimationFrame;
+
+    rafCallback = undefined;
+
+    window.requestAnimationFrame = vi.fn((callback) => {
+      rafCallback = callback;
+      return 1;
+    });
+
+    window.cancelAnimationFrame = vi.fn();
+
+    mocks.updateGameState.mockImplementation(() => ({
+      commands: [],
+      localPlayerId: null,
+      hudSnapshot: null,
+    }));
+  });
+
+  afterEach(() => {
+    if (originalRequestAnimationFrame) {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+    } else {
+      delete window.requestAnimationFrame;
+    }
+
+    if (originalCancelAnimationFrame) {
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
+    } else {
+      delete window.cancelAnimationFrame;
+    }
+
+    performanceNowSpy?.mockRestore();
+    mocks.updateGameState.mockReset();
+    mocks.updateGameState.mockImplementation(() => ({
+      commands: [],
+      localPlayerId: null,
+      hudSnapshot: null,
+    }));
+    mocks.gameStoreState = {};
+  });
+
+  it('creates a local damage popup when the player hits a target', async () => {
+    const canvas = createCanvas();
+    const dispatch = vi.fn();
+    let capturedRenderState = null;
+    let latestSharedState = null;
+
+    const localPlayerId = 'player-1';
+    const targetMicroId = 'micro-42';
+
+    mocks.gameStoreState = {
+      playerId: localPlayerId,
+      players: {
+        [localPlayerId]: {
+          id: localPlayerId,
+          position: { x: 48, y: 72 },
+          combatStatus: { state: 'idle', targetPlayerId: null, targetObjectId: null },
+        },
+      },
+      remotePlayers: { byId: {} },
+      world: { microorganisms: [{ id: targetMicroId, position: { x: 200, y: 180 }, color: '#22aa88' }] },
+      combatLog: [],
+    };
+
+    mocks.updateGameState.mockImplementation(({ renderState, sharedState }) => {
+      capturedRenderState = renderState;
+      latestSharedState = sharedState;
+      if (renderState) {
+        renderState.playersById.set(localPlayerId, {
+          id: localPlayerId,
+          renderPosition: { x: 64, y: 96 },
+          palette: { base: '#ff5f73' },
+        });
+        renderState.worldView.microorganisms = [
+          { id: targetMicroId, x: 200, y: 180, color: '#22aa88' },
+        ];
+      }
+      return {
+        commands: { movement: null, attacks: [] },
+        localPlayerId,
+        hudSnapshot: null,
+      };
+    });
+
+    render(<HookWrapper canvas={canvas} dispatch={dispatch} />);
+
+    await waitFor(() => {
+      expect(typeof rafCallback).toBe('function');
+    });
+
+    const firstFrame = rafCallback;
+    act(() => {
+      firstFrame(16);
+    });
+
+    const secondFrame = rafCallback;
+    expect(mocks.gameStoreListeners.size).toBeGreaterThan(0);
+
+    const logEntry = {
+      timestamp: 1_000,
+      attackerId: localPlayerId,
+      targetKind: 'microorganism',
+      targetObjectId: targetMicroId,
+      damage: 12,
+      outcome: 'hit',
+      remainingHealth: 8,
+    };
+
+    mocks.gameStoreState = {
+      ...mocks.gameStoreState,
+      combatLog: [logEntry],
+    };
+    act(() => {
+      notifyStoreSubscribers();
+    });
+
+    act(() => {
+      secondFrame(32);
+    });
+
+    expect(capturedRenderState).toBeTruthy();
+    expect(latestSharedState?.combatLog).toHaveLength(1);
+    expect(latestSharedState?.playerId).toBe(localPlayerId);
+    expect(capturedRenderState.damagePopups).toHaveLength(1);
+    const popup = capturedRenderState.damagePopups[0];
+    expect(popup.value).toBe(12);
+    expect(popup.variant).toBe('advantage');
+    expect(popup.x).toBe(200);
+    expect(popup.y).toBe(180);
+    expect(capturedRenderState.damagePopupIndex.get(popup.id)).toBe(popup);
+    expect(capturedRenderState.particles.length).toBeGreaterThan(0);
+    expect(capturedRenderState.lastCombatLogEntry).toMatchObject({ timestamp: 1_000, sequence: 0 });
+
+    const thirdFrame = rafCallback;
+    act(() => {
+      thirdFrame(48);
+    });
+
+    expect(capturedRenderState.damagePopups).toHaveLength(1);
+  });
+
+  it('creates popups for damage received by the local player without duplicating entries', async () => {
+    const canvas = createCanvas();
+    const dispatch = vi.fn();
+    let capturedRenderState = null;
+    let latestSharedState = null;
+
+    const localPlayerId = 'player-1';
+    const attackerId = 'player-2';
+
+    mocks.gameStoreState = {
+      playerId: localPlayerId,
+      players: {
+        [localPlayerId]: {
+          id: localPlayerId,
+          position: { x: 120, y: 140 },
+          combatStatus: { state: 'idle', targetPlayerId: null, targetObjectId: null },
+        },
+        [attackerId]: {
+          id: attackerId,
+          position: { x: 240, y: 140 },
+          combatStatus: { state: 'idle', targetPlayerId: null, targetObjectId: null },
+        },
+      },
+      remotePlayers: { byId: {} },
+      world: { microorganisms: [] },
+      combatLog: [],
+    };
+
+    mocks.updateGameState.mockImplementation(({ renderState, sharedState }) => {
+      capturedRenderState = renderState;
+      latestSharedState = sharedState;
+      if (renderState) {
+        renderState.playersById.set(localPlayerId, {
+          id: localPlayerId,
+          renderPosition: { x: 132, y: 156 },
+          palette: { base: '#ff5f73' },
+        });
+        renderState.playersById.set(attackerId, {
+          id: attackerId,
+          renderPosition: { x: 240, y: 156 },
+          palette: { base: '#3388ff' },
+        });
+      }
+      return {
+        commands: { movement: null, attacks: [] },
+        localPlayerId,
+        hudSnapshot: null,
+      };
+    });
+
+    render(<HookWrapper canvas={canvas} dispatch={dispatch} />);
+
+    await waitFor(() => {
+      expect(typeof rafCallback).toBe('function');
+    });
+
+    const firstFrame = rafCallback;
+    act(() => {
+      firstFrame(16);
+    });
+
+    const secondFrame = rafCallback;
+    expect(mocks.gameStoreListeners.size).toBeGreaterThan(0);
+
+    const damageEntry = {
+      timestamp: 2_000,
+      attackerId,
+      targetKind: 'player',
+      targetId: localPlayerId,
+      damage: 7,
+      outcome: 'hit',
+      remainingHealth: 25,
+    };
+
+    mocks.gameStoreState = {
+      ...mocks.gameStoreState,
+      combatLog: [damageEntry],
+    };
+    act(() => {
+      notifyStoreSubscribers();
+    });
+
+    act(() => {
+      secondFrame(32);
+    });
+
+    expect(capturedRenderState).toBeTruthy();
+    expect(latestSharedState?.combatLog).toHaveLength(1);
+    expect(latestSharedState?.playerId).toBe(localPlayerId);
+    expect(capturedRenderState.damagePopups).toHaveLength(1);
+    const popup = capturedRenderState.damagePopups[0];
+    expect(popup.value).toBe(7);
+    expect(popup.variant).toBe('normal');
+    expect(popup.x).toBe(132);
+    expect(popup.y).toBe(156);
+    expect(capturedRenderState.lastCombatLogEntry).toMatchObject({ timestamp: 2_000, sequence: 0 });
+    expect(capturedRenderState.lastCombatLogLength).toBe(1);
+
+    const thirdFrame = rafCallback;
+    act(() => {
+      thirdFrame(48);
+    });
+
+    expect(capturedRenderState.damagePopups).toHaveLength(1);
+  });
+});
+
 describe('setActiveEvolutionTier', () => {
   beforeEach(() => {
     mocks.updateGameState.mockClear();

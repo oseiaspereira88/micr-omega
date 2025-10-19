@@ -13,6 +13,7 @@ import useInputController from '../input/useInputController';
 import { DEFAULT_JOYSTICK_STATE } from '../input/utils';
 import { gameStore } from '../../store/gameStore';
 import { createInitialState } from '../state/initialState';
+import { pushDamagePopup } from '../state/damagePopups';
 import {
   checkEvolution as checkEvolutionSystem,
   chooseEvolution as chooseEvolutionSystem,
@@ -227,6 +228,10 @@ const collectSharedDamagePopups = (sharedState, now) => {
 const DEFAULT_POPUP_LIFETIME = 1;
 const POPUP_RISE_DISTANCE = 28;
 
+const HIT_OUTCOMES = new Set(['hit', 'defeated']);
+
+const isHitOutcome = (outcome) => HIT_OUTCOMES.has(outcome);
+
 const ensureRenderPopupStructures = (renderState) => {
   if (!renderState) {
     return { list: [], index: new Map() };
@@ -303,6 +308,269 @@ const syncDamagePopups = (renderState, sharedState, deltaSeconds) => {
   }
 };
 
+const resolvePlayerFromRenderState = (renderState, playerId) => {
+  if (!playerId) return null;
+  if (renderState?.playersById instanceof Map && renderState.playersById.has(playerId)) {
+    return renderState.playersById.get(playerId);
+  }
+  if (Array.isArray(renderState?.playerList)) {
+    return renderState.playerList.find((player) => player?.id === playerId) ?? null;
+  }
+  return null;
+};
+
+const resolveEntityPosition = (entity) => {
+  if (!entity || typeof entity !== 'object') {
+    return null;
+  }
+
+  const candidate = entity.renderPosition || entity.position || entity;
+  const x = Number.isFinite(candidate?.x) ? candidate.x : null;
+  const y = Number.isFinite(candidate?.y) ? candidate.y : null;
+  if (x === null || y === null) {
+    return null;
+  }
+
+  return { x, y };
+};
+
+const resolveEntityColor = (entity) => {
+  if (!entity || typeof entity !== 'object') {
+    return null;
+  }
+
+  if (entity.palette && typeof entity.palette.base === 'string') {
+    return entity.palette.base;
+  }
+
+  if (typeof entity.color === 'string') {
+    return entity.color;
+  }
+
+  if (typeof entity.fillColor === 'string') {
+    return entity.fillColor;
+  }
+
+  return null;
+};
+
+const findWorldEntityById = (collection, id) => {
+  if (!id || !Array.isArray(collection)) {
+    return null;
+  }
+
+  return collection.find((entry) => entry?.id === id) ?? null;
+};
+
+const resolveCombatLogTargetPosition = (renderState, entry, localContext) => {
+  if (!renderState || !entry) {
+    return null;
+  }
+
+  const targetKind = entry.targetKind;
+  const worldView = renderState.worldView || {};
+
+  if (targetKind === 'player') {
+    const targetId = entry.targetId || entry.targetObjectId;
+    const targetPlayer = resolvePlayerFromRenderState(renderState, targetId);
+    if (targetPlayer) {
+      const position = resolveEntityPosition(targetPlayer);
+      if (position) {
+        return { ...position, color: resolveEntityColor(targetPlayer) };
+      }
+    }
+
+    if (targetId && localContext?.localPlayer && targetId === localContext.localPlayer.id) {
+      const fallbackPosition = resolveEntityPosition(localContext.localPlayer);
+      if (fallbackPosition) {
+        return { ...fallbackPosition, color: resolveEntityColor(localContext.localPlayer) };
+      }
+    }
+
+    return null;
+  }
+
+  if (targetKind === 'microorganism') {
+    const targetId = entry.targetObjectId || entry.targetId;
+    const entity = findWorldEntityById(worldView.microorganisms, targetId);
+    if (entity) {
+      const position = resolveEntityPosition(entity);
+      if (position) {
+        return { ...position, color: resolveEntityColor(entity) };
+      }
+    }
+    return null;
+  }
+
+  if (targetKind === 'organic_matter') {
+    const targetId = entry.targetObjectId || entry.targetId;
+    const entity = findWorldEntityById(worldView.organicMatter, targetId);
+    if (entity) {
+      const position = resolveEntityPosition(entity);
+      if (position) {
+        return { ...position, color: resolveEntityColor(entity) };
+      }
+    }
+    return null;
+  }
+
+  if (targetKind === 'obstacle') {
+    const targetId = entry.targetObjectId || entry.targetId;
+    const entity = findWorldEntityById(worldView.obstacles, targetId);
+    if (entity) {
+      const position = resolveEntityPosition(entity);
+      if (position) {
+        return { ...position, color: resolveEntityColor(entity) };
+      }
+    }
+    return null;
+  }
+
+  return null;
+};
+
+const resolvePopupVariant = (entry, { isLocalAttacker, isLocalTarget }) => {
+  if (!entry) {
+    return 'normal';
+  }
+
+  if (isLocalAttacker) {
+    return entry.outcome === 'defeated' ? 'critical' : 'advantage';
+  }
+
+  if (entry.outcome === 'defeated' && isLocalTarget) {
+    return 'critical';
+  }
+
+  return 'normal';
+};
+
+const processLocalCombatLogFeedback = (renderState, sharedState, localPlayerId, helpers = {}) => {
+  if (!renderState || !sharedState || !localPlayerId) {
+    return;
+  }
+
+  const combatLog = Array.isArray(sharedState.combatLog) ? sharedState.combatLog : [];
+  if (!combatLog.length) {
+    renderState.lastCombatLogEntry = null;
+    renderState.lastCombatLogLength = 0;
+    return;
+  }
+
+  const previousLength = Number.isFinite(renderState.lastCombatLogLength)
+    ? renderState.lastCombatLogLength
+    : 0;
+  let cursor = renderState.lastCombatLogEntry ?? null;
+
+  if (combatLog.length < previousLength) {
+    cursor = null;
+  } else if (cursor) {
+    const latestTimestamp = Number.isFinite(combatLog[combatLog.length - 1]?.timestamp)
+      ? combatLog[combatLog.length - 1].timestamp
+      : null;
+    if (latestTimestamp !== null && latestTimestamp < cursor.timestamp) {
+      cursor = null;
+    }
+  }
+
+  const localPlayer = resolvePlayerFromRenderState(renderState, localPlayerId);
+  const localPosition = resolveEntityPosition(localPlayer);
+  const localColor = resolveEntityColor(localPlayer) || '#ff5f73';
+
+  let lastProcessedEntry = cursor;
+  let groupTimestamp = null;
+  let groupSequence = -1;
+
+  for (let i = 0; i < combatLog.length; i += 1) {
+    const entry = combatLog[i];
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+
+    const timestamp = Number.isFinite(entry.timestamp) ? entry.timestamp : null;
+    if (timestamp === null) {
+      continue;
+    }
+
+    if (groupTimestamp === timestamp) {
+      groupSequence += 1;
+    } else {
+      groupTimestamp = timestamp;
+      groupSequence = 0;
+    }
+
+    if (cursor) {
+      if (timestamp < cursor.timestamp) {
+        continue;
+      }
+      if (timestamp === cursor.timestamp && groupSequence <= cursor.sequence) {
+        continue;
+      }
+    }
+
+    const isLocalAttacker = entry.attackerId === localPlayerId;
+    const isLocalTarget = entry.targetId === localPlayerId;
+    if (!isLocalAttacker && !isLocalTarget) {
+      lastProcessedEntry = { timestamp, sequence: groupSequence };
+      continue;
+    }
+
+    if (!isHitOutcome(entry.outcome)) {
+      lastProcessedEntry = { timestamp, sequence: groupSequence };
+      continue;
+    }
+
+    const rawDamage = Number.isFinite(entry.damage) ? Math.round(entry.damage) : 0;
+    if (rawDamage <= 0) {
+      lastProcessedEntry = { timestamp, sequence: groupSequence };
+      continue;
+    }
+
+    const targetPosition = resolveCombatLogTargetPosition(renderState, entry, { localPlayer });
+    const popupPosition = targetPosition || localPosition;
+    if (!popupPosition) {
+      lastProcessedEntry = { timestamp, sequence: groupSequence };
+      continue;
+    }
+
+    ensureRenderPopupStructures(renderState);
+    const popup = pushDamagePopup(renderState, {
+      x: popupPosition.x,
+      y: popupPosition.y,
+      value: rawDamage,
+      variant: resolvePopupVariant(entry, { isLocalAttacker, isLocalTarget }),
+    });
+
+    if (popup) {
+      if (Array.isArray(renderState.damagePopups) && !renderState.damagePopups.includes(popup)) {
+        renderState.damagePopups.push(popup);
+      }
+      if (renderState.damagePopupIndex instanceof Map) {
+        renderState.damagePopupIndex.set(popup.id, popup);
+      }
+    }
+
+    const particleColor =
+      targetPosition?.color || (isLocalTarget ? localColor : null) || localColor;
+
+    if (particleColor && typeof helpers.createParticle === 'function') {
+      helpers.createParticle(
+        popupPosition.x,
+        popupPosition.y,
+        particleColor,
+        isLocalAttacker ? 4 : 3,
+      );
+    }
+
+    lastProcessedEntry = { timestamp, sequence: groupSequence };
+  }
+
+  if (lastProcessedEntry) {
+    renderState.lastCombatLogEntry = lastProcessedEntry;
+  }
+  renderState.lastCombatLogLength = combatLog.length;
+};
+
 const createInitialRenderState = () => ({
   camera: {
     x: 0,
@@ -342,6 +610,8 @@ const createInitialRenderState = () => ({
   combatIndicators: [],
   damagePopups: [],
   damagePopupIndex: new Map(),
+  lastCombatLogEntry: null,
+  lastCombatLogLength: 0,
   pendingInputs: {
     movement: null,
     attacks: [],
@@ -1559,6 +1829,9 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
       const state = renderStateRef.current;
       syncDamagePopups(state, sharedState, delta);
+      processLocalCombatLogFeedback(state, sharedState, updateResult.localPlayerId, {
+        createParticle,
+      });
       const hudSnapshot = updateResult?.hudSnapshot ?? null;
       let shouldSyncProgression = false;
 
