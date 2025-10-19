@@ -65,6 +65,42 @@ describe('checkEvolution', () => {
     expect(state.pendingEvolutionLevel).toBe(2);
   });
 
+  it('clamps negative XP fields before processing level ups', () => {
+    const state = createState();
+    state.xp.current = -125;
+    state.xp.total = -400;
+    state.xp.next = -50;
+
+    checkEvolution(state, helpers);
+
+    expect({
+      level: state.level,
+      xp: state.xp,
+    }).toMatchInlineSnapshot(`
+      {
+        "level": 1,
+        "xp": {
+          "current": 0,
+          "level": 1,
+          "next": 120,
+          "thresholds": [
+            0,
+            120,
+            280,
+            520,
+            840,
+            1240,
+            1720,
+            2280,
+            2920,
+            3640,
+          ],
+          "total": 0,
+        },
+      }
+    `);
+  });
+
   it('normalizes zero or negative XP requirements to avoid runaway leveling', () => {
     const state = createState();
     state.xp.current = 200;
@@ -72,10 +108,34 @@ describe('checkEvolution', () => {
 
     checkEvolution(state, helpers);
 
-    expect(state.level).toBe(2);
-    expect(state.xp.next).toBeGreaterThan(0);
-    expect(state.xp.current).toBeGreaterThanOrEqual(0);
-    expect(state.pendingEvolutionLevel).toBe(2);
+    expect({
+      level: state.level,
+      pendingLevel: state.pendingEvolutionLevel,
+      xp: state.xp,
+    }).toMatchInlineSnapshot(`
+      {
+        "level": 2,
+        "pendingLevel": 2,
+        "xp": {
+          "current": 80,
+          "level": 2,
+          "next": 160,
+          "thresholds": [
+            0,
+            120,
+            280,
+            520,
+            840,
+            1240,
+            1720,
+            2280,
+            2920,
+            3640,
+          ],
+          "total": 120,
+        },
+      }
+    `);
 
     const levelToasts = helpers.addNotification.mock.calls
       .map(([, message]) => message)

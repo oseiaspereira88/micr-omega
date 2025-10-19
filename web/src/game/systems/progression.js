@@ -477,9 +477,13 @@ export const checkEvolution = (state, helpers = {}) => {
   const xpState = state.xp || { current: 0, next: 120, total: 0, level: state.level };
   const safeLevel = Number.isFinite(state.level) ? state.level : 1;
 
-  xpState.current = Number.isFinite(xpState.current) ? xpState.current : 0;
-  xpState.total = Number.isFinite(xpState.total) ? xpState.total : 0;
+  const safeCurrent = Number.isFinite(xpState.current) ? xpState.current : 0;
+  const safeTotal = Number.isFinite(xpState.total) ? xpState.total : 0;
+
+  xpState.current = Math.max(0, safeCurrent);
+  xpState.total = Math.max(0, safeTotal);
   xpState.level = Number.isFinite(xpState.level) ? xpState.level : safeLevel;
+  state.xp = xpState;
 
   const normalizedThreshold = (() => {
     const requirement = getXpRequirementForLevel(xpState, safeLevel);
@@ -489,9 +493,16 @@ export const checkEvolution = (state, helpers = {}) => {
     return requirement;
   })();
 
-  xpState.next = normalizedThreshold;
+  if (!Number.isFinite(normalizedThreshold) || normalizedThreshold <= 0) {
+    xpState.next = 1;
+    state.xp = xpState;
+    helpers.syncState?.(state);
+    return state;
+  }
 
-  let threshold = normalizedThreshold;
+  xpState.next = Math.max(1, normalizedThreshold);
+
+  let threshold = xpState.next;
   let leveledUp = false;
 
   while (xpState.current >= threshold) {
@@ -500,6 +511,13 @@ export const checkEvolution = (state, helpers = {}) => {
     state.level += 1;
     xpState.level = state.level;
     threshold = getXpRequirementForLevel(xpState, state.level);
+
+    if (!Number.isFinite(threshold) || threshold <= 0) {
+      xpState.next = 1;
+      break;
+    }
+
+    threshold = Math.max(1, threshold);
     xpState.next = threshold;
     recalcPointsAndSlots(state);
 
