@@ -572,6 +572,24 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     const boss = state.boss ?? null;
     const bossHealth = boss?.health?.current ?? boss?.health ?? state.bossHealth ?? 0;
     const bossMaxHealth = boss?.health?.max ?? boss?.maxHealth ?? state.bossMaxHealth ?? 0;
+    const bossName = (() => {
+      const rawName = typeof boss?.name === 'string'
+        ? boss.name
+        : typeof state.bossName === 'string'
+        ? state.bossName
+        : typeof boss?.label === 'string'
+        ? boss.label
+        : undefined;
+
+      if (typeof rawName === 'string') {
+        const trimmed = rawName.trim();
+        if (trimmed.length > 0) {
+          return trimmed;
+        }
+      }
+
+      return undefined;
+    })();
 
     const skillList = safeArray(state.skillList);
     const notifications = safeArray(state.notifications);
@@ -625,6 +643,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
         bossActive: Boolean(boss),
         bossHealth,
         bossMaxHealth,
+        bossName,
         currentSkill: state.currentSkill ?? null,
         skillList,
         hasMultipleSkills:

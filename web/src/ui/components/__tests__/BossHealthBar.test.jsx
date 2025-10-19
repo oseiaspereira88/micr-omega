@@ -17,5 +17,15 @@ describe('BossHealthBar', () => {
     expect(fill).not.toBeNull();
     expect(fill).toHaveStyle({ width: '0%' });
   });
+
+  it('renders custom boss name when provided', () => {
+    render(
+      <BossHealthBar active health={250} maxHealth={500} name="Colosso Primevo" />
+    );
+
+    expect(screen.getByText(/⚠️ Colosso Primevo/)).toBeInTheDocument();
+    const progress = screen.getByRole('progressbar', { name: /colosso primevo/i });
+    expect(progress).toBeInTheDocument();
+  });
 });
 

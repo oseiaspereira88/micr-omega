@@ -131,6 +131,7 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
     bossActive,
     bossHealth,
     bossMaxHealth,
+    bossName,
     element,
     affinity,
     elementLabel,
@@ -412,6 +413,7 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
         bossActive={bossActive}
         bossHealth={bossHealth}
         bossMaxHealth={bossMaxHealth}
+        bossName={bossName}
         element={element}
         affinity={affinity}
         elementLabel={elementLabel}

@@ -1341,6 +1341,25 @@ const buildHudSnapshot = (
     localPlayer?.bossMaxHealth,
     safeNumber(safePreviousHud.bossMaxHealth, bossHealth || 0)
   );
+  const bossName = (() => {
+    const candidates = [
+      localPlayer?.bossName,
+      localPlayer?.boss?.name,
+      safePreviousHud.bossName,
+      safePreviousHud.boss?.name,
+    ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed.length > 0) {
+          return trimmed;
+        }
+      }
+    }
+
+    return null;
+  })();
 
   const evolutionMenuSource =
     localPlayer?.evolutionMenu ??
@@ -1447,6 +1466,7 @@ const buildHudSnapshot = (
     bossActive,
     bossHealth,
     bossMaxHealth,
+    bossName,
     skillList,
     hasMultipleSkills,
     currentSkill,

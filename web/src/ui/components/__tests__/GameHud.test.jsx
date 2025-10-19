@@ -34,6 +34,7 @@ const BASE_PROPS = {
   bossActive: false,
   bossHealth: 0,
   bossMaxHealth: 0,
+  bossName: null,
   element: null,
   affinity: null,
   elementLabel: '',
@@ -249,6 +250,49 @@ describe('GameHud sidebar accessibility', () => {
 
     await waitFor(() => expect(toggleButton).toHaveFocus());
     expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+describe('GameHud boss health bar', () => {
+  let originalConnectionStatus;
+  let originalJoinError;
+
+  beforeEach(() => {
+    const state = gameStore.getState();
+    originalConnectionStatus = state.connectionStatus;
+    originalJoinError = state.joinError;
+
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'connected', joinError: null });
+    });
+  });
+
+  afterEach(() => {
+    act(() => {
+      gameStore.setPartial({
+        connectionStatus: originalConnectionStatus,
+        joinError: originalJoinError,
+      });
+    });
+  });
+
+  it('renderiza o nome personalizado do chefe', () => {
+    render(
+      <GameSettingsProvider>
+        <GameHud
+          {...BASE_PROPS}
+          bossActive
+          bossHealth={320}
+          bossMaxHealth={640}
+          bossName="Soberano Plasmático"
+        />
+      </GameSettingsProvider>,
+    );
+
+    expect(screen.getByText(/⚠️ Soberano Plasmático/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('progressbar', { name: /soberano plasmático/i }),
+    ).toBeInTheDocument();
   });
 });
 

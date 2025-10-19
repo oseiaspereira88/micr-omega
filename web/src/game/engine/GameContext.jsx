@@ -33,6 +33,7 @@ const initialState = {
   bossActive: false,
   bossHealth: 0,
   bossMaxHealth: 0,
+  bossName: null,
   currentSkill: null,
   skillList: [],
   hasMultipleSkills: false,
