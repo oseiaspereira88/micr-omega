@@ -111,7 +111,7 @@ const SkillWheel = ({
       ) : null}
 
       {skillList.length > 0 && (
-        <div className={styles.skills}>
+        <ul className={styles.skills}>
           {skillList.map(skill => {
             const cooldownValue = Number.isFinite(skill.cooldown) ? skill.cooldown : 0;
             const maxCooldownValue = Number.isFinite(skill.maxCooldown) ? skill.maxCooldown : 0;
@@ -143,12 +143,15 @@ const SkillWheel = ({
               ? `${styles.skillItem} ${styles.skillItemActive}`
               : styles.skillItem;
 
+            const elementLabel = ELEMENT_LABELS[skill.element] ?? skill.element ?? '—';
+            const typeLabel = SKILL_TYPE_LABELS[skill.type] ?? skill.type ?? 'Ativa';
+
             return (
-              <div
+              <li
                 key={skill.key}
                 className={itemClass}
-                title={`${skill.name} • ${ELEMENT_LABELS[skill.element] ?? skill.element ?? '—'} (${SKILL_TYPE_LABELS[skill.type] ?? skill.type ?? 'Ativa'})`}
-                aria-label={`${skill.name}. ${cooldownStatusLabel}`}
+                title={`${skill.name} • ${elementLabel} (${typeLabel}) • ${cooldownStatusLabel}`}
+                aria-label={`${skill.name}. Elemento: ${elementLabel}. Tipo: ${typeLabel}. ${cooldownStatusLabel}.`}
               >
                 <span>{skill.icon}</span>
                 <span className={styles.visuallyHidden}>
@@ -166,10 +169,10 @@ const SkillWheel = ({
                     }}
                   />
                 )}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
       {hasMultipleSkills && (
