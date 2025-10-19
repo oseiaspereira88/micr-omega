@@ -152,6 +152,62 @@ const ORGANIC_CLUSTER_PATTERNS = [
   ],
 ] as const;
 
+type OrganicRespawnDistanceBand = { min: number; max: number };
+
+const DEFAULT_RESPAWN_DISTANCE_BANDS: readonly OrganicRespawnDistanceBand[] = [
+  {
+    min: PLAYER_COLLECT_RADIUS * 1.1,
+    max: PLAYER_COLLECT_RADIUS * 1.75,
+  },
+  {
+    min: PLAYER_COLLECT_RADIUS * 1.4,
+    max: PLAYER_COLLECT_RADIUS * 2.1,
+  },
+];
+
+const DEFAULT_RESPAWN_ANGLE_JITTER = Math.PI / 6;
+
+const ORGANIC_CLUSTER_DISTANCE_PARAMETERS: readonly {
+  readonly distanceBands: readonly OrganicRespawnDistanceBand[];
+  readonly angleJitterRadians: number;
+}[] = [
+  {
+    distanceBands: [
+      {
+        min: PLAYER_COLLECT_RADIUS * 1.05,
+        max: PLAYER_COLLECT_RADIUS * 1.6,
+      },
+      {
+        min: PLAYER_COLLECT_RADIUS * 1.2,
+        max: PLAYER_COLLECT_RADIUS * 1.9,
+      },
+    ],
+    angleJitterRadians: Math.PI / 7,
+  },
+  {
+    distanceBands: [
+      {
+        min: PLAYER_COLLECT_RADIUS * 1.35,
+        max: PLAYER_COLLECT_RADIUS * 2.1,
+      },
+    ],
+    angleJitterRadians: Math.PI / 5,
+  },
+  {
+    distanceBands: [
+      {
+        min: PLAYER_COLLECT_RADIUS * 1.55,
+        max: PLAYER_COLLECT_RADIUS * 2.4,
+      },
+      {
+        min: PLAYER_COLLECT_RADIUS * 1.8,
+        max: PLAYER_COLLECT_RADIUS * 2.9,
+      },
+    ],
+    angleJitterRadians: Math.PI / 4,
+  },
+];
+
 const CLIENT_TIME_MAX_FUTURE_DRIFT_MS = 2_000;
 
 const WORLD_BOUNDS = {
@@ -1052,6 +1108,8 @@ type PendingOrganicRespawnGroup = {
   templates: PendingOrganicRespawnTemplate[];
   delayRangeMs: { min: number; max: number };
   respawnAt: number;
+  distanceBands: readonly OrganicRespawnDistanceBand[];
+  angleJitterRadians: number;
 };
 
 const clampToWorldBounds = (position: Vector2): Vector2 => ({
@@ -2833,15 +2891,55 @@ export class RoomDO {
     return { worldChanged, scoresChanged };
   }
 
-  private findOrganicMatterRespawnPosition(origin: Vector2, attempts = 12): Vector2 | null {
+  private findOrganicMatterRespawnPosition(
+    origin: Vector2,
+    attemptsOrOptions: number | {
+      attempts?: number;
+      distanceBands?: readonly OrganicRespawnDistanceBand[];
+      angleJitterRadians?: number;
+    } = 12,
+  ): Vector2 | null {
     const rng = this.organicMatterRespawnRng;
-    const minimumDistance = PLAYER_COLLECT_RADIUS * 1.1;
-    const distanceSpread = Math.max(PLAYER_COLLECT_RADIUS * 0.6, 1);
+    const baseOptions =
+      typeof attemptsOrOptions === "number"
+        ? { attempts: attemptsOrOptions }
+        : attemptsOrOptions ?? {};
+
+    const attempts = Math.max(1, Math.round(baseOptions.attempts ?? 12));
+    const rawBands =
+      baseOptions.distanceBands && baseOptions.distanceBands.length > 0
+        ? baseOptions.distanceBands
+        : DEFAULT_RESPAWN_DISTANCE_BANDS;
+    const mappedBands = rawBands.map((band) => {
+      const minimum = Math.max(PLAYER_COLLECT_RADIUS * 1.05, band.min);
+      const maximum = Math.max(minimum, band.max);
+      return { min: minimum, max: maximum };
+    });
+    const distanceBands =
+      mappedBands.length > 0
+        ? mappedBands
+        : DEFAULT_RESPAWN_DISTANCE_BANDS.map((band) => ({
+            min: Math.max(PLAYER_COLLECT_RADIUS * 1.05, band.min),
+            max: Math.max(Math.max(PLAYER_COLLECT_RADIUS * 1.05, band.min), band.max),
+          }));
+    const angleJitterRadians = Math.max(
+      0,
+      typeof baseOptions.angleJitterRadians === "number"
+        ? baseOptions.angleJitterRadians
+        : DEFAULT_RESPAWN_ANGLE_JITTER,
+    );
+
+    const collectionRadiusSquared = PLAYER_COLLECT_RADIUS ** 2;
+    const bandsCount = distanceBands.length;
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
-      const angle = rng() * Math.PI * 2;
-      const radialOffset = attempt * PLAYER_COLLECT_RADIUS * 0.35;
-      const distance = minimumDistance + radialOffset + rng() * distanceSpread;
+      const band = distanceBands[attempt % bandsCount] ?? distanceBands[0]!;
+      const bandSpan = Math.max(0, band.max - band.min);
+      const distance = band.min + rng() * bandSpan;
+      const baseAngle = (attempt / attempts) * Math.PI * 2;
+      const jitter = angleJitterRadians > 0 ? (rng() - 0.5) * 2 * angleJitterRadians : 0;
+      const angle = baseAngle + jitter;
+
       const candidate = this.clampPosition({
         x: origin.x + Math.cos(angle) * distance,
         y: origin.y + Math.sin(angle) * distance,
@@ -2851,19 +2949,34 @@ export class RoomDO {
         continue;
       }
 
-      if (this.distanceSquared(origin, candidate) < PLAYER_COLLECT_RADIUS ** 2) {
+      if (this.distanceSquared(origin, candidate) < collectionRadiusSquared) {
         continue;
       }
 
       return candidate;
     }
 
-    const fallback = this.clampPosition({
-      x: origin.x + minimumDistance + attempts * PLAYER_COLLECT_RADIUS * 0.35,
-      y: origin.y,
-    });
-    if (!this.isBlockedByObstacle(fallback) && this.distanceSquared(origin, fallback) >= PLAYER_COLLECT_RADIUS ** 2) {
-      return fallback;
+    const fallbackDistances = distanceBands.flatMap((band) => [band.min, band.max]);
+    for (const fallbackDistance of fallbackDistances) {
+      if (!Number.isFinite(fallbackDistance) || fallbackDistance <= 0) {
+        continue;
+      }
+      for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+        const candidate = this.clampPosition({
+          x: origin.x + Math.cos(angle) * fallbackDistance,
+          y: origin.y + Math.sin(angle) * fallbackDistance,
+        });
+
+        if (this.isBlockedByObstacle(candidate)) {
+          continue;
+        }
+
+        if (this.distanceSquared(origin, candidate) < collectionRadiusSquared) {
+          continue;
+        }
+
+        return candidate;
+      }
     }
 
     return null;
@@ -3516,14 +3629,22 @@ export class RoomDO {
       const remaining = collectedEntries.length - index;
       const baseSize = Math.min(remaining, Math.floor(rng() * 3) + 3);
       const clusterSize = Math.max(1, baseSize);
-      const anchor = this.findOrganicMatterRespawnPosition(player.position, 18);
-      if (!anchor) {
-        break;
-      }
-
       const patternIndex = Math.floor(rng() * ORGANIC_CLUSTER_PATTERNS.length);
       const clusterShape =
         ORGANIC_CLUSTER_PATTERNS[patternIndex] ?? ORGANIC_CLUSTER_PATTERNS[0];
+      const distanceParams =
+        ORGANIC_CLUSTER_DISTANCE_PARAMETERS[patternIndex] ?? {
+          distanceBands: DEFAULT_RESPAWN_DISTANCE_BANDS,
+          angleJitterRadians: DEFAULT_RESPAWN_ANGLE_JITTER,
+        };
+      const anchor = this.findOrganicMatterRespawnPosition(player.position, {
+        attempts: 18,
+        distanceBands: distanceParams.distanceBands,
+        angleJitterRadians: distanceParams.angleJitterRadians,
+      });
+      if (!anchor) {
+        break;
+      }
       const templates: PendingOrganicRespawnTemplate[] = [];
 
       for (let clusterIndex = 0; clusterIndex < clusterSize; clusterIndex += 1) {
@@ -3553,6 +3674,8 @@ export class RoomDO {
         templates,
         delayRangeMs,
         respawnAt: now + Math.max(delay, delayRangeMs.min),
+        distanceBands: distanceParams.distanceBands,
+        angleJitterRadians: distanceParams.angleJitterRadians,
       });
 
       index += templates.length;
@@ -3572,6 +3695,8 @@ export class RoomDO {
           templates: [],
           delayRangeMs: ORGANIC_RESPAWN_DELAY_RANGE_MS,
           respawnAt: now,
+          distanceBands: DEFAULT_RESPAWN_DISTANCE_BANDS,
+          angleJitterRadians: DEFAULT_RESPAWN_ANGLE_JITTER,
         });
       }
     }
@@ -3692,7 +3817,11 @@ export class RoomDO {
         });
 
         if (this.isBlockedByObstacle(spawnPosition)) {
-          const fallback = this.findOrganicMatterRespawnPosition(spawnPosition, 12);
+          const fallback = this.findOrganicMatterRespawnPosition(spawnPosition, {
+            attempts: 12,
+            distanceBands: group.distanceBands,
+            angleJitterRadians: group.angleJitterRadians,
+          });
           if (fallback) {
             spawnPosition = fallback;
           } else {
