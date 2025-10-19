@@ -1,5 +1,6 @@
 import { createVisualEffect } from '../effects/visualEffects';
 import { createParticle as generateParticle } from '../effects/particles';
+import { pushDamagePopup } from '../state/damagePopups';
 import {
   ELEMENT_TYPES,
   SKILL_TYPES,
@@ -26,6 +27,31 @@ const createStatusEffect = (state, entity, statusKey, options = {}) => {
   return result;
 };
 
+const applySkillDamage = (state, enemy, rawDamage) => {
+  if (!state || !enemy) {
+    return 0;
+  }
+
+  const currentHealth = Number.isFinite(enemy.health) ? enemy.health : 0;
+  const incomingDamage = Number.isFinite(rawDamage) ? Math.max(0, rawDamage) : 0;
+  const appliedDamage = Math.min(currentHealth, incomingDamage);
+
+  if (appliedDamage <= 0) {
+    return 0;
+  }
+
+  enemy.health = Math.max(0, currentHealth - appliedDamage);
+
+  pushDamagePopup(state, {
+    x: enemy.x,
+    y: enemy.y,
+    value: appliedDamage,
+    variant: 'skill',
+  });
+
+  return appliedDamage;
+};
+
 export const createSkills = ({ playSound }) => ({
   pulse: {
     name: 'Pulso Osmótico',
@@ -47,7 +73,7 @@ export const createSkills = ({ playSound }) => ({
         if (dist <= radius) {
           enemy.vx += (dx / (dist || 1)) * 18;
           enemy.vy += (dy / (dist || 1)) * 18;
-          enemy.health -= Math.max(4, org.attack * 0.45);
+          applySkillDamage(state, enemy, Math.max(4, org.attack * 0.45));
           createStatusEffect(state, enemy, STATUS_EFFECTS.FISSURE, { stacks: 1, duration: 6 });
           affected += 1;
         }
@@ -135,8 +161,7 @@ export const createSkills = ({ playSound }) => ({
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         if (dist < (org.range ?? org.attackRange) * 1.4) {
-          const drain = Math.min(enemy.health, Math.max(6, org.attack * 0.4));
-          enemy.health -= drain;
+          const drain = applySkillDamage(state, enemy, Math.max(6, org.attack * 0.4));
           totalDrain += drain;
           createStatusEffect(state, enemy, STATUS_EFFECTS.FISSURE, { stacks: 1, duration: 4 });
 
@@ -178,7 +203,7 @@ export const createSkills = ({ playSound }) => ({
         const dist = Math.sqrt(toEnemyX * toEnemyX + toEnemyY * toEnemyY) || 1;
         const alignment = (toEnemyX * facingX + toEnemyY * facingY) / dist;
         if (dist < (org.range ?? org.attackRange) * 1.6 && alignment > 0.45) {
-          enemy.health -= Math.max(5, org.attack * 0.55);
+          applySkillDamage(state, enemy, Math.max(5, org.attack * 0.55));
           createStatusEffect(state, enemy, STATUS_EFFECTS.PHOTOLESION, { stacks: 1, duration: 5 });
         }
       });
