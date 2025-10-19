@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SplashScreen from './SplashScreen.jsx';
 import MainMenuScreen from './MainMenuScreen.jsx';
 import LobbyScreen from './LobbyScreen.jsx';
@@ -42,6 +42,16 @@ const STAGE_METADATA = {
 const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
   const [activeStage, setActiveStage] = useState('splash');
   const [feedbackNotice, setFeedbackNotice] = useState(null);
+  const splashTimerRef = useRef(null);
+
+  const clearSplashTimer = useCallback(() => {
+    if (splashTimerRef.current) {
+      clearTimeout(splashTimerRef.current);
+      splashTimerRef.current = null;
+    }
+  }, []);
+
+  const skipButtonRef = useRef(null);
 
   const stageConfig = useMemo(() => STAGE_METADATA[activeStage] ?? STAGE_METADATA.splash, [activeStage]);
 
@@ -75,6 +85,7 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
 
   useEffect(() => {
     if (activeStage !== 'splash') {
+      clearSplashTimer();
       return undefined;
     }
 
@@ -82,17 +93,31 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
     const splashDelay = isTestEnvironment ? 50 : autoAdvanceAfter;
 
     const timer = setTimeout(() => {
+      clearSplashTimer();
       goToStage('menu');
     }, Math.max(0, splashDelay));
 
+    splashTimerRef.current = timer;
+
     return () => {
-      clearTimeout(timer);
+      clearSplashTimer();
     };
-  }, [activeStage, goToStage]);
+  }, [activeStage, clearSplashTimer, goToStage]);
+
+  useEffect(() => {
+    if (activeStage === 'splash' && skipButtonRef.current) {
+      skipButtonRef.current.focus();
+    }
+  }, [activeStage]);
 
   const handlePlay = useCallback(() => {
     goToStage('lobby');
   }, [goToStage]);
+
+  const handleSkip = useCallback(() => {
+    clearSplashTimer();
+    goToStage('menu');
+  }, [clearSplashTimer, goToStage]);
 
   const handleEnterPublic = useCallback(() => {
     if (typeof onComplete === 'function') {
@@ -152,6 +177,18 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
         <p className={styles.description}>{stageConfig.description}</p>
       </header>
       <div className={styles.stageArea}>
+        {activeStage === 'splash' && (
+          <button
+            type="button"
+            className={styles.skipButton}
+            onClick={handleSkip}
+            ref={skipButtonRef}
+            data-testid="splash-skip"
+            aria-label="Pular introdução e ir para o menu"
+          >
+            Pular
+          </button>
+        )}
         <div className={styles.stageShell}>
           <div className={styles.stageGlow} />
           <div className={styles.stageContent}>
