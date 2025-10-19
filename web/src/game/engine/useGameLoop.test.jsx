@@ -774,6 +774,130 @@ describe('useGameLoop evolution confirmation flow', () => {
     const toastAdditions = mocks.addNotification.mock.calls.filter(([, text]) => text === '⬆️ Nível 2');
     expect(toastAdditions).toHaveLength(1);
   });
+
+  it('normalizes repeated XP snapshots across frames without double-leveling', async () => {
+    const actualCheckEvolution = mocks.actualSystems?.checkEvolution;
+    expect(actualCheckEvolution).toBeTypeOf('function');
+
+    mocks.checkEvolution.mockClear();
+    mocks.checkEvolution.mockImplementation((state, helpers) => actualCheckEvolution(state, helpers));
+
+    const repeatedSnapshot = {
+      commands: { movement: null, attacks: [] },
+      localPlayerId: 'player-1',
+      hudSnapshot: {
+        xp: { current: 260, total: 260, next: 120, level: 1 },
+        level: 1,
+        notifications: [],
+        resourceBag: {},
+        showEvolutionChoice: false,
+      },
+    };
+
+    const snapshots = [repeatedSnapshot, repeatedSnapshot, repeatedSnapshot];
+
+    let callIndex = 0;
+    mocks.updateGameState.mockImplementation(() => {
+      const frame = snapshots[Math.min(callIndex, snapshots.length - 1)];
+      callIndex += 1;
+      const { hudSnapshot } = frame;
+
+      return {
+        commands: frame.commands,
+        localPlayerId: frame.localPlayerId,
+        hudSnapshot: {
+          ...hudSnapshot,
+          xp: { ...hudSnapshot.xp },
+          notifications: [...(hudSnapshot.notifications ?? [])],
+          resourceBag: { ...(hudSnapshot.resourceBag ?? {}) },
+        },
+      };
+    });
+
+    const canvas = createCanvas();
+    const dispatch = vi.fn();
+
+    render(<HookWrapper canvas={canvas} dispatch={dispatch} />);
+
+    await waitFor(() => {
+      expect(typeof rafCallback).toBe('function');
+    });
+
+    act(() => {
+      rafCallback(0);
+    });
+
+    await waitFor(() => {
+      expect(mocks.checkEvolution).toHaveBeenCalled();
+    });
+
+    const firstFrameCheckCalls = mocks.checkEvolution.mock.calls.slice();
+    const firstCheckState = firstFrameCheckCalls[firstFrameCheckCalls.length - 1][0];
+    const firstFrameDispatchCount = dispatch.mock.calls.length;
+    const firstFrameFinalPayload = dispatch.mock.calls[firstFrameDispatchCount - 1][0].payload;
+
+    expect(firstFrameFinalPayload.level).toBe(firstCheckState.level);
+    expect(firstFrameFinalPayload.xp).toMatchObject({
+      current: firstCheckState.xp.current,
+      next: firstCheckState.xp.next,
+      total: firstCheckState.xp.total,
+      level: firstCheckState.xp.level,
+    });
+    expect(firstFrameFinalPayload.xp.current).toBeLessThan(260);
+    expect(firstFrameFinalPayload.xp.next).toBeGreaterThan(120);
+
+    const firstFrameResourceBagLevel = firstFrameFinalPayload.resourceBag?.level;
+    expect(firstFrameResourceBagLevel).toBe(firstCheckState.level);
+
+    const syncNotifications = dispatch.mock.calls
+      .slice(0, firstFrameDispatchCount)
+      .flatMap(([action]) =>
+        Array.isArray(action.payload?.notifications)
+          ? action.payload.notifications.map((notification) =>
+              typeof notification === 'string' ? notification : notification?.text
+            )
+          : []
+      )
+      .filter(Boolean);
+    expect(syncNotifications).toContain('⬆️ Nível 2');
+
+    const firstFrameNotificationTexts = Array.isArray(firstFrameFinalPayload.notifications)
+      ? firstFrameFinalPayload.notifications.map((notification) =>
+          typeof notification === 'string' ? notification : notification?.text
+        )
+      : [];
+    expect(firstFrameNotificationTexts).toContain('⬆️ Nível 2');
+
+    act(() => {
+      rafCallback(16);
+    });
+
+    await waitFor(() => {
+      expect(mocks.checkEvolution.mock.calls.length).toBeGreaterThan(firstFrameCheckCalls.length);
+    });
+
+    const subsequentCheckStates = mocks.checkEvolution.mock.calls
+      .slice(firstFrameCheckCalls.length)
+      .map(([state]) => state);
+    expect(subsequentCheckStates.length).toBeGreaterThan(0);
+    expect(subsequentCheckStates.every((state) => state.level === firstCheckState.level)).toBe(true);
+
+    const finalPayload = dispatch.mock.calls.at(-1)[0].payload;
+    expect(finalPayload.level).toBe(firstCheckState.level);
+    expect(finalPayload.xp.current).toBe(firstCheckState.xp.current);
+    expect(finalPayload.xp.next).toBe(firstCheckState.xp.next);
+    expect(finalPayload.resourceBag.level).toBe(firstCheckState.level);
+
+    const finalNotificationTexts = Array.isArray(finalPayload.notifications)
+      ? finalPayload.notifications.map((notification) =>
+          typeof notification === 'string' ? notification : notification?.text
+        )
+      : [];
+    expect(finalNotificationTexts).toContain('⬆️ Nível 2');
+
+    const levelUpToasts = mocks.addNotification.mock.calls.filter(([, text]) => text === '⬆️ Nível 2');
+    expect(levelUpToasts).toHaveLength(1);
+  });
 });
 
 describe('setActiveEvolutionTier', () => {

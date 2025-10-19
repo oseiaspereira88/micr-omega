@@ -1678,6 +1678,13 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
           hudSnapshot.confirmedLevel = Number.isFinite(state.confirmedLevel)
             ? state.confirmedLevel
             : state.level;
+          if (state.xp && typeof state.xp === 'object') {
+            const xpClone = { ...state.xp };
+            if (Array.isArray(state.xp.thresholds)) {
+              xpClone.thresholds = [...state.xp.thresholds];
+            }
+            hudSnapshot.xp = xpClone;
+          }
           const existingBag =
             hudSnapshot.resourceBag && typeof hudSnapshot.resourceBag === 'object'
               ? { ...hudSnapshot.resourceBag }
@@ -1688,6 +1695,14 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
           };
           if (hudSnapshot.reroll && state.reroll && typeof state.reroll === 'object') {
             Object.assign(hudSnapshot.reroll, state.reroll);
+          }
+          if (Array.isArray(state.notifications)) {
+            hudSnapshot.notifications = state.notifications.map((notification) => {
+              if (!notification || typeof notification !== 'object') {
+                return notification;
+              }
+              return { ...notification };
+            });
           }
         }
         syncHudState(state);
