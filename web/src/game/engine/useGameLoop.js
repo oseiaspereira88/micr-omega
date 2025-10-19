@@ -745,12 +745,78 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
   const skills = useMemo(() => createSkills({ playSound }), [playSound]);
 
-  const createParticle = useCallback((x, y, color, size = 3) => {
-    const particle = generateParticle(x, y, color, size);
-    if (!particle) return;
+  const createParticle = useCallback((arg1, arg2, arg3, arg4, arg5) => {
+    let state = renderStateRef.current;
+    if (!state) return;
 
-    const state = renderStateRef.current;
-    state.particles.push(particle);
+    let payload = arg1;
+    let x = arg1;
+    let y = arg2;
+    let colorOrOptions = arg3;
+    let size = arg4;
+
+    if (arg1 && typeof arg1 === 'object' && Array.isArray(arg1.particles)) {
+      state = arg1;
+      payload = arg2;
+      x = arg2;
+      y = arg3;
+      colorOrOptions = arg4;
+      size = arg5;
+    }
+
+    const normalizeParticles = (value) => {
+      if (!value) return [];
+      if (Array.isArray(value)) {
+        return value.filter(
+          (particle) =>
+            particle &&
+            typeof particle === 'object' &&
+            Number.isFinite(particle.x) &&
+            Number.isFinite(particle.y) &&
+            Number.isFinite(particle.life),
+        );
+      }
+      if (typeof value === 'function') {
+        return normalizeParticles(value());
+      }
+      if (
+        value &&
+        typeof value === 'object' &&
+        Number.isFinite(value.x) &&
+        Number.isFinite(value.y) &&
+        Number.isFinite(value.life)
+      ) {
+        return [value];
+      }
+      return [];
+    };
+
+    let particles = normalizeParticles(payload);
+
+    if (!particles.length && Number.isFinite(x) && Number.isFinite(y)) {
+      particles = normalizeParticles(generateParticle(x, y, colorOrOptions, size));
+    }
+
+    if (
+      !particles.length &&
+      payload &&
+      typeof payload === 'object' &&
+      Number.isFinite(payload.x) &&
+      Number.isFinite(payload.y)
+    ) {
+      const { x: px, y: py, ...options } = payload;
+      particles = normalizeParticles(generateParticle(px, py, options));
+    }
+
+    if (!particles.length) {
+      return;
+    }
+
+    particles.forEach((particle) => {
+      if (particle) {
+        state.particles.push(particle);
+      }
+    });
   }, []);
 
   const createEffect = useCallback((x, y, type, color) => {
