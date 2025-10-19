@@ -113,27 +113,69 @@ export const effectsRenderer = {
         nextEffects.push(eff);
       });
 
+      const offsetX = camera?.offsetX ?? 0;
+      const offsetY = camera?.offsetY ?? 0;
+
       particles.forEach(p => {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= 0.02;
-        p.vy += 0.15;
+        const normalizedDelta = Number.isFinite(delta) ? Math.max(0, delta) : 0;
+        const frameScale = normalizedDelta > 0 ? Math.min(3, normalizedDelta * 60) : 1;
+
+        p.x += (p.vx ?? 0) * frameScale;
+        p.y += (p.vy ?? 0) * frameScale;
+        p.vy = (p.vy ?? 0) + (p.gravity ?? 0.15) * frameScale;
+        p.life -= (p.decay ?? 0.02) * frameScale;
+        p.age = (p.age ?? 0) + normalizedDelta;
 
         if (p.life <= 0) {
           return;
         }
 
-        const screenX = p.x - camera.offsetX;
-        const screenY = p.y - camera.offsetY;
+        const screenX = (p.x ?? 0) - offsetX;
+        const screenY = (p.y ?? 0) - offsetY;
+        const glowStrength = Math.max(0, p.glowStrength ?? 0);
+        const pulseSpeed = p.pulseSpeed ?? 0;
+        const pulseOffset = p.pulseOffset ?? 0;
+        const pulseFactor = pulseSpeed
+          ? (Math.sin((p.age ?? 0) * pulseSpeed + pulseOffset) + 1) / 2
+          : 1;
+        const baseAlpha = Math.max(0, Math.min(1, p.baseAlpha ?? 1));
+        const alpha = Math.max(
+          0,
+          Math.min(1, p.life * (baseAlpha * (glowStrength > 0 ? 0.6 + 0.4 * pulseFactor : 1)))
+        );
+        const sizePulse = p.size * (1 + (glowStrength > 0 ? (pulseFactor - 0.5) * 0.3 : 0));
+
+        ctx.save();
+
+        if ((p.composite ?? 'source-over') === 'additive') {
+          ctx.globalCompositeOperation = 'lighter';
+        }
 
         ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.life;
-        ctx.shadowBlur = 8;
+        ctx.globalAlpha = alpha;
+        ctx.shadowBlur = 8 * (1 + glowStrength * 0.8);
         ctx.shadowColor = p.color;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, p.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
+
+        const spriteKey = p.sprite;
+        const spriteAtlas = assets?.sprites;
+        const spriteImage = spriteKey && spriteAtlas ? spriteAtlas[spriteKey] : null;
+
+        if (spriteImage) {
+          const width = sizePulse * 2;
+          const height = sizePulse * 2;
+          ctx.drawImage(spriteImage, screenX - sizePulse, screenY - sizePulse, width, height);
+        } else {
+          const shape = p.shape ?? 'circle';
+          ctx.beginPath();
+          if (shape === 'square') {
+            ctx.rect(screenX - sizePulse, screenY - sizePulse, sizePulse * 2, sizePulse * 2);
+          } else {
+            ctx.arc(screenX, screenY, sizePulse, 0, Math.PI * 2);
+          }
+          ctx.fill();
+        }
+
+        ctx.restore();
 
         nextParticles.push(p);
       });
