@@ -65,6 +65,36 @@
   justify-content: center;
 }
 
+.skipButton {
+  position: absolute;
+  top: clamp(16px, 2vw, 28px);
+  right: clamp(16px, 2vw, 32px);
+  z-index: 2;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(74, 224, 255, 0.45);
+  background: rgba(6, 18, 38, 0.75);
+  color: rgba(229, 244, 255, 0.95);
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: clamp(0.8rem, 1.4vw, 0.95rem);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.skipButton:hover,
+.skipButton:focus-visible {
+  background: rgba(74, 224, 255, 0.18);
+  border-color: rgba(74, 224, 255, 0.8);
+  color: rgba(255, 255, 255, 0.98);
+}
+
+.skipButton:focus-visible {
+  outline: 2px solid rgba(74, 224, 255, 0.9);
+  outline-offset: 3px;
+}
+
 .stageShell {
   position: relative;
   width: min(100%, 1020px);

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SplashScreen from './SplashScreen.jsx';
 import MainMenuScreen from './MainMenuScreen.jsx';
 import LobbyScreen from './LobbyScreen.jsx';
@@ -41,6 +41,7 @@ const STAGE_METADATA = {
 
 const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
   const [activeStage, setActiveStage] = useState('splash');
+  const splashTimerRef = useRef(null);
 
   const stageConfig = useMemo(() => STAGE_METADATA[activeStage] ?? STAGE_METADATA.splash, [activeStage]);
 
@@ -72,6 +73,13 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
     [onAdvance],
   );
 
+  const clearSplashTimer = useCallback(() => {
+    if (splashTimerRef.current) {
+      clearTimeout(splashTimerRef.current);
+      splashTimerRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (activeStage !== 'splash') {
       return undefined;
@@ -84,10 +92,17 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
       goToStage('menu');
     }, Math.max(0, splashDelay));
 
+    splashTimerRef.current = timer;
+
     return () => {
-      clearTimeout(timer);
+      clearSplashTimer();
     };
-  }, [activeStage, goToStage]);
+  }, [activeStage, clearSplashTimer, goToStage]);
+
+  const handleSkip = useCallback(() => {
+    clearSplashTimer();
+    goToStage('menu');
+  }, [clearSplashTimer, goToStage]);
 
   const handlePlay = useCallback(() => {
     goToStage('lobby');
@@ -121,6 +136,16 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
         <p className={styles.description}>{stageConfig.description}</p>
       </header>
       <div className={styles.stageArea}>
+        {activeStage === 'splash' && (
+          <button
+            type="button"
+            className={styles.skipButton}
+            onClick={handleSkip}
+            aria-label="Pular introdução e ir para o menu"
+          >
+            Pular
+          </button>
+        )}
         <div className={styles.stageShell}>
           <div className={styles.stageGlow} />
           <div className={styles.stageContent}>

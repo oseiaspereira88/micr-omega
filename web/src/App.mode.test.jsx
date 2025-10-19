@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,6 +23,7 @@ describe('App display mode flow', () => {
 
   afterEach(() => {
     updateSearch('');
+    vi.useRealTimers();
   });
 
   it('renders onboarding flow by default', () => {
@@ -32,6 +33,23 @@ describe('App display mode flow', () => {
     expect(screen.getByTestId('splash-screen')).toBeInTheDocument();
     expect(screen.getByText(/Micr•Omega Boot Sequence/i)).toBeInTheDocument();
     expect(screen.queryByTestId('main-menu-play')).not.toBeInTheDocument();
+  });
+
+  it('permite pular manualmente a introdução para o menu', () => {
+    vi.useFakeTimers();
+
+    render(<App />);
+
+    const skipButton = screen.getByRole('button', { name: /pular/i });
+
+    fireEvent.click(skipButton);
+
+    expect(screen.getByTestId('main-menu-screen')).toBeInTheDocument();
+    expect(screen.queryByTestId('splash-screen')).not.toBeInTheDocument();
+
+    vi.runOnlyPendingTimers();
+
+    expect(screen.getByTestId('main-menu-screen')).toBeInTheDocument();
   });
 
   it('advances through onboarding stages before entering the game', async () => {
