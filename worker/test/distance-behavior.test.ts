@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
 import { RoomDO, WORLD_TICK_INTERVAL_MS } from "../src/RoomDO";
@@ -227,6 +227,84 @@ describe("RoomDO distance-sensitive behaviour", () => {
       expect(storedIds.has(entry.id)).toBe(true);
     }
     expect(roomAny.world.organicMatter).toHaveLength(originalCount);
+  });
+
+  it("respects respawn distance bands when initial attempts are blocked", async () => {
+    const { roomAny } = await createRoom();
+
+    const origin = { x: 12, y: -18 };
+    const distanceBands = [
+      { min: 120, max: 150 },
+      { min: 180, max: 210 },
+    ];
+
+    const rngValues = [0.3, 0.6];
+    const originalRng = roomAny.organicMatterRespawnRng;
+    roomAny.organicMatterRespawnRng = () => {
+      const next = rngValues.shift();
+      return next !== undefined ? next : 0.5;
+    };
+
+    const originalIsBlocked = roomAny.isBlockedByObstacle;
+    const blocker = vi.fn().mockImplementationOnce(() => true).mockReturnValue(false);
+    roomAny.isBlockedByObstacle = blocker;
+
+    const position = roomAny.findOrganicMatterRespawnPosition(origin, {
+      attempts: 4,
+      distanceBands,
+      angleJitterRadians: 0,
+    });
+
+    expect(position).not.toBeNull();
+    const distance = Math.hypot((position?.x ?? 0) - origin.x, (position?.y ?? 0) - origin.y);
+    expect(distance).toBeGreaterThanOrEqual(distanceBands[1]!.min);
+    expect(distance).toBeLessThanOrEqual(distanceBands[1]!.max);
+    expect(blocker).toHaveBeenCalledTimes(2);
+
+    roomAny.isBlockedByObstacle = originalIsBlocked;
+    roomAny.organicMatterRespawnRng = originalRng;
+  });
+
+  it("falls back to safe angles when all sampled distances are obstructed", async () => {
+    const { roomAny } = await createRoom();
+
+    const origin = { x: -24, y: 6 };
+    const distanceBands = [{ min: 90, max: 110 }];
+    const allowedDistance = distanceBands[0]!.min;
+
+    const rngValues = [0.2, 0.8];
+    const originalRng = roomAny.organicMatterRespawnRng;
+    roomAny.organicMatterRespawnRng = () => {
+      const next = rngValues.shift();
+      return next !== undefined ? next : 0.5;
+    };
+
+    const originalIsBlocked = roomAny.isBlockedByObstacle;
+    roomAny.isBlockedByObstacle = vi
+      .fn()
+      .mockImplementation((candidate: { x: number; y: number }) => {
+        const dx = candidate.x - origin.x;
+        const dy = candidate.y - origin.y;
+        if (Math.abs(dx - allowedDistance) < 1e-3 && Math.abs(dy) < 1e-3) {
+          return false;
+        }
+        return true;
+      });
+
+    const position = roomAny.findOrganicMatterRespawnPosition(origin, {
+      attempts: 2,
+      distanceBands,
+      angleJitterRadians: 0,
+    });
+
+    expect(position).not.toBeNull();
+    const distance = Math.hypot((position?.x ?? 0) - origin.x, (position?.y ?? 0) - origin.y);
+    expect(distance).toBeGreaterThanOrEqual(distanceBands[0]!.min);
+    expect(distance).toBeLessThanOrEqual(distanceBands[0]!.max);
+    expect(roomAny.isBlockedByObstacle).toHaveBeenCalled();
+
+    roomAny.isBlockedByObstacle = originalIsBlocked;
+    roomAny.organicMatterRespawnRng = originalRng;
   });
 
   it("resolves player attacks when targets are within range", async () => {
