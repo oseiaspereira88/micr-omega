@@ -114,10 +114,17 @@ export const effectsRenderer = {
       });
 
       particles.forEach(p => {
+        const fade = Number.isFinite(p.fade) ? p.fade : 0.02;
+        const gravity = Number.isFinite(p.gravity) ? p.gravity : 0.15;
+
         p.x += p.vx;
         p.y += p.vy;
-        p.life -= 0.02;
-        p.vy += 0.15;
+        p.life -= fade;
+        p.vy += gravity;
+
+        if (Number.isFinite(p.angularVelocity) && p.angularVelocity !== 0) {
+          p.orientation = (p.orientation ?? 0) + p.angularVelocity;
+        }
 
         if (p.life <= 0) {
           return;
@@ -125,15 +132,28 @@ export const effectsRenderer = {
 
         const screenX = p.x - camera.offsetX;
         const screenY = p.y - camera.offsetY;
+        const previousComposite = ctx.globalCompositeOperation;
 
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        if (Number.isFinite(p.orientation)) {
+          ctx.rotate(p.orientation);
+        }
+        const stretch = Number.isFinite(p.stretch) ? Math.max(0.2, p.stretch) : 1;
+        if (stretch !== 1) {
+          ctx.scale(stretch, 1);
+        }
+
+        ctx.globalCompositeOperation = p.blend || previousComposite;
         ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.life;
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
         ctx.shadowBlur = 8;
         ctx.shadowColor = p.color;
         ctx.beginPath();
-        ctx.arc(screenX, screenY, p.size, 0, Math.PI * 2);
+        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
+        ctx.restore();
+        ctx.globalCompositeOperation = previousComposite;
 
         nextParticles.push(p);
       });

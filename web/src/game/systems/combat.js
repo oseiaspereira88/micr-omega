@@ -11,6 +11,11 @@ import {
   tickStatusEffects,
 } from './statusEffects';
 import { pushDamagePopup } from '../state/damagePopups';
+import {
+  createCriticalSparks,
+  createElementalBurst,
+  createStatusDrip,
+} from '../effects/particles';
 
 const resolveBossName = (enemy) => {
   if (!enemy || typeof enemy !== 'object') return null;
@@ -29,10 +34,24 @@ const resolveBossName = (enemy) => {
   return null;
 };
 
+const ELEMENT_PARTICLE_COLORS = {
+  [ELEMENT_TYPES.BIO]: '#7ED957',
+  [ELEMENT_TYPES.CHEMICAL]: '#f59e0b',
+  [ELEMENT_TYPES.ACID]: '#ff4d6d',
+  [ELEMENT_TYPES.THERMAL]: '#ffd93d',
+  [ELEMENT_TYPES.ELECTRIC]: '#00d9ff',
+  [ELEMENT_TYPES.KINETIC]: '#f97316',
+  [ELEMENT_TYPES.PSIONIC]: '#9f7aea',
+  [ELEMENT_TYPES.SONIC]: '#60a5fa',
+};
+
+const resolveElementColor = (element, fallback) =>
+  ELEMENT_PARTICLE_COLORS[element] ?? fallback ?? '#ffffff';
+
 export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   if (!state || !enemy) return false;
 
-  const { playSound, createEffect, addNotification } = helpers;
+  const { playSound, createEffect, addNotification, createParticle } = helpers;
   const organism = state.organism;
   if (!organism) return false;
 
@@ -43,6 +62,15 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
       enemy.health = Math.max(0, enemy.health - normalizedDamage);
       const color = STATUS_METADATA[status]?.color ?? enemy.color;
       createEffect?.(state, enemy.x, enemy.y, getStatusEffectVisual(status), color);
+      createParticle?.(
+        state,
+        createStatusDrip(enemy.x, enemy.y, {
+          color,
+          life: 1.1,
+          count: 4,
+          direction: Math.PI / 2,
+        }),
+      );
       pushDamagePopup(state, {
         x: enemy.x,
         y: enemy.y,
@@ -286,6 +314,43 @@ export const performAttack = (state, helpers = {}) => {
       enemy.health -= damage;
 
       createEffect?.(state, enemy.x, enemy.y, 'hit', organism.color);
+      const attackDirection = Math.atan2(enemy.y - organism.y, enemy.x - organism.x);
+      const elementColor = resolveElementColor(attackElement, organism.color);
+      let impactParticles;
+
+      if (criticalHit) {
+        impactParticles = createCriticalSparks(enemy.x, enemy.y, {
+          color: elementColor,
+          highlight: '#ffffff',
+          direction: attackDirection,
+          count: 10,
+          speed: 9,
+        });
+      } else if (damageResult.relation === 'advantage') {
+        impactParticles = createElementalBurst(enemy.x, enemy.y, {
+          color: elementColor,
+          direction: attackDirection,
+          count: 14,
+          life: 1.1,
+          speed: 8,
+        });
+      } else if (damageResult.relation === 'disadvantage') {
+        impactParticles = createStatusDrip(enemy.x, enemy.y, {
+          color: elementColor,
+          direction: attackDirection + Math.PI / 2,
+          count: 6,
+          life: 0.8,
+        });
+      } else {
+        impactParticles = createElementalBurst(enemy.x, enemy.y, {
+          color: elementColor,
+          direction: attackDirection,
+          count: 10,
+          life: 0.85,
+          speed: 6,
+        });
+      }
+      createParticle?.(state, impactParticles);
 
       enemy.vx += (dx / dist) * 5;
       enemy.vy += (dy / dist) * 5;
@@ -330,9 +395,16 @@ export const performAttack = (state, helpers = {}) => {
         state.energy += 30;
         state.score += enemy.points;
         addNotification?.(state, `+${enemy.points} pts`);
-        for (let i = 0; i < 15; i++) {
-          createParticle?.(state, enemy.x, enemy.y, enemy.color);
-        }
+        createParticle?.(
+          state,
+          createElementalBurst(enemy.x, enemy.y, {
+            color: enemy.color,
+            count: 24,
+            life: 1.2,
+            speed: 9,
+            spread: Math.PI * 2,
+          }),
+        );
         dropPowerUps?.(state, enemy);
         if (enemy.boss) {
           state.boss = null;

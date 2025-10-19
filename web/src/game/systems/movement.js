@@ -7,6 +7,7 @@ import {
   getStatusMovementMultiplier,
   tickStatusEffects,
 } from './statusEffects';
+import { createElementalBurst, createStatusDrip } from '../effects/particles';
 
 export const performDash = (state, helpers = {}) => {
   if (!state) return state;
@@ -69,17 +70,14 @@ export const performDash = (state, helpers = {}) => {
   playSound?.('dash');
   createEffect?.(state, organism.x, organism.y, 'dashstart', organism.color);
 
-  for (let i = 0; i < 10; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const distance = Math.random() * 20;
-    createParticle?.(
-      state,
-      organism.x + Math.cos(angle) * distance,
-      organism.y + Math.sin(angle) * distance,
-      organism.color,
-      6
-    );
-  }
+  const dashParticles = createElementalBurst(organism.x, organism.y, {
+    color: organism.color,
+    direction: dashAngle,
+    count: 18,
+    life: 0.9,
+    speed: 10,
+  });
+  createParticle?.(state, dashParticles);
 
   syncState?.(state);
   return state;
@@ -257,9 +255,18 @@ export const updateOrganismPhysics = (state, helpers = {}, delta = 0) => {
     .filter(trail => trail.life > 0);
 
   if (organism.isDashing) {
-    for (let i = 0; i < 3; i++) {
-      createParticle?.(state, organism.x, organism.y, organism.color, 4);
-    }
+    const trailDirection = Math.atan2(organism.vy, organism.vx) + Math.PI;
+    createParticle?.(
+      state,
+      createStatusDrip(organism.x, organism.y, {
+        color: organism.color,
+        direction: trailDirection,
+        count: 4,
+        life: 0.6,
+        speed: 2.2,
+        fade: 0.02,
+      }),
+    );
   }
 
   if (organism.dashCharge < organism.maxDashCharge) {
