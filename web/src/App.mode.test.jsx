@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -47,6 +47,31 @@ describe('App display mode flow', () => {
 
     await user.click(screen.getByTestId('lobby-join-public'));
     expect(await screen.findByTestId('game-app')).toBeInTheDocument();
+  });
+
+  it('permite pular a introdução manualmente a partir da tela splash', async () => {
+    vi.useFakeTimers();
+
+    try {
+      render(<App />);
+
+      const skipButton = screen.getByRole('button', { name: /pular introdução/i });
+
+      skipButton.focus();
+      expect(skipButton).toHaveFocus();
+
+      fireEvent.click(skipButton);
+      expect(screen.getByTestId('main-menu-screen')).toBeInTheDocument();
+      expect(screen.queryByTestId('splash-screen')).not.toBeInTheDocument();
+
+      vi.runOnlyPendingTimers();
+      expect(screen.queryByTestId('splash-screen')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('main-menu-play'));
+      expect(screen.getByTestId('lobby-screen')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('skips concept screens when ?mode=play is present', () => {
