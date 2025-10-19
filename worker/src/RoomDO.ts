@@ -825,6 +825,13 @@ const cloneWorldState = (world: SharedWorldState): SharedWorldState => ({
   })),
 });
 
+type StoredMicroorganism = Omit<Microorganism, "name" | "level"> &
+  Partial<Pick<Microorganism, "name" | "level">>;
+
+type StoredWorldState = Omit<SharedWorldState, "microorganisms"> & {
+  microorganisms: StoredMicroorganism[];
+};
+
 const cloneMicroorganism = (entity: Microorganism): Microorganism => ({
   ...entity,
   position: cloneVector(entity.position),
@@ -1173,6 +1180,124 @@ const hashString = (value: string): number => {
     hash = Math.imul(hash, 16777619) >>> 0;
   }
   return hash;
+};
+
+const LEGACY_MICROORGANISM_NAME_ADJECTIVES = [
+  "Amber",
+  "Crimson",
+  "Azure",
+  "Verdant",
+  "Saffron",
+  "Obsidian",
+  "Ivory",
+  "Cerulean",
+  "Umbral",
+  "Gilded",
+  "Cinder",
+  "Misty",
+] as const;
+
+const LEGACY_MICROORGANISM_NAME_NOUNS = [
+  "Spindle",
+  "Bloom",
+  "Spiral",
+  "Lancer",
+  "Veil",
+  "Shard",
+  "Warden",
+  "Drift",
+  "Glyph",
+  "Maw",
+  "Crown",
+  "Echo",
+] as const;
+
+const DEFAULT_LEGACY_MICROORGANISM_LEVEL = 1;
+
+const generateLegacyMicroorganismName = (
+  microorganism: StoredMicroorganism,
+  index: number,
+): string => {
+  const baseHash = hashString(`${microorganism.id ?? index}:${microorganism.species ?? ""}`);
+  const adjective =
+    LEGACY_MICROORGANISM_NAME_ADJECTIVES[
+      baseHash % LEGACY_MICROORGANISM_NAME_ADJECTIVES.length
+    ] ?? "Luminous";
+  const noun =
+    LEGACY_MICROORGANISM_NAME_NOUNS[
+      Math.floor(baseHash / LEGACY_MICROORGANISM_NAME_ADJECTIVES.length) %
+        LEGACY_MICROORGANISM_NAME_NOUNS.length
+    ] ?? "Strain";
+  const name = `${adjective} ${noun}`.trim();
+  return name.slice(0, 64);
+};
+
+const normalizeStoredMicroorganism = (
+  microorganism: StoredMicroorganism,
+  index: number,
+): { entity: Microorganism; changed: boolean } => {
+  let changed = false;
+
+  const rawName =
+    typeof microorganism.name === "string" ? microorganism.name.trim() : "";
+  const normalizedName =
+    rawName.length > 0 ? rawName.slice(0, 64) : generateLegacyMicroorganismName(microorganism, index);
+  if (normalizedName !== microorganism.name) {
+    changed = true;
+  }
+
+  const rawLevel = microorganism.level;
+  let normalizedLevel: number;
+  if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) {
+    normalizedLevel = Math.trunc(rawLevel);
+    if (normalizedLevel < 0) {
+      normalizedLevel = 0;
+    }
+    if (normalizedLevel !== rawLevel) {
+      changed = true;
+    }
+  } else {
+    normalizedLevel = DEFAULT_LEGACY_MICROORGANISM_LEVEL;
+    changed = true;
+  }
+
+  return {
+    entity: {
+      ...microorganism,
+      name: normalizedName,
+      level: normalizedLevel,
+    } as Microorganism,
+    changed,
+  };
+};
+
+const normalizeStoredWorldState = (
+  world: StoredWorldState,
+): { world: SharedWorldState; changed: boolean } => {
+  const microorganismsSource = Array.isArray(world.microorganisms)
+    ? world.microorganisms
+    : [];
+  let changed = !Array.isArray(world.microorganisms);
+
+  const microorganisms = microorganismsSource.map((entity, index) => {
+    const result = normalizeStoredMicroorganism(entity, index);
+    if (result.changed) {
+      changed = true;
+    }
+    return result.entity;
+  });
+
+  if (!changed) {
+    return { world: world as SharedWorldState, changed: false };
+  }
+
+  return {
+    world: {
+      ...world,
+      microorganisms,
+    },
+    changed: true,
+  };
 };
 
 const getSpawnPositionForPlayer = (playerId: string): Vector2 => {
@@ -1555,9 +1680,13 @@ export class RoomDO {
 
     this.connectedPlayers = this.recalculateConnectedPlayers();
 
-    const storedWorld = await this.state.storage.get<SharedWorldState>(WORLD_KEY);
+    const storedWorld = await this.state.storage.get<StoredWorldState>(WORLD_KEY);
     if (storedWorld) {
-      this.world = cloneWorldState(storedWorld);
+      const { world: normalizedWorld, changed: worldChanged } = normalizeStoredWorldState(storedWorld);
+      this.world = cloneWorldState(normalizedWorld);
+      if (worldChanged) {
+        await this.state.storage.put(WORLD_KEY, cloneWorldState(this.world));
+      }
     } else {
       const primarySpawn = this.getPrimarySpawnPosition();
       this.world = createInitialWorldState({ primarySpawn });
