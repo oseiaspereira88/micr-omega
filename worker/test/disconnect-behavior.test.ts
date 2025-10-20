@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
-import { RoomDO } from "../src/RoomDO";
+import { RoomDO, hashReconnectToken } from "../src/RoomDO";
 import type { Env } from "../src";
 import type { CombatLogEntry, SharedWorldStateDiff } from "../src/types";
 import { MockDurableObjectState } from "./utils/mock-state";
@@ -20,6 +20,8 @@ describe("RoomDO disconnect behavior", () => {
       await roomAny.ready;
 
       const now = Date.now();
+      const playerReconnectToken = "player-reconnect-token";
+      const playerReconnectTokenHash = await hashReconnectToken(playerReconnectToken);
       const player = {
         id: "player-1",
         name: "Alice",
@@ -47,8 +49,12 @@ describe("RoomDO disconnect behavior", () => {
         connectedAt: now,
         totalSessionDurationMs: 0,
         sessionCount: 0,
+        reconnectToken: playerReconnectToken,
+        reconnectTokenHash: playerReconnectTokenHash,
       };
 
+      const survivorReconnectToken = "survivor-reconnect-token";
+      const survivorReconnectTokenHash = await hashReconnectToken(survivorReconnectToken);
       const survivor = {
         id: "player-2",
         name: "Bob",
@@ -76,6 +82,8 @@ describe("RoomDO disconnect behavior", () => {
         connectedAt: now,
         totalSessionDurationMs: 0,
         sessionCount: 0,
+        reconnectToken: survivorReconnectToken,
+        reconnectTokenHash: survivorReconnectTokenHash,
       };
 
       roomAny.players.set(player.id, player);

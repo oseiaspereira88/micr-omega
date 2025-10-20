@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
-import { RoomDO } from "../src/RoomDO";
+import { RoomDO, hashReconnectToken } from "../src/RoomDO";
 import type { Env } from "../src";
 import { MockDurableObjectState } from "./utils/mock-state";
 
-function createTestPlayer(id: string): any {
+async function createTestPlayer(id: string): Promise<any> {
   const now = Date.now();
+  const reconnectToken = `${id}-token`;
+  const reconnectTokenHash = await hashReconnectToken(reconnectToken);
 
   return {
     id,
@@ -26,7 +28,8 @@ function createTestPlayer(id: string): any {
     combatAttributes: { attack: 0, defense: 0, speed: 0, range: 0 },
     evolutionState: { pending: [], applied: [] },
     archetypeKey: null,
-    reconnectToken: "token",
+    reconnectToken,
+    reconnectTokenHash,
     connected: true,
     lastActiveAt: now,
     lastSeenAt: now,
@@ -51,7 +54,7 @@ describe("RoomDO removePlayer cleanup", () => {
     const roomAny = room as any;
     await roomAny.ready;
 
-    const player = createTestPlayer("player-1");
+    const player = await createTestPlayer("player-1");
     roomAny.players.set(player.id, player);
     roomAny.nameToPlayerId.set(player.name.toLowerCase(), player.id);
     roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
