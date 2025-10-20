@@ -24,7 +24,7 @@ const Notifications = ({ notifications = [] }) => {
   }
 
   return (
-    <div className={styles.container} role="status" aria-live="polite">
+    <div className={styles.container} aria-live="polite">
       {notifications.map((notification, index) => {
         const variantClass = resolveVariantClass(notification?.variant);
         const className = variantClass
@@ -36,6 +36,7 @@ const Notifications = ({ notifications = [] }) => {
             key={notification.id ?? `${notification.text ?? ''}-${index}`}
             className={className}
             data-variant={notification?.variant}
+            role="status"
           >
             {notification.text}
           </div>
