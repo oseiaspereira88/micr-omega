@@ -215,6 +215,11 @@ export const updateStatusAuras = (state, delta, context = {}) => {
       return;
     }
 
+    if (!event.sourcePlayerId) {
+      removeStatusAura(entityId);
+      return;
+    }
+
     const stacks = Number.isFinite(event.stacks) ? event.stacks : 0;
     if (stacks <= 0) {
       removeStatusAura(entityId);
