@@ -957,8 +957,25 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
           ? Math.max(0, definition.cooldown / 1000)
           : 0;
 
+        const description =
+          typeof definition?.description === 'string' && definition.description.trim().length > 0
+            ? definition.description
+            : undefined;
+
+        const normalizedCost =
+          definition && typeof definition.cost === 'object' && definition.cost !== null
+            ? { ...definition.cost }
+            : {};
+
         const baseDefinition = definition
-          ? { ...definition }
+          ? {
+              ...definition,
+              applies: Array.isArray(definition.applies)
+                ? definition.applies.slice()
+                : [],
+              cost: normalizedCost,
+              description,
+            }
           : {
               name: skillKey,
               icon: '❔',
@@ -966,6 +983,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
               element: null,
               applies: [],
               cost: {},
+              description: 'Habilidade misteriosa.',
             };
 
         return {
@@ -974,6 +992,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
           cooldown: cooldownSeconds,
           maxCooldown: maxCooldownSeconds,
           isActive: index === normalizedIndex,
+          description: baseDefinition.description ?? description ?? 'Habilidade misteriosa.',
         };
       });
 

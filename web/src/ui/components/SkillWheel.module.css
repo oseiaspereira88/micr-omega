@@ -137,6 +137,18 @@
   margin-bottom: 6px;
 }
 
+.description {
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: rgba(226, 232, 240, 0.85);
+  margin: 4px 0 10px;
+}
+
+.mobile .description {
+  font-size: clamp(0.75rem, 2.6vw, 0.95rem);
+  margin: clamp(4px, 1.5vw, 8px) 0 clamp(10px, 2.8vw, 16px);
+}
+
 .progress {
   display: flex;
   justify-content: center;

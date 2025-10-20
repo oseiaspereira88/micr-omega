@@ -56,6 +56,8 @@ export const createSkills = ({ playSound }) => ({
   pulse: {
     name: 'Pulso Osmótico',
     icon: '💥',
+    description:
+      'Emite uma onda de choque que empurra inimigos próximos, causa dano e aplica fissuras.',
     cooldown: 3200,
     cost: formatCost({ energy: 28, xp: 6 }),
     color: '#00D9FF',
@@ -87,6 +89,8 @@ export const createSkills = ({ playSound }) => ({
   spike: {
     name: 'Lança Corrosiva',
     icon: '🔱',
+    description:
+      'Projeta lanças corrosivas em leque, perfurando inimigos à frente e aplicando corrosão.',
     cooldown: 2300,
     cost: formatCost({ energy: 18, xp: 4 }),
     color: '#FF0066',
@@ -117,6 +121,8 @@ export const createSkills = ({ playSound }) => ({
   shield: {
     name: 'Biofilme Local',
     icon: '🛡️',
+    description:
+      'Cria um biofilme protetor que cura, concede invulnerabilidade breve e prende ameaças próximas.',
     cooldown: 5200,
     cost: formatCost({ energy: 24, mg: 5 }),
     color: '#7ED957',
@@ -145,6 +151,8 @@ export const createSkills = ({ playSound }) => ({
   drain: {
     name: 'Absorção Vital',
     icon: '🌀',
+    description:
+      'Absorve vitalidade dos inimigos em torno, causando dano e convertendo em cura para você.',
     cooldown: 4200,
     cost: formatCost({ energy: 30, xp: 8 }),
     color: '#00FF88',
@@ -187,6 +195,8 @@ export const createSkills = ({ playSound }) => ({
   biofilm: {
     name: 'Rede Fotônica',
     icon: '🔆',
+    description:
+      'Projeta uma rede luminosa na direção enfrentada, queimando inimigos alinhados com fotolesão.',
     cooldown: 3600,
     cost: formatCost({ energy: 26, xp: 10 }),
     color: '#FFD93D',
@@ -214,6 +224,8 @@ export const createSkills = ({ playSound }) => ({
   entangle: {
     name: 'Tecido Adesivo',
     icon: '🕸️',
+    description:
+      'Lança fibras psíquicas que imobilizam múltiplos alvos próximos com cargas extras de entrave.',
     cooldown: 2800,
     cost: formatCost({ energy: 16, mg: 4 }),
     color: '#7F8CFF',

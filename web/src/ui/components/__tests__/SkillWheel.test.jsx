@@ -14,6 +14,7 @@ const BASE_PROPS = {
     element: 'fire',
     cost: { energy: 5 },
     applies: ['burn'],
+    description: 'Lança uma esfera flamejante que incinera inimigos próximos.',
   },
   skillList: [
     {
@@ -25,6 +26,7 @@ const BASE_PROPS = {
       cooldown: 0,
       maxCooldown: 10,
       isActive: true,
+      description: 'Lança uma esfera flamejante que incinera inimigos próximos.',
     },
   ],
   hasMultipleSkills: true,
@@ -67,5 +69,24 @@ describe('SkillWheel control hints', () => {
     expect(
       screen.getByText('Toque em “Usar habilidade” ou deslize para trocar.'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('SkillWheel descriptions', () => {
+  it('renders the current skill description and includes it in tooltips', () => {
+    render(<SkillWheel {...BASE_PROPS} />);
+
+    expect(
+      screen.getByText('Lança uma esfera flamejante que incinera inimigos próximos.'),
+    ).toBeInTheDocument();
+
+    const skillItem = screen.getByLabelText(/Bola de Fogo/);
+    expect(skillItem).toHaveAttribute(
+      'title',
+      expect.stringContaining('Lança uma esfera flamejante que incinera inimigos próximos.'),
+    );
+    expect(skillItem.getAttribute('aria-label')).toContain(
+      'Lança uma esfera flamejante que incinera inimigos próximos.',
+    );
   });
 });
