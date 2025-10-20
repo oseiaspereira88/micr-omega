@@ -75,7 +75,7 @@
 
 :global(.mobileHud) :local(.container) {
   top: auto;
-  bottom: calc(148px + var(--safe-area-inset-bottom, 0px));
+  bottom: calc(var(--hud-mobile-offset, 148px) + var(--safe-area-inset-bottom, 0px) + 12px);
   transform: translate(-50%, 0);
   gap: 8px;
   max-width: min(420px, 90vw);
