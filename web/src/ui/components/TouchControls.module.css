@@ -102,6 +102,16 @@
   overflow: hidden;
 }
 
+.actionGroup {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.actionGroup > * {
+  pointer-events: auto;
+}
+
 .button:focus-visible:not(:disabled):not(.disabled),
 .attackButton:focus-visible:not(:disabled):not(.disabled),
 .dashButton:focus-visible:not(:disabled):not(.disabled),

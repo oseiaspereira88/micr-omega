@@ -658,6 +658,8 @@ const GameHud = ({
             onCycleSkill={onCycleSkill}
             onUseSkill={onUseSkill}
             touchControlsActive={showTouchControls}
+            showTouchControls={showTouchControls}
+            touchLayout={touchLayoutPreference}
           />
 
           <Notifications notifications={notifications} />

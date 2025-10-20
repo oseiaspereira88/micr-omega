@@ -20,7 +20,10 @@
 }
 
 .mobile:focus-within {
-  transform: translate(-50%, -2px);
+  transform: translate(
+    calc(-50% + var(--skill-wheel-horizontal-offset, 0px)),
+    -2px
+  );
 }
 
 .mobile {
@@ -29,7 +32,8 @@
   right: auto;
   left: 50%;
   bottom: calc(18px + var(--safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
+  --skill-wheel-horizontal-offset: 0px;
+  transform: translateX(calc(-50% + var(--skill-wheel-horizontal-offset, 0px)));
   width: min(520px, calc(100vw - 24px));
   padding: clamp(14px, 3.8vw, 22px) clamp(16px, 4.5vw, 28px);
   border-radius: 20px;
@@ -42,7 +46,7 @@
 
 .mobile.mobileWithTouchControls {
   bottom: calc(var(--safe-area-inset-bottom, 0px) + 140px);
-  width: clamp(240px, calc(100vw - 148px), 480px);
+  width: clamp(240px, calc(100vw - var(--touch-controls-footprint, 148px)), 480px);
 }
 
 .mobile.mobileWithTouchControls .skills {
@@ -96,6 +100,16 @@
 .mobile .hint {
   font-size: clamp(0.72rem, 2.4vw, 0.9rem);
   margin-top: 0;
+}
+
+.mobileOffsetLeft {
+  --skill-wheel-horizontal-offset: calc(var(--touch-controls-footprint, 148px) / 2);
+  margin-left: calc(var(--touch-controls-footprint, 148px) / 2);
+}
+
+.mobileOffsetRight {
+  --skill-wheel-horizontal-offset: calc(-1 * var(--touch-controls-footprint, 148px) / 2);
+  margin-right: calc(var(--touch-controls-footprint, 148px) / 2);
 }
 
 .header {
@@ -261,11 +275,17 @@
 @keyframes skillWheelMobileEnter {
   from {
     opacity: 0;
-    transform: translate(-50%, 12px);
+    transform: translate(
+      calc(-50% + var(--skill-wheel-horizontal-offset, 0px)),
+      12px
+    );
   }
 
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translate(
+      calc(-50% + var(--skill-wheel-horizontal-offset, 0px)),
+      0
+    );
   }
 }
