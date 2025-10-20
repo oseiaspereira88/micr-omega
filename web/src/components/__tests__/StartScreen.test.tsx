@@ -208,6 +208,36 @@ describe("StartScreen", () => {
     expect(input).toHaveFocus();
   });
 
+  it("exibe o guia de controles acessível quando solicitado", () => {
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+    const openGuideButton = screen.getByRole("button", { name: /como jogar/i });
+    expect(openGuideButton).toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", {
+        name: /como jogar/i,
+      }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(openGuideButton);
+
+    const guideDialog = screen.getByRole("dialog", { name: /como jogar/i });
+    expect(guideDialog).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /teclado/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/W, A, S, D/i)).toBeInTheDocument();
+
+    fireEvent.keyDown(guideDialog, { key: "Escape" });
+
+    expect(
+      screen.queryByRole("dialog", {
+        name: /como jogar/i,
+      }),
+    ).not.toBeInTheDocument();
+    expect(openGuideButton).toHaveFocus();
+  });
+
   it("foca o diálogo ao abrir e mantém o foco preso nele", async () => {
     act(() => {
       gameStore.actions.setConnectionStatus("connected");
