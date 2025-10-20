@@ -79,6 +79,7 @@ import {
 } from "./statuses";
 
 const TEXT_ENCODER = new TextEncoder();
+const TEXT_DECODER = new TextDecoder("utf-8", { fatal: true });
 
 const MIN_PLAYERS_TO_START = 1;
 const WAITING_START_DELAY_MS = 15_000;
@@ -4353,136 +4354,172 @@ export class RoomDO {
     this.activeSockets.add(socket);
 
     socket.addEventListener("message", (event) => {
-      const data = typeof event.data === "string" ? event.data : String(event.data);
-      const now = Date.now();
+      void (async () => {
+        let data: string;
+        try {
+          data = await (async (rawData: unknown): Promise<string> => {
+            if (typeof rawData === "string") {
+              return rawData;
+            }
 
-      const payloadByteLength = TEXT_ENCODER.encode(data).length;
+            if (rawData instanceof ArrayBuffer) {
+              return TEXT_DECODER.decode(rawData);
+            }
 
-      if (payloadByteLength > MAX_CLIENT_MESSAGE_SIZE_BYTES) {
-        this.observability.log("warn", "client_payload_invalid", {
-          stage: "size",
-          bytes: payloadByteLength,
-          category: "protocol_error"
-        });
-        this.observability.recordMetric("protocol_errors", 1, {
-          type: "payload_too_large",
-          bytes: payloadByteLength
-        });
-        this.send(socket, { type: "error", reason: "invalid_payload" });
-        socket.close(1009, "invalid_payload");
-        return;
-      }
+            if (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(rawData)) {
+              return TEXT_DECODER.decode(rawData as ArrayBufferView);
+            }
 
-      const perConnectionLimiter = this.getConnectionLimiter(socket);
-      if (!perConnectionLimiter.consume(now)) {
-        const retryAfter = perConnectionLimiter.getRetryAfterMs(now);
-        const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
-        this.handleRateLimit(socket, "connection", retryAfter, knownPlayerId, {
-          limit: MAX_MESSAGES_PER_CONNECTION,
-          activeConnections: this.activeSockets.size,
-        });
-        return;
-      }
+            if (typeof Blob !== "undefined" && rawData instanceof Blob) {
+              const arrayBuffer = await rawData.arrayBuffer();
+              return TEXT_DECODER.decode(arrayBuffer);
+            }
 
-      this.maybeRecordRateLimitUtilization(
-        socket,
-        perConnectionLimiter,
-        now,
-        MAX_MESSAGES_PER_CONNECTION
-      );
-
-      const globalLimit = this.getDynamicGlobalLimit();
-      if (!this.globalRateLimiter.consume(now, globalLimit)) {
-        const retryAfter = this.globalRateLimiter.getRetryAfterMs(now);
-        const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
-        this.handleRateLimit(socket, "global", retryAfter, knownPlayerId, {
-          limit: globalLimit,
-          activeConnections: this.activeSockets.size,
-        });
-        return;
-      }
-
-      this.maybeRecordGlobalRateLimitUtilization(now, globalLimit);
-
-      let json: unknown;
-      try {
-        json = JSON.parse(data);
-      } catch (error) {
-        this.observability.log("warn", "client_payload_invalid", {
-          stage: "parse",
-          error: serializeError(error),
-          category: "protocol_error"
-        });
-        this.observability.recordMetric("protocol_errors", 1, {
-          type: "invalid_json"
-        });
-        this.send(socket, { type: "error", reason: "invalid_payload" });
-        socket.close(1003, "invalid_payload");
-        return;
-      }
-
-      const validation = clientMessageSchema.safeParse(json);
-      if (!validation.success) {
-        const rawType =
-          typeof json === "object" && json !== null ? (json as { type?: string }).type : undefined;
-        const issues = validation.error.issues.map((issue) => ({
-          code: issue.code,
-          path: issue.path,
-          message: issue.message
-        }));
-        this.observability.log("warn", "client_payload_invalid", {
-          stage: "schema",
-          type: rawType ?? "unknown",
-          issues,
-          category: "protocol_error"
-        });
-        this.observability.recordMetric("protocol_errors", 1, {
-          type: "schema_invalid",
-          messageType: rawType ?? "unknown"
-        });
-
-        if (rawType === "join") {
-          const hasNameValidationError = validation.error.issues.some(
-            (issue) =>
-              issue.path.length > 0 &&
-              issue.path[0] === "name" &&
-              NAME_VALIDATION_ERROR_MESSAGES.has(issue.message ?? ""),
-          );
-          const reason = hasNameValidationError ? "invalid_name" : "invalid_payload";
-          this.send(socket, { type: "error", reason });
-          socket.close(1008, reason);
-        } else {
+            return String(rawData);
+          })(event.data);
+        } catch (error) {
+          this.observability.log("warn", "client_payload_invalid", {
+            stage: "decode",
+            error: serializeError(error),
+            category: "protocol_error"
+          });
+          this.observability.recordMetric("protocol_errors", 1, {
+            type: "invalid_text"
+          });
           this.send(socket, { type: "error", reason: "invalid_payload" });
           socket.close(1003, "invalid_payload");
+          return;
         }
-        return;
-      }
 
-      const parsed = validation.data;
+        const now = Date.now();
 
-      const handleActionFailure = (error: unknown, source: string): void => {
-        const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
-        this.observability.logError("action_message_failed", error, {
-          category: "protocol_error",
-          source,
-          playerId: knownPlayerId,
-        });
-        this.observability.recordMetric("protocol_errors", 1, {
-          type: "action_processing_failed",
-          source,
-        });
-        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CLOSING) {
-          try {
-            socket.close(1011, "error");
-          } catch (closeError) {
-            this.observability.logError("action_socket_close_failed", closeError, {
-              category: "protocol_error",
-              source,
-              playerId: knownPlayerId,
-            });
+        const payloadByteLength = TEXT_ENCODER.encode(data).length;
+
+        if (payloadByteLength > MAX_CLIENT_MESSAGE_SIZE_BYTES) {
+          this.observability.log("warn", "client_payload_invalid", {
+            stage: "size",
+            bytes: payloadByteLength,
+            category: "protocol_error"
+          });
+          this.observability.recordMetric("protocol_errors", 1, {
+            type: "payload_too_large",
+            bytes: payloadByteLength
+          });
+          this.send(socket, { type: "error", reason: "invalid_payload" });
+          socket.close(1009, "invalid_payload");
+          return;
+        }
+
+        const perConnectionLimiter = this.getConnectionLimiter(socket);
+        if (!perConnectionLimiter.consume(now)) {
+          const retryAfter = perConnectionLimiter.getRetryAfterMs(now);
+          const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
+          this.handleRateLimit(socket, "connection", retryAfter, knownPlayerId, {
+            limit: MAX_MESSAGES_PER_CONNECTION,
+            activeConnections: this.activeSockets.size,
+          });
+          return;
+        }
+
+        this.maybeRecordRateLimitUtilization(
+          socket,
+          perConnectionLimiter,
+          now,
+          MAX_MESSAGES_PER_CONNECTION
+        );
+
+        const globalLimit = this.getDynamicGlobalLimit();
+        if (!this.globalRateLimiter.consume(now, globalLimit)) {
+          const retryAfter = this.globalRateLimiter.getRetryAfterMs(now);
+          const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
+          this.handleRateLimit(socket, "global", retryAfter, knownPlayerId, {
+            limit: globalLimit,
+            activeConnections: this.activeSockets.size,
+          });
+          return;
+        }
+
+        this.maybeRecordGlobalRateLimitUtilization(now, globalLimit);
+
+        let json: unknown;
+        try {
+          json = JSON.parse(data);
+        } catch (error) {
+          this.observability.log("warn", "client_payload_invalid", {
+            stage: "parse",
+            error: serializeError(error),
+            category: "protocol_error"
+          });
+          this.observability.recordMetric("protocol_errors", 1, {
+            type: "invalid_json"
+          });
+          this.send(socket, { type: "error", reason: "invalid_payload" });
+          socket.close(1003, "invalid_payload");
+          return;
+        }
+
+        const validation = clientMessageSchema.safeParse(json);
+        if (!validation.success) {
+          const rawType =
+            typeof json === "object" && json !== null ? (json as { type?: string }).type : undefined;
+          const issues = validation.error.issues.map((issue) => ({
+            code: issue.code,
+            path: issue.path,
+            message: issue.message
+          }));
+          this.observability.log("warn", "client_payload_invalid", {
+            stage: "schema",
+            type: rawType ?? "unknown",
+            issues,
+            category: "protocol_error"
+          });
+          this.observability.recordMetric("protocol_errors", 1, {
+            type: "schema_invalid",
+            messageType: rawType ?? "unknown"
+          });
+
+          if (rawType === "join") {
+            const hasNameValidationError = validation.error.issues.some(
+              (issue) =>
+                issue.path.length > 0 &&
+                issue.path[0] === "name" &&
+                NAME_VALIDATION_ERROR_MESSAGES.has(issue.message ?? ""),
+            );
+            const reason = hasNameValidationError ? "invalid_name" : "invalid_payload";
+            this.send(socket, { type: "error", reason });
+            socket.close(1008, reason);
+          } else {
+            this.send(socket, { type: "error", reason: "invalid_payload" });
+            socket.close(1003, "invalid_payload");
           }
+          return;
         }
-      };
+
+        const parsed = validation.data;
+
+        const handleActionFailure = (error: unknown, source: string): void => {
+          const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
+          this.observability.logError("action_message_failed", error, {
+            category: "protocol_error",
+            source,
+            playerId: knownPlayerId,
+          });
+          this.observability.recordMetric("protocol_errors", 1, {
+            type: "action_processing_failed",
+            source,
+          });
+          if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CLOSING) {
+            try {
+              socket.close(1011, "error");
+            } catch (closeError) {
+              this.observability.logError("action_socket_close_failed", closeError, {
+                category: "protocol_error",
+                source,
+                playerId: knownPlayerId,
+              });
+            }
+          }
+        };
 
       switch (parsed.type) {
         case "join":
@@ -4575,6 +4612,20 @@ export class RoomDO {
           void this.handlePing(socket, parsed.ts);
           break;
       }
+      })().catch((error) => {
+        this.observability.logError("client_message_handler_failed", error, {
+          category: "protocol_error",
+        });
+        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CLOSING) {
+          try {
+            socket.close(1011, "error");
+          } catch (closeError) {
+            this.observability.logError("client_message_handler_close_failed", closeError, {
+              category: "protocol_error",
+            });
+          }
+        }
+      });
     });
 
     socket.addEventListener("close", () => {
