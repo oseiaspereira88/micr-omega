@@ -38,6 +38,10 @@ const BossHealthBar = ({ active, health, maxHealth, name, portrait }) => {
   const percent = Math.max(0, Math.min(100, Number.isFinite(rawPercent) ? rawPercent : 0));
   const bossName = resolveBossName(name);
   const isLowHealth = percent <= 20;
+  const roundedHealth = Math.round(safeHealth);
+  const roundedMaxHealth = Math.round(safeMaxHealth);
+  const roundedPercent = Math.round(percent);
+  const valueText = `${roundedPercent}% (${roundedHealth} de ${roundedMaxHealth})`;
   const segmentSize = 100 / SEGMENT_COUNT;
   const phaseIndex = Math.min(
     SEGMENT_COUNT - 1,
@@ -66,10 +70,11 @@ const BossHealthBar = ({ active, health, maxHealth, name, portrait }) => {
         <div
           className={styles.progress}
           role="progressbar"
-          aria-label={bossName}
+          aria-label={`${bossName} - vida`}
           aria-valuenow={percent}
           aria-valuemin={0}
           aria-valuemax={100}
+          aria-valuetext={valueText}
           aria-describedby={legendId}
         >
           <div
