@@ -82,6 +82,95 @@
   gap: 18px;
 }
 
+.journeySection {
+  align-self: center;
+  width: min(100%, 520px);
+  background: rgba(10, 8, 26, 0.55);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 32px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.journeyHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.journeyTitle {
+  font-size: 1.75rem;
+  margin: 0;
+  color: #ffba4d;
+}
+
+.journeySubtitle {
+  margin: 0;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.journeyGrid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 18px;
+}
+
+.journeyItem {
+  background: rgba(22, 12, 44, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 140px;
+}
+
+.journeyLabel {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.journeyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  font-size: 1.4rem;
+  background: rgba(255, 186, 77, 0.18);
+  box-shadow: 0 10px 25px rgba(255, 186, 77, 0.25);
+}
+
+.journeyValue {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.journeyDetail {
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
 .statCard {
   display: flex;
   align-items: center;
@@ -219,6 +308,43 @@
   gap: 14px;
 }
 
+.mobile .journeySection {
+  width: 100%;
+  padding: 24px clamp(16px, 6vw, 28px);
+  gap: 18px;
+}
+
+.mobile .journeyTitle {
+  font-size: 1.4rem;
+}
+
+.mobile .journeySubtitle {
+  font-size: 0.9rem;
+}
+
+.mobile .journeyGrid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.mobile .journeyItem {
+  padding: 16px clamp(16px, 5vw, 24px);
+  gap: 8px;
+  min-height: auto;
+}
+
+.mobile .journeyLabel {
+  font-size: 0.85rem;
+}
+
+.mobile .journeyValue {
+  font-size: 1.3rem;
+}
+
+.mobile .journeyDetail {
+  font-size: 0.85rem;
+}
+
 .mobile .statCard {
   padding: 16px 18px;
   border-radius: 16px;
@@ -269,6 +395,28 @@
 
 .compact .summaryScore {
   font-size: clamp(2.4rem, 9vw, 3rem);
+}
+
+.compact .journeySection {
+  padding: 24px clamp(16px, 6vw, 28px);
+  gap: 18px;
+}
+
+.compact .journeyGrid {
+  gap: 16px;
+}
+
+.compact .journeyItem {
+  min-height: auto;
+  padding: 16px 18px;
+}
+
+.compact .journeyValue {
+  font-size: 1.3rem;
+}
+
+.compact .journeyDetail {
+  font-size: 0.85rem;
 }
 
 .compact .statCard {
