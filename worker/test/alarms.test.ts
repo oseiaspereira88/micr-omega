@@ -3,11 +3,21 @@ import type { DurableObjectState, WebSocket } from "@cloudflare/workers-types";
 
 import { RoomDO } from "../src/RoomDO";
 import type { Env } from "../src";
+import { setRuntimeConfigOverrides, type RuntimeConfigOverrides } from "../src/config/runtime";
 import { MockDurableObjectState } from "./utils/mock-state";
 
-async function createRoom() {
+async function createRoom(runtimeOverrides?: RuntimeConfigOverrides) {
   const mockState = new MockDurableObjectState();
-  const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+  setRuntimeConfigOverrides(runtimeOverrides);
+  const envOverrides = runtimeOverrides
+    ? (Object.fromEntries(
+        Object.entries(runtimeOverrides).map(([key, value]) => [key, String(value)])
+      ) as Partial<Env>)
+    : {};
+  const room = new RoomDO(
+    mockState as unknown as DurableObjectState,
+    envOverrides as Env,
+  );
   await (room as any).ready;
   mockState.storageImpl.resetCounts();
   return { room, mockState };

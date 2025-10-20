@@ -68,7 +68,41 @@ Este documento descreve, passo a passo, como sair de uma conta Cloudflare vazia 
    ```
 2. Acrescente outras variáveis em `[vars]` ou como `wrangler secret` conforme necessário (por exemplo, chaves de API para integrações futuras).
 
-### 3.5 Deploy inicial do Worker
+### 3.5 Ajustar parâmetros de runtime do RoomDO
+
+O `RoomDO` expõe limites e intervalos configuráveis via variáveis de ambiente do Worker ou
+bindings globais no Durable Object. O loader em `worker/src/config/runtime.ts` lê automaticamente
+esses valores (aceita números como string ou número) e recalcula derivados como
+`WAITING_START_DELAY_ENABLED`. Para ambientes Wrangler, defina-os em `[vars]` ou com
+`wrangler secret/kv` caso deseje mantê-los privados.
+
+| Variável | Descrição | Default |
+| --- | --- | --- |
+| `MIN_PLAYERS_TO_START` | Jogadores conectados necessários para iniciar uma rodada. | `1` |
+| `WAITING_START_DELAY_MS` | Atraso entre atingir o mínimo e iniciar a partida. | `15000` |
+| `ROUND_DURATION_MS` | Duração total da rodada antes do encerramento automático. | `120000` |
+| `RESET_DELAY_MS` | Tempo entre o fim da rodada e o reset completo. | `10000` |
+| `RECONNECT_WINDOW_MS` | Janela para o jogador reconectar mantendo progresso. | `30000` |
+| `INACTIVE_TIMEOUT_MS` | Tempo máximo de inatividade antes de desconectar o socket. | `45000` |
+| `MAX_PLAYERS` | Capacidade simultânea do RoomDO. | `100` |
+| `MAX_CLIENT_MESSAGE_SIZE_BYTES` | Tamanho máximo de payload aceito por mensagem. | `16384` |
+| `RATE_LIMIT_WINDOW_MS` | Janela dos limites de mensagens por conexão. | `60000` |
+| `MAX_MESSAGES_PER_CONNECTION` | Máximo de mensagens por conexão dentro da janela. | `4200` |
+| `MAX_MESSAGES_GLOBAL` | Limite global agregado de mensagens para o DO. | `12000` |
+| `GLOBAL_RATE_LIMIT_HEADROOM` | Fator de folga aplicado ao limite global efetivo. | `1.25` |
+| `WORLD_TICK_INTERVAL_MS` | Intervalo de processamento do mundo. | `50` |
+| `SNAPSHOT_FLUSH_INTERVAL_MS` | Frequência de persistência do snapshot compartilhado. | `500` |
+| `PLAYER_ATTACK_COOLDOWN_MS` | Cooldown base dos ataques de jogador. | `800` |
+| `PLAYER_COLLECT_RADIUS` | Raio de coleta de recursos. | `60` |
+| `CONTACT_BUFFER` | Folga aplicada a colisões e alcance de ataque. | `4` |
+| `MICRO_LOW_HEALTH_THRESHOLD` | Percentual de vida para acionar fuga de micróbios. | `0.3` |
+| `CLIENT_TIME_MAX_FUTURE_DRIFT_MS` | Tolerância do relógio do cliente antes de rejeitar ações. | `2000` |
+
+Outros parâmetros detalhados (ex.: evolução, respawn, movimentação de NPCs) também podem ser
+definidos; consulte o objeto `DEFAULT_RUNTIME_CONFIG` para a lista completa. Ajuste-os com cautela
+e mantenha valores coerentes para evitar inconsistências na simulação.
+
+### 3.6 Deploy inicial do Worker
 
 1. Execute o deploy (gera automaticamente a migração `RoomDO` declarada em `wrangler.toml`):
    ```bash

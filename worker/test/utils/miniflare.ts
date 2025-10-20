@@ -1,6 +1,8 @@
 import { build } from "esbuild";
 import { Miniflare } from "miniflare";
 
+import { setRuntimeConfigOverrides, type RuntimeConfigOverrides } from "../../src/config/runtime";
+
 let cachedScript: string | null = null;
 
 async function bundleWorker(): Promise<string> {
@@ -23,8 +25,18 @@ async function bundleWorker(): Promise<string> {
   return cachedScript;
 }
 
-export async function createMiniflare() {
+export interface CreateMiniflareOptions {
+  runtime?: RuntimeConfigOverrides;
+}
+
+export async function createMiniflare(options: CreateMiniflareOptions = {}) {
   const script = await bundleWorker();
+  setRuntimeConfigOverrides(options.runtime);
+  const bindings = options.runtime
+    ? Object.fromEntries(
+        Object.entries(options.runtime).map(([key, value]) => [key, String(value)])
+      )
+    : undefined;
   return new Miniflare({
     modules: true,
     script,
@@ -32,6 +44,7 @@ export async function createMiniflare() {
     durableObjects: {
       ROOM: { className: "RoomDO" },
     },
+    bindings,
   });
 }
 
