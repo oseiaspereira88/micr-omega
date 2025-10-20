@@ -267,6 +267,15 @@ const StartScreen = ({
     [updateSettings]
   );
 
+  const handleTouchAutoSwapChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      updateSettings({
+        autoSwapTouchLayoutWhenSidebarOpen: event.target.checked,
+      });
+    },
+    [updateSettings]
+  );
+
   const isConnected = effectiveStatus === "connected" && Boolean(playerId);
   const canQuit =
     isConnected ||
@@ -285,12 +294,18 @@ const StartScreen = ({
   const touchLayoutSelectId = "touch-layout";
   const touchLayoutDescriptionId = "touch-layout-description";
   const touchLayoutHelperId = "touch-layout-helper";
+  const touchLayoutAutoSwapToggleId = "touch-layout-auto-swap";
+  const touchLayoutAutoSwapDescriptionId = "touch-layout-auto-swap-description";
+  const touchLayoutAutoSwapHelperId = "touch-layout-auto-swap-helper";
 
   const isTouchLayoutDisabled =
     isConnecting || !settings.showTouchControls;
   const touchLayoutDescribedBy = settings.showTouchControls
     ? touchLayoutDescriptionId
     : `${touchLayoutDescriptionId} ${touchLayoutHelperId}`;
+  const touchLayoutAutoSwapDescribedBy = settings.showTouchControls
+    ? touchLayoutAutoSwapDescriptionId
+    : `${touchLayoutAutoSwapDescriptionId} ${touchLayoutAutoSwapHelperId}`;
 
   const audioLabel = settings.audioEnabled ? "Som ligado" : "Som desligado";
 
@@ -552,6 +567,51 @@ const StartScreen = ({
                   <option value="right">Botões à direita</option>
                   <option value="left">Botões à esquerda</option>
                 </select>
+              </div>
+
+              <div className={styles.optionRow}>
+                <div className={styles.optionContent}>
+                  <span className={styles.optionTitle}>Ajustar ao painel lateral</span>
+                  <span
+                    className={styles.optionDescription}
+                    id={touchLayoutAutoSwapDescriptionId}
+                  >
+                    Inverta o lado dos botões automaticamente quando o painel lateral estiver
+                    aberto.
+                  </span>
+                  {!settings.showTouchControls ? (
+                    <span
+                      className={styles.optionDescription}
+                      id={touchLayoutAutoSwapHelperId}
+                    >
+                      Ative os controles touch para configurar este ajuste.
+                    </span>
+                  ) : null}
+                </div>
+                <label
+                  className={styles.toggleWrapper}
+                  htmlFor={touchLayoutAutoSwapToggleId}
+                >
+                  <input
+                    type="checkbox"
+                    id={touchLayoutAutoSwapToggleId}
+                    name="touch-layout-auto-swap"
+                    className={styles.checkbox}
+                    checked={settings.autoSwapTouchLayoutWhenSidebarOpen}
+                    onChange={handleTouchAutoSwapChange}
+                    disabled={isTouchLayoutDisabled}
+                    aria-checked={settings.autoSwapTouchLayoutWhenSidebarOpen}
+                    aria-disabled={isTouchLayoutDisabled}
+                    aria-describedby={touchLayoutAutoSwapDescribedBy}
+                  />
+                  <span className={styles.toggleLabelText}>
+                    Ajuste automático
+                    {" "}
+                    <span className={styles.toggleStatus} aria-live="polite" aria-atomic="true">
+                      {settings.autoSwapTouchLayoutWhenSidebarOpen ? "ativado" : "desativado"}
+                    </span>
+                  </span>
+                </label>
               </div>
             </div>
           </div>

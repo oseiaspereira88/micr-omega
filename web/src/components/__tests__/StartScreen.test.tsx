@@ -164,16 +164,23 @@ describe("StartScreen", () => {
     const touchLayoutSelect = screen.getByLabelText(
       /layout dos controles touch/i,
     );
+    const touchAutoSwapToggle = screen.getByLabelText(/ajuste automático/i);
     expect(touchLayoutSelect).toBeDisabled();
     expect(touchLayoutSelect).toHaveAttribute("aria-disabled", "true");
     expect(
       screen.getByText(/ative os controles touch para escolher o layout/i),
     ).toBeInTheDocument();
+    expect(touchAutoSwapToggle).toBeDisabled();
+    expect(touchAutoSwapToggle).toHaveAttribute("aria-disabled", "true");
 
     fireEvent.click(touchToggle);
 
     expect(touchLayoutSelect).not.toBeDisabled();
+    expect(touchAutoSwapToggle).not.toBeDisabled();
+    expect(touchAutoSwapToggle).toBeChecked();
     fireEvent.change(touchLayoutSelect, { target: { value: "left" } });
+    fireEvent.click(touchAutoSwapToggle);
+    expect(touchAutoSwapToggle).not.toBeChecked();
 
     const startButton = screen.getByRole("button", { name: /entrar na partida/i });
     fireEvent.click(startButton);
@@ -187,6 +194,7 @@ describe("StartScreen", () => {
         showTouchControls: true,
         showMinimap: featureToggles.minimap,
         touchLayout: "left",
+        autoSwapTouchLayoutWhenSidebarOpen: false,
       },
       autoJoinRequested: true,
     });
@@ -269,6 +277,8 @@ describe("StartScreen", () => {
     const touchLayoutSelect = screen.getByLabelText(
       /layout dos controles touch/i,
     );
+    const touchAutoSwapToggle = screen.getByLabelText(/ajuste automático/i);
+    fireEvent.click(touchAutoSwapToggle);
     fireEvent.change(touchLayoutSelect, { target: { value: "left" } });
 
     await waitFor(() => {
@@ -280,6 +290,7 @@ describe("StartScreen", () => {
         showTouchControls: true,
         showMinimap: featureToggles.minimap,
         touchLayout: "left",
+        autoSwapTouchLayoutWhenSidebarOpen: false,
       });
     });
   });

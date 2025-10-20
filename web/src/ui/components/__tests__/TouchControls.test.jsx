@@ -42,6 +42,19 @@ describe('TouchControls', () => {
     expect(container.firstChild).toHaveClass(styles.layoutRight);
   });
 
+  it('inverte o layout quando solicitado para evitar o painel lateral', () => {
+    const { container } = render(
+      <TouchControls
+        {...baseProps}
+        touchLayout="right"
+        autoInvertWhenSidebarOpen
+        isSidebarOpen
+      />
+    );
+
+    expect(container.firstChild).toHaveClass(styles.layoutLeft);
+  });
+
   it('triggers attack release when touch is cancelled', () => {
     const onAttackRelease = vi.fn();
 
