@@ -228,6 +228,7 @@ const PLAYERS_KEY = "players";
 const WORLD_KEY = "world";
 const ALARM_KEY = "alarms";
 const SNAPSHOT_STATE_KEY = "snapshot_state";
+const RNG_STATE_KEY = "rng_state";
 
 const SNAPSHOT_FLUSH_INTERVAL_MS = 500;
 const PLAYER_ATTACK_COOLDOWN_MS = 800;
@@ -300,6 +301,11 @@ type SnapshotState = {
   playersDirty: boolean;
   worldDirty: boolean;
   pendingSnapshotAlarm: number | null;
+};
+
+type RngState = {
+  organicMatterRespawn: number;
+  progression: number;
 };
 
 type ApplyPlayerActionResult = {
@@ -873,7 +879,9 @@ export class RoomDO {
   private organicMatterOrder = new Map<string, number>();
   private roomObjects = new Map<string, RoomObject>();
   private entitySequence = 0;
+  private rngState: RngState = { organicMatterRespawn: 1, progression: 1 };
   private organicMatterRespawnRng: () => number = Math.random;
+  private progressionRng: () => number = Math.random;
   private organicGroupRngFactory: (seed: number) => () => number = (seed) =>
     createMulberry32(seed);
   private organicRespawnQueue: PendingOrganicRespawnGroup[] = [];
@@ -1162,6 +1170,10 @@ export class RoomDO {
   }
 
   private async initialize(): Promise<void> {
+    const storedRngState = await this.state.storage.get<RngState>(RNG_STATE_KEY);
+    this.initializeRngState(storedRngState ?? null);
+    await this.persistRngState();
+
     const storedPlayers = await this.state.storage.get<StoredPlayerSnapshot[]>(PLAYERS_KEY);
     let needsLegacyHashMigration = false;
     if (storedPlayers) {
@@ -2375,23 +2387,107 @@ export class RoomDO {
     return { worldChanged, scoresChanged };
   }
 
-  private normalizeOrganicRespawnSeed(value: number): number {
+  private normalizeRngSeed(value: number): number {
     if (!Number.isFinite(value) || value <= 0) {
       return 1;
     }
-    const normalized = Math.floor(value * 0x1_0000_0000) >>> 0;
+
+    const normalized = Math.floor(Math.abs(value)) >>> 0;
     if (normalized === 0) {
       return 1;
     }
     return normalized;
   }
 
+  private advanceRngSeed(seed: number): number {
+    const normalized = this.normalizeRngSeed(seed);
+    const next = (normalized + 0x6d2b79f5) >>> 0;
+    if (next === 0) {
+      return 1;
+    }
+    return next;
+  }
+
+  private convertRandomToSeed(value: number): number {
+    if (!Number.isFinite(value)) {
+      return 1;
+    }
+
+    const clamped = Math.min(Math.max(value, 0), 0.9999999999999999);
+    const scaled = Math.floor(clamped * 0x1_0000_0000) >>> 0;
+    return this.normalizeRngSeed(scaled);
+  }
+
+  private generateRandomSeed(): number {
+    const buffer = new Uint32Array(1);
+    if (typeof crypto?.getRandomValues === "function") {
+      crypto.getRandomValues(buffer);
+    } else {
+      buffer[0] = Math.floor(Math.random() * 0xffffffff);
+    }
+    return this.normalizeRngSeed(buffer[0]!);
+  }
+
+  private createPersistentRng<K extends keyof RngState>(
+    key: K,
+    initialSeed: number,
+  ): () => number {
+    const normalized = this.normalizeRngSeed(initialSeed);
+    this.rngState[key] = normalized;
+    let currentSeed = normalized;
+    const rng = createMulberry32(normalized);
+    return () => {
+      const value = rng();
+      currentSeed = this.advanceRngSeed(currentSeed);
+      this.rngState[key] = currentSeed;
+      this.queueRngStatePersist();
+      return value;
+    };
+  }
+
+  private initializeRngState(stored?: RngState | null): void {
+    const organicSeed = this.normalizeRngSeed(
+      stored?.organicMatterRespawn ?? this.generateRandomSeed(),
+    );
+    const progressionSeed = this.normalizeRngSeed(
+      stored?.progression ?? this.generateRandomSeed(),
+    );
+
+    this.rngState = {
+      organicMatterRespawn: organicSeed,
+      progression: progressionSeed,
+    };
+
+    this.organicMatterRespawnRng = this.createPersistentRng(
+      "organicMatterRespawn",
+      organicSeed,
+    );
+    this.progressionRng = this.createPersistentRng("progression", progressionSeed);
+  }
+
+  private queueRngStatePersist(): void {
+    void this.persistRngState().catch((error) => {
+      this.observability.logError("rng_state_persist_failed", error, {
+        category: "persistence",
+      });
+    });
+  }
+
   private createOrganicRespawnRng(): { seed: number; rng: () => number } {
     const base = this.organicMatterRespawnRng();
-    const seed = this.normalizeOrganicRespawnSeed(base);
+    const seed = this.convertRandomToSeed(base);
     return {
       seed,
       rng: this.organicGroupRngFactory(seed),
+    };
+  }
+
+  private createProgressionRng(): { seed: number; rng: () => number } {
+    const base = this.progressionRng();
+    const seed = this.convertRandomToSeed(base);
+    return {
+      seed,
+      rng: createMulberry32(seed),
     };
   }
 
@@ -2581,6 +2677,7 @@ export class RoomDO {
       await this.persistWorld();
     }
 
+    await this.persistRngState();
     await this.persistSnapshotState();
 
     if (force) {
@@ -5276,6 +5373,9 @@ export class RoomDO {
     this.roundEndsAt = null;
     const worldDiff = this.regenerateWorldForPrimarySpawn();
 
+    this.initializeRngState();
+    await this.persistRngState();
+
     const resetTimestamp = Date.now();
     for (const player of this.players.values()) {
       player.score = 0;
@@ -5407,6 +5507,7 @@ export class RoomDO {
   ): void {
     const state = this.ensureProgressionState(player.id);
     const pending = this.queueProgressionStream(player.id);
+    const { rng: progressionRng } = this.createProgressionRng();
     const event: SharedProgressionKillEvent = {
       playerId: player.id,
       targetId: context.targetId,
@@ -5414,10 +5515,10 @@ export class RoomDO {
       advantage: context.advantage ?? false,
       xpMultiplier: 1,
       rolls: {
-        fragment: Math.random(),
-        fragmentAmount: Math.random(),
-        stableGene: Math.random(),
-        mg: Math.random(),
+        fragment: progressionRng(),
+        fragmentAmount: progressionRng(),
+        stableGene: progressionRng(),
+        mg: progressionRng(),
       },
       timestamp: Date.now(),
     };
@@ -5425,7 +5526,7 @@ export class RoomDO {
 
     const dropResults = aggregateDrops([event], {
       dropTables: DROP_TABLES,
-      rng: Math.random,
+      rng: progressionRng,
       initialPity: state.dropPity,
     });
     const xpGain = Math.round(
@@ -5794,6 +5895,14 @@ export class RoomDO {
 
   private async persistWorld(): Promise<void> {
     await this.state.storage.put(WORLD_KEY, cloneWorldState(this.world));
+  }
+
+  private async persistRngState(): Promise<void> {
+    const snapshot: RngState = {
+      organicMatterRespawn: this.normalizeRngSeed(this.rngState.organicMatterRespawn),
+      progression: this.normalizeRngSeed(this.rngState.progression),
+    };
+    await this.state.storage.put(RNG_STATE_KEY, snapshot);
   }
 
   private async persistSnapshotState(): Promise<void> {
