@@ -79,6 +79,7 @@ import {
 } from "./statuses";
 
 const TEXT_ENCODER = new TextEncoder();
+const TEXT_DECODER = new TextDecoder();
 
 const MIN_PLAYERS_TO_START = 1;
 const WAITING_START_DELAY_MS = 15_000;
@@ -4353,89 +4354,131 @@ export class RoomDO {
     this.activeSockets.add(socket);
 
     socket.addEventListener("message", (event) => {
-      const data = typeof event.data === "string" ? event.data : String(event.data);
-      const now = Date.now();
+      void (async () => {
+        const rawData = event.data;
+        const now = Date.now();
 
-      const payloadByteLength = TEXT_ENCODER.encode(data).length;
+        let payloadText: string;
 
-      if (payloadByteLength > MAX_CLIENT_MESSAGE_SIZE_BYTES) {
-        this.observability.log("warn", "client_payload_invalid", {
-          stage: "size",
-          bytes: payloadByteLength,
-          category: "protocol_error"
-        });
-        this.observability.recordMetric("protocol_errors", 1, {
-          type: "payload_too_large",
-          bytes: payloadByteLength
-        });
-        this.send(socket, { type: "error", reason: "invalid_payload" });
-        socket.close(1009, "invalid_payload");
-        return;
-      }
+        const handleOversizedPayload = (bytes: number): boolean => {
+          if (bytes <= MAX_CLIENT_MESSAGE_SIZE_BYTES) {
+            return true;
+          }
 
-      const perConnectionLimiter = this.getConnectionLimiter(socket);
-      if (!perConnectionLimiter.consume(now)) {
-        const retryAfter = perConnectionLimiter.getRetryAfterMs(now);
-        const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
-        this.handleRateLimit(socket, "connection", retryAfter, knownPlayerId, {
-          limit: MAX_MESSAGES_PER_CONNECTION,
-          activeConnections: this.activeSockets.size,
-        });
-        return;
-      }
+          this.observability.log("warn", "client_payload_invalid", {
+            stage: "size",
+            bytes,
+            category: "protocol_error"
+          });
+          this.observability.recordMetric("protocol_errors", 1, {
+            type: "payload_too_large",
+            bytes
+          });
+          this.send(socket, { type: "error", reason: "invalid_payload" });
+          socket.close(1009, "invalid_payload");
+          return false;
+        };
 
-      this.maybeRecordRateLimitUtilization(
-        socket,
-        perConnectionLimiter,
-        now,
-        MAX_MESSAGES_PER_CONNECTION
-      );
+        if (typeof rawData === "string") {
+          const bytes = TEXT_ENCODER.encode(rawData).length;
+          if (!handleOversizedPayload(bytes)) {
+            return;
+          }
+          payloadText = rawData;
+        } else if (typeof Blob !== "undefined" && rawData instanceof Blob) {
+          const bytes = rawData.size;
+          if (!handleOversizedPayload(bytes)) {
+            return;
+          }
+          const arrayBuffer = await rawData.arrayBuffer();
+          payloadText = TEXT_DECODER.decode(arrayBuffer);
+        } else if (rawData instanceof ArrayBuffer) {
+          const bytes = rawData.byteLength;
+          if (!handleOversizedPayload(bytes)) {
+            return;
+          }
+          payloadText = TEXT_DECODER.decode(rawData);
+        } else if (ArrayBuffer.isView(rawData)) {
+          const bytes = rawData.byteLength;
+          if (!handleOversizedPayload(bytes)) {
+            return;
+          }
+          const view = rawData instanceof Uint8Array
+            ? rawData
+            : new Uint8Array(rawData.buffer, rawData.byteOffset, rawData.byteLength);
+          payloadText = TEXT_DECODER.decode(view);
+        } else {
+          const stringified = String(rawData);
+          const bytes = TEXT_ENCODER.encode(stringified).length;
+          if (!handleOversizedPayload(bytes)) {
+            return;
+          }
+          payloadText = stringified;
+        }
 
-      const globalLimit = this.getDynamicGlobalLimit();
-      if (!this.globalRateLimiter.consume(now, globalLimit)) {
-        const retryAfter = this.globalRateLimiter.getRetryAfterMs(now);
-        const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
-        this.handleRateLimit(socket, "global", retryAfter, knownPlayerId, {
-          limit: globalLimit,
-          activeConnections: this.activeSockets.size,
-        });
-        return;
-      }
+        const perConnectionLimiter = this.getConnectionLimiter(socket);
+        if (!perConnectionLimiter.consume(now)) {
+          const retryAfter = perConnectionLimiter.getRetryAfterMs(now);
+          const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
+          this.handleRateLimit(socket, "connection", retryAfter, knownPlayerId, {
+            limit: MAX_MESSAGES_PER_CONNECTION,
+            activeConnections: this.activeSockets.size,
+          });
+          return;
+        }
 
-      this.maybeRecordGlobalRateLimitUtilization(now, globalLimit);
+        this.maybeRecordRateLimitUtilization(
+          socket,
+          perConnectionLimiter,
+          now,
+          MAX_MESSAGES_PER_CONNECTION
+        );
 
-      let json: unknown;
-      try {
-        json = JSON.parse(data);
-      } catch (error) {
-        this.observability.log("warn", "client_payload_invalid", {
-          stage: "parse",
-          error: serializeError(error),
-          category: "protocol_error"
-        });
-        this.observability.recordMetric("protocol_errors", 1, {
-          type: "invalid_json"
-        });
-        this.send(socket, { type: "error", reason: "invalid_payload" });
-        socket.close(1003, "invalid_payload");
-        return;
-      }
+        const globalLimit = this.getDynamicGlobalLimit();
+        if (!this.globalRateLimiter.consume(now, globalLimit)) {
+          const retryAfter = this.globalRateLimiter.getRetryAfterMs(now);
+          const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
+          this.handleRateLimit(socket, "global", retryAfter, knownPlayerId, {
+            limit: globalLimit,
+            activeConnections: this.activeSockets.size,
+          });
+          return;
+        }
 
-      const validation = clientMessageSchema.safeParse(json);
-      if (!validation.success) {
-        const rawType =
-          typeof json === "object" && json !== null ? (json as { type?: string }).type : undefined;
-        const issues = validation.error.issues.map((issue) => ({
-          code: issue.code,
-          path: issue.path,
-          message: issue.message
-        }));
-        this.observability.log("warn", "client_payload_invalid", {
-          stage: "schema",
-          type: rawType ?? "unknown",
-          issues,
-          category: "protocol_error"
-        });
+        this.maybeRecordGlobalRateLimitUtilization(now, globalLimit);
+
+        let json: unknown;
+        try {
+          json = JSON.parse(payloadText);
+        } catch (error) {
+          this.observability.log("warn", "client_payload_invalid", {
+            stage: "parse",
+            error: serializeError(error),
+            category: "protocol_error"
+          });
+          this.observability.recordMetric("protocol_errors", 1, {
+            type: "invalid_json"
+          });
+          this.send(socket, { type: "error", reason: "invalid_payload" });
+          socket.close(1003, "invalid_payload");
+          return;
+        }
+
+        const validation = clientMessageSchema.safeParse(json);
+        if (!validation.success) {
+          const rawType =
+            typeof json === "object" && json !== null ? (json as { type?: string }).type : undefined;
+          const issues = validation.error.issues.map((issue) => ({
+            code: issue.code,
+            path: issue.path,
+            message: issue.message
+          }));
+          this.observability.log("warn", "client_payload_invalid", {
+            stage: "schema",
+            type: rawType ?? "unknown",
+            issues,
+            category: "protocol_error"
+          });
         this.observability.recordMetric("protocol_errors", 1, {
           type: "schema_invalid",
           messageType: rawType ?? "unknown"
@@ -4575,6 +4618,20 @@ export class RoomDO {
           void this.handlePing(socket, parsed.ts);
           break;
       }
+    })().catch((error) => {
+      this.observability.logError("client_message_handler_failed", error, {
+        category: "protocol_error",
+      });
+      if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+        try {
+          socket.close(1011, "internal_error");
+        } catch (closeError) {
+          this.observability.logError("client_message_handler_close_failed", closeError, {
+            category: "protocol_error",
+          });
+        }
+      }
+    });
     });
 
     socket.addEventListener("close", () => {

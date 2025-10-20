@@ -40,6 +40,54 @@ describe("RoomDO", () => {
     }
   });
 
+  it("accepts binary websocket frames within the size limit", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const joinedPromise = onceMessage<{ type: string; playerId: string }>(socket, "joined");
+
+      const payload = JSON.stringify({ type: "join", name: "Binary" });
+      const encoded = textEncoder.encode(payload);
+      socket.send(encoded);
+
+      const joined = await joinedPromise;
+      expect(joined.type).toBe("joined");
+      expect(joined.playerId).toEqual(expect.any(String));
+
+      socket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("rejects binary websocket frames that exceed the size limit", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const errorPromise = onceMessage<{ type: string; reason: string }>(socket, "error");
+      const closePromise = new Promise<number>((resolve) => {
+        socket.addEventListener(
+          "close",
+          (event) => resolve((event as { code?: number }).code ?? 0),
+          { once: true }
+        );
+      });
+
+      const oversized = new Uint8Array(MAX_CLIENT_MESSAGE_SIZE_BYTES + 1);
+      oversized.fill(0x20);
+      socket.send(oversized);
+
+      const error = await errorPromise;
+      expect(error.type).toBe("error");
+      expect(error.reason).toBe("invalid_payload");
+
+      const closeCode = await closePromise;
+      expect(closeCode).toBe(1009);
+    } finally {
+      await mf.dispose();
+    }
+  });
+
   it("starts a solo session immediately and accepts movement actions", async () => {
     const mf = await createMiniflare();
     try {
