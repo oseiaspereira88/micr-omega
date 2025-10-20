@@ -90,3 +90,28 @@ describe('SkillWheel descriptions', () => {
     );
   });
 });
+
+describe('SkillWheel empty state', () => {
+  it('renders a placeholder when no skills are available', () => {
+    const { container } = render(<SkillWheel currentSkill={null} skillList={[]} />);
+
+    expect(container.firstChild).toHaveClass(styles.container, styles.empty);
+    expect(
+      screen.getByText('Nenhuma habilidade disponível no momento.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Equipe uma habilidade para vê-la aqui.')).toBeInTheDocument();
+  });
+
+  it('retains the layout footprint for touch layouts when showing the placeholder', () => {
+    const { container } = render(
+      <SkillWheel currentSkill={null} skillList={[]} touchControlsActive />,
+    );
+
+    expect(container.firstChild).toHaveClass(
+      styles.container,
+      styles.mobile,
+      styles.mobileWithTouchControls,
+      styles.empty,
+    );
+  });
+});

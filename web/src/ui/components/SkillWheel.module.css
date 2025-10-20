@@ -343,6 +343,41 @@
   margin-top: 4px;
 }
 
+.empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 180px;
+  text-align: center;
+  gap: 12px;
+}
+
+.emptyContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.emptyIcon {
+  font-size: 1.6rem;
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.45));
+}
+
+.emptyMessage {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e0f2fe;
+}
+
+.emptyHint {
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.8);
+  max-width: 20ch;
+}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;
