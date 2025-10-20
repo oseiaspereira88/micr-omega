@@ -119,6 +119,7 @@ const PLAYERS_KEY = "players";
 const WORLD_KEY = "world";
 const ALARM_KEY = "alarms";
 const SNAPSHOT_STATE_KEY = "snapshot_state";
+const RNG_STATE_KEY = "rng_state";
 
 export const WORLD_TICK_INTERVAL_MS = 50;
 const SNAPSHOT_FLUSH_INTERVAL_MS = 500;
@@ -255,6 +256,12 @@ type SnapshotState = {
   playersDirty: boolean;
   worldDirty: boolean;
   pendingSnapshotAlarm: number | null;
+  rngStateDirty: boolean;
+};
+
+type StoredRngState = {
+  organicMatterSeed: number;
+  playerSeeds?: Record<string, number>;
 };
 
 type StoredPlayerSkillState = {
@@ -349,6 +356,7 @@ type ApplyPlayerActionResult = {
 type PlayerProgressionState = {
   dropPity: { fragment: number; stableGene: number };
   sequence: number;
+  rngSeed: number;
 };
 
 type PendingProgressionStream = {
@@ -1518,9 +1526,11 @@ export class RoomDO {
   private organicMatterOrder = new Map<string, number>();
   private roomObjects = new Map<string, RoomObject>();
   private entitySequence = 0;
-  private organicMatterRespawnRng: () => number = Math.random;
+  private organicMatterRespawnSeed = 1;
+  private organicMatterRespawnRng: () => number = () => this.generateOrganicMatterRandom();
   private organicGroupRngFactory: (seed: number) => () => number = (seed) =>
     createMulberry32(seed);
+  private playerRngSeeds = new Map<string, number>();
   private organicRespawnQueue: PendingOrganicRespawnGroup[] = [];
   private obstacles = new Map<string, Obstacle>();
   private microorganismBehavior = new Map<string, MicroorganismBehaviorState>();
@@ -1541,6 +1551,7 @@ export class RoomDO {
   private gameStateSnapshotDirty = true;
   private progressionState = new Map<string, PlayerProgressionState>();
   private pendingProgression = new Map<string, PendingProgressionStream>();
+  private rngStateDirty = false;
 
   private connectedPlayers = 0;
 
@@ -1784,6 +1795,38 @@ export class RoomDO {
   }
 
   private async initialize(): Promise<void> {
+    const storedRngState = await this.state.storage.get<StoredRngState>(RNG_STATE_KEY);
+    let needsRngNormalization = false;
+    if (storedRngState) {
+      const normalizedOrganicSeed = this.normalizeStoredSeed(storedRngState.organicMatterSeed);
+      if (normalizedOrganicSeed !== storedRngState.organicMatterSeed) {
+        needsRngNormalization = true;
+      }
+      this.organicMatterRespawnSeed = normalizedOrganicSeed;
+      const playerEntries: Array<[string, number]> = [];
+      for (const [playerId, rawSeed] of Object.entries(storedRngState.playerSeeds ?? {})) {
+        const normalizedSeed = this.normalizeStoredSeed(rawSeed);
+        if (normalizedSeed !== rawSeed) {
+          needsRngNormalization = true;
+        }
+        playerEntries.push([playerId, normalizedSeed]);
+      }
+      this.playerRngSeeds = new Map(playerEntries);
+      if (needsRngNormalization) {
+        await this.state.storage.put(RNG_STATE_KEY, {
+          organicMatterSeed: this.organicMatterRespawnSeed,
+          playerSeeds: Object.fromEntries(this.playerRngSeeds.entries()),
+        });
+      }
+    } else {
+      this.organicMatterRespawnSeed = this.generateSeed();
+      this.playerRngSeeds = new Map();
+      await this.state.storage.put(RNG_STATE_KEY, {
+        organicMatterSeed: this.organicMatterRespawnSeed,
+        playerSeeds: {},
+      });
+    }
+
     const storedPlayers = await this.state.storage.get<StoredPlayerSnapshot[]>(PLAYERS_KEY);
     let needsLegacyHashMigration = false;
     if (storedPlayers) {
@@ -1891,10 +1934,12 @@ export class RoomDO {
       this.playersDirty = storedSnapshotState.playersDirty ?? false;
       this.worldDirty = storedSnapshotState.worldDirty ?? false;
       this.pendingSnapshotAlarm = storedSnapshotState.pendingSnapshotAlarm ?? null;
+      this.rngStateDirty = storedSnapshotState.rngStateDirty ?? false;
     } else {
       this.playersDirty = false;
       this.worldDirty = false;
       this.pendingSnapshotAlarm = null;
+      this.rngStateDirty = false;
     }
 
     const storedAlarms = await this.state.storage.get<AlarmSnapshot>(ALARM_KEY);
@@ -3008,6 +3053,87 @@ export class RoomDO {
     return normalized;
   }
 
+  private normalizeStoredSeed(seed: number | undefined): number {
+    if (!Number.isFinite(seed)) {
+      return 1;
+    }
+    const normalized = Math.floor(Math.abs(seed!)) >>> 0;
+    if (normalized === 0) {
+      return 1;
+    }
+    return normalized;
+  }
+
+  private advanceSeed(seed: number): number {
+    const next = (seed + 1) >>> 0;
+    return next === 0 ? 1 : next;
+  }
+
+  private drawFromSeed(seed: number): { value: number; nextSeed: number } {
+    const normalizedSeed = this.normalizeStoredSeed(seed);
+    const rng = createMulberry32(normalizedSeed);
+    const value = rng();
+    const nextSeed = this.advanceSeed(normalizedSeed);
+    return { value, nextSeed };
+  }
+
+  private generateOrganicMatterRandom(): number {
+    const { value, nextSeed } = this.drawFromSeed(this.organicMatterRespawnSeed);
+    this.updateOrganicMatterSeed(nextSeed);
+    return value;
+  }
+
+  private updateOrganicMatterSeed(seed: number): void {
+    const normalized = this.normalizeStoredSeed(seed);
+    if (this.organicMatterRespawnSeed !== normalized) {
+      this.organicMatterRespawnSeed = normalized;
+    }
+    this.markRngStateDirty();
+  }
+
+  private generateSeed(): number {
+    const base = Math.floor(Math.random() * 0xffffffff);
+    return this.normalizeStoredSeed(base);
+  }
+
+  private setPlayerRngSeed(playerId: string, seed: number): void {
+    const normalized = this.normalizeStoredSeed(seed);
+    const previous = this.playerRngSeeds.get(playerId);
+    if (previous === normalized) {
+      return;
+    }
+    this.playerRngSeeds.set(playerId, normalized);
+    this.markRngStateDirty();
+  }
+
+  private usePlayerRandom(playerId: string): number {
+    const state = this.ensureProgressionState(playerId);
+    const { value, nextSeed } = this.drawFromSeed(state.rngSeed);
+    state.rngSeed = nextSeed;
+    this.setPlayerRngSeed(playerId, nextSeed);
+    return value;
+  }
+
+  private markRngStateDirty(): void {
+    const wasDirty = this.rngStateDirty;
+    this.rngStateDirty = true;
+    const pendingChanged = this.scheduleSnapshotFlush();
+    if (!wasDirty || pendingChanged) {
+      this.queueSnapshotStatePersist();
+    }
+  }
+
+  private async persistRngState(): Promise<void> {
+    const playerSeeds: Record<string, number> = {};
+    for (const [playerId, seed] of this.playerRngSeeds.entries()) {
+      playerSeeds[playerId] = this.normalizeStoredSeed(seed);
+    }
+    await this.state.storage.put(RNG_STATE_KEY, {
+      organicMatterSeed: this.normalizeStoredSeed(this.organicMatterRespawnSeed),
+      playerSeeds,
+    });
+  }
+
   private createOrganicRespawnRng(): { seed: number; rng: () => number } {
     const base = this.organicMatterRespawnRng();
     const seed = this.normalizeOrganicRespawnSeed(base);
@@ -3179,8 +3305,9 @@ export class RoomDO {
     const { force = false } = options;
     const shouldPersistPlayers = force || this.playersDirty;
     const shouldPersistWorld = force || this.worldDirty;
+    const shouldPersistRngState = force || this.rngStateDirty;
 
-    if (!shouldPersistPlayers && !shouldPersistWorld) {
+    if (!shouldPersistPlayers && !shouldPersistWorld && !shouldPersistRngState) {
       if (force && this.pendingSnapshotAlarm !== null) {
         this.pendingSnapshotAlarm = null;
         this.alarmSchedule.delete("snapshot");
@@ -3192,6 +3319,7 @@ export class RoomDO {
 
     this.playersDirty = false;
     this.worldDirty = false;
+    this.rngStateDirty = false;
     this.pendingSnapshotAlarm = null;
     this.alarmSchedule.delete("snapshot");
 
@@ -3201,6 +3329,10 @@ export class RoomDO {
 
     if (shouldPersistWorld) {
       await this.persistWorld();
+    }
+
+    if (shouldPersistRngState) {
+      await this.persistRngState();
     }
 
     await this.persistSnapshotState();
@@ -6004,7 +6136,10 @@ export class RoomDO {
   private ensureProgressionState(playerId: string): PlayerProgressionState {
     let state = this.progressionState.get(playerId);
     if (!state) {
-      state = { dropPity: { fragment: 0, stableGene: 0 }, sequence: 0 };
+      const storedSeed = this.playerRngSeeds.get(playerId);
+      const rngSeed = storedSeed !== undefined ? this.normalizeStoredSeed(storedSeed) : this.generateSeed();
+      this.setPlayerRngSeed(playerId, rngSeed);
+      state = { dropPity: { fragment: 0, stableGene: 0 }, sequence: 0, rngSeed };
       this.progressionState.set(playerId, state);
       this.invalidateGameStateSnapshot();
     }
@@ -6030,6 +6165,7 @@ export class RoomDO {
   ): void {
     const state = this.ensureProgressionState(player.id);
     const pending = this.queueProgressionStream(player.id);
+    const rng = () => this.usePlayerRandom(player.id);
     const event: SharedProgressionKillEvent = {
       playerId: player.id,
       targetId: context.targetId,
@@ -6037,10 +6173,10 @@ export class RoomDO {
       advantage: context.advantage ?? false,
       xpMultiplier: 1,
       rolls: {
-        fragment: Math.random(),
-        fragmentAmount: Math.random(),
-        stableGene: Math.random(),
-        mg: Math.random(),
+        fragment: rng(),
+        fragmentAmount: rng(),
+        stableGene: rng(),
+        mg: rng(),
       },
       timestamp: Date.now(),
     };
@@ -6048,7 +6184,7 @@ export class RoomDO {
 
     const dropResults = aggregateDrops([event], {
       dropTables: DROP_TABLES,
-      rng: Math.random,
+      rng,
       initialPity: state.dropPity,
     });
     const xpGain = Math.round(
@@ -6076,6 +6212,7 @@ export class RoomDO {
     state.dropPity = clonePityCounters(dropResults.pity);
     pending.dropPity = clonePityCounters(dropResults.pity);
     this.invalidateGameStateSnapshot();
+    this.markPlayersDirty();
   }
 
   private flushPendingProgression(): SharedProgressionState | null {
@@ -6200,6 +6337,9 @@ export class RoomDO {
 
     this.progressionState.delete(playerId);
     this.pendingProgression.delete(playerId);
+    if (this.playerRngSeeds.delete(playerId)) {
+      this.markRngStateDirty();
+    }
     this.invalidateGameStateSnapshot();
 
     return player;
@@ -6420,7 +6560,12 @@ export class RoomDO {
   }
 
   private async persistSnapshotState(): Promise<void> {
-    if (!this.playersDirty && !this.worldDirty && this.pendingSnapshotAlarm === null) {
+    if (
+      !this.playersDirty &&
+      !this.worldDirty &&
+      !this.rngStateDirty &&
+      this.pendingSnapshotAlarm === null
+    ) {
       await this.state.storage.delete(SNAPSHOT_STATE_KEY);
       return;
     }
@@ -6429,6 +6574,7 @@ export class RoomDO {
       playersDirty: this.playersDirty,
       worldDirty: this.worldDirty,
       pendingSnapshotAlarm: this.pendingSnapshotAlarm,
+      rngStateDirty: this.rngStateDirty,
     };
 
     await this.state.storage.put(SNAPSHOT_STATE_KEY, snapshotState);

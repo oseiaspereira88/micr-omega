@@ -9,12 +9,12 @@ import { MockDurableObjectState } from "./utils/mock-state";
 import { getDefaultSkillList } from "../src/skills";
 import type { OrganicMatter, SharedWorldStateDiff, CombatLogEntry } from "../src/types";
 
-async function createRoom() {
-  const mockState = new MockDurableObjectState();
+async function createRoom(existingState?: MockDurableObjectState) {
+  const mockState = existingState ?? new MockDurableObjectState();
   const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
   const roomAny = room as any;
   await roomAny.ready;
-  return { roomAny } as const;
+  return { roomAny, mockState } as const;
 }
 
 function createTestPlayer(id: string): any {
@@ -139,5 +139,26 @@ describe("organic respawn randomness", () => {
         },
       ),
     );
+  });
+
+  it("persists organic respawn RNG across resets", async () => {
+    const mockState = new MockDurableObjectState();
+    const { roomAny } = await createRoom(mockState);
+
+    roomAny.createOrganicRespawnRng();
+    roomAny.createOrganicRespawnRng();
+
+    const nextSeedState = roomAny.organicMatterRespawnSeed;
+    const expectedBase = createMulberry32(nextSeedState)();
+    const expectedSeed = roomAny.normalizeOrganicRespawnSeed(expectedBase);
+
+    await roomAny.flushSnapshots({ force: true });
+
+    const { roomAny: resumed } = await createRoom(mockState);
+    const resumedGroup = resumed.createOrganicRespawnRng();
+    expect(resumedGroup.seed).toBe(expectedSeed);
+
+    const expectedGroupRng = createMulberry32(expectedSeed);
+    expect(resumedGroup.rng()).toBeCloseTo(expectedGroupRng());
   });
 });

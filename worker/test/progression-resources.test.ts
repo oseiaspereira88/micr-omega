@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
+import { aggregateDrops, createMulberry32, DROP_TABLES } from "@micr-omega/shared";
 import { RoomDO } from "../src/RoomDO";
 import { getDefaultSkillList } from "../src/skills";
 import {
@@ -18,12 +19,12 @@ import type {
 import type { Env } from "../src";
 import { MockDurableObjectState } from "./utils/mock-state";
 
-async function createRoom() {
-  const mockState = new MockDurableObjectState();
+async function createRoom(existingState?: MockDurableObjectState) {
+  const mockState = existingState ?? new MockDurableObjectState();
   const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
   const roomAny = room as any;
   await roomAny.ready;
-  return { roomAny } as const;
+  return { roomAny, mockState } as const;
 }
 
 function createTestPlayer(id: string): any {
@@ -117,11 +118,23 @@ describe("RoomDO progression resource updates", () => {
     expect(result.defeated).toBe(true);
     expect(player.xp).toBeGreaterThan(0);
     expect(player.geneticMaterial).toBeGreaterThan(0);
-    const fragmentTotal =
-      (player.geneFragments.minor ?? 0) +
-      (player.geneFragments.major ?? 0) +
-      (player.geneFragments.apex ?? 0);
-    expect(fragmentTotal).toBeGreaterThan(0);
+
+    const pending = roomAny.pendingProgression.get(player.id);
+    expect(pending?.kills).toBeDefined();
+    const killEvent = pending?.kills?.[0];
+    expect(killEvent).toBeDefined();
+    if (!killEvent) {
+      return;
+    }
+
+    const expectedDrops = aggregateDrops([killEvent], {
+      dropTables: DROP_TABLES,
+      initialPity: { fragment: 0, stableGene: 0 },
+    });
+
+    expect(player.geneticMaterial).toBe(expectedDrops.geneticMaterial);
+    expect(player.geneFragments).toEqual(expectedDrops.fragments);
+    expect(player.stableGenes).toEqual(expectedDrops.stableGenes);
   });
 
   it("restores energy from organic matter to enable costly skills", async () => {
@@ -424,5 +437,45 @@ describe("RoomDO progression resource updates", () => {
     const spawnedIds = new Set(respawnDiff.upsertOrganicMatter!.map((matter) => matter.id));
     expect(spawnedIds.size).toBe(group.size);
     expect(roomAny.organicRespawnQueue).toHaveLength(0);
+  });
+
+  it("continues player progression RNG across resets", async () => {
+    const mockState = new MockDurableObjectState();
+    const { roomAny } = await createRoom(mockState);
+    const player = createTestPlayer("steward");
+    roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+    roomAny.ensureProgressionState(player.id);
+    roomAny.markPlayersDirty();
+    await roomAny.flushSnapshots({ force: true });
+
+    roomAny.recordKillProgression(player, { dropTier: "minion" });
+    const initialPending = roomAny.pendingProgression.get(player.id);
+    expect(initialPending?.kills).toBeDefined();
+
+    const progressionState = roomAny.ensureProgressionState(player.id);
+    let expectedSeed = progressionState.rngSeed;
+    const expectedRolls: number[] = [];
+    for (let index = 0; index < 4; index += 1) {
+      const rng = createMulberry32(expectedSeed);
+      expectedRolls.push(rng());
+      expectedSeed = roomAny.advanceSeed(expectedSeed);
+    }
+
+    await roomAny.flushSnapshots({ force: true });
+
+    const { roomAny: resumed } = await createRoom(mockState);
+    const resumedPlayer = resumed.players.get(player.id);
+    expect(resumedPlayer).toBeDefined();
+
+    resumed.recordKillProgression(resumedPlayer, { dropTier: "minion" });
+    const resumedPending = resumed.pendingProgression.get(player.id);
+    expect(resumedPending?.kills).toBeDefined();
+    const resumedKills = resumedPending?.kills ?? [];
+    const resumedEvent = resumedKills[resumedKills.length - 1];
+    expect(resumedEvent?.rolls?.fragment).toBeCloseTo(expectedRolls[0]!);
+    expect(resumedEvent?.rolls?.fragmentAmount).toBeCloseTo(expectedRolls[1]!);
+    expect(resumedEvent?.rolls?.stableGene).toBeCloseTo(expectedRolls[2]!);
+    expect(resumedEvent?.rolls?.mg).toBeCloseTo(expectedRolls[3]!);
   });
 });
