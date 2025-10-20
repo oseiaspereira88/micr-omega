@@ -11,6 +11,25 @@ import { MAX_CLIENT_MESSAGE_SIZE_BYTES } from "../src/RoomDO";
 const textEncoder = new TextEncoder();
 
 describe("RoomDO", () => {
+  it("rejects non-GET methods with 405", async () => {
+    const mf = await createMiniflare();
+    try {
+      const namespace = await mf.getDurableObjectNamespace("ROOM");
+      const id = namespace.idFromName("public-room");
+      const stub = namespace.get(id);
+      const response = await stub.fetch("http://localhost/", {
+        method: "POST",
+      });
+
+      expect(response.status).toBe(405);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+      expect(await response.text()).toBe("Method Not Allowed");
+    } finally {
+      await mf.dispose();
+    }
+  });
+
   it("responds with joined payload when a player joins", async () => {
     const mf = await createMiniflare();
     try {

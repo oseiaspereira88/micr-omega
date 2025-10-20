@@ -1566,6 +1566,13 @@ export class RoomDO {
       return new Response("Not Found", { status: 404, headers: baseHeaders });
     }
 
+    if (request.method !== "GET") {
+      this.observability.log("warn", "room_invalid_method", {
+        method: request.method,
+      });
+      return new Response("Method Not Allowed", { status: 405, headers: baseHeaders });
+    }
+
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("Expected WebSocket", { status: 426, headers: baseHeaders });
     }
