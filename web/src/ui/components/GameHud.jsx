@@ -99,6 +99,14 @@ const GameHud = ({
   const hudContentRef = useRef(null);
   const sidebarId = useId();
   const minimapToggleId = useId();
+  const minimapPreviewClassName = useMemo(
+    () =>
+      [
+        styles.minimapPreview,
+        isMinimapEnabled ? styles.minimapPreviewActive : styles.minimapPreviewInactive,
+      ].join(' '),
+    [isMinimapEnabled],
+  );
 
   const showStatusOverlay = connectionStatus !== 'connected';
   const hudDisabled = showStatusOverlay;
@@ -629,11 +637,14 @@ const GameHud = ({
           <div className={styles.settingsPanel}>
             <h3 className={styles.settingsHeading}>Exibição</h3>
             <label className={styles.settingsToggle} htmlFor={minimapToggleId}>
-              <div className={styles.settingsToggleText}>
-                <span className={styles.settingsToggleTitle}>Minimapa</span>
-                <span className={styles.settingsToggleDescription}>
-                  Ative uma visão geral do mundo e compacte a barra de status do jogador.
-                </span>
+              <div className={styles.settingsToggleInfo}>
+                <div className={minimapPreviewClassName} aria-hidden="true" />
+                <div className={styles.settingsToggleText}>
+                  <span className={styles.settingsToggleTitle}>Minimapa</span>
+                  <span className={styles.settingsToggleDescription}>
+                    Ative uma visão geral do mundo e compacte a barra de status do jogador.
+                  </span>
+                </div>
               </div>
               <div className={styles.settingsToggleControl}>
                 <input
