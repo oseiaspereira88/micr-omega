@@ -112,7 +112,10 @@ export const WORLD_TICK_INTERVAL_MS = 50;
 const SNAPSHOT_FLUSH_INTERVAL_MS = 500;
 const PLAYER_ATTACK_COOLDOWN_MS = 800;
 const PLAYER_COLLECT_RADIUS = 60;
-const PLAYER_ATTACK_RANGE_BUFFER = 4;
+export const CONTACT_BUFFER = 4;
+const PLAYER_ATTACK_RANGE_BUFFER = CONTACT_BUFFER;
+export const PLAYER_COLLISION_RADIUS = 36;
+export const MICRO_COLLISION_RADIUS = 60;
 const OBSTACLE_PADDING = 12;
 
 const MICRO_LOW_HEALTH_THRESHOLD = 0.3;
@@ -4120,8 +4123,11 @@ export class RoomDO {
         continue;
       }
 
-      const attackRange = 100;
-      const attackRangeSquared = attackRange ** 2;
+      const attackRange = Math.max(
+        0,
+        PLAYER_COLLISION_RADIUS + MICRO_COLLISION_RADIUS + CONTACT_BUFFER,
+      );
+      const attackRangeSquared = attackRange * attackRange;
       if (closest.distanceSquared > attackRangeSquared) {
         continue;
       }
