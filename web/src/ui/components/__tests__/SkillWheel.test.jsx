@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import SkillWheel from '../SkillWheel';
+import styles from '../SkillWheel.module.css';
 
 const BASE_PROPS = {
   currentSkill: {
@@ -51,7 +52,9 @@ describe('SkillWheel control hints', () => {
   });
 
   it('shows touch guidance when touch controls are active', () => {
-    render(<SkillWheel {...BASE_PROPS} touchControlsActive />);
+    const { container } = render(<SkillWheel {...BASE_PROPS} touchControlsActive />);
+
+    expect(container.firstChild).toHaveClass(styles.mobile, styles.mobileWithTouchControls);
 
     expect(
       screen.getByRole('button', { name: '🔁 Trocar habilidade' }),

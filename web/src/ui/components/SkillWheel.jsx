@@ -81,7 +81,13 @@ const SkillWheel = ({
     ? 'Toque em “Usar habilidade” ou deslize para trocar.'
     : 'Q: usar habilidade • Shift: dash';
 
-  const containerClassName = `${styles.container} ${isMobileLayout ? styles.mobile : ''}`;
+  const containerClassName = [
+    styles.container,
+    isMobileLayout ? styles.mobile : '',
+    touchControlsActive ? styles.mobileWithTouchControls : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   const showUseButton = Boolean(currentSkill && onUseSkill);
 
   return (

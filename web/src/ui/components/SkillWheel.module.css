@@ -40,6 +40,19 @@
   animation: skillWheelMobileEnter 220ms ease;
 }
 
+.mobile.mobileWithTouchControls {
+  bottom: calc(var(--safe-area-inset-bottom, 0px) + 140px);
+  width: clamp(240px, calc(100vw - 148px), 480px);
+}
+
+.mobile.mobileWithTouchControls .skills {
+  justify-content: center;
+}
+
+.mobile.mobileWithTouchControls .hint {
+  text-align: center;
+}
+
 .mobile .header {
   margin-bottom: 0;
 }
