@@ -215,8 +215,26 @@ const pushSharedDamagePopup = (sharedState, payload = {}, fallbackVariant = 'nor
   });
 };
 
-const spawnImpactParticles = (helpers, x, y, color, count = 6) => {
-  if (typeof helpers?.createParticle !== 'function') {
+const PARTICLE_COUNT_SCALE = 8;
+const PARTICLE_COUNT_MIN = 2;
+const PARTICLE_COUNT_MAX = 18;
+
+const deriveParticleCount = (damage) => {
+  if (!Number.isFinite(damage)) {
+    return 0;
+  }
+
+  const sanitized = Math.max(0, Math.round(damage));
+  if (sanitized <= 0) {
+    return 0;
+  }
+
+  const scaled = Math.round(sanitized / PARTICLE_COUNT_SCALE);
+  return Math.max(PARTICLE_COUNT_MIN, Math.min(PARTICLE_COUNT_MAX, scaled));
+};
+
+const spawnImpactParticles = (helpers, x, y, color, count) => {
+  if (typeof helpers?.createParticle !== 'function' || !Number.isFinite(count) || count <= 0) {
     return;
   }
 
@@ -233,18 +251,25 @@ const spawnImpactVisuals = ({ helpers, sharedState, x, y, damage, profile }) => 
     return;
   }
 
-  if (!Number.isFinite(damage) || damage <= 0) {
+  const sanitizedDamage = Number.isFinite(damage) ? Math.max(0, Math.round(damage)) : 0;
+  if (sanitizedDamage <= 0) {
     return;
   }
+
+  const particleCount = deriveParticleCount(sanitizedDamage);
 
   if (typeof helpers?.createEffect === 'function') {
     helpers.createEffect(x, y, profile.effectType, profile.effectColor);
   }
 
-  spawnImpactParticles(helpers, x, y, profile.particleColor);
+  spawnImpactParticles(helpers, x, y, profile.particleColor, particleCount);
 
   if (sharedState) {
-    pushSharedDamagePopup(sharedState, { x, y, value: damage, variant: profile.popupVariant }, profile.popupVariant);
+    pushSharedDamagePopup(
+      sharedState,
+      { x, y, value: sanitizedDamage, variant: profile.popupVariant },
+      profile.popupVariant
+    );
   }
 };
 

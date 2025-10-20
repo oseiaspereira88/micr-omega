@@ -1037,6 +1037,69 @@ describe('updateGameState', () => {
     expect(sharedState.damagePopups[0]).toMatchObject({ variant: 'critical', value: 42 });
   });
 
+  it('emits fewer particles for smaller hits', () => {
+    const renderState = createRenderState();
+    const sharedState = createSharedState();
+
+    const createParticle = vi.fn();
+    const aiSpy = vi
+      .spyOn(aiModule, 'resolveNpcCombat')
+      .mockReturnValueOnce({
+        world: sharedState.world,
+        events: [
+          {
+            type: 'attack',
+            targetId: 'micro-1',
+            damage: 4,
+          },
+        ],
+        drops: [],
+        memory: { threatManagers: {} },
+      })
+      .mockReturnValueOnce({
+        world: sharedState.world,
+        events: [
+          {
+            type: 'attack',
+            targetId: 'micro-1',
+            damage: 120,
+          },
+        ],
+        drops: [],
+        memory: { threatManagers: {} },
+      });
+
+    try {
+      updateGameState({
+        renderState,
+        sharedState,
+        delta: 0.016,
+        movementIntent: { x: 0, y: 0 },
+        actionBuffer: { attacks: [] },
+        helpers: { createParticle },
+      });
+
+      const lowDamageCount = createParticle.mock.calls.length;
+      expect(lowDamageCount).toBeGreaterThan(0);
+
+      createParticle.mockClear();
+
+      updateGameState({
+        renderState,
+        sharedState,
+        delta: 0.016,
+        movementIntent: { x: 0, y: 0 },
+        actionBuffer: { attacks: [] },
+        helpers: { createParticle },
+      });
+
+      const highDamageCount = createParticle.mock.calls.length;
+      expect(highDamageCount).toBeGreaterThan(lowDamageCount);
+    } finally {
+      aiSpy.mockRestore();
+    }
+  });
+
   it('skips impact visuals when damage is zero or missing', () => {
     const renderState = createRenderState();
     const sharedState = createSharedState();
