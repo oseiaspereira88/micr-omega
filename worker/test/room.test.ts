@@ -187,6 +187,44 @@ describe("RoomDO", () => {
     }
   });
 
+  it("accepts join payloads sent as Uint8Array", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const joinedPromise = onceMessage<{ type: string }>(socket, "joined");
+
+      const payload = textEncoder.encode(JSON.stringify({ type: "join", name: "Binary" }));
+      socket.send(payload);
+
+      const joined = await joinedPromise;
+      expect(joined.type).toBe("joined");
+
+      socket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("accepts join payloads sent as Blob", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const joinedPromise = onceMessage<{ type: string }>(socket, "joined");
+
+      const payload = new Blob([JSON.stringify({ type: "join", name: "Blob" })], {
+        type: "application/json",
+      });
+      socket.send(payload);
+
+      const joined = await joinedPromise;
+      expect(joined.type).toBe("joined");
+
+      socket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
   it("rejects malformed join payloads with invalid_payload", async () => {
     const mf = await createMiniflare();
     try {
@@ -210,6 +248,36 @@ describe("RoomDO", () => {
           { once: true },
         );
       });
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("rejects non-UTF-8 payloads with invalid_payload", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const errorPromise = onceMessage<{ type: string; reason: string }>(socket, "error");
+
+      const invalidUtf8 = new Uint8Array([0xff, 0xfe, 0xfd, 0xfc]);
+      socket.send(invalidUtf8);
+
+      const error = await errorPromise;
+      expect(error.type).toBe("error");
+      expect(error.reason).toBe("invalid_payload");
+
+      const closeEvent = await new Promise<{ code?: number; reason?: string }>((resolve) => {
+        socket.addEventListener(
+          "close",
+          (event) => {
+            resolve(event as { code?: number; reason?: string });
+          },
+          { once: true },
+        );
+      });
+
+      expect(closeEvent.code).toBe(1003);
+      expect(closeEvent.reason).toBe("invalid_payload");
     } finally {
       await mf.dispose();
     }
