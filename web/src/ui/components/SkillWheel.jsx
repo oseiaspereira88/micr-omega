@@ -14,13 +14,20 @@ const SkillWheel = ({
   skillCooldownLabel,
   skillReadyPercent,
   onCycleSkill,
+  onUseSkill,
   touchControlsActive = false,
+  layout,
 }) => {
   const shouldRender = currentSkill || skillList.length > 0;
 
   if (!shouldRender) {
     return null;
   }
+
+  const resolvedLayout = layout ?? (touchControlsActive ? 'mobile' : 'desktop');
+  const isMobileLayout = resolvedLayout === 'mobile';
+  const usesTouchGuidance = touchControlsActive || isMobileLayout;
+  const statusMessageId = React.useId();
 
   const handleCycleClick = () => {
     onCycleSkill?.(1);
@@ -31,6 +38,18 @@ const SkillWheel = ({
     if (pointerType && (pointerType === 'touch' || pointerType === 'pen' || pointerType === 'stylus')) {
       event.preventDefault();
       onCycleSkill?.(1);
+    }
+  };
+
+  const handleUseClick = () => {
+    onUseSkill?.();
+  };
+
+  const handleUsePointerDown = (event) => {
+    const pointerType = event.pointerType ?? event.nativeEvent?.pointerType;
+    if (pointerType && (pointerType === 'touch' || pointerType === 'pen' || pointerType === 'stylus')) {
+      event.preventDefault();
+      onUseSkill?.();
     }
   };
 
@@ -50,16 +69,23 @@ const SkillWheel = ({
   const readinessPercent = Math.max(0, Math.min(100, Math.round(skillReadyPercent)));
   const readinessStatus = readinessPercent >= 100 ? 'Pronta' : `${readinessPercent}% recarregada`;
 
-  const cycleButtonLabel = touchControlsActive
+  const cycleButtonLabel = usesTouchGuidance
     ? '🔁 Trocar habilidade'
     : '🔁 Trocar habilidade (R)';
 
-  const hintContent = touchControlsActive
-    ? 'Toque no botão de habilidade para usar.'
+  const useButtonLabel = usesTouchGuidance
+    ? '✨ Usar habilidade'
+    : '✨ Usar habilidade (Q)';
+
+  const hintContent = usesTouchGuidance
+    ? 'Toque em “Usar habilidade” ou deslize para trocar.'
     : 'Q: usar habilidade • Shift: dash';
 
+  const containerClassName = `${styles.container} ${isMobileLayout ? styles.mobile : ''}`;
+  const showUseButton = Boolean(currentSkill && onUseSkill);
+
   return (
-    <div className={styles.container}>
+    <div className={containerClassName}>
       <div className={styles.header}>
         <span className={styles.title}>
           {currentSkill ? `${currentSkill.icon} ${currentSkill.name}` : 'Sem habilidade ativa'}
@@ -94,16 +120,16 @@ const SkillWheel = ({
           className={styles.progressFill}
           style={{
             width: `${readinessPercent}%`,
-            background: 'linear-gradient(90deg, #00D9FF, #7B2FFF)',
           }}
         />
       </div>
       <span
+        id={statusMessageId}
         className={styles.visuallyHidden}
         role="status"
         aria-live="polite"
       >
-        Estado da habilidade: {readinessStatus}
+        Estado da habilidade atual: {currentSkill ? `${currentSkill.name}. ${readinessStatus}` : readinessStatus}
       </span>
 
       {currentSkill?.applies?.length ? (
@@ -181,15 +207,31 @@ const SkillWheel = ({
         </ul>
       )}
 
-      {hasMultipleSkills && (
-        <button
-          type="button"
-          className={styles.cycleButton}
-          onClick={handleCycleClick}
-          onPointerDown={handleCyclePointerDown}
-        >
-          {cycleButtonLabel}
-        </button>
+      {(showUseButton || hasMultipleSkills) && (
+        <div className={styles.actionRow}>
+          {showUseButton && (
+            <button
+              type="button"
+              className={`${styles.actionButton} ${styles.useButton}`}
+              onClick={handleUseClick}
+              onPointerDown={handleUsePointerDown}
+              aria-describedby={statusMessageId}
+            >
+              {useButtonLabel}
+            </button>
+          )}
+          {hasMultipleSkills && (
+            <button
+              type="button"
+              className={`${styles.actionButton} ${styles.cycleButton}`}
+              onClick={handleCycleClick}
+              onPointerDown={handleCyclePointerDown}
+              aria-describedby={statusMessageId}
+            >
+              {cycleButtonLabel}
+            </button>
+          )}
+        </div>
       )}
 
       {hintContent ? <div className={styles.hint}>{hintContent}</div> : null}

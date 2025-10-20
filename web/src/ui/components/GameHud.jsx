@@ -567,6 +567,7 @@ const GameHud = ({
             skillCooldownLabel={skillData?.skillCooldownLabel ?? 'Sem habilidade'}
             skillReadyPercent={skillData?.skillReadyPercent ?? 0}
             onCycleSkill={onCycleSkill}
+            onUseSkill={onUseSkill}
             touchControlsActive={showTouchControls}
           />
 
