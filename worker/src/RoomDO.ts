@@ -77,6 +77,120 @@ import {
   toStatusEffectEvent,
   type StatusCollection,
 } from "./statuses";
+import {
+  applyEvolutionActionToState,
+  cloneCombatAttributes,
+  cloneCombatStatusState,
+  cloneEvolutionState,
+  cloneHealthState,
+  cloneOrientation,
+  clonePlayerSkillState,
+  cloneVector,
+  computeEvolutionSlotsForPlayer,
+  computeCombatAttributesWithModifiers,
+  DEFAULT_COMBAT_ATTRIBUTES,
+  createCombatAttributes,
+  createCombatStatusState,
+  createEvolutionState,
+  createHealthState,
+  createOrientation,
+  createPlayerSkillState,
+  createVector,
+  DEFAULT_DASH_CHARGE,
+  DEFAULT_PLAYER_ENERGY,
+  DEFAULT_PLAYER_GENETIC_MATERIAL,
+  DEFAULT_PLAYER_XP,
+  DASH_CHARGE_COST,
+  DASH_COOLDOWN_MS,
+  DASH_RECHARGE_PER_MS,
+  getArchetypeDefinition,
+  MAX_DASH_CHARGE,
+  normalizeVectorOrNull,
+  normalizeDashCharge,
+  normalizeDashCooldown,
+  normalizePlayerSkillState,
+  orientationsApproximatelyEqual,
+  rotateVector,
+  vectorsApproximatelyEqual,
+  type PendingAttack,
+  type PlayerInternal,
+  type PlayerSkillState,
+  type StoredPlayer,
+  type StoredPlayerSkillState,
+  type StoredPlayerSnapshot,
+} from "./playerManager";
+import {
+  cloneGeneCounter,
+  createGeneCounter,
+  getPlayerLevelFromXp,
+  incrementGeneCounter,
+  type GeneCounter,
+  type PendingProgressionStream,
+  type PlayerProgressionState,
+} from "./progression";
+import {
+  GLOBAL_RATE_LIMIT_HEADROOM,
+  MAX_CLIENT_MESSAGE_SIZE_BYTES,
+  MAX_MESSAGES_GLOBAL,
+  MAX_MESSAGES_PER_CONNECTION,
+  MessageRateLimiter,
+  RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS,
+  RATE_LIMIT_WINDOW_MS,
+} from "./networking";
+import {
+  CONTACT_BUFFER,
+  DAMAGE_POPUP_TTL_MS,
+  MICRO_COLLISION_RADIUS,
+  MICRO_CONTACT_INVULNERABILITY_MS,
+  MAX_DAMAGE_POPUPS_PER_TICK,
+  PLAYER_COLLISION_RADIUS,
+  WORLD_BOUNDS,
+  WORLD_TICK_INTERVAL_MS,
+  clamp,
+  clampToWorldBounds,
+  getDeterministicCombatAttributesForPlayer,
+  getSpawnPositionForPlayer,
+  hashString,
+  sanitizeOrganicMatterTags,
+  translateWithinWorldBounds,
+  vectorMagnitude,
+} from "./worldSimulation";
+
+export {
+  MessageRateLimiter,
+  MAX_CLIENT_MESSAGE_SIZE_BYTES,
+  RATE_LIMIT_WINDOW_MS,
+  MAX_MESSAGES_PER_CONNECTION,
+  MAX_MESSAGES_GLOBAL,
+  GLOBAL_RATE_LIMIT_HEADROOM,
+} from "./networking";
+
+export {
+  WORLD_TICK_INTERVAL_MS,
+  CONTACT_BUFFER,
+  PLAYER_COLLISION_RADIUS,
+  MICRO_COLLISION_RADIUS,
+  MAX_DAMAGE_POPUPS_PER_TICK,
+  DAMAGE_POPUP_TTL_MS,
+  MICRO_CONTACT_INVULNERABILITY_MS,
+} from "./worldSimulation";
+
+export {
+  DEFAULT_PLAYER_ENERGY,
+  DEFAULT_PLAYER_XP,
+  DEFAULT_PLAYER_GENETIC_MATERIAL,
+  MAX_DASH_CHARGE,
+  DEFAULT_DASH_CHARGE,
+  DASH_CHARGE_COST,
+  DASH_COOLDOWN_MS,
+} from "./playerManager";
+
+export {
+  createGeneCounter,
+  cloneGeneCounter,
+  incrementGeneCounter,
+  getPlayerLevelFromXp,
+} from "./progression";
 
 const TEXT_ENCODER = new TextEncoder();
 const TEXT_DECODER = new TextDecoder("utf-8", { fatal: true });
@@ -100,34 +214,18 @@ const RESET_DELAY_MS = 10_000;
 const RECONNECT_WINDOW_MS = 30_000;
 const INACTIVE_TIMEOUT_MS = 45_000;
 export const MAX_PLAYERS = 100;
-export const MAX_CLIENT_MESSAGE_SIZE_BYTES = 16 * 1024;
 
 const MAX_COMBO_MULTIPLIER = 50;
-const DAMAGE_POPUP_TTL_MS = 1_200;
-const MAX_DAMAGE_POPUPS_PER_TICK = 12;
-
-// Allow clients to sustain at least 70 messages per second without being
-// throttled by using a one-minute sliding window.
-export const RATE_LIMIT_WINDOW_MS = 60_000;
-export const MAX_MESSAGES_PER_CONNECTION = 4_200;
-// Base global rate limit; the runtime cap scales with the number of active sockets.
-export const MAX_MESSAGES_GLOBAL = 12_000;
-export const GLOBAL_RATE_LIMIT_HEADROOM = 1.25;
-const RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS = 5_000;
 
 const PLAYERS_KEY = "players";
 const WORLD_KEY = "world";
 const ALARM_KEY = "alarms";
 const SNAPSHOT_STATE_KEY = "snapshot_state";
 
-export const WORLD_TICK_INTERVAL_MS = 50;
 const SNAPSHOT_FLUSH_INTERVAL_MS = 500;
 const PLAYER_ATTACK_COOLDOWN_MS = 800;
 const PLAYER_COLLECT_RADIUS = 60;
-export const CONTACT_BUFFER = 4;
 const PLAYER_ATTACK_RANGE_BUFFER = CONTACT_BUFFER;
-export const PLAYER_COLLISION_RADIUS = 36;
-export const MICRO_COLLISION_RADIUS = 60;
 const OBSTACLE_PADDING = 12;
 
 const MICRO_LOW_HEALTH_THRESHOLD = 0.3;
@@ -141,15 +239,6 @@ const MICRO_ZIG_ANGLE_RADIANS = Math.PI / 6;
 const MICRO_ZIG_INTERVAL_MS = 1_200;
 const MICRO_STEERING_SAMPLE_DISTANCE = 360;
 const MICRO_STEERING_ANGLES = [Math.PI / 6, Math.PI / 4, Math.PI / 3] as const;
-
-const SMALL_EVOLUTION_SLOT_BASE = 2;
-const SMALL_SLOT_LEVEL_DIVISOR = 3;
-const MEDIUM_SLOT_INTERVAL = 2;
-const LARGE_SLOT_INTERVAL = 5;
-const MIN_XP_REQUIREMENT = 60;
-const BASE_XP_REQUIREMENT = 120;
-const XP_REQUIREMENT_GROWTH = 45;
-const MAX_LEVEL_ITERATIONS = 200;
 
 const ORGANIC_MATTER_CELL_SIZE = PLAYER_COLLECT_RADIUS;
 const ORGANIC_RESPAWN_DELAY_RANGE_MS = { min: 1_200, max: 3_600 } as const;
@@ -194,57 +283,6 @@ const NAME_VALIDATION_ERROR_MESSAGES = new Set([
   "name_invalid_chars",
 ]);
 
-export class MessageRateLimiter {
-  private timestamps: number[] = [];
-  private startIndex = 0;
-
-  constructor(private readonly limit: number, private readonly windowMs: number) {}
-
-  consume(now: number, limitOverride?: number): boolean {
-    this.prune(now);
-    const limit = limitOverride ?? this.limit;
-    if (this.getActiveCount() >= limit) {
-      return false;
-    }
-    this.timestamps.push(now);
-    return true;
-  }
-
-  getUtilization(now: number, limitOverride?: number): number {
-    this.prune(now);
-    const limit = limitOverride ?? this.limit;
-    if (limit <= 0) {
-      return 0;
-    }
-    return this.getActiveCount() / limit;
-  }
-
-  getRetryAfterMs(now: number): number {
-    this.prune(now);
-    const earliest = this.timestamps[this.startIndex];
-    if (earliest === undefined) {
-      return 0;
-    }
-    return Math.max(0, earliest + this.windowMs - now);
-  }
-
-  private prune(now: number): void {
-    const cutoff = now - this.windowMs;
-    while (this.startIndex < this.timestamps.length && this.timestamps[this.startIndex]! <= cutoff) {
-      this.startIndex++;
-    }
-
-    if (this.startIndex > 0 && this.startIndex * 2 >= this.timestamps.length) {
-      this.timestamps = this.timestamps.slice(this.startIndex);
-      this.startIndex = 0;
-    }
-  }
-
-  private getActiveCount(): number {
-    return this.timestamps.length - this.startIndex;
-  }
-}
-
 type PersistentAlarmType = "waiting_start" | "round_end" | "reset" | "cleanup";
 type TransientAlarmType = "world_tick" | "snapshot";
 type AlarmType = PersistentAlarmType | TransientAlarmType;
@@ -257,239 +295,12 @@ type SnapshotState = {
   pendingSnapshotAlarm: number | null;
 };
 
-type StoredPlayerSkillState = {
-  available: SkillKey[];
-  current: SkillKey;
-  cooldowns: Record<string, number>;
-};
-
-type PlayerSkillState = {
-  available: SkillKey[];
-  current: SkillKey;
-  cooldowns: Record<string, number>;
-};
-
-type PendingAttack = {
-  kind: AttackKind;
-  targetPlayerId?: string | null;
-  targetObjectId?: string | null;
-};
-
-type StoredPlayer = {
-  id: string;
-  name: string;
-  score: number;
-  combo: number;
-  energy: number;
-  xp: number;
-  geneticMaterial: number;
-  geneFragments: GeneCounter;
-  stableGenes: GeneCounter;
-  dashCharge: number;
-  dashCooldownMs: number;
-  position: Vector2;
-  movementVector: Vector2;
-  orientation: OrientationState;
-  health: HealthState;
-  combatStatus: CombatStatus;
-  combatAttributes: CombatAttributes;
-  evolutionState: PlayerEvolutionState;
-  archetypeKey: string | null;
-  reconnectTokenHash: string;
-  reconnectToken?: string;
-  skillState?: StoredPlayerSkillState;
-  totalSessionDurationMs?: number;
-  sessionCount?: number;
-};
-
-type StoredPlayerSnapshot = Omit<
-  StoredPlayer,
-  "position" | "movementVector" | "orientation" | "health" | "combatStatus" | "combatAttributes" | "evolutionState"
-> &
-  Partial<
-    Pick<
-      StoredPlayer,
-      | "position"
-      | "movementVector"
-      | "orientation"
-      | "health"
-      | "combatStatus"
-      | "combatAttributes"
-      | "evolutionState"
-      | "archetypeKey"
-      | "skillState"
-      | "reconnectToken"
-      | "reconnectTokenHash"
-      | "dashCharge"
-      | "dashCooldownMs"
-      | "geneFragments"
-      | "stableGenes"
-    >
-  >;
-
-type PlayerInternal = Omit<StoredPlayer, "skillState"> & {
-  connected: boolean;
-  lastActiveAt: number;
-  lastSeenAt: number;
-  connectedAt: number | null;
-  skillState: PlayerSkillState;
-  pendingAttack: PendingAttack | null;
-  statusEffects: StatusCollection;
-  invulnerableUntil: number | null;
-  pendingRemoval?: boolean;
-};
-
 type ApplyPlayerActionResult = {
   updatedPlayers: PlayerInternal[];
   worldDiff?: SharedWorldStateDiff;
   combatLog?: CombatLogEntry[];
   scoresChanged?: boolean;
 };
-
-type PlayerProgressionState = {
-  dropPity: { fragment: number; stableGene: number };
-  sequence: number;
-};
-
-type PendingProgressionStream = {
-  sequence: number;
-  dropPity: { fragment: number; stableGene: number };
-  damage?: SharedProgressionStream["damage"];
-  objectives?: SharedProgressionStream["objectives"];
-  kills?: SharedProgressionKillEvent[];
-};
-
-type GeneCounter = { minor: number; major: number; apex: number };
-
-const createGeneCounter = (counter?: Partial<GeneCounter> | null): GeneCounter => ({
-  minor: Math.max(0, Number.isFinite(counter?.minor) ? Number(counter!.minor) : 0),
-  major: Math.max(0, Number.isFinite(counter?.major) ? Number(counter!.major) : 0),
-  apex: Math.max(0, Number.isFinite(counter?.apex) ? Number(counter!.apex) : 0),
-});
-
-const cloneGeneCounter = (counter?: GeneCounter | null): GeneCounter =>
-  createGeneCounter(counter ?? undefined);
-
-const incrementGeneCounter = (target: GeneCounter, increment: Partial<GeneCounter> | undefined) => {
-  if (!increment) {
-    return;
-  }
-  if (Number.isFinite(increment.minor)) {
-    target.minor = Math.max(0, target.minor + Math.max(0, Math.round(increment.minor!)));
-  }
-  if (Number.isFinite(increment.major)) {
-    target.major = Math.max(0, target.major + Math.max(0, Math.round(increment.major!)));
-  }
-  if (Number.isFinite(increment.apex)) {
-    target.apex = Math.max(0, target.apex + Math.max(0, Math.round(increment.apex!)));
-  }
-};
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-const createVector = (vector?: Vector2): Vector2 => ({
-  x: vector?.x ?? 0,
-  y: vector?.y ?? 0,
-});
-
-const cloneVector = (vector: Vector2): Vector2 => ({ x: vector.x, y: vector.y });
-
-const vectorMagnitude = (vector: Vector2): number => Math.sqrt(vector.x ** 2 + vector.y ** 2);
-
-const normalizeVectorOrNull = (vector: Vector2): Vector2 | null => {
-  const magnitude = vectorMagnitude(vector);
-  if (!Number.isFinite(magnitude) || magnitude === 0) {
-    return null;
-  }
-  return { x: vector.x / magnitude, y: vector.y / magnitude };
-};
-
-const rotateVector = (vector: Vector2, angle: number): Vector2 => {
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  return {
-    x: vector.x * cos - vector.y * sin,
-    y: vector.x * sin + vector.y * cos,
-  };
-};
-
-const vectorsApproximatelyEqual = (a: Vector2, b: Vector2, tolerance = 1e-3): boolean =>
-  Math.abs(a.x - b.x) <= tolerance && Math.abs(a.y - b.y) <= tolerance;
-
-const orientationsApproximatelyEqual = (
-  a: OrientationState,
-  b: OrientationState,
-  tolerance = 1e-3,
-): boolean => {
-  if (Math.abs(a.angle - b.angle) > tolerance) {
-    return false;
-  }
-  return a.tilt === b.tilt;
-};
-
-const createOrientation = (orientation?: OrientationState): OrientationState => {
-  if (!orientation) {
-    return { angle: 0 };
-  }
-  return orientation.tilt === undefined
-    ? { angle: orientation.angle }
-    : { angle: orientation.angle, tilt: orientation.tilt };
-};
-
-const cloneOrientation = (orientation: OrientationState): OrientationState =>
-  orientation.tilt === undefined
-    ? { angle: orientation.angle }
-    : { angle: orientation.angle, tilt: orientation.tilt };
-
-const sanitizeStringTagArray = (values: unknown): string[] => {
-  if (!Array.isArray(values)) {
-    return [];
-  }
-  const sanitized: string[] = [];
-  for (const value of values) {
-    if (typeof value !== "string") {
-      continue;
-    }
-    const trimmed = value.trim();
-    if (trimmed.length === 0) {
-      continue;
-    }
-    sanitized.push(trimmed);
-  }
-  return sanitized;
-};
-
-const sanitizeOrganicMatterTags = (
-  tags: OrganicMatter["tags"] | null | undefined,
-  nutrients: OrganicMatter["nutrients"] | null | undefined,
-): OrganicMatter["tags"] => {
-  const nutrientTags = sanitizeStringTagArray(tags?.nutrients);
-  const attributeTags = sanitizeStringTagArray(tags?.attributes);
-  if (nutrientTags.length === 0 && nutrients) {
-    for (const key of Object.keys(nutrients)) {
-      const trimmed = typeof key === "string" ? key.trim() : "";
-      if (trimmed.length === 0) {
-        continue;
-      }
-      nutrientTags.push(trimmed);
-    }
-  }
-  return { nutrients: nutrientTags, attributes: attributeTags };
-};
-
-const DEFAULT_MAX_HEALTH = 100;
-
-const createHealthState = (health?: HealthState): HealthState => {
-  const max = health?.max ?? DEFAULT_MAX_HEALTH;
-  const current = health?.current ?? max;
-  return {
-    current: Math.max(0, Math.min(max, current)),
-    max,
-  };
-};
-
 const sanitizeReconnectToken = (token: unknown): string | null => {
   if (typeof token !== "string") {
     return null;
@@ -504,428 +315,6 @@ const sanitizeReconnectToken = (token: unknown): string | null => {
 };
 
 const generateReconnectToken = (): string => crypto.randomUUID();
-
-const cloneHealthState = (health: HealthState): HealthState => ({
-  current: health.current,
-  max: health.max,
-});
-
-const createCombatStatusState = (status?: CombatStatus): CombatStatus => ({
-  state: status?.state ?? "idle",
-  targetPlayerId: status?.targetPlayerId ?? null,
-  targetObjectId: status?.targetObjectId ?? null,
-  lastAttackAt: status?.lastAttackAt ?? null,
-});
-
-const cloneCombatStatusState = (status: CombatStatus): CombatStatus => ({
-  state: status.state,
-  targetPlayerId: status.targetPlayerId,
-  targetObjectId: status.targetObjectId,
-  lastAttackAt: status.lastAttackAt,
-});
-
-const DEFAULT_COMBAT_ATTRIBUTES: CombatAttributes = {
-  attack: 8,
-  defense: 4,
-  speed: 140,
-  range: 80,
-};
-
-const DEFAULT_PLAYER_ENERGY = 100;
-const DEFAULT_PLAYER_XP = 0;
-const DEFAULT_PLAYER_GENETIC_MATERIAL = 0;
-
-const MAX_DASH_CHARGE = 100;
-const DEFAULT_DASH_CHARGE = MAX_DASH_CHARGE;
-const DASH_CHARGE_COST = 30;
-const DASH_COOLDOWN_MS = 1_000;
-const DASH_RECHARGE_RATE_PER_SECOND = 20;
-const DASH_RECHARGE_PER_MS = DASH_RECHARGE_RATE_PER_SECOND / 1_000;
-
-const createCombatAttributes = (attributes?: CombatAttributes): CombatAttributes => ({
-  attack: attributes?.attack ?? DEFAULT_COMBAT_ATTRIBUTES.attack,
-  defense: attributes?.defense ?? DEFAULT_COMBAT_ATTRIBUTES.defense,
-  speed: attributes?.speed ?? DEFAULT_COMBAT_ATTRIBUTES.speed,
-  range: attributes?.range ?? DEFAULT_COMBAT_ATTRIBUTES.range,
-});
-
-const normalizeDashCharge = (charge?: number): number => {
-  if (!Number.isFinite(charge)) {
-    return DEFAULT_DASH_CHARGE;
-  }
-  return clamp(charge as number, 0, MAX_DASH_CHARGE);
-};
-
-const normalizeDashCooldown = (cooldown?: number): number => {
-  if (!Number.isFinite(cooldown)) {
-    return 0;
-  }
-  return Math.max(0, cooldown as number);
-};
-
-const createPlayerSkillState = (stored?: StoredPlayerSkillState): PlayerSkillState => {
-  const storedAvailable = Array.isArray(stored?.available)
-    ? stored!.available.filter((entry): entry is SkillKey => typeof entry === "string" && isSkillKey(entry))
-    : [];
-  const available = storedAvailable.length > 0 ? storedAvailable : getDefaultSkillList();
-  const fallback = available[0] ?? getDefaultSkillList()[0]!;
-  const current = stored?.current && isSkillKey(stored.current) ? stored.current : fallback;
-  const cooldownEntries = cloneSkillCooldowns(stored?.cooldowns);
-  const normalizedCooldowns: Record<string, number> = {};
-  for (const key of available) {
-    normalizedCooldowns[key] = Math.max(0, cooldownEntries[key] ?? 0);
-  }
-  return {
-    available,
-    current,
-    cooldowns: normalizedCooldowns,
-  };
-};
-
-const clonePlayerSkillState = (state: PlayerSkillState): StoredPlayerSkillState => ({
-  available: state.available.slice(),
-  current: state.current,
-  cooldowns: { ...state.cooldowns },
-});
-
-const normalizePlayerSkillState = (
-  state: PlayerSkillState | StoredPlayerSkillState | undefined,
-): PlayerSkillState => createPlayerSkillState(state as StoredPlayerSkillState | undefined);
-
-type ArchetypeDefinition = {
-  key: ArchetypeKey;
-  maxHealth: number;
-  combatAttributes: CombatAttributes;
-};
-
-const ARCHETYPE_DEFINITIONS: Record<ArchetypeKey, ArchetypeDefinition> = {
-  virus: {
-    key: "virus",
-    maxHealth: 90,
-    combatAttributes: createCombatAttributes({
-      attack: 12,
-      defense: 3,
-      speed: 176,
-      range: 88,
-    }),
-  },
-  bacteria: {
-    key: "bacteria",
-    maxHealth: 120,
-    combatAttributes: createCombatAttributes({
-      attack: 9,
-      defense: 7,
-      speed: 144,
-      range: 84,
-    }),
-  },
-  archaea: {
-    key: "archaea",
-    maxHealth: 125,
-    combatAttributes: createCombatAttributes({
-      attack: 10,
-      defense: 8,
-      speed: 140,
-      range: 82,
-    }),
-  },
-  protozoa: {
-    key: "protozoa",
-    maxHealth: 100,
-    combatAttributes: createCombatAttributes({
-      attack: 13,
-      defense: 4,
-      speed: 172,
-      range: 90,
-    }),
-  },
-  algae: {
-    key: "algae",
-    maxHealth: 115,
-    combatAttributes: createCombatAttributes({
-      attack: 9,
-      defense: 6,
-      speed: 150,
-      range: 92,
-    }),
-  },
-  fungus: {
-    key: "fungus",
-    maxHealth: 130,
-    combatAttributes: createCombatAttributes({
-      attack: 11,
-      defense: 9,
-      speed: 136,
-      range: 82,
-    }),
-  },
-};
-
-const getArchetypeDefinition = (key: string | null | undefined): ArchetypeDefinition | null => {
-  if (!key) {
-    return null;
-  }
-  const normalized = sanitizeArchetypeKey(key);
-  if (!normalized) {
-    return null;
-  }
-  return ARCHETYPE_DEFINITIONS[normalized] ?? null;
-};
-
-const cloneCombatAttributes = (attributes: CombatAttributes): CombatAttributes => ({
-  attack: attributes.attack,
-  defense: attributes.defense,
-  speed: attributes.speed,
-  range: attributes.range,
-});
-
-const COMBAT_STAT_KEYS = ["attack", "defense", "speed", "range"] as const;
-type CombatStatKey = (typeof COMBAT_STAT_KEYS)[number];
-
-const EVOLUTION_TIERS = ["small", "medium", "large", "macro"] as const;
-type EvolutionTier = (typeof EVOLUTION_TIERS)[number];
-
-type CombatStatModifierState = {
-  additive: number;
-  multiplier: number;
-  baseOverride: number;
-};
-
-type EvolutionHistoryState = Record<EvolutionTier, Record<string, number>>;
-
-type PlayerEvolutionState = {
-  traits: string[];
-  history: EvolutionHistoryState;
-  modifiers: Record<CombatStatKey, CombatStatModifierState>;
-};
-
-const createCombatStatModifier = (modifier?: Partial<CombatStatModifierState>): CombatStatModifierState => ({
-  additive: Number.isFinite(modifier?.additive) ? Number(modifier?.additive) : 0,
-  multiplier: Number.isFinite(modifier?.multiplier) ? Number(modifier?.multiplier) : 0,
-  baseOverride: Number.isFinite(modifier?.baseOverride) ? Number(modifier?.baseOverride) : 0,
-});
-
-const sanitizeHistoryBucket = (bucket?: Record<string, unknown> | null): Record<string, number> => {
-  if (!bucket || typeof bucket !== "object") {
-    return {};
-  }
-
-  const normalized: Record<string, number> = {};
-  for (const [key, value] of Object.entries(bucket)) {
-    if (typeof key !== "string" || !key) {
-      continue;
-    }
-    const numeric = Number.isFinite(value) ? Math.trunc(Number(value)) : 0;
-    if (numeric > 0) {
-      normalized[key] = numeric;
-    }
-  }
-  return normalized;
-};
-
-const createEvolutionHistoryState = (history?: Partial<EvolutionHistoryState> | null): EvolutionHistoryState => ({
-  small: sanitizeHistoryBucket(history?.small),
-  medium: sanitizeHistoryBucket(history?.medium),
-  large: sanitizeHistoryBucket(history?.large),
-  macro: sanitizeHistoryBucket((history as Partial<EvolutionHistoryState> | undefined)?.macro),
-});
-
-const createEvolutionState = (state?: Partial<PlayerEvolutionState> | null): PlayerEvolutionState => {
-  const traits = Array.isArray(state?.traits)
-    ? Array.from(
-        new Set(
-          state!.traits
-            .map((trait) => (typeof trait === "string" ? trait.trim() : ""))
-            .filter((trait) => trait.length > 0),
-        ),
-      )
-    : [];
-
-  const modifiers: Record<CombatStatKey, CombatStatModifierState> = {
-    attack: createCombatStatModifier(state?.modifiers?.attack),
-    defense: createCombatStatModifier(state?.modifiers?.defense),
-    speed: createCombatStatModifier(state?.modifiers?.speed),
-    range: createCombatStatModifier(state?.modifiers?.range),
-  };
-
-  return {
-    traits,
-    history: createEvolutionHistoryState(state?.history),
-    modifiers,
-  };
-};
-
-const cloneEvolutionState = (state?: PlayerEvolutionState | null): PlayerEvolutionState => {
-  if (!state) {
-    return createEvolutionState();
-  }
-
-  return {
-    traits: [...state.traits],
-    history: {
-      small: { ...state.history.small },
-      medium: { ...state.history.medium },
-      large: { ...state.history.large },
-      macro: { ...state.history.macro },
-    },
-    modifiers: {
-      attack: { ...state.modifiers.attack },
-      defense: { ...state.modifiers.defense },
-      speed: { ...state.modifiers.speed },
-      range: { ...state.modifiers.range },
-    },
-  };
-};
-
-const getXpRequirementForLevel = (level: number): number => {
-  return Math.max(MIN_XP_REQUIREMENT, BASE_XP_REQUIREMENT + (Math.max(1, level) - 1) * XP_REQUIREMENT_GROWTH);
-};
-
-const getPlayerLevelFromXp = (xp: number): number => {
-  if (!Number.isFinite(xp)) {
-    return 1;
-  }
-
-  let remaining = Math.max(0, Math.trunc(xp));
-  let level = 1;
-  let requirement = getXpRequirementForLevel(level);
-  let iterations = 0;
-
-  while (remaining >= requirement && iterations < MAX_LEVEL_ITERATIONS) {
-    remaining -= requirement;
-    level += 1;
-    requirement = getXpRequirementForLevel(level);
-    iterations += 1;
-  }
-
-  return Math.max(1, level);
-};
-
-const sumEvolutionHistory = (bucket: Record<string, number> | undefined): number => {
-  if (!bucket) {
-    return 0;
-  }
-
-  let total = 0;
-  for (const value of Object.values(bucket)) {
-    if (Number.isFinite(value)) {
-      total += Math.max(0, Math.trunc(value));
-    }
-  }
-  return total;
-};
-
-const computeEvolutionSlotsForPlayer = (player: PlayerInternal) => {
-  const level = getPlayerLevelFromXp(player.xp);
-  const smallMax = SMALL_EVOLUTION_SLOT_BASE + Math.floor(level / SMALL_SLOT_LEVEL_DIVISOR);
-  const mediumMax = Math.floor(level / MEDIUM_SLOT_INTERVAL);
-  const largeMax = Math.floor(level / LARGE_SLOT_INTERVAL);
-  const macroMax = largeMax;
-
-  const history = player.evolutionState?.history ?? createEvolutionHistoryState(null);
-
-  const buildSlot = (bucket: Record<string, number> | undefined, max: number) => {
-    const used = sumEvolutionHistory(bucket);
-    return {
-      used,
-      max: Math.max(max, used),
-    };
-  };
-
-  return {
-    small: buildSlot(history.small, smallMax),
-    medium: buildSlot(history.medium, mediumMax),
-    large: buildSlot(history.large, largeMax),
-    macro: buildSlot(history.macro, macroMax),
-  };
-};
-
-const applyStatAdjustments = (
-  target: Record<CombatStatKey, CombatStatModifierState>,
-  adjustments: Partial<Record<CombatStatKey, number>> | undefined,
-  kind: keyof CombatStatModifierState,
-): boolean => {
-  if (!adjustments) {
-    return false;
-  }
-
-  let changed = false;
-  for (const key of COMBAT_STAT_KEYS) {
-    const delta = adjustments[key];
-    if (!Number.isFinite(delta) || delta === 0) {
-      continue;
-    }
-    const modifier = target[key];
-    const next = modifier[kind] + Number(delta);
-    if (Number.isFinite(next)) {
-      modifier[kind] = next;
-      changed = true;
-    }
-  }
-  return changed;
-};
-
-const applyEvolutionActionToState = (
-  state: PlayerEvolutionState,
-  action: PlayerEvolutionAction,
-): boolean => {
-  let changed = false;
-
-  if (action.tier && action.evolutionId) {
-    const tier = EVOLUTION_TIERS.find((value) => value === action.tier);
-    if (tier) {
-      const bucket = state.history[tier];
-      const delta =
-        action.countDelta !== undefined && Number.isFinite(action.countDelta)
-          ? Math.trunc(Number(action.countDelta))
-          : 1;
-      if (delta !== 0) {
-        const next = (bucket[action.evolutionId] ?? 0) + delta;
-        if (next > 0) {
-          bucket[action.evolutionId] = next;
-        } else {
-          delete bucket[action.evolutionId];
-        }
-        changed = true;
-      }
-    }
-  }
-
-  if (Array.isArray(action.traitDeltas)) {
-    for (const trait of action.traitDeltas) {
-      if (typeof trait !== "string") {
-        continue;
-      }
-      const normalized = trait.trim();
-      if (normalized && !state.traits.includes(normalized)) {
-        state.traits.push(normalized);
-        changed = true;
-      }
-    }
-  }
-
-  const additiveChanged = applyStatAdjustments(state.modifiers, action.additiveDelta, "additive");
-  const multiplierChanged = applyStatAdjustments(state.modifiers, action.multiplierDelta, "multiplier");
-  const baseChanged = applyStatAdjustments(state.modifiers, action.baseDelta, "baseOverride");
-
-  return changed || additiveChanged || multiplierChanged || baseChanged;
-};
-
-const computeStatWithModifiers = (
-  base: number,
-  modifier: CombatStatModifierState,
-): number => {
-  const baseOverride = Number.isFinite(modifier.baseOverride) ? modifier.baseOverride : 0;
-  const additive = Number.isFinite(modifier.additive) ? modifier.additive : 0;
-  const multiplier = Number.isFinite(modifier.multiplier) ? modifier.multiplier : 0;
-
-  const effectiveBase = base + baseOverride;
-  const scaled = (effectiveBase + additive) * Math.max(0, 1 + multiplier);
-  if (!Number.isFinite(scaled)) {
-    return Math.max(0, base);
-  }
-  return Math.max(0, scaled);
-};
 
 const clonePityCounters = (pity: { fragment: number; stableGene: number }) => ({
   fragment: pity.fragment,
@@ -1184,17 +573,6 @@ type PendingOrganicRespawnGroup = {
   randomSeed: number;
 };
 
-const clampToWorldBounds = (position: Vector2): Vector2 => ({
-  x: clamp(position.x, WORLD_BOUNDS.minX, WORLD_BOUNDS.maxX),
-  y: clamp(position.y, WORLD_BOUNDS.minY, WORLD_BOUNDS.maxY),
-});
-
-const translateWithinWorldBounds = (position: Vector2, offset: Vector2): Vector2 =>
-  clampToWorldBounds({
-    x: position.x + offset.x,
-    y: position.y + offset.y,
-  });
-
 const ENTITY_OFFSET_RATIOS: readonly number[] = [0.22, 0.18, 0.16, 0.14, 0.12, 0.1];
 
 const normalizeVector = (vector: Vector2): Vector2 => {
@@ -1327,15 +705,6 @@ const PLAYER_SPAWN_POSITIONS: Vector2[] = [
   { x: -PLAYER_SPAWN_DISTANCE, y: 0 },
 ];
 
-const hashString = (value: string): number => {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619) >>> 0;
-  }
-  return hash;
-};
-
 const LEGACY_MICROORGANISM_NAME_ADJECTIVES = [
   "Amber",
   "Crimson",
@@ -1462,27 +831,6 @@ const normalizeStoredWorldState = (
     },
     changed: true,
   };
-};
-
-const getSpawnPositionForPlayer = (playerId: string): Vector2 => {
-  const index = hashString(playerId) % PLAYER_SPAWN_POSITIONS.length;
-  const position = PLAYER_SPAWN_POSITIONS[index];
-  return { x: position.x, y: position.y };
-};
-
-const getDeterministicCombatAttributesForPlayer = (playerId: string): CombatAttributes => {
-  const hash = hashString(playerId);
-  const attackBonus = hash % 5;
-  const defenseBonus = Math.floor(hash / 5) % 4;
-  const speedBonus = Math.floor(hash / 17) % 5;
-  const rangeBonus = Math.floor(hash / 29) % 4;
-
-  return createCombatAttributes({
-    attack: DEFAULT_COMBAT_ATTRIBUTES.attack + attackBonus,
-    defense: DEFAULT_COMBAT_ATTRIBUTES.defense + defenseBonus,
-    speed: DEFAULT_COMBAT_ATTRIBUTES.speed + speedBonus * 8,
-    range: DEFAULT_COMBAT_ATTRIBUTES.range + rangeBonus * 6,
-  });
 };
 
 export class RoomDO {
@@ -2035,7 +1383,7 @@ export class RoomDO {
     if (!player) {
       return null;
     }
-    const spawn = getSpawnPositionForPlayer(player.id);
+    const spawn = getSpawnPositionForPlayer(player.id, PLAYER_SPAWN_POSITIONS);
     return { x: spawn.x, y: spawn.y };
   }
 
@@ -3932,12 +3280,7 @@ export class RoomDO {
       : getDeterministicCombatAttributesForPlayer(player.id);
     const modifiers = player.evolutionState.modifiers;
 
-    return createCombatAttributes({
-      attack: computeStatWithModifiers(base.attack, modifiers.attack),
-      defense: computeStatWithModifiers(base.defense, modifiers.defense),
-      speed: computeStatWithModifiers(base.speed, modifiers.speed),
-      range: computeStatWithModifiers(base.range, modifiers.range),
-    });
+    return computeCombatAttributesWithModifiers(base, modifiers);
   }
 
   private updatePlayerCombatAttributes(player: PlayerInternal): boolean {
@@ -4814,7 +4157,9 @@ export class RoomDO {
 
     if (!player) {
       const id = crypto.randomUUID();
-      const spawnPosition = this.clampPosition(getSpawnPositionForPlayer(id));
+      const spawnPosition = this.clampPosition(
+        getSpawnPositionForPlayer(id, PLAYER_SPAWN_POSITIONS),
+      );
       const evolutionState = createEvolutionState();
       const skillState = createPlayerSkillState();
       const reconnectToken = generateReconnectToken();
@@ -5910,7 +5255,9 @@ export class RoomDO {
       player.lastActiveAt = resetTimestamp;
       player.movementVector = createVector();
       player.orientation = createOrientation();
-      player.position = this.clampPosition(getSpawnPositionForPlayer(player.id));
+      player.position = this.clampPosition(
+        getSpawnPositionForPlayer(player.id, PLAYER_SPAWN_POSITIONS),
+      );
       player.health = createHealthState({
         max: player.health.max,
         current: player.health.max,
