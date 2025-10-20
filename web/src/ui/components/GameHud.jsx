@@ -18,6 +18,8 @@ import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
 import { shallowEqual, useGameStore } from '../../store/gameStore';
 import { useGameSettings } from '../../store/gameSettings';
 
+const MOBILE_HUD_QUERY = '(max-width: 900px)';
+
 const COMBAT_STATE_LABELS = {
   idle: 'Ocioso',
   engaged: 'Em combate',
@@ -83,6 +85,13 @@ const GameHud = ({
   );
 
   const currentSkill = skillData?.currentSkill ?? null;
+  const [isMobileHud, setIsMobileHud] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+
+    return window.matchMedia(MOBILE_HUD_QUERY).matches;
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarRef = useRef(null);
   const toggleButtonRef = useRef(null);
@@ -93,6 +102,36 @@ const GameHud = ({
   const hudDisabled = showStatusOverlay;
   const sidebarIsInactive = hudDisabled || !isSidebarOpen;
   const sidebarInert = sidebarIsInactive ? 'true' : undefined;
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined;
+    }
+
+    const mediaQueryList = window.matchMedia(MOBILE_HUD_QUERY);
+
+    const handleChange = (event) => {
+      setIsMobileHud(event.matches);
+    };
+
+    handleChange(mediaQueryList);
+
+    if (typeof mediaQueryList.addEventListener === 'function') {
+      mediaQueryList.addEventListener('change', handleChange);
+      return () => {
+        mediaQueryList.removeEventListener('change', handleChange);
+      };
+    }
+
+    if (typeof mediaQueryList.addListener === 'function') {
+      mediaQueryList.addListener(handleChange);
+      return () => {
+        mediaQueryList.removeListener(handleChange);
+      };
+    }
+
+    return undefined;
+  }, []);
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
@@ -359,13 +398,36 @@ const GameHud = ({
 
   const sidebarAriaHidden = sidebarIsInactive ? true : undefined;
 
+  const hudClassName = [styles.hud, isMobileHud ? styles.mobileHud : '']
+    .filter(Boolean)
+    .join(' ');
+  const sidebarToggleClassName = [
+    styles.sidebarToggle,
+    isMobileHud ? styles.sidebarToggleFloating : '',
+    hudDisabled ? styles.hudElementDisabled : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const sidebarClassName = [
+    styles.sidebar,
+    isMobileHud ? styles.sidebarSheet : '',
+    isSidebarOpen ? styles.sidebarOpen : styles.sidebarClosed,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const mainHudClassName = [
+    styles.mainHud,
+    isMobileHud ? styles.mainHudMobile : '',
+    hudDisabled ? styles.hudElementDisabled : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <>
       <button
         type="button"
-        className={`${styles.sidebarToggle} ${
-          hudDisabled ? styles.hudElementDisabled : ''
-        }`}
+        className={sidebarToggleClassName}
         onClick={handleToggleSidebar}
         aria-expanded={isSidebarOpen}
         aria-controls={sidebarId}
@@ -377,7 +439,7 @@ const GameHud = ({
         {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
       </button>
 
-      <div className={styles.hud}>
+      <div className={hudClassName} data-mobile-hud={isMobileHud ? 'true' : 'false'}>
         <div
           className={`${styles.canvasOverlay} ${
             showStatusOverlay ? styles.canvasOverlayVisible : ''
@@ -434,9 +496,7 @@ const GameHud = ({
 
         <div
           id={sidebarId}
-          className={`${styles.sidebar} ${
-            isSidebarOpen ? styles.sidebarOpen : styles.sidebarClosed
-          } ${hudDisabled ? styles.hudElementDisabled : ''}`}
+          className={`${sidebarClassName} ${hudDisabled ? styles.hudElementDisabled : ''}`}
           role="complementary"
           aria-label="Painel lateral do jogo"
           aria-hidden={sidebarAriaHidden}
@@ -521,11 +581,12 @@ const GameHud = ({
         </div>
 
         <div
-          className={`${styles.mainHud} ${hudDisabled ? styles.hudElementDisabled : ''}`}
+          className={mainHudClassName}
           aria-hidden={hudDisabled ? true : undefined}
           inert={hudDisabled ? 'true' : undefined}
         >
           <HudBar
+            isMobileHud={isMobileHud}
             level={level}
             score={score}
             energy={energy}

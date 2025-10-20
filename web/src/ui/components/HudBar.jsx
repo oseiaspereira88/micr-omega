@@ -46,6 +46,7 @@ const HudBar = ({
   affinityLabel,
   resistances,
   isMinimized = false,
+  isMobileHud = false,
 }) => {
   const numberFormatter = useMemo(() => new Intl.NumberFormat('pt-BR'), []);
   const formatNumber = useCallback((value) => numberFormatter.format(value), [numberFormatter]);
@@ -163,9 +164,13 @@ const HudBar = ({
   );
 
   const minimized = Boolean(isMinimized);
-  const statsClassName = minimized
-    ? `${styles.stats} ${styles.statsCompact}`.trim()
-    : styles.stats;
+  const statsClassName = [
+    styles.stats,
+    minimized ? styles.statsCompact : '',
+    isMobileHud ? styles.chipStrip : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const renderBadge = ({ key, icon, label, value, style, className, ariaLabel }) => (
     <div
@@ -230,48 +235,39 @@ const HudBar = ({
     },
   ];
 
-  return (
-    <>
-      <div className={styles.header}>
-        <div className={styles.title}>MicrΩ • Nv.{safeLevel} • {formatNumber(safeScore)} pts</div>
-        <div className={styles.combatProfile}>
-          <span className={styles.combatTag} title={`Elemento ${elementName}`}>
-            {elementIcon} {elementName}
-          </span>
-          <span
-            className={`${styles.combatTag} ${styles.affinityTag}`}
-            title={`Afinidade ${affinityName}`}
-          >
-            {affinityIcon} {affinityName}
-          </span>
-        </div>
-      </div>
+  if (safeCombo > 1) {
+    primaryBadges.push({
+      key: 'combo',
+      icon: '🔥',
+      label: 'Combo',
+      value: comboDisplay,
+      style: { background: 'rgba(255, 80, 0, 0.25)' },
+      className: styles.comboBadge,
+      ariaLabel: `Combo atual: ${comboDisplay}`,
+    });
+  }
 
-      <div className={statsClassName}>
-        {primaryBadges.map(renderBadge)}
-        {safeCombo > 1 && (
-          renderBadge({
-            key: 'combo',
-            icon: '🔥',
-            label: 'Combo',
-            value: comboDisplay,
-            style: { background: 'rgba(255, 80, 0, 0.25)' },
-            className: styles.comboBadge,
-            ariaLabel: `Combo atual: ${comboDisplay}`,
-          })
-        )}
-        {safeMaxCombo > 0 && (
-          renderBadge({
-            key: 'maxCombo',
-            icon: '🏅',
-            label: 'Combo máx.',
-            value: maxComboDisplay,
-            style: { background: 'rgba(255, 255, 255, 0.1)' },
-            className: styles.maxComboBadge,
-            ariaLabel: `Melhor combo: ${maxComboDisplay}`,
-          })
-        )}
-        {resistanceEntries.length > 0 && !minimized && (
+  if (safeMaxCombo > 0) {
+    primaryBadges.push({
+      key: 'maxCombo',
+      icon: '🏅',
+      label: 'Combo máx.',
+      value: maxComboDisplay,
+      style: { background: 'rgba(255, 255, 255, 0.1)' },
+      className: styles.maxComboBadge,
+      ariaLabel: `Melhor combo: ${maxComboDisplay}`,
+    });
+  }
+
+  const showResistances = !minimized && resistanceEntries.length > 0;
+  const showStatuses = !minimized && statusBadges.length > 0;
+  const showProgress = !minimized;
+  const showPowerUps = showProgress && powerUpSummaries.length > 0;
+
+  const secondaryContent =
+    showResistances || showStatuses || showProgress ? (
+      <div className={styles.secondaryStats}>
+        {showResistances ? (
           <div className={styles.resistanceRow}>
             {resistanceEntries.map(([key, value]) => {
               const label = ELEMENT_LABELS[key] ?? key;
@@ -292,8 +288,8 @@ const HudBar = ({
               );
             })}
           </div>
-        )}
-        {statusBadges.length > 0 && !minimized && (
+        ) : null}
+        {showStatuses ? (
           <div className={styles.statusRow}>
             {statusBadges.map((status) => (
               <span
@@ -306,8 +302,8 @@ const HudBar = ({
               </span>
             ))}
           </div>
-        )}
-        {!minimized && (
+        ) : null}
+        {showProgress ? (
           <>
             <div className={styles.progressRow}>
               <div className={styles.xpPanel}>
@@ -367,7 +363,7 @@ const HudBar = ({
                 </div>
               </div>
             </div>
-            {powerUpSummaries.length > 0 && (
+            {showPowerUps ? (
               <div className={styles.powerUps}>
                 {powerUpSummaries.map((power) => (
                   <div
@@ -384,9 +380,45 @@ const HudBar = ({
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
           </>
-        )}
+        ) : null}
+      </div>
+    ) : null;
+
+  const hasSecondary = Boolean(secondaryContent);
+
+  return (
+    <>
+      <div className={styles.header}>
+        <div className={styles.title}>MicrΩ • Nv.{safeLevel} • {formatNumber(safeScore)} pts</div>
+        <div className={styles.combatProfile}>
+          <span className={styles.combatTag} title={`Elemento ${elementName}`}>
+            {elementIcon} {elementName}
+          </span>
+          <span
+            className={`${styles.combatTag} ${styles.affinityTag}`}
+            title={`Afinidade ${affinityName}`}
+          >
+            {affinityIcon} {affinityName}
+          </span>
+        </div>
+      </div>
+
+      <div className={statsClassName}>
+        <div className={styles.primaryBadges}>{primaryBadges.map(renderBadge)}</div>
+        {hasSecondary
+          ? isMobileHud
+            ? (
+                <details className={styles.secondaryAccordion}>
+                  <summary>Detalhes do status</summary>
+                  {secondaryContent}
+                </details>
+              )
+            : (
+                secondaryContent
+              )
+          : null}
       </div>
     </>
   );

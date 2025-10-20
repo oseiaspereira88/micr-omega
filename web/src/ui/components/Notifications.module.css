@@ -73,6 +73,14 @@
   }
 }
 
+:global(.mobileHud) :local(.container) {
+  top: auto;
+  bottom: calc(148px + var(--safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 0);
+  gap: 8px;
+  max-width: min(420px, 90vw);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .notification {
     animation: none;
