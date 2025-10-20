@@ -2,6 +2,7 @@ import {
   ChangeEvent,
   FormEvent,
   KeyboardEvent,
+  MouseEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -32,6 +33,7 @@ import {
   sanitizePlayerName,
 } from "../utils/messageTypes";
 import styles from "./StartScreen.module.css";
+import ControlsGuide from "../ui/components/ControlsGuide";
 
 export const START_SCREEN_MOBILE_MEDIA_QUERY = "(max-width: 640px)";
 
@@ -111,9 +113,13 @@ const StartScreen = ({
 
   const [inputValue, setInputValue] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isControlsGuideOpen, setControlsGuideOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const controlsGuideTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const controlsGuideDialogRef = useRef<HTMLDivElement | null>(null);
+  const shouldRestoreGuideFocusRef = useRef(false);
 
   const focusInput = useCallback(() => {
     inputRef.current?.focus({ preventScroll: true });
@@ -340,6 +346,9 @@ const StartScreen = ({
   const touchLayoutAutoSwapToggleId = "touch-layout-auto-swap";
   const touchLayoutAutoSwapDescriptionId = "touch-layout-auto-swap-description";
   const touchLayoutAutoSwapHelperId = "touch-layout-auto-swap-helper";
+  const controlsGuideDialogId = "controls-guide-dialog";
+  const controlsGuideTitleId = "controls-guide-title";
+  const controlsGuideDescriptionId = "controls-guide-description";
 
   const isTouchLayoutDisabled =
     isConnecting || !settings.showTouchControls;
@@ -363,6 +372,108 @@ const StartScreen = ({
     : isConnecting
     ? "Cancelar tentativa"
     : "Desconectar";
+
+  const getControlsGuideFocusableElements = useCallback(() => {
+    const container = controlsGuideDialogRef.current;
+    if (!container) {
+      return [] as HTMLElement[];
+    }
+
+    const focusableSelectors = [
+      "a[href]",
+      "button:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "[tabindex]:not([tabindex='-1'])",
+    ].join(",");
+
+    return Array.from(
+      container.querySelectorAll<HTMLElement>(focusableSelectors),
+    ).filter((element) => {
+      if (element.getAttribute("aria-hidden") === "true") {
+        return false;
+      }
+
+      const elementWithDisabled = element as HTMLElement & { disabled?: boolean };
+      if (elementWithDisabled.disabled) {
+        return false;
+      }
+
+      return true;
+    });
+  }, []);
+
+  const closeControlsGuide = useCallback(() => {
+    setControlsGuideOpen(false);
+    shouldRestoreGuideFocusRef.current = true;
+  }, []);
+
+  const handleControlsGuideKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeControlsGuide();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements = getControlsGuideFocusableElements();
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      const activeElement =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+      if (event.shiftKey) {
+        if (!activeElement || activeElement === firstElement) {
+          event.preventDefault();
+          lastElement.focus({ preventScroll: true });
+        }
+        return;
+      }
+
+      if (!activeElement || activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus({ preventScroll: true });
+      }
+    },
+    [closeControlsGuide, getControlsGuideFocusableElements],
+  );
+
+  const handleControlsGuideBackdropClick = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (event.target === event.currentTarget) {
+        closeControlsGuide();
+      }
+    },
+    [closeControlsGuide],
+  );
+
+  useEffect(() => {
+    if (isControlsGuideOpen) {
+      const focusableElements = getControlsGuideFocusableElements();
+      if (focusableElements.length > 0) {
+        focusableElements[0].focus({ preventScroll: true });
+        return;
+      }
+
+      controlsGuideDialogRef.current?.focus({ preventScroll: true });
+      return;
+    }
+
+    if (shouldRestoreGuideFocusRef.current) {
+      shouldRestoreGuideFocusRef.current = false;
+      controlsGuideTriggerRef.current?.focus({ preventScroll: true });
+    }
+  }, [getControlsGuideFocusableElements, isControlsGuideOpen]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -452,11 +563,12 @@ const StartScreen = ({
         className={panelClassName}
         ref={panelRef}
         role="dialog"
-        aria-modal="true"
+        aria-modal={isControlsGuideOpen ? undefined : true}
         aria-labelledby={dialogTitleId}
         aria-describedby={dialogDescriptionId}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
+        aria-hidden={isControlsGuideOpen ? "true" : undefined}
       >
         <header className={styles.header}>
           <h1 id={dialogTitleId} className={styles.title}>
@@ -726,6 +838,18 @@ const StartScreen = ({
 
           <div className={actionsClassName}>
             <button
+              type="button"
+              className={styles.guideButton}
+              onClick={() => {
+                setControlsGuideOpen(true);
+              }}
+              aria-expanded={isControlsGuideOpen}
+              aria-controls={controlsGuideDialogId}
+              ref={controlsGuideTriggerRef}
+            >
+              Como jogar
+            </button>
+            <button
               type="submit"
               className={styles.primaryButton}
               disabled={isConnecting}
@@ -745,6 +869,41 @@ const StartScreen = ({
           </div>
         </form>
       </div>
+      {isControlsGuideOpen ? (
+        <div
+          className={styles.controlsGuideBackdrop}
+          role="presentation"
+          onMouseDown={handleControlsGuideBackdropClick}
+        >
+          <div
+            id={controlsGuideDialogId}
+            className={styles.controlsGuideDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={controlsGuideTitleId}
+            aria-describedby={controlsGuideDescriptionId}
+            ref={controlsGuideDialogRef}
+            tabIndex={-1}
+            onKeyDown={handleControlsGuideKeyDown}
+          >
+            <ControlsGuide
+              className={styles.controlsGuideContent}
+              title="Como jogar"
+              titleId={controlsGuideTitleId}
+              descriptionId={controlsGuideDescriptionId}
+              actions={
+                <button
+                  type="button"
+                  className={styles.controlsGuideCloseButton}
+                  onClick={closeControlsGuide}
+                >
+                  Fechar
+                </button>
+              }
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
