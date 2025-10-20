@@ -118,6 +118,23 @@
   line-height: 1.45;
 }
 
+.comingSoonBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: linear-gradient(120deg, rgba(74, 224, 255, 0.22), rgba(111, 68, 255, 0.28));
+  border: 1px solid rgba(74, 224, 255, 0.35);
+  color: rgba(226, 244, 255, 0.9);
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
 .statusCard {
   display: grid;
   gap: 6px;

@@ -60,12 +60,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
                   Monte partidas privadas com regras avançadas e convide o seu esquadrão.
                 </p>
                 <button
-                  aria-disabled="false"
-                  class="_createButton_6bb24e"
+                  aria-disabled="true"
+                  aria-label="Criação de salas indisponível. Recurso em breve."
+                  class="_createButton_6bb24e _createButtonDisabled_6bb24e"
+                  disabled=""
                   type="button"
                 >
                   Criar nova sala
+                  <span
+                    aria-hidden="true"
+                    class="_comingSoonBadge_6bb24e"
+                  >
+                    Em breve
+                  </span>
                 </button>
+                <p
+                  class="_createButtonNotice_6bb24e"
+                  role="status"
+                >
+                  Em breve: conecte-se a uma sala pública enquanto preparamos a criação privada.
+                </p>
                 <div
                   class="_sidebarHighlights_6bb24e"
                 >
@@ -174,13 +188,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
                         🔒 Premium
                       </span>
                       <button
-                        aria-disabled="false"
-                        class="_unlockButton_6bb24e"
-                        title="Desbloquear 120💎"
+                        aria-disabled="true"
+                        aria-label="Cluster Sináptico indisponível. Recurso em breve."
+                        class="_unlockButton_6bb24e _unlockButtonDisabled_6bb24e"
+                        disabled=""
+                        title="Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível."
                         type="button"
                       >
                         Desbloquear 120💎
+                        <span
+                          aria-hidden="true"
+                          class="_comingSoonBadge_6bb24e"
+                        >
+                          Em breve
+                        </span>
                       </button>
+                      <span
+                        class="_unlockButtonHint_6bb24e"
+                      >
+                        Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível.
+                      </span>
                     </div>
                   </article>
                   <article
@@ -206,13 +233,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
                         🔒 Premium
                       </span>
                       <button
-                        aria-disabled="false"
-                        class="_unlockButton_6bb24e"
-                        title="Desbloquear 95💎"
+                        aria-disabled="true"
+                        aria-label="Ninho Lúmen indisponível. Recurso em breve."
+                        class="_unlockButton_6bb24e _unlockButtonDisabled_6bb24e"
+                        disabled=""
+                        title="Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível."
                         type="button"
                       >
                         Desbloquear 95💎
+                        <span
+                          aria-hidden="true"
+                          class="_comingSoonBadge_6bb24e"
+                        >
+                          Em breve
+                        </span>
                       </button>
+                      <span
+                        class="_unlockButtonHint_6bb24e"
+                      >
+                        Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível.
+                      </span>
                     </div>
                   </article>
                 </div>
@@ -247,12 +287,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
         Monte partidas privadas com regras avançadas e convide o seu esquadrão.
       </p>
       <button
-        aria-disabled="false"
-        class="_createButton_6bb24e"
+        aria-disabled="true"
+        aria-label="Criação de salas indisponível. Recurso em breve."
+        class="_createButton_6bb24e _createButtonDisabled_6bb24e"
+        disabled=""
         type="button"
       >
         Criar nova sala
+        <span
+          aria-hidden="true"
+          class="_comingSoonBadge_6bb24e"
+        >
+          Em breve
+        </span>
       </button>
+      <p
+        class="_createButtonNotice_6bb24e"
+        role="status"
+      >
+        Em breve: conecte-se a uma sala pública enquanto preparamos a criação privada.
+      </p>
       <div
         class="_sidebarHighlights_6bb24e"
       >
@@ -361,13 +415,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
               🔒 Premium
             </span>
             <button
-              aria-disabled="false"
-              class="_unlockButton_6bb24e"
-              title="Desbloquear 120💎"
+              aria-disabled="true"
+              aria-label="Cluster Sináptico indisponível. Recurso em breve."
+              class="_unlockButton_6bb24e _unlockButtonDisabled_6bb24e"
+              disabled=""
+              title="Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível."
               type="button"
             >
               Desbloquear 120💎
+              <span
+                aria-hidden="true"
+                class="_comingSoonBadge_6bb24e"
+              >
+                Em breve
+              </span>
             </button>
+            <span
+              class="_unlockButtonHint_6bb24e"
+            >
+              Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível.
+            </span>
           </div>
         </article>
         <article
@@ -393,13 +460,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
               🔒 Premium
             </span>
             <button
-              aria-disabled="false"
-              class="_unlockButton_6bb24e"
-              title="Desbloquear 95💎"
+              aria-disabled="true"
+              aria-label="Ninho Lúmen indisponível. Recurso em breve."
+              class="_unlockButton_6bb24e _unlockButtonDisabled_6bb24e"
+              disabled=""
+              title="Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível."
               type="button"
             >
               Desbloquear 95💎
+              <span
+                aria-hidden="true"
+                class="_comingSoonBadge_6bb24e"
+              >
+                Em breve
+              </span>
             </button>
+            <span
+              class="_unlockButtonHint_6bb24e"
+            >
+              Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível.
+            </span>
           </div>
         </article>
       </div>
@@ -540,8 +620,11 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
         class="_storeActions_87a75a"
       >
         <button
-          class="_storeButton_87a75a"
+          aria-disabled="true"
+          aria-label="Configurações indisponível. Recurso em breve."
+          class="_storeButton_87a75a _storeButtonDisabled_87a75a"
           data-testid="main-menu-settings"
+          disabled=""
           type="button"
         >
           <span
@@ -550,15 +633,22 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
             Configurações
           </span>
           <span
-            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
+            role="status"
           >
-            Em breve
+            <span
+              class="_storeButtonBadge_87a75a"
+            >
+              Em breve
+            </span>
           </span>
         </button>
         <button
-          class="_storeButton_87a75a"
+          aria-disabled="true"
+          aria-label="Loja indisponível. Recurso em breve."
+          class="_storeButton_87a75a _storeButtonDisabled_87a75a"
           data-testid="main-menu-store"
+          disabled=""
           type="button"
         >
           <span
@@ -567,15 +657,22 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
             Loja
           </span>
           <span
-            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
+            role="status"
           >
-            Em breve
+            <span
+              class="_storeButtonBadge_87a75a"
+            >
+              Em breve
+            </span>
           </span>
         </button>
         <button
-          class="_storeButton_87a75a"
+          aria-disabled="true"
+          aria-label="Missões indisponível. Recurso em breve."
+          class="_storeButton_87a75a _storeButtonDisabled_87a75a"
           data-testid="main-menu-missions"
+          disabled=""
           type="button"
         >
           <span
@@ -584,15 +681,22 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
             Missões
           </span>
           <span
-            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
+            role="status"
           >
-            Em breve
+            <span
+              class="_storeButtonBadge_87a75a"
+            >
+              Em breve
+            </span>
           </span>
         </button>
         <button
-          class="_storeButton_87a75a"
+          aria-disabled="true"
+          aria-label="Amigos indisponível. Recurso em breve."
+          class="_storeButton_87a75a _storeButtonDisabled_87a75a"
           data-testid="main-menu-friends"
+          disabled=""
           type="button"
         >
           <span
@@ -601,10 +705,14 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
             Amigos
           </span>
           <span
-            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
+            role="status"
           >
-            Em breve
+            <span
+              class="_storeButtonBadge_87a75a"
+            >
+              Em breve
+            </span>
           </span>
         </button>
       </div>
@@ -686,12 +794,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
                   Monte partidas privadas com regras avançadas e convide o seu esquadrão.
                 </p>
                 <button
-                  aria-disabled="false"
-                  class="_createButton_6bb24e"
+                  aria-disabled="true"
+                  aria-label="Criação de salas indisponível. Recurso em breve."
+                  class="_createButton_6bb24e _createButtonDisabled_6bb24e"
+                  disabled=""
                   type="button"
                 >
                   Criar nova sala
+                  <span
+                    aria-hidden="true"
+                    class="_comingSoonBadge_6bb24e"
+                  >
+                    Em breve
+                  </span>
                 </button>
+                <p
+                  class="_createButtonNotice_6bb24e"
+                  role="status"
+                >
+                  Em breve: conecte-se a uma sala pública enquanto preparamos a criação privada.
+                </p>
                 <div
                   class="_sidebarHighlights_6bb24e _sidebarHighlightsMobile_6bb24e"
                 >
@@ -800,13 +922,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
                         🔒 Premium
                       </span>
                       <button
-                        aria-disabled="false"
-                        class="_unlockButton_6bb24e"
-                        title="Desbloquear 120💎"
+                        aria-disabled="true"
+                        aria-label="Cluster Sináptico indisponível. Recurso em breve."
+                        class="_unlockButton_6bb24e _unlockButtonDisabled_6bb24e"
+                        disabled=""
+                        title="Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível."
                         type="button"
                       >
                         Desbloquear 120💎
+                        <span
+                          aria-hidden="true"
+                          class="_comingSoonBadge_6bb24e"
+                        >
+                          Em breve
+                        </span>
                       </button>
+                      <span
+                        class="_unlockButtonHint_6bb24e"
+                      >
+                        Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível.
+                      </span>
                     </div>
                   </article>
                   <article
@@ -832,13 +967,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
                         🔒 Premium
                       </span>
                       <button
-                        aria-disabled="false"
-                        class="_unlockButton_6bb24e"
-                        title="Desbloquear 95💎"
+                        aria-disabled="true"
+                        aria-label="Ninho Lúmen indisponível. Recurso em breve."
+                        class="_unlockButton_6bb24e _unlockButtonDisabled_6bb24e"
+                        disabled=""
+                        title="Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível."
                         type="button"
                       >
                         Desbloquear 95💎
+                        <span
+                          aria-hidden="true"
+                          class="_comingSoonBadge_6bb24e"
+                        >
+                          Em breve
+                        </span>
                       </button>
+                      <span
+                        class="_unlockButtonHint_6bb24e"
+                      >
+                        Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível.
+                      </span>
                     </div>
                   </article>
                 </div>
@@ -873,12 +1021,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
         Monte partidas privadas com regras avançadas e convide o seu esquadrão.
       </p>
       <button
-        aria-disabled="false"
-        class="_createButton_6bb24e"
+        aria-disabled="true"
+        aria-label="Criação de salas indisponível. Recurso em breve."
+        class="_createButton_6bb24e _createButtonDisabled_6bb24e"
+        disabled=""
         type="button"
       >
         Criar nova sala
+        <span
+          aria-hidden="true"
+          class="_comingSoonBadge_6bb24e"
+        >
+          Em breve
+        </span>
       </button>
+      <p
+        class="_createButtonNotice_6bb24e"
+        role="status"
+      >
+        Em breve: conecte-se a uma sala pública enquanto preparamos a criação privada.
+      </p>
       <div
         class="_sidebarHighlights_6bb24e _sidebarHighlightsMobile_6bb24e"
       >
@@ -987,13 +1149,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
               🔒 Premium
             </span>
             <button
-              aria-disabled="false"
-              class="_unlockButton_6bb24e"
-              title="Desbloquear 120💎"
+              aria-disabled="true"
+              aria-label="Cluster Sináptico indisponível. Recurso em breve."
+              class="_unlockButton_6bb24e _unlockButtonDisabled_6bb24e"
+              disabled=""
+              title="Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível."
               type="button"
             >
               Desbloquear 120💎
+              <span
+                aria-hidden="true"
+                class="_comingSoonBadge_6bb24e"
+              >
+                Em breve
+              </span>
             </button>
+            <span
+              class="_unlockButtonHint_6bb24e"
+            >
+              Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível.
+            </span>
           </div>
         </article>
         <article
@@ -1019,13 +1194,26 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
               🔒 Premium
             </span>
             <button
-              aria-disabled="false"
-              class="_unlockButton_6bb24e"
-              title="Desbloquear 95💎"
+              aria-disabled="true"
+              aria-label="Ninho Lúmen indisponível. Recurso em breve."
+              class="_unlockButton_6bb24e _unlockButtonDisabled_6bb24e"
+              disabled=""
+              title="Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível."
               type="button"
             >
               Desbloquear 95💎
+              <span
+                aria-hidden="true"
+                class="_comingSoonBadge_6bb24e"
+              >
+                Em breve
+              </span>
             </button>
+            <span
+              class="_unlockButtonHint_6bb24e"
+            >
+              Disponível quando a loja estiver ativa ou uma oferta de desbloqueio estiver disponível.
+            </span>
           </div>
         </article>
       </div>
@@ -1166,8 +1354,11 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
         class="_storeActions_87a75a"
       >
         <button
-          class="_storeButton_87a75a"
+          aria-disabled="true"
+          aria-label="Configurações indisponível. Recurso em breve."
+          class="_storeButton_87a75a _storeButtonDisabled_87a75a"
           data-testid="main-menu-settings"
+          disabled=""
           type="button"
         >
           <span
@@ -1176,15 +1367,22 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
             Configurações
           </span>
           <span
-            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
+            role="status"
           >
-            Em breve
+            <span
+              class="_storeButtonBadge_87a75a"
+            >
+              Em breve
+            </span>
           </span>
         </button>
         <button
-          class="_storeButton_87a75a"
+          aria-disabled="true"
+          aria-label="Loja indisponível. Recurso em breve."
+          class="_storeButton_87a75a _storeButtonDisabled_87a75a"
           data-testid="main-menu-store"
+          disabled=""
           type="button"
         >
           <span
@@ -1193,15 +1391,22 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
             Loja
           </span>
           <span
-            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
+            role="status"
           >
-            Em breve
+            <span
+              class="_storeButtonBadge_87a75a"
+            >
+              Em breve
+            </span>
           </span>
         </button>
         <button
-          class="_storeButton_87a75a"
+          aria-disabled="true"
+          aria-label="Missões indisponível. Recurso em breve."
+          class="_storeButton_87a75a _storeButtonDisabled_87a75a"
           data-testid="main-menu-missions"
+          disabled=""
           type="button"
         >
           <span
@@ -1210,15 +1415,22 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
             Missões
           </span>
           <span
-            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
+            role="status"
           >
-            Em breve
+            <span
+              class="_storeButtonBadge_87a75a"
+            >
+              Em breve
+            </span>
           </span>
         </button>
         <button
-          class="_storeButton_87a75a"
+          aria-disabled="true"
+          aria-label="Amigos indisponível. Recurso em breve."
+          class="_storeButton_87a75a _storeButtonDisabled_87a75a"
           data-testid="main-menu-friends"
+          disabled=""
           type="button"
         >
           <span
@@ -1227,10 +1439,14 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
             Amigos
           </span>
           <span
-            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
+            role="status"
           >
-            Em breve
+            <span
+              class="_storeButtonBadge_87a75a"
+            >
+              Em breve
+            </span>
           </span>
         </button>
       </div>

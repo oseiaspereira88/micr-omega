@@ -14,6 +14,8 @@ const LobbyScreen = ({
   onFilterChange,
   initialActiveFilters,
   onUnlockRoom,
+  isCreateRoomComingSoon = false,
+  isUnlockRoomComingSoon = false,
 }) => {
   const testId = variant === 'mobile' ? 'lobby-screen-mobile' : 'lobby-screen';
   const className = [styles.root, variant === 'mobile' ? styles.mobile : ''].filter(Boolean).join(' ');
@@ -34,14 +36,14 @@ const LobbyScreen = ({
   const roomListClassName = [styles.roomList, variant === 'mobile' ? styles.mobileRoomList : '']
     .filter(Boolean)
     .join(' ');
-  const isCreateRoomEnabled = typeof onCreateRoom === 'function';
+  const isCreateRoomEnabled = !isCreateRoomComingSoon && typeof onCreateRoom === 'function';
   const createButtonClassName = [
     styles.createButton,
     !isCreateRoomEnabled ? styles.createButtonDisabled : '',
   ]
     .filter(Boolean)
     .join(' ');
-  const isUnlockEnabled = typeof onUnlockRoom === 'function';
+  const isUnlockEnabled = !isUnlockRoomComingSoon && typeof onUnlockRoom === 'function';
   const unlockButtonClassName = [
     styles.unlockButton,
     !isUnlockEnabled ? styles.unlockButtonDisabled : '',
@@ -123,8 +125,20 @@ const LobbyScreen = ({
             onClick={isCreateRoomEnabled ? onCreateRoom : undefined}
             disabled={!isCreateRoomEnabled}
             aria-disabled={!isCreateRoomEnabled}
+            aria-label={
+              isCreateRoomComingSoon
+                ? 'Criação de salas indisponível. Recurso em breve.'
+                : !isCreateRoomEnabled
+                  ? 'Criação de salas indisponível.'
+                  : undefined
+            }
           >
             Criar nova sala
+            {isCreateRoomComingSoon && (
+              <span className={styles.comingSoonBadge} aria-hidden="true">
+                Em breve
+              </span>
+            )}
           </button>
           {!isCreateRoomEnabled && (
             <p className={styles.createButtonNotice} role="status">
@@ -205,8 +219,20 @@ const LobbyScreen = ({
                         ? `Desbloquear ${room.price}`
                         : premiumAvailabilityMessage
                     }
+                    aria-label={
+                      isUnlockRoomComingSoon
+                        ? `${room.title} indisponível. Recurso em breve.`
+                        : !isUnlockEnabled
+                          ? `${room.title} indisponível.`
+                          : `Desbloquear sala ${room.title} por ${room.price}`
+                    }
                   >
                     {`Desbloquear ${room.price}`}
+                    {isUnlockRoomComingSoon && (
+                      <span className={styles.comingSoonBadge} aria-hidden="true">
+                        Em breve
+                      </span>
+                    )}
                   </button>
                   {!isUnlockEnabled && (
                     <span className={styles.unlockButtonHint}>{premiumAvailabilityMessage}</span>
