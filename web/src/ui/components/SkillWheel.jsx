@@ -163,6 +163,11 @@ const SkillWheel = ({
     ? 'Toque em “Usar habilidade” ou deslize para trocar.'
     : 'Q: usar habilidade • Shift: dash';
 
+  const currentSkillDescription =
+    typeof currentSkill?.description === 'string' && currentSkill.description.trim().length > 0
+      ? currentSkill.description.trim()
+      : null;
+
   const containerClassName = [
     styles.container,
     isMobileLayout ? styles.mobile : '',
@@ -205,6 +210,10 @@ const SkillWheel = ({
         <span>Custo: {currentSkill ? resolveCostLabel(currentSkill) : '--'}</span>
         <span>{skillCooldownLabel}</span>
       </div>
+
+      {currentSkillDescription ? (
+        <p className={styles.description}>{currentSkillDescription}</p>
+      ) : null}
 
       <div className={styles.progress}>
         <div
@@ -280,17 +289,39 @@ const SkillWheel = ({
 
             const elementLabel = ELEMENT_LABELS[skill.element] ?? skill.element ?? '—';
             const typeLabel = SKILL_TYPE_LABELS[skill.type] ?? skill.type ?? 'Ativa';
+            const descriptionText =
+              typeof skill.description === 'string' && skill.description.trim().length > 0
+                ? skill.description.trim()
+                : null;
+
+            const tooltipParts = [
+              skill.name,
+              `${elementLabel} (${typeLabel})`,
+              cooldownStatusLabel,
+            ];
+            if (descriptionText) {
+              tooltipParts.push(descriptionText);
+            }
+
+            const ariaLabelParts = [
+              `${skill.name}. Elemento: ${elementLabel}.`,
+              `Tipo: ${typeLabel}.`,
+              `${cooldownStatusLabel}.`,
+            ];
+            if (descriptionText) {
+              ariaLabelParts.push(descriptionText);
+            }
 
             return (
               <li
                 key={skill.key}
                 className={itemClass}
-                title={`${skill.name} • ${elementLabel} (${typeLabel}) • ${cooldownStatusLabel}`}
-                aria-label={`${skill.name}. Elemento: ${elementLabel}. Tipo: ${typeLabel}. ${cooldownStatusLabel}.`}
+                title={tooltipParts.join(' • ')}
+                aria-label={ariaLabelParts.join(' ')}
               >
                 <span>{skill.icon}</span>
                 <span className={styles.visuallyHidden}>
-                  {`${skill.name}: ${cooldownStatusLabel}`}
+                  {`${skill.name}: ${cooldownStatusLabel}${descriptionText ? `. ${descriptionText}` : ''}`}
                 </span>
                 {skill.cooldown > 0 && (
                   <div
