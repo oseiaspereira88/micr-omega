@@ -332,9 +332,13 @@ describe("RoomDO progression resource updates", () => {
     const anchor = { x: 160, y: -20 };
     roomAny.findOrganicMatterRespawnPosition = vi.fn().mockReturnValue(anchor);
 
-    const rngValues = [0.3, 0.2, 0.75];
-    roomAny.organicMatterRespawnRng = vi
-      .fn(() => (rngValues.length > 0 ? rngValues.shift()! : 0.5));
+    const groupSequences = [[0.3, 0.2, 0.75]];
+    roomAny.organicMatterRespawnRng = vi.fn(() => 0.4123);
+    roomAny.organicGroupRngFactory = vi.fn(() => {
+      const values = groupSequences.shift() ?? [];
+      let index = 0;
+      return () => (index < values.length ? values[index++]! : 0.5);
+    });
 
     const collectionDiff: SharedWorldStateDiff = {};
     const collectionLog: CombatLogEntry[] = [];
@@ -391,9 +395,13 @@ describe("RoomDO progression resource updates", () => {
     const anchor = { x: -140, y: 40 };
     roomAny.findOrganicMatterRespawnPosition = vi.fn().mockReturnValue(anchor);
 
-    const rngValues = [0.25, 0.6, 0.4];
-    roomAny.organicMatterRespawnRng = vi
-      .fn(() => (rngValues.length > 0 ? rngValues.shift()! : 0.5));
+    const groupSequences = [[0.25, 0.6, 0.4]];
+    roomAny.organicMatterRespawnRng = vi.fn(() => 0.2987);
+    roomAny.organicGroupRngFactory = vi.fn(() => {
+      const values = groupSequences.shift() ?? [];
+      let index = 0;
+      return () => (index < values.length ? values[index++]! : 0.5);
+    });
 
     const collectionDiff: SharedWorldStateDiff = {};
     const collectionLog: CombatLogEntry[] = [];

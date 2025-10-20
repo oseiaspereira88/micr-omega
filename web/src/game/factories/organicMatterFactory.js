@@ -1,9 +1,27 @@
-import { WORLD_SIZE } from '@micr-omega/shared';
+import { WORLD_SIZE, createMulberry32 } from '@micr-omega/shared';
 
 import { organicMatterTypes as defaultOrganicMatterTypes } from '../config/organicMatterTypes';
 import { createOrganicMatter } from '../entities/organicMatter';
 
 const getRandom = (rng = Math.random) => (typeof rng === 'function' ? rng : Math.random);
+
+const resolveRandomSource = (override, fallback) => {
+  if (typeof override === 'number') {
+    return createMulberry32(override);
+  }
+  if (typeof override === 'function') {
+    return getRandom(override);
+  }
+  if (override && typeof override === 'object') {
+    if (typeof override.seed === 'number') {
+      return createMulberry32(override.seed);
+    }
+    if (typeof override.rng === 'function') {
+      return getRandom(override.rng);
+    }
+  }
+  return fallback;
+};
 
 const pickRandom = (items = [], random) => {
   if (!items.length) return undefined;
@@ -122,9 +140,13 @@ export const spawnOrganicMatter = ({
   count = 1,
   worldSize = WORLD_SIZE,
   types = defaultOrganicMatterTypes,
-  rng = Math.random
+  rng = Math.random,
+  randomness = {}
 } = {}) => {
   const random = getRandom(rng);
+  const baseClusterRandom = resolveRandomSource(randomness.cluster, random);
+  const baseAppearanceRandom = resolveRandomSource(randomness.appearance, random);
+  const groupOverrides = Array.isArray(randomness.groups) ? randomness.groups : [];
   const availableTypes = Object.keys(types || {});
   if (!availableTypes.length || count <= 0) return [];
 
@@ -135,7 +157,10 @@ export const spawnOrganicMatter = ({
     const type = types[typeKey];
     if (!type) continue;
 
-    const cluster = generateClusterDescriptor(random);
+    const override = groupOverrides[i] || {};
+    const clusterRandom = resolveRandomSource(override.cluster, baseClusterRandom);
+    const appearanceRandom = resolveRandomSource(override.appearance, baseAppearanceRandom);
+    const cluster = generateClusterDescriptor(clusterRandom);
     const baseX = random() * worldSize;
     const baseY = random() * worldSize;
 
@@ -143,7 +168,7 @@ export const spawnOrganicMatter = ({
       const organic = createOrganicMatter(typeKey, type, {
         x: baseX,
         y: baseY,
-        rng: random,
+        rng: appearanceRandom,
         layout: {
           shape: cluster.shape,
           size: cluster.size,
