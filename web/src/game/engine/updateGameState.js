@@ -233,6 +233,10 @@ const spawnImpactVisuals = ({ helpers, sharedState, x, y, damage, profile }) => 
     return;
   }
 
+  if (!Number.isFinite(damage) || damage <= 0) {
+    return;
+  }
+
   if (typeof helpers?.createEffect === 'function') {
     helpers.createEffect(x, y, profile.effectType, profile.effectColor);
   }
@@ -1921,12 +1925,13 @@ export const updateGameState = ({
       }
 
       const profile = getImpactVisualProfile(attack);
+      const damage = Number.isFinite(attack?.damage) ? attack.damage : 0;
       spawnImpactVisuals({
         helpers,
         sharedState,
         x: position.x,
         y: position.y,
-        damage: attack.damage,
+        damage,
         profile,
       });
     });
