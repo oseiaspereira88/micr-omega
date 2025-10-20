@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import styles from './GameOverScreen.module.css';
 
 const numberFormatter = new Intl.NumberFormat('pt-BR');
@@ -25,6 +25,85 @@ const GameOverScreen = ({ score, level, maxCombo, onRestart, onQuit }) => {
   const titleId = useId();
   const descriptionId = useId();
   const hasQuitAction = Boolean(onQuit);
+  const [viewportState, setViewportState] = useState({
+    isMobile: false,
+    isCompact: false,
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined;
+    }
+
+    const mobileQuery = window.matchMedia('(max-width: 600px)');
+    const compactQuery = window.matchMedia('(max-height: 720px)');
+
+    const updateViewportState = () => {
+      setViewportState((prevState) => {
+        const nextState = {
+          isMobile: mobileQuery.matches,
+          isCompact: compactQuery.matches,
+        };
+
+        if (
+          prevState.isMobile === nextState.isMobile &&
+          prevState.isCompact === nextState.isCompact
+        ) {
+          return prevState;
+        }
+
+        return nextState;
+      });
+    };
+
+    updateViewportState();
+
+    const handleChange = () => {
+      updateViewportState();
+    };
+
+    const attachListener = (query) => {
+      if (typeof query.addEventListener === 'function') {
+        query.addEventListener('change', handleChange);
+        return () => query.removeEventListener('change', handleChange);
+      }
+
+      query.addListener(handleChange);
+      return () => query.removeListener(handleChange);
+    };
+
+    const detachMobile = attachListener(mobileQuery);
+    const detachCompact = attachListener(compactQuery);
+
+    return () => {
+      detachMobile();
+      detachCompact();
+    };
+  }, []);
+
+  const { isMobile, isCompact } = viewportState;
+  const containerClassName = [
+    styles.container,
+    isMobile ? styles.mobile : '',
+    isCompact ? styles.compact : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const stats = [
+    {
+      key: 'level',
+      label: 'Nível Alcançado',
+      value: formattedLevel,
+      icon: '🧬',
+    },
+    {
+      key: 'maxCombo',
+      label: 'Combo Máximo',
+      value: `x${formattedMaxCombo}`,
+      icon: '🔥',
+    },
+  ];
 
   useEffect(() => {
     if (!dialogRef.current) {
@@ -79,7 +158,7 @@ const GameOverScreen = ({ score, level, maxCombo, onRestart, onQuit }) => {
   return (
     <div className={styles.backdrop}>
       <div
-        className={styles.container}
+        className={containerClassName}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -92,12 +171,26 @@ const GameOverScreen = ({ score, level, maxCombo, onRestart, onQuit }) => {
           Game Over
         </h1>
 
-        <div id={descriptionId} className={styles.summaryCard}>
-          <div className={styles.summaryLabel}>Pontuação Final</div>
-          <div className={styles.summaryScore}>{formattedScore}</div>
-          <span className={styles.summaryDetail}>🧬 Nível Alcançado: {formattedLevel}</span>
-          <span className={styles.summaryDetail}>🔥 Combo Máximo: x{formattedMaxCombo}</span>
-        </div>
+        <section id={descriptionId} className={styles.summaryCard}>
+          <header className={styles.summaryHeader}>
+            <p className={styles.summaryLabel}>Pontuação Final</p>
+            <p className={styles.summaryScore}>{formattedScore}</p>
+          </header>
+
+          <ul className={styles.statsList}>
+            {stats.map((stat) => (
+              <li key={stat.key} className={styles.statCard}>
+                <span className={styles.statIcon} aria-hidden="true">
+                  {stat.icon}
+                </span>
+                <div className={styles.statContent}>
+                  <span className={styles.statLabel}>{stat.label}</span>
+                  <span className={styles.statValue}>{stat.value}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <div className={styles.actions}>
           <button type="button" className={styles.restartButton} onClick={onRestart}>
