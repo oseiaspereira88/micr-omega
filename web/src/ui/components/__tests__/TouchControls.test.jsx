@@ -148,6 +148,18 @@ describe('TouchControls', () => {
     expect(dashButton).not.toHaveAttribute('aria-valuenow');
   });
 
+  it('exibe rótulos visíveis em todos os botões de ação', () => {
+    const { container } = render(<TouchControls {...baseProps} />);
+
+    const actionLabels = Array.from(
+      container.querySelectorAll(`.${styles.buttonLabel}`),
+    ).map(node => node.textContent.trim());
+
+    expect(actionLabels).toEqual(
+      expect.arrayContaining(['Ataque', 'Dash', 'Habilidade', 'Trocar', 'Evoluir']),
+    );
+  });
+
   it('exibe o texto de recarga da habilidade e não usa atributos ARIA inválidos no botão', () => {
     const { getByRole, getByText } = render(
       <TouchControls
