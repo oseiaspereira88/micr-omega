@@ -36,7 +36,7 @@
 
 :global(.mobileHud) :local(.container) {
   top: auto;
-  bottom: calc(196px + var(--safe-area-inset-bottom, 0px));
+  bottom: calc(var(--hud-mobile-offset, 196px) + var(--safe-area-inset-bottom, 0px));
   width: min(520px, 92vw);
   border-radius: 16px;
   padding: 12px 18px;
