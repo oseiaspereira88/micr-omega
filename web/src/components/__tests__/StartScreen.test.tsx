@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import StartScreen from "../StartScreen";
+import StartScreen, {
+  START_SCREEN_MOBILE_MEDIA_QUERY,
+} from "../StartScreen";
 import { GameSettingsProvider, useGameSettings } from "../../store/gameSettings";
 import { gameStore, type GameStoreState } from "../../store/gameStore";
 import { MIN_NAME_LENGTH, NAME_PATTERN } from "../../utils/messageTypes";
@@ -51,11 +53,108 @@ const resetStore = () => {
 const renderWithProviders = (ui: React.ReactNode) =>
   render(<GameSettingsProvider>{ui}</GameSettingsProvider>);
 
+type MediaQueryListener = (event: MediaQueryListEvent) => void;
+
+const createMatchMediaMock = () => {
+  const registry = new Map<
+    string,
+    {
+      matches: boolean;
+      listeners: Set<MediaQueryListener>;
+      lists: Set<MediaQueryList & { _update: (matches: boolean) => void }>;
+    }
+  >();
+
+  const ensureEntry = (query: string) => {
+    if (!registry.has(query)) {
+      registry.set(query, {
+        matches: false,
+        listeners: new Set(),
+        lists: new Set(),
+      });
+    }
+
+    return registry.get(query)!;
+  };
+
+  const matchMedia = (query: string): MediaQueryList => {
+    const entry = ensureEntry(query);
+
+    const mediaQueryList = {
+      matches: entry.matches,
+      media: query,
+      onchange: null as MediaQueryList["onchange"],
+      addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => {
+        if (type === "change" && typeof listener === "function") {
+          entry.listeners.add(listener as MediaQueryListener);
+        }
+      },
+      removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => {
+        if (type === "change" && typeof listener === "function") {
+          entry.listeners.delete(listener as MediaQueryListener);
+        }
+      },
+      addListener: (listener: MediaQueryListener) => {
+        entry.listeners.add(listener);
+      },
+      removeListener: (listener: MediaQueryListener) => {
+        entry.listeners.delete(listener);
+      },
+      dispatchEvent: () => false,
+      _update(matches: boolean) {
+        if (mediaQueryList.matches === matches) {
+          return;
+        }
+
+        mediaQueryList.matches = matches;
+        const event = { matches, media: query } as MediaQueryListEvent;
+        mediaQueryList.onchange?.(event);
+      },
+    } as MediaQueryList & { _update: (matches: boolean) => void };
+
+    entry.lists.add(mediaQueryList);
+
+    return mediaQueryList;
+  };
+
+  const setMatches = (query: string, matches: boolean) => {
+    const entry = ensureEntry(query);
+
+    if (entry.matches === matches) {
+      return;
+    }
+
+    entry.matches = matches;
+
+    const event = { matches, media: query } as MediaQueryListEvent;
+
+    entry.lists.forEach((list) => {
+      list._update(matches);
+    });
+
+    entry.listeners.forEach((listener) => listener(event));
+  };
+
+  return { matchMedia, setMatches };
+};
+
+let mediaQueryMock: ReturnType<typeof createMatchMediaMock> | null = null;
+
+const setMobileLayout = (matches: boolean) => {
+  mediaQueryMock?.setMatches(START_SCREEN_MOBILE_MEDIA_QUERY, matches);
+};
+
 describe("StartScreen", () => {
   beforeEach(() => {
     resetStore();
     if (typeof window !== "undefined") {
       window.localStorage.clear();
+      mediaQueryMock = createMatchMediaMock();
+      Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: (query: string) => mediaQueryMock!.matchMedia(query),
+      });
+      setMobileLayout(false);
     }
   });
 
@@ -140,6 +239,36 @@ describe("StartScreen", () => {
     });
 
     fireEvent.keyDown(quitButton, { key: "Tab" });
+
+    await waitFor(() => {
+      expect(nameInput).toHaveFocus();
+    });
+  });
+
+  it("mantém o foco preso no layout móvel", async () => {
+    setMobileLayout(true);
+
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+    const dialog = screen.getByRole("dialog", { name: /micro/i });
+    const nameInput = screen.getByLabelText(/nome do jogador/i);
+
+    await waitFor(() => {
+      expect(dialog).toHaveFocus();
+    });
+
+    fireEvent.keyDown(dialog, { key: "Tab" });
+
+    await waitFor(() => {
+      expect(nameInput).toHaveFocus();
+    });
+
+    const startButton = screen.getByRole("button", { name: /entrar na partida/i });
+    act(() => {
+      startButton.focus();
+    });
+
+    fireEvent.keyDown(startButton, { key: "Tab" });
 
     await waitFor(() => {
       expect(nameInput).toHaveFocus();

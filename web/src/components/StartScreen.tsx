@@ -33,6 +33,8 @@ import {
 } from "../utils/messageTypes";
 import styles from "./StartScreen.module.css";
 
+export const START_SCREEN_MOBILE_MEDIA_QUERY = "(max-width: 640px)";
+
 type StartScreenProps = {
   onStart: (
     payload: {
@@ -65,6 +67,47 @@ const StartScreen = ({
   const effectiveJoinError = joinErrorProp ?? joinError;
 
   const { settings, updateSettings } = useGameSettings();
+
+  const [layout, setLayout] = useState<"desktop" | "mobile">(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return "desktop";
+    }
+
+    return window.matchMedia(START_SCREEN_MOBILE_MEDIA_QUERY).matches
+      ? "mobile"
+      : "desktop";
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+
+    const mediaQueryList = window.matchMedia(START_SCREEN_MOBILE_MEDIA_QUERY);
+    const updateLayout = (matches: boolean) => {
+      setLayout(matches ? "mobile" : "desktop");
+    };
+
+    updateLayout(mediaQueryList.matches);
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      updateLayout(event.matches);
+    };
+
+    if (typeof mediaQueryList.addEventListener === "function") {
+      mediaQueryList.addEventListener("change", handleChange);
+      return () => mediaQueryList.removeEventListener("change", handleChange);
+    }
+
+    if (typeof mediaQueryList.addListener === "function") {
+      mediaQueryList.addListener(handleChange);
+      return () => mediaQueryList.removeListener(handleChange);
+    }
+
+    return undefined;
+  }, []);
+
+  const isMobileLayout = layout === "mobile";
 
   const [inputValue, setInputValue] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -378,10 +421,35 @@ const StartScreen = ({
     [focusFirstFocusable, focusLastFocusable, getFocusableElements]
   );
 
+  const rootClassName = [
+    styles.root,
+    isMobileLayout ? styles.mobileRoot : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const panelClassName = [
+    styles.panel,
+    isMobileLayout ? styles.mobilePanel : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const formBodyClassName = [
+    styles.formBody,
+    isMobileLayout ? styles.mobileFormBody : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const actionsClassName = [
+    styles.actions,
+    isMobileLayout ? styles.mobileActions : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className={styles.root}>
+    <div className={rootClassName}>
       <div
-        className={styles.panel}
+        className={panelClassName}
         ref={panelRef}
         role="dialog"
         aria-modal="true"
@@ -401,12 +469,13 @@ const StartScreen = ({
         </header>
 
         <form className={styles.form} onSubmit={handleSubmit} noValidate>
-          <div className={styles.fieldGroup}>
-            <label className={styles.label} htmlFor="player-name">
-              Nome do jogador
-            </label>
-            <p id={playerNameHelperId} className={styles.helperText}>
-              {`Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos:`}
+          <div className={formBodyClassName}>
+            <div className={styles.fieldGroup}>
+              <label className={styles.label} htmlFor="player-name">
+                Nome do jogador
+              </label>
+              <p id={playerNameHelperId} className={styles.helperText}>
+                {`Use entre ${MIN_NAME_LENGTH} e ${MAX_NAME_LENGTH} caracteres válidos:`}
               {" "}
               letras (incluindo acentos), números, espaços, hífens ou sublinhados.
             </p>
@@ -436,187 +505,226 @@ const StartScreen = ({
                 {errorMessage}
               </p>
             ) : null}
-          </div>
+            </div>
 
-          <div className={`${styles.fieldGroup} ${styles.controls}`}>
-            <span className={styles.label}>Preferências</span>
-            <div className={styles.options}>
-              <div className={styles.optionRow}>
-                <div className={styles.optionContent}>
-                  <span className={styles.optionTitle}>Áudio</span>
-                  <span className={styles.optionDescription}>
-                    Ative os efeitos sonoros durante a partida.
-                  </span>
-                </div>
-                <label
-                  className={styles.toggleWrapper}
-                  htmlFor={audioToggleId}
+            <div className={`${styles.fieldGroup} ${styles.controls}`}>
+              <span className={styles.label}>Preferências</span>
+              <div className={styles.preferenceGroups}>
+                <details
+                  className={styles.preferenceAccordion}
+                  {...(isMobileLayout ? {} : { open: true })}
                 >
-                  <input
-                    type="checkbox"
-                    id={audioToggleId}
-                    name="audio-enabled"
-                    className={styles.toggle}
-                    checked={settings.audioEnabled}
-                    onChange={handleAudioToggle}
-                    disabled={isConnecting}
-                    aria-checked={settings.audioEnabled}
-                    aria-label={audioLabel}
-                  />
-                  <span className={styles.toggleLabelText}>
-                    <span
-                      className={styles.toggleStatus}
-                      aria-live="polite"
-                      aria-atomic="true"
-                    >
-                      {audioLabel}
+                  <summary className={styles.preferenceSummary}>
+                    <span className={styles.preferenceSummaryTitle}>Áudio</span>
+                    <span className={styles.preferenceSummaryDescription}>
+                      Gerencie o feedback sonoro da sessão.
                     </span>
-                  </span>
-                </label>
-              </div>
+                  </summary>
+                  <div className={styles.preferenceContent}>
+                    <div className={styles.optionRow}>
+                      <div className={styles.optionContent}>
+                        <span className={styles.optionTitle}>Efeitos sonoros</span>
+                        <span className={styles.optionDescription}>
+                          Ative os efeitos sonoros durante a partida.
+                        </span>
+                      </div>
+                      <label
+                        className={styles.toggleWrapper}
+                        htmlFor={audioToggleId}
+                      >
+                        <input
+                          type="checkbox"
+                          id={audioToggleId}
+                          name="audio-enabled"
+                          className={styles.toggle}
+                          checked={settings.audioEnabled}
+                          onChange={handleAudioToggle}
+                          disabled={isConnecting}
+                          aria-checked={settings.audioEnabled}
+                          aria-label={audioLabel}
+                        />
+                        <span className={styles.toggleLabelText}>
+                          <span className={styles.toggleStatus} aria-live="polite" aria-atomic="true">
+                            {audioLabel}
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </details>
 
-              <div className={styles.optionRow}>
-                <div className={styles.optionContent}>
-                  <label
-                    className={styles.optionTitle}
-                    htmlFor="visual-density"
-                  >
-                    Densidade visual
-                  </label>
-                  <span className={styles.optionDescription}>
-                    Ajuste a quantidade de partículas e elementos em cena.
-                  </span>
-                </div>
-                <select
-                  id="visual-density"
-                  name="visual-density"
-                  className={`${styles.select} ${styles.input}`.trim()}
-                  value={settings.visualDensity}
-                  onChange={handleDensityChange}
-                  disabled={isConnecting}
-                  aria-label="Densidade visual"
+                <details
+                  className={styles.preferenceAccordion}
+                  {...(isMobileLayout ? {} : { open: true })}
                 >
-                  <option value="low">Baixa</option>
-                  <option value="medium">Média</option>
-                  <option value="high">Alta</option>
-                </select>
-              </div>
-
-              <div className={styles.optionRow}>
-                <div className={styles.optionContent}>
-                  <span className={styles.optionTitle}>Controles touch</span>
-                  <span className={styles.optionDescription}>
-                    Exibir botões virtuais para dispositivos sensíveis ao toque.
-                  </span>
-                </div>
-                <label className={styles.toggleWrapper} htmlFor={touchToggleId}>
-                  <input
-                    type="checkbox"
-                    id={touchToggleId}
-                    name="show-touch-controls"
-                    className={styles.checkbox}
-                    checked={settings.showTouchControls}
-                    onChange={handleTouchToggle}
-                    disabled={isConnecting}
-                    aria-checked={settings.showTouchControls}
-                  />
-                  <span className={styles.toggleLabelText}>
-                    Mostrar controles
-                    {' '}
-                    <span className={styles.toggleStatus} aria-live="polite" aria-atomic="true">
-                      {settings.showTouchControls ? 'ativos' : 'ocultos'}
+                  <summary className={styles.preferenceSummary}>
+                    <span className={styles.preferenceSummaryTitle}>Interface</span>
+                    <span className={styles.preferenceSummaryDescription}>
+                      Ajuste a densidade de elementos exibidos.
                     </span>
-                  </span>
-                </label>
-              </div>
+                  </summary>
+                  <div className={styles.preferenceContent}>
+                    <div className={styles.optionRow}>
+                      <div className={styles.optionContent}>
+                        <label
+                          className={styles.optionTitle}
+                          htmlFor="visual-density"
+                        >
+                          Densidade visual
+                        </label>
+                        <span className={styles.optionDescription}>
+                          Ajuste a quantidade de partículas e elementos em cena.
+                        </span>
+                      </div>
+                      <select
+                        id="visual-density"
+                        name="visual-density"
+                        className={`${styles.select} ${styles.input}`.trim()}
+                        value={settings.visualDensity}
+                        onChange={handleDensityChange}
+                        disabled={isConnecting}
+                        aria-label="Densidade visual"
+                      >
+                        <option value="low">Baixa</option>
+                        <option value="medium">Média</option>
+                        <option value="high">Alta</option>
+                      </select>
+                    </div>
+                  </div>
+                </details>
 
-              <div className={styles.optionRow}>
-                <div className={styles.optionContent}>
-                  <label
-                    className={styles.optionTitle}
-                    htmlFor={touchLayoutSelectId}
-                  >
-                    Layout dos controles touch
-                  </label>
-                  <span
-                    className={styles.optionDescription}
-                    id={touchLayoutDescriptionId}
-                  >
-                    Escolha o lado onde os botões de ação ficam posicionados.
-                  </span>
-                  {!settings.showTouchControls ? (
-                    <span
-                      className={styles.optionDescription}
-                      id={touchLayoutHelperId}
-                    >
-                      Ative os controles touch para escolher o layout.
-                    </span>
-                  ) : null}
-                </div>
-                <select
-                  id={touchLayoutSelectId}
-                  name="touch-layout"
-                  className={`${styles.select} ${styles.input}`.trim()}
-                  value={settings.touchLayout}
-                  onChange={handleTouchLayoutChange}
-                  disabled={isTouchLayoutDisabled}
-                  aria-label="Layout dos controles touch"
-                  aria-disabled={isTouchLayoutDisabled}
-                  aria-describedby={touchLayoutDescribedBy}
+                <details
+                  className={styles.preferenceAccordion}
+                  {...(isMobileLayout ? {} : { open: true })}
                 >
-                  <option value="right">Botões à direita</option>
-                  <option value="left">Botões à esquerda</option>
-                </select>
-              </div>
+                  <summary className={styles.preferenceSummary}>
+                    <span className={styles.preferenceSummaryTitle}>Controles touch</span>
+                    <span className={styles.preferenceSummaryDescription}>
+                      Configure atalhos e layouts para telas sensíveis ao toque.
+                    </span>
+                  </summary>
+                  <div className={styles.preferenceContent}>
+                    <div className={styles.optionRow}>
+                      <div className={styles.optionContent}>
+                        <span className={styles.optionTitle}>Exibir controles</span>
+                        <span className={styles.optionDescription}>
+                          Ative os botões virtuais durante a partida.
+                        </span>
+                      </div>
+                      <label
+                        className={styles.toggleWrapper}
+                        htmlFor={touchToggleId}
+                      >
+                        <input
+                          type="checkbox"
+                          id={touchToggleId}
+                          name="show-touch-controls"
+                          className={styles.checkbox}
+                          checked={settings.showTouchControls}
+                          onChange={handleTouchToggle}
+                          disabled={isConnecting}
+                          aria-checked={settings.showTouchControls}
+                        />
+                        <span className={styles.toggleLabelText}>
+                          Mostrar controles
+                          {" "}
+                          <span className={styles.toggleStatus} aria-live="polite" aria-atomic="true">
+                            {settings.showTouchControls ? "ativos" : "ocultos"}
+                          </span>
+                        </span>
+                      </label>
+                    </div>
 
-              <div className={styles.optionRow}>
-                <div className={styles.optionContent}>
-                  <span className={styles.optionTitle}>Ajustar ao painel lateral</span>
-                  <span
-                    className={styles.optionDescription}
-                    id={touchLayoutAutoSwapDescriptionId}
-                  >
-                    Inverta o lado dos botões automaticamente quando o painel lateral estiver
-                    aberto.
-                  </span>
-                  {!settings.showTouchControls ? (
-                    <span
-                      className={styles.optionDescription}
-                      id={touchLayoutAutoSwapHelperId}
-                    >
-                      Ative os controles touch para configurar este ajuste.
-                    </span>
-                  ) : null}
-                </div>
-                <label
-                  className={styles.toggleWrapper}
-                  htmlFor={touchLayoutAutoSwapToggleId}
-                >
-                  <input
-                    type="checkbox"
-                    id={touchLayoutAutoSwapToggleId}
-                    name="touch-layout-auto-swap"
-                    className={styles.checkbox}
-                    checked={settings.autoSwapTouchLayoutWhenSidebarOpen}
-                    onChange={handleTouchAutoSwapChange}
-                    disabled={isTouchLayoutDisabled}
-                    aria-checked={settings.autoSwapTouchLayoutWhenSidebarOpen}
-                    aria-disabled={isTouchLayoutDisabled}
-                    aria-describedby={touchLayoutAutoSwapDescribedBy}
-                  />
-                  <span className={styles.toggleLabelText}>
-                    Ajuste automático
-                    {" "}
-                    <span className={styles.toggleStatus} aria-live="polite" aria-atomic="true">
-                      {settings.autoSwapTouchLayoutWhenSidebarOpen ? "ativado" : "desativado"}
-                    </span>
-                  </span>
-                </label>
+                    <div className={styles.optionRow}>
+                      <div className={styles.optionContent}>
+                        <label
+                          className={styles.optionTitle}
+                          htmlFor={touchLayoutSelectId}
+                        >
+                          Layout dos controles touch
+                        </label>
+                        <span
+                          className={styles.optionDescription}
+                          id={touchLayoutDescriptionId}
+                        >
+                          Escolha o lado onde os botões de ação ficam posicionados.
+                        </span>
+                        {!settings.showTouchControls ? (
+                          <span
+                            className={styles.optionDescription}
+                            id={touchLayoutHelperId}
+                          >
+                            Ative os controles touch para escolher o layout.
+                          </span>
+                        ) : null}
+                      </div>
+                      <select
+                        id={touchLayoutSelectId}
+                        name="touch-layout"
+                        className={`${styles.select} ${styles.input}`.trim()}
+                        value={settings.touchLayout}
+                        onChange={handleTouchLayoutChange}
+                        disabled={isTouchLayoutDisabled}
+                        aria-label="Layout dos controles touch"
+                        aria-disabled={isTouchLayoutDisabled}
+                        aria-describedby={touchLayoutDescribedBy}
+                      >
+                        <option value="right">Botões à direita</option>
+                        <option value="left">Botões à esquerda</option>
+                      </select>
+                    </div>
+
+                    <div className={styles.optionRow}>
+                      <div className={styles.optionContent}>
+                        <span className={styles.optionTitle}>Ajustar ao painel lateral</span>
+                        <span
+                          className={styles.optionDescription}
+                          id={touchLayoutAutoSwapDescriptionId}
+                        >
+                          Inverta o lado dos botões automaticamente quando o painel lateral estiver
+                          aberto.
+                        </span>
+                        {!settings.showTouchControls ? (
+                          <span
+                            className={styles.optionDescription}
+                            id={touchLayoutAutoSwapHelperId}
+                          >
+                            Ative os controles touch para configurar este ajuste.
+                          </span>
+                        ) : null}
+                      </div>
+                      <label
+                        className={styles.toggleWrapper}
+                        htmlFor={touchLayoutAutoSwapToggleId}
+                      >
+                        <input
+                          type="checkbox"
+                          id={touchLayoutAutoSwapToggleId}
+                          name="touch-layout-auto-swap"
+                          className={styles.checkbox}
+                          checked={settings.autoSwapTouchLayoutWhenSidebarOpen}
+                          onChange={handleTouchAutoSwapChange}
+                          disabled={isTouchLayoutDisabled}
+                          aria-checked={settings.autoSwapTouchLayoutWhenSidebarOpen}
+                          aria-disabled={isTouchLayoutDisabled}
+                          aria-describedby={touchLayoutAutoSwapDescribedBy}
+                        />
+                        <span className={styles.toggleLabelText}>
+                          Ajuste automático
+                          {" "}
+                          <span className={styles.toggleStatus} aria-live="polite" aria-atomic="true">
+                            {settings.autoSwapTouchLayoutWhenSidebarOpen ? "ativado" : "desativado"}
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </details>
               </div>
             </div>
           </div>
 
-          <div className={styles.actions}>
+          <div className={actionsClassName}>
             <button
               type="submit"
               className={styles.primaryButton}
