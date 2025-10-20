@@ -28,6 +28,83 @@ describe("RoomDO", () => {
     } finally {
       await mf.dispose();
     }
+  }, 15000);
+
+  it("routes different room URLs to distinct durable objects", async () => {
+    const mf = await createMiniflare();
+    try {
+      const alphaSocket = await openSocket(mf, "/?room=alpha-room");
+      const alphaJoinedPromise = onceMessage<{
+        type: string;
+        state: { players: { name: string }[] };
+        ranking: { name?: string }[];
+      }>(alphaSocket, "joined");
+
+      alphaSocket.send(JSON.stringify({ type: "join", name: "Alpha" }));
+
+      const alphaJoined = await alphaJoinedPromise;
+      const alphaPlayers = alphaJoined.state.players.map((player) => player.name);
+      expect(alphaPlayers).toContain("Alpha");
+
+      const betaSocket = await openSocket(mf, "/rooms/beta-room");
+      const betaJoinedPromise = onceMessage<{
+        type: string;
+        state: { players: { name: string }[] };
+        ranking: { name?: string }[];
+      }>(betaSocket, "joined");
+
+      betaSocket.send(JSON.stringify({ type: "join", name: "Beta" }));
+
+      const betaJoined = await betaJoinedPromise;
+      const betaPlayers = betaJoined.state.players.map((player) => player.name);
+
+      expect(betaPlayers).toContain("Beta");
+      expect(betaPlayers).not.toContain("Alpha");
+
+      alphaSocket.close();
+      betaSocket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("treats identical room identifiers from query and path as the same room", async () => {
+    const mf = await createMiniflare();
+    try {
+      const querySocket = await openSocket(mf, "/?room=shared-room");
+      const queryJoinedPromise = onceMessage<{
+        type: string;
+        state: { players: { name: string }[] };
+        ranking: { name?: string }[];
+      }>(querySocket, "joined");
+
+      querySocket.send(JSON.stringify({ type: "join", name: "QueryUser" }));
+
+      const queryJoined = await queryJoinedPromise;
+      const queryPlayers = queryJoined.state.players.map((player) => player.name);
+      expect(queryPlayers).toContain("QueryUser");
+
+      const pathSocket = await openSocket(mf, "/rooms/shared-room/ws");
+      const pathJoinedPromise = onceMessage<{
+        type: string;
+        state: { players: { name: string }[] };
+        ranking: { name?: string }[];
+      }>(pathSocket, "joined");
+
+      pathSocket.send(JSON.stringify({ type: "join", name: "PathUser" }));
+
+      const pathJoined = await pathJoinedPromise;
+      const playerNames = pathJoined.state.players.map((player) => player.name);
+
+      expect(playerNames).toEqual(
+        expect.arrayContaining(["QueryUser", "PathUser"])
+      );
+
+      querySocket.close();
+      pathSocket.close();
+    } finally {
+      await mf.dispose();
+    }
   });
 
   it("responds with joined payload when a player joins", async () => {

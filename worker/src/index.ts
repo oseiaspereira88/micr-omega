@@ -1,11 +1,16 @@
 import { RoomDO } from "./RoomDO";
 import { createObservability, type ObservabilityBindings } from "./observability";
+import {
+  ROOM_ID_HEADER,
+  deriveRoomIdFromUrl,
+  parseRoomRoute,
+  routeExpectsWebSocket,
+  normalizePathname,
+} from "./room-routing";
 
 export interface Env extends ObservabilityBindings {
   ROOM: DurableObjectNamespace;
 }
-
-const ROOM_ID = "public-room";
 
 function isWebSocketRequest(request: Request): boolean {
   return request.headers.get("Upgrade")?.toLowerCase() === "websocket";
@@ -16,30 +21,44 @@ export default {
     const observability = createObservability(env, { component: "Worker" });
     const url = new URL(request.url);
 
-    const isSupportedRoute = url.pathname === "/" || url.pathname === "/ws";
+    const route = parseRoomRoute(url.pathname);
+    const expectsWebSocket = routeExpectsWebSocket(route);
+    const derivedRoom = deriveRoomIdFromUrl(url, route);
+    const roomId = derivedRoom.roomId;
 
-    if (isSupportedRoute) {
+    if (route && expectsWebSocket) {
       if (!isWebSocketRequest(request)) {
         observability.log("warn", "ws_upgrade_missing", {
           category: "protocol_error",
           url: url.toString(),
-          path: url.pathname
+          path: url.pathname,
+          roomId,
+          route: route.kind,
+          derivedFrom: derivedRoom.source,
         });
         return new Response("Expected WebSocket", { status: 426 });
       }
 
-      const id = env.ROOM.idFromName(ROOM_ID);
+      const id = env.ROOM.idFromName(roomId);
       const stub = env.ROOM.get(id);
+      const headers = new Headers(request.headers);
+      headers.set(ROOM_ID_HEADER, roomId);
+      const forwardRequest = new Request(request, { headers });
+
       observability.log("info", "ws_upgrade_forwarded", {
-        roomId: ROOM_ID,
-        path: url.pathname
+        roomId,
+        path: url.pathname,
+        route: route.kind,
+        derivedFrom: derivedRoom.source,
       });
       try {
-        return await stub.fetch(request);
+        return await stub.fetch(forwardRequest);
       } catch (error) {
         observability.logError("ws_upgrade_forward_failed", error, {
-          roomId: ROOM_ID,
-          path: url.pathname
+          roomId,
+          path: url.pathname,
+          route: route.kind,
+          derivedFrom: derivedRoom.source,
         });
 
         if (isWebSocketRequest(request)) {
@@ -51,8 +70,9 @@ export default {
             server.close(1011, "internal_error");
           } catch (closeError) {
             observability.logError("ws_upgrade_cleanup_failed", closeError, {
-              roomId: ROOM_ID,
-              path: url.pathname
+              roomId,
+              path: url.pathname,
+              route: route.kind,
             });
           }
 
@@ -63,10 +83,11 @@ export default {
       }
     }
 
+    const normalizedPath = normalizePathname(url.pathname);
     observability.log("warn", "unexpected_route", {
       category: "protocol_error",
       path: url.pathname,
-      expectedPaths: ["/", "/ws"]
+      normalizedPath,
     });
     return new Response("Not Found", { status: 404 });
   }
