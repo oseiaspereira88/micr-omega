@@ -156,6 +156,21 @@ const geneCounterSchema = z.object({
   apex: z.number().finite().nonnegative().default(0),
 });
 
+const evolutionSlotSchema = z.object({
+  used: z.number().finite().nonnegative().default(0),
+  max: z.number().finite().nonnegative().default(0),
+});
+
+const evolutionSlotsSchema = z
+  .object({
+    small: evolutionSlotSchema.optional(),
+    medium: evolutionSlotSchema.optional(),
+    large: evolutionSlotSchema.optional(),
+    macro: evolutionSlotSchema.optional(),
+  })
+  .partial()
+  .optional();
+
 export const sharedPlayerStateSchema = z.object({
   id: playerIdSchema,
   name: playerNameSchema,
@@ -183,7 +198,8 @@ export const sharedPlayerStateSchema = z.object({
   skillCooldowns: z
     .record(z.string().trim().min(1).max(64), z.number().finite().nonnegative())
     .optional()
-    .default({})
+    .default({}),
+  evolutionSlots: evolutionSlotsSchema,
 });
 
 export const microorganismSchema = z.object({

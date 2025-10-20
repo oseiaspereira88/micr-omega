@@ -4,6 +4,7 @@ import { getOrganicMatterAttributePreset } from '../config/organicMatterTypes';
 import { archetypePalettes } from '../config/archetypePalettes';
 import { HOSTILITY_MATRIX } from '../config/ecosystem';
 import { resolveNpcCombat } from '../systems/ai';
+import { createResourceProfile } from '../state/resourceProfile';
 import {
   AFFINITY_LABELS,
   AFFINITY_TYPES,
@@ -121,6 +122,8 @@ const DEFAULT_RESOURCE_STUB = {
   total: 0,
   level: 1,
 };
+
+const DEFAULT_EVOLUTION_SLOTS = createResourceProfile().evolutionSlots;
 
 const DAMAGE_VISUAL_VARIANTS = {
   normal: {
@@ -507,7 +510,18 @@ const mergeGeneCounters = (...sources) =>
 
 const mergeEvolutionSlots = (...sources) => {
   const keys = ['small', 'medium', 'large', 'macro'];
-  const result = Object.fromEntries(keys.map((key) => [key, { used: 0, max: 0 }]));
+  const result = Object.fromEntries(
+    keys.map((key) => {
+      const fallback = DEFAULT_EVOLUTION_SLOTS?.[key] || { used: 0, max: 0 };
+      return [
+        key,
+        {
+          used: Number.isFinite(fallback.used) ? fallback.used : 0,
+          max: Number.isFinite(fallback.max) ? fallback.max : 0,
+        },
+      ];
+    })
+  );
   sources.forEach((source) => {
     if (!source || typeof source !== 'object') return;
     keys.forEach((key) => {
@@ -1083,6 +1097,11 @@ const createRenderPlayer = (sharedPlayer, appearance) => {
   );
   const geneFragments = mergeGeneCounters(sharedPlayer.geneFragments);
   const stableGenes = mergeGeneCounters(sharedPlayer.stableGenes);
+  const hasServerEvolutionSlots =
+    sharedPlayer.evolutionSlots && typeof sharedPlayer.evolutionSlots === 'object';
+  const evolutionSlots = hasServerEvolutionSlots
+    ? mergeEvolutionSlots(sharedPlayer.evolutionSlots)
+    : undefined;
   const dashCharge = Number.isFinite(sharedPlayer.dashCharge)
     ? Math.max(0, Math.min(100, sharedPlayer.dashCharge))
     : 0;
@@ -1112,12 +1131,14 @@ const createRenderPlayer = (sharedPlayer, appearance) => {
     energy,
     geneFragments,
     stableGenes,
+    evolutionSlots,
     resources: {
       energy,
       xp: xpResource,
       geneticMaterial: geneticMaterialResource,
       geneFragments,
       stableGenes,
+      ...(evolutionSlots ? { evolutionSlots } : {}),
       dropPity: mergeNumericRecord({ fragment: 0, stableGene: 0 }),
       dashCharge,
     },
@@ -1244,6 +1265,18 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
       { fragment: 0, stableGene: 0 },
       previousResources.dropPity
     );
+    const hasServerEvolutionSlots =
+      player.evolutionSlots && typeof player.evolutionSlots === 'object';
+    const previousEvolutionSlots =
+      (previousResources.evolutionSlots && typeof previousResources.evolutionSlots === 'object'
+        ? previousResources.evolutionSlots
+        : undefined) ??
+      (existing.evolutionSlots && typeof existing.evolutionSlots === 'object'
+        ? existing.evolutionSlots
+        : undefined);
+    const evolutionSlotState = hasServerEvolutionSlots
+      ? mergeEvolutionSlots(previousEvolutionSlots, player.evolutionSlots)
+      : previousEvolutionSlots;
     const dashChargeValue = Number.isFinite(player.dashCharge)
       ? Math.max(0, Math.min(100, player.dashCharge))
       : Math.max(0, Math.min(100, previousResources.dashCharge ?? existing.dashCharge ?? 0));
@@ -1251,7 +1284,7 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
       ? Math.max(0, player.dashCooldownMs)
       : Math.max(0, existing.dashCooldownMs ?? 0);
 
-    existing.resources = {
+    const nextResources = {
       ...previousResources,
       energy: energyValue,
       xp: xpResource,
@@ -1261,9 +1294,20 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
       dropPity: dropPityResource,
       dashCharge: dashChargeValue,
     };
+    if (evolutionSlotState) {
+      nextResources.evolutionSlots = evolutionSlotState;
+    } else {
+      delete nextResources.evolutionSlots;
+    }
+    existing.resources = nextResources;
     existing.energy = energyValue;
     existing.geneFragments = geneFragmentsResource;
     existing.stableGenes = stableGenesResource;
+    if (evolutionSlotState) {
+      existing.evolutionSlots = evolutionSlotState;
+    } else {
+      delete existing.evolutionSlots;
+    }
     existing.dashCharge = dashChargeValue;
     existing.dashCooldownMs = dashCooldownValue;
 
@@ -1486,10 +1530,12 @@ const buildHudSnapshot = (
   playerList,
   notifications,
   camera,
-  previousHud = {}
+  previousHud = {},
+  options = {}
 ) => {
   const safePreviousHud = previousHud ?? {};
   const resourceBag = localPlayer?.resources || {};
+  const fallbackEvolutionSlots = options?.fallbackEvolutionSlots;
 
   const sanitizeXpRecord = (record = {}) => ({
     current: safeNumber(record.current, 0),
@@ -1540,6 +1586,8 @@ const buildHudSnapshot = (
   };
 
   const evolutionSlots = mergeEvolutionSlots(
+    fallbackEvolutionSlots,
+    safePreviousHud.resourceBag?.evolutionSlots,
     safePreviousHud.evolutionSlots,
     resourceBag.evolutionSlots,
     localPlayer?.evolutionSlots
@@ -2087,7 +2135,11 @@ export const updateGameState = ({
     renderState.playerList,
     renderState.notifications,
     renderState.camera,
-    renderState.hudSnapshot
+    renderState.hudSnapshot,
+    {
+      fallbackEvolutionSlots:
+        renderState.resources?.evolutionSlots ?? renderState.evolutionSlots ?? DEFAULT_EVOLUTION_SLOTS,
+    }
   );
   if (localRenderPlayer) {
     const localHealth = Number.isFinite(localRenderPlayer.health?.current)

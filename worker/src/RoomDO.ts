@@ -130,6 +130,15 @@ const MICRO_ZIG_INTERVAL_MS = 1_200;
 const MICRO_STEERING_SAMPLE_DISTANCE = 360;
 const MICRO_STEERING_ANGLES = [Math.PI / 6, Math.PI / 4, Math.PI / 3] as const;
 
+const SMALL_EVOLUTION_SLOT_BASE = 2;
+const SMALL_SLOT_LEVEL_DIVISOR = 3;
+const MEDIUM_SLOT_INTERVAL = 2;
+const LARGE_SLOT_INTERVAL = 5;
+const MIN_XP_REQUIREMENT = 60;
+const BASE_XP_REQUIREMENT = 120;
+const XP_REQUIREMENT_GROWTH = 45;
+const MAX_LEVEL_ITERATIONS = 200;
+
 const ORGANIC_MATTER_CELL_SIZE = PLAYER_COLLECT_RADIUS;
 const ORGANIC_RESPAWN_DELAY_RANGE_MS = { min: 1_200, max: 3_600 } as const;
 const ORGANIC_CLUSTER_PATTERNS = [
@@ -750,6 +759,69 @@ const cloneEvolutionState = (state?: PlayerEvolutionState | null): PlayerEvoluti
       speed: { ...state.modifiers.speed },
       range: { ...state.modifiers.range },
     },
+  };
+};
+
+const getXpRequirementForLevel = (level: number): number => {
+  return Math.max(MIN_XP_REQUIREMENT, BASE_XP_REQUIREMENT + (Math.max(1, level) - 1) * XP_REQUIREMENT_GROWTH);
+};
+
+const getPlayerLevelFromXp = (xp: number): number => {
+  if (!Number.isFinite(xp)) {
+    return 1;
+  }
+
+  let remaining = Math.max(0, Math.trunc(xp));
+  let level = 1;
+  let requirement = getXpRequirementForLevel(level);
+  let iterations = 0;
+
+  while (remaining >= requirement && iterations < MAX_LEVEL_ITERATIONS) {
+    remaining -= requirement;
+    level += 1;
+    requirement = getXpRequirementForLevel(level);
+    iterations += 1;
+  }
+
+  return Math.max(1, level);
+};
+
+const sumEvolutionHistory = (bucket: Record<string, number> | undefined): number => {
+  if (!bucket) {
+    return 0;
+  }
+
+  let total = 0;
+  for (const value of Object.values(bucket)) {
+    if (Number.isFinite(value)) {
+      total += Math.max(0, Math.trunc(value));
+    }
+  }
+  return total;
+};
+
+const computeEvolutionSlotsForPlayer = (player: PlayerInternal) => {
+  const level = getPlayerLevelFromXp(player.xp);
+  const smallMax = SMALL_EVOLUTION_SLOT_BASE + Math.floor(level / SMALL_SLOT_LEVEL_DIVISOR);
+  const mediumMax = Math.floor(level / MEDIUM_SLOT_INTERVAL);
+  const largeMax = Math.floor(level / LARGE_SLOT_INTERVAL);
+  const macroMax = largeMax;
+
+  const history = player.evolutionState?.history ?? createEvolutionHistoryState(null);
+
+  const buildSlot = (bucket: Record<string, number> | undefined, max: number) => {
+    const used = sumEvolutionHistory(bucket);
+    return {
+      used,
+      max: Math.max(max, used),
+    };
+  };
+
+  return {
+    small: buildSlot(history.small, smallMax),
+    medium: buildSlot(history.medium, mediumMax),
+    large: buildSlot(history.large, largeMax),
+    macro: buildSlot(history.macro, macroMax),
   };
 };
 
@@ -5806,6 +5878,7 @@ export class RoomDO {
       skillList: skillState.available.slice(),
       currentSkill: skillState.current ?? null,
       skillCooldowns: { ...skillState.cooldowns },
+      evolutionSlots: computeEvolutionSlotsForPlayer(player),
     };
   }
 
