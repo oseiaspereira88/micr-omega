@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
-import { RoomDO, WORLD_TICK_INTERVAL_MS } from "../src/RoomDO";
+import {
+  CONTACT_BUFFER,
+  MICRO_COLLISION_RADIUS,
+  PLAYER_COLLISION_RADIUS,
+  RoomDO,
+  WORLD_TICK_INTERVAL_MS,
+} from "../src/RoomDO";
 import { getDefaultSkillList } from "../src/skills";
 import type { Env } from "../src";
 import type {
@@ -358,6 +364,62 @@ describe("RoomDO distance-sensitive behaviour", () => {
     expect(updatedPlayers.has(playerFar.id)).toBe(false);
     expect(roomAny.microorganismBehavior.get(microorganism.id)?.lastAttackAt).toBe(now);
     expect(combatLog.some((entry) => entry.targetId === playerNear.id)).toBe(true);
+  });
+
+  it("only applies contact damage once collision radii overlap", async () => {
+    const { roomAny } = await createRoom();
+
+    const player: TestPlayer = createTestPlayer("target", {
+      position: { x: 0, y: 0 },
+    });
+    roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    const attackRange =
+      PLAYER_COLLISION_RADIUS + MICRO_COLLISION_RADIUS + CONTACT_BUFFER;
+    const farDistance = attackRange + 1;
+
+    const microorganism = createTestMicroorganism("hostile-contact", {
+      position: { x: farDistance, y: 0 },
+      movementVector: { x: 0, y: 0 },
+      orientation: { angle: 0 },
+      health: { current: 20, max: 20 },
+      aggression: "hostile",
+      attributes: { speed: 0, damage: 5, resilience: 0 },
+    });
+
+    roomAny.microorganisms.clear();
+    roomAny.microorganisms.set(microorganism.id, microorganism);
+    roomAny.world.microorganisms = [microorganism];
+    roomAny.microorganismBehavior.clear();
+
+    let worldDiff: SharedWorldStateDiff = {};
+    let combatLog: CombatLogEntry[] = [];
+    let updatedPlayers = new Map<string, TestPlayer>();
+    const now = Date.now();
+
+    roomAny.updateMicroorganismsDuringTick(0, now, worldDiff, combatLog, updatedPlayers);
+
+    expect(player.health.current).toBe(player.health.max);
+    expect(updatedPlayers.has(player.id)).toBe(false);
+    expect(combatLog.some((entry) => entry.targetId === player.id)).toBe(false);
+
+    const closeDistance = attackRange - 1;
+    microorganism.position = { x: closeDistance, y: 0 };
+    roomAny.microorganisms.set(microorganism.id, microorganism);
+    roomAny.world.microorganisms = [microorganism];
+
+    worldDiff = {};
+    combatLog = [];
+    updatedPlayers = new Map<string, TestPlayer>();
+    const later = now + 2_000;
+
+    roomAny.updateMicroorganismsDuringTick(0, later, worldDiff, combatLog, updatedPlayers);
+
+    expect(player.health.current).toBeLessThan(player.health.max);
+    expect(updatedPlayers.has(player.id)).toBe(true);
+    expect(combatLog.some((entry) => entry.targetId === player.id)).toBe(true);
+    expect(roomAny.microorganismBehavior.get(microorganism.id)?.lastAttackAt).toBe(later);
   });
 
   it("does not let hostile microorganisms attack disconnected players", async () => {
