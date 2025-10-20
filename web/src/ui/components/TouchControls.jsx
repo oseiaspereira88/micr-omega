@@ -489,7 +489,9 @@ const TouchControls = ({
           aria-describedby={skillStatusId}
           onTouchStart={event => {
             event.preventDefault();
-            onUseSkill?.();
+            if (!skillDisabled) {
+              onUseSkill?.();
+            }
           }}
           onTouchEnd={handleSkillTouchEnd}
           onTouchCancel={handleSkillTouchEnd}
