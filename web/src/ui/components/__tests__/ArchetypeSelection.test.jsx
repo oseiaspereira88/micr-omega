@@ -98,4 +98,17 @@ describe('ArchetypeSelection', () => {
 
     expect(overlay?.className).toContain('mobileOverlay');
   });
+
+  it('exibe os nomes localizados das habilidades iniciais', () => {
+    render(
+      <ArchetypeSelection
+        selection={{ pending: true, options: ['virus'] }}
+        selected="virus"
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Pulso Osmótico')).toBeInTheDocument();
+    expect(screen.getByText('Lança Corrosiva')).toBeInTheDocument();
+  });
 });

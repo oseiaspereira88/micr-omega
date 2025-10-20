@@ -179,6 +179,18 @@
   padding: 4px 10px;
   font-size: 0.75rem;
   color: rgba(210, 235, 255, 0.9);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+.skillIcon {
+  font-size: 0.95rem;
+}
+
+.skillName {
+  white-space: nowrap;
 }
 
 .mobileOverlay .dialog {
