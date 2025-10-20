@@ -1,5 +1,6 @@
 import { createMulberry32 } from "@micr-omega/shared";
 import type { Env } from "./index";
+import { createHealthResponse, NO_STORE_HEADERS } from "./health";
 import { createObservability, serializeError, type Observability } from "./observability";
 import {
   ORGANIC_COLLECTION_ENERGY_MULTIPLIER,
@@ -1556,11 +1557,15 @@ export class RoomDO {
     const url = new URL(request.url);
     const pathname = url.pathname === "" ? "/" : url.pathname;
     const isSupportedRoute = pathname === "/" || pathname === "/ws";
+    const baseHeaders = NO_STORE_HEADERS;
 
-    const baseHeaders = {
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-    } as const;
+    if (pathname === "/health") {
+      if (request.method !== "GET") {
+        return new Response("Method Not Allowed", { status: 405, headers: baseHeaders });
+      }
+
+      return createHealthResponse();
+    }
 
     if (!isSupportedRoute) {
       return new Response("Not Found", { status: 404, headers: baseHeaders });

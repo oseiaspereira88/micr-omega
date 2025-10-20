@@ -1,4 +1,5 @@
 import { RoomDO } from "./RoomDO";
+import { createHealthResponse, NO_STORE_HEADERS } from "./health";
 import { createObservability, type ObservabilityBindings } from "./observability";
 
 export interface Env extends ObservabilityBindings {
@@ -16,7 +17,18 @@ export default {
     const observability = createObservability(env, { component: "Worker" });
     const url = new URL(request.url);
 
-    const isSupportedRoute = url.pathname === "/" || url.pathname === "/ws";
+    const pathname = url.pathname === "" ? "/" : url.pathname;
+
+    if (pathname === "/health") {
+      if (request.method !== "GET") {
+        return new Response("Method Not Allowed", { status: 405, headers: NO_STORE_HEADERS });
+      }
+
+      observability.log("debug", "health_check", { path: pathname });
+      return createHealthResponse();
+    }
+
+    const isSupportedRoute = pathname === "/" || pathname === "/ws";
 
     if (isSupportedRoute) {
       if (!isWebSocketRequest(request)) {
@@ -65,10 +77,10 @@ export default {
 
     observability.log("warn", "unexpected_route", {
       category: "protocol_error",
-      path: url.pathname,
-      expectedPaths: ["/", "/ws"]
+      path: pathname,
+      expectedPaths: ["/", "/ws", "/health"]
     });
-    return new Response("Not Found", { status: 404 });
+    return new Response("Not Found", { status: 404, headers: NO_STORE_HEADERS });
   }
 };
 
