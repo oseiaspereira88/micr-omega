@@ -1,14 +1,25 @@
 import { describe, expect, it } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
-import { MAX_PLAYERS, RoomDO } from "../src/RoomDO";
+import { RoomDO } from "../src/RoomDO";
 import type { Env } from "../src";
+import {
+  DEFAULT_RUNTIME_CONFIG,
+  createRuntimeConfigBindings,
+  type RuntimeConfig,
+} from "../src/config/runtime";
 import { MockDurableObjectState } from "./utils/mock-state";
 import { createMockSocket, type MockSocketCloseRecord } from "./utils/mock-socket";
 
-async function createRoom() {
+const DEFAULT_MAX_PLAYERS = DEFAULT_RUNTIME_CONFIG.maxPlayers;
+
+async function createRoom(configOverrides?: Partial<RuntimeConfig>) {
   const mockState = new MockDurableObjectState();
-  const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+  const envOverrides = configOverrides ? createRuntimeConfigBindings(configOverrides) : {};
+  const room = new RoomDO(
+    mockState as unknown as DurableObjectState,
+    envOverrides as Env
+  );
   const roomAny = room as any;
   await roomAny.ready;
   return { roomAny } as const;
@@ -23,13 +34,13 @@ describe("RoomDO capacity limits", () => {
     try {
       const { roomAny } = await createRoom();
 
-      for (let i = 0; i < MAX_PLAYERS; i++) {
+      for (let i = 0; i < DEFAULT_MAX_PLAYERS; i++) {
         const socket = createMockSocket();
         const playerId = await roomAny.handleJoin(socket, { type: "join", name: `Player ${i}` });
         expect(typeof playerId === "string").toBe(true);
       }
 
-      expect(roomAny.getConnectedPlayersCount()).toBe(MAX_PLAYERS);
+      expect(roomAny.getConnectedPlayersCount()).toBe(DEFAULT_MAX_PLAYERS);
 
       const sent: string[] = [];
       const closed: MockSocketCloseRecord[] = [];
@@ -43,7 +54,7 @@ describe("RoomDO capacity limits", () => {
       expect(sent).toHaveLength(1);
       expect(JSON.parse(sent[0]!)).toEqual({ type: "error", reason: "room_full" });
       expect(closed).toContainEqual({ code: 1008, reason: "room_full" });
-      expect(roomAny.getConnectedPlayersCount()).toBe(MAX_PLAYERS);
+      expect(roomAny.getConnectedPlayersCount()).toBe(DEFAULT_MAX_PLAYERS);
     } finally {
       (globalThis as any).WebSocket = originalWebSocket;
     }
@@ -59,7 +70,7 @@ describe("RoomDO capacity limits", () => {
       const sockets: WebSocket[] = [];
       const playerIds: string[] = [];
 
-      for (let i = 0; i < MAX_PLAYERS; i++) {
+      for (let i = 0; i < DEFAULT_MAX_PLAYERS; i++) {
         const socket = createMockSocket();
         const playerId = await roomAny.handleJoin(socket, { type: "join", name: `Player ${i}` });
         sockets.push(socket);
@@ -78,7 +89,7 @@ describe("RoomDO capacity limits", () => {
 
       await roomAny.handleDisconnect(sockets[0], playerIds[0]);
 
-      expect(roomAny.getConnectedPlayersCount()).toBe(MAX_PLAYERS - 1);
+      expect(roomAny.getConnectedPlayersCount()).toBe(DEFAULT_MAX_PLAYERS - 1);
 
       const replacementSocket = createMockSocket();
       const replacementId = await roomAny.handleJoin(replacementSocket, {
@@ -87,7 +98,7 @@ describe("RoomDO capacity limits", () => {
       });
 
       expect(typeof replacementId === "string").toBe(true);
-      expect(roomAny.getConnectedPlayersCount()).toBe(MAX_PLAYERS);
+      expect(roomAny.getConnectedPlayersCount()).toBe(DEFAULT_MAX_PLAYERS);
     } finally {
       (globalThis as any).WebSocket = originalWebSocket;
     }
@@ -109,6 +120,40 @@ describe("RoomDO capacity limits", () => {
       expect(roomAny.getConnectedPlayersCount()).toBe(0);
       expect(roomAny.players.size).toBe(0);
       expect(roomAny.nameToPlayerId.size).toBe(0);
+    } finally {
+      (globalThis as any).WebSocket = originalWebSocket;
+    }
+  });
+
+  it("applies custom capacity from runtime config overrides", async () => {
+    const originalWebSocket = (globalThis as any).WebSocket;
+    const websocketMock = { OPEN: 1, CLOSING: 2, CLOSED: 3 };
+    (globalThis as any).WebSocket = websocketMock;
+
+    const customMaxPlayers = 5;
+
+    try {
+      const { roomAny } = await createRoom({ maxPlayers: customMaxPlayers });
+
+      for (let i = 0; i < customMaxPlayers; i++) {
+        const socket = createMockSocket();
+        const playerId = await roomAny.handleJoin(socket, { type: "join", name: `Player ${i}` });
+        expect(typeof playerId === "string").toBe(true);
+      }
+
+      expect(roomAny.getConnectedPlayersCount()).toBe(customMaxPlayers);
+
+      const overflowSent: string[] = [];
+      const overflowClosed: MockSocketCloseRecord[] = [];
+      const overflowSocket = createMockSocket(overflowSent, overflowClosed);
+      const overflowResult = await roomAny.handleJoin(overflowSocket, {
+        type: "join",
+        name: "Overflow",
+      });
+
+      expect(overflowResult).toBeNull();
+      expect(overflowClosed).toContainEqual({ code: 1008, reason: "room_full" });
+      expect(roomAny.getConnectedPlayersCount()).toBe(customMaxPlayers);
     } finally {
       (globalThis as any).WebSocket = originalWebSocket;
     }
