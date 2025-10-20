@@ -395,9 +395,6 @@ const getRelativeLuminance = (hex) => {
   return 0.2126 * linearR + 0.7152 * linearG + 0.0722 * linearB;
 };
 
-const getContrastingTextColor = (hex) =>
-  getRelativeLuminance(hex) > 0.48 ? '#0c111e' : '#f8fbff';
-
 const createMicroorganismPalette = (baseColor) => {
   const color = normalizeHexColor(baseColor ?? DEFAULT_SPECIES_COLOR);
   const coreColor = adjustHexColor(color, 24);
@@ -408,9 +405,11 @@ const createMicroorganismPalette = (baseColor) => {
   const glowColor = adjustHexColor(color, 72);
   const hpFillColor = adjustHexColor(color, 16);
   const hpBorderColor = adjustHexColor(color, -52);
-  const labelColor = getContrastingTextColor(coreColor);
-  const labelBackground =
-    getRelativeLuminance(color) > 0.42 ? 'rgba(12, 17, 29, 0.82)' : 'rgba(245, 249, 255, 0.88)';
+  const labelBackgroundIsDark = getRelativeLuminance(color) > 0.42;
+  const labelBackground = labelBackgroundIsDark
+    ? 'rgba(12, 17, 29, 0.82)'
+    : 'rgba(245, 249, 255, 0.88)';
+  const labelColor = labelBackgroundIsDark ? '#f8fbff' : '#0c111e';
 
   const palette = {
     base: color,

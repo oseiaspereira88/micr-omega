@@ -843,6 +843,67 @@ describe('updateGameState', () => {
     expect(renderState.worldView.roomObjects[0]).toMatchObject({ id: 'console-1', type: 'control' });
   });
 
+  it('ensures microorganism labels use contrasting text for light and dark palettes', () => {
+    const renderState = createRenderState();
+    const sharedState = createSharedState({
+      world: {
+        microorganisms: [
+          {
+            id: 'light-bg',
+            kind: 'microorganism',
+            species: 'custom-dark',
+            name: 'Umbral Cell',
+            color: '#121722',
+            level: 4,
+            position: { x: 12, y: -18 },
+            movementVector: { x: 0, y: 0 },
+            orientation: { angle: 0 },
+            health: { current: 6, max: 6 },
+            aggression: 'neutral',
+            attributes: {},
+          },
+          {
+            id: 'dark-bg',
+            kind: 'microorganism',
+            species: 'custom-light',
+            name: 'Auroral Cell',
+            color: '#f0f8ff',
+            level: 5,
+            position: { x: -24, y: 36 },
+            movementVector: { x: 0, y: 0 },
+            orientation: { angle: 0 },
+            health: { current: 8, max: 8 },
+            aggression: 'passive',
+            attributes: {},
+          },
+        ],
+        organicMatter: [],
+        obstacles: [],
+        roomObjects: [],
+      },
+    });
+
+    updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    const microorganisms = new Map(
+      renderState.worldView.microorganisms.map((micro) => [micro.id, micro])
+    );
+
+    const lightBackgroundMicro = microorganisms.get('light-bg');
+    expect(lightBackgroundMicro.labelBackground).toBe('rgba(245, 249, 255, 0.88)');
+    expect(lightBackgroundMicro.labelColor).toBe('#0c111e');
+
+    const darkBackgroundMicro = microorganisms.get('dark-bg');
+    expect(darkBackgroundMicro.labelBackground).toBe('rgba(12, 17, 29, 0.82)');
+    expect(darkBackgroundMicro.labelColor).toBe('#f8fbff');
+  });
+
   it('marks the HUD as game over when the local player health reaches zero', () => {
     const renderState = createRenderState();
     const sharedState = createSharedState({
