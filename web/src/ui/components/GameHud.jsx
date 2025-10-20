@@ -19,6 +19,7 @@ import { shallowEqual, useGameStore } from '../../store/gameStore';
 import { useGameSettings } from '../../store/gameSettings';
 
 const MOBILE_HUD_QUERY = '(max-width: 900px)';
+const SIDEBAR_TRANSITION_DURATION_MS = 350;
 
 const COMBAT_STATE_LABELS = {
   idle: 'Ocioso',
@@ -93,6 +94,7 @@ const GameHud = ({
     return window.matchMedia(MOBILE_HUD_QUERY).matches;
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarBackdropVisible, setIsSidebarBackdropVisible] = useState(false);
   const sidebarRef = useRef(null);
   const toggleButtonRef = useRef(null);
   const hudRootRef = useRef(null);
@@ -137,6 +139,10 @@ const GameHud = ({
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
+  }, []);
+
+  const handleCloseSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
   }, []);
 
   useEffect(() => {
@@ -454,6 +460,26 @@ const GameHud = ({
     .join(' ');
 
   useEffect(() => {
+    if (!isMobileHud) {
+      setIsSidebarBackdropVisible(false);
+      return undefined;
+    }
+
+    if (isSidebarOpen) {
+      setIsSidebarBackdropVisible(true);
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setIsSidebarBackdropVisible(false);
+    }, SIDEBAR_TRANSITION_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [isMobileHud, isSidebarOpen]);
+
+  useEffect(() => {
     const hudRoot = hudRootRef.current;
     const hudContent = hudContentRef.current;
 
@@ -566,9 +592,22 @@ const GameHud = ({
           ) : null}
         </div>
 
+      {isSidebarBackdropVisible ? (
         <div
-          id={sidebarId}
-          className={`${sidebarClassName} ${hudDisabled ? styles.hudElementDisabled : ''}`}
+          className={`${styles.sidebarBackdrop} ${
+            isMobileHud && isSidebarOpen
+              ? styles.sidebarBackdropOpen
+              : styles.sidebarBackdropClosing
+          }`}
+          aria-hidden="true"
+          role="presentation"
+          onClick={handleCloseSidebar}
+        />
+      ) : null}
+
+      <div
+        id={sidebarId}
+        className={`${sidebarClassName} ${hudDisabled ? styles.hudElementDisabled : ''}`}
           role="complementary"
           aria-label="Painel lateral do jogo"
           aria-hidden={sidebarAriaHidden}

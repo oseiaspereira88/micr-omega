@@ -198,6 +198,27 @@
   pointer-events: auto;
 }
 
+.sidebarBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 10, 22, 0.65);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+  z-index: 40;
+}
+
+.sidebarBackdropOpen {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebarBackdropClosing {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .sidebarOpen {
   opacity: 1;
   transform: translateY(0);
