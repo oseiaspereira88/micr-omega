@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import GameHud from '../../ui/components/GameHud';
 import GameOverScreen from '../../ui/components/GameOverScreen';
 import ArchetypeSelection from '../../ui/components/ArchetypeSelection';
@@ -42,6 +42,39 @@ const TIER_METADATA = Object.freeze({
 
 const EVOLUTION_TIER_KEYS = Object.freeze(['small', 'medium', 'large', 'macro']);
 const EVOLUTION_OPTIONS_PANEL_ID = 'evolution-options-panel';
+
+const createEmptyJourneyStats = () => ({
+  elapsedMs: 0,
+  xpTotal: 0,
+  mgTotal: 0,
+  evolutionsTotal: 0,
+  evolutionsByTier: {
+    small: 0,
+    medium: 0,
+    large: 0,
+    macro: 0,
+  },
+});
+
+const summarizeEvolutionSlots = (slots = {}) => {
+  const summary = {
+    total: 0,
+    byTier: {
+      small: 0,
+      medium: 0,
+      large: 0,
+      macro: 0,
+    },
+  };
+
+  EVOLUTION_TIER_KEYS.forEach((tier) => {
+    const used = Number.isFinite(slots?.[tier]?.used) ? Math.max(0, slots[tier].used) : 0;
+    summary.byTier[tier] = used;
+    summary.total += used;
+  });
+
+  return summary;
+};
 
 export const formatEvolutionCost = (cost = {}) => {
   const resolvedCost = typeof cost === 'object' && cost !== null ? cost : {};
@@ -95,6 +128,10 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
   const canvasRef = useRef(null);
   const gameState = useGameState();
   const dispatch = useGameDispatch();
+  const [journeyStats, setJourneyStats] = useState(() => createEmptyJourneyStats());
+
+  const runStartRef = useRef(null);
+  const lastGameOverRef = useRef(Boolean(gameState.gameOver));
 
   const {
     joystick,
@@ -156,6 +193,62 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
     maxCombo,
     activePowerUps,
   } = gameState;
+
+  useEffect(() => {
+    const now = Date.now();
+    const xpTotal = Number.isFinite(xp?.total) ? Math.max(0, xp.total) : 0;
+    const mgTotal = Number.isFinite(geneticMaterial?.total) ? Math.max(0, geneticMaterial.total) : 0;
+    const evolutionSummary = summarizeEvolutionSlots(evolutionSlots);
+
+    setJourneyStats((previous) => {
+      let start = runStartRef.current;
+      if (!gameState.gameOver) {
+        if (lastGameOverRef.current || start === null) {
+          start = now;
+          runStartRef.current = start;
+        }
+
+        const elapsedMs = start ? Math.max(0, now - start) : 0;
+
+        return {
+          elapsedMs,
+          xpTotal,
+          mgTotal,
+          evolutionsTotal: evolutionSummary.total,
+          evolutionsByTier: evolutionSummary.byTier,
+        };
+      }
+
+      if (!lastGameOverRef.current && start !== null) {
+        const elapsedMs = Math.max(0, now - start);
+        return {
+          elapsedMs,
+          xpTotal,
+          mgTotal,
+          evolutionsTotal: evolutionSummary.total,
+          evolutionsByTier: evolutionSummary.byTier,
+        };
+      }
+
+      return {
+        elapsedMs: previous.elapsedMs ?? 0,
+        xpTotal,
+        mgTotal,
+        evolutionsTotal: evolutionSummary.total,
+        evolutionsByTier: evolutionSummary.byTier,
+      };
+    });
+
+    if (!gameState.gameOver && lastGameOverRef.current) {
+      runStartRef.current = now;
+    }
+
+    if (gameState.gameOver && !lastGameOverRef.current) {
+      runStartRef.current = runStartRef.current ?? now;
+    }
+
+    lastGameOverRef.current = gameState.gameOver;
+  }, [gameState.gameOver, xp, geneticMaterial, evolutionSlots]);
 
   const xpCurrent = xp?.current ?? 0;
   const mgCurrent = geneticMaterial?.current ?? 0;
@@ -232,6 +325,7 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
         score={gameState.score}
         level={gameState.level}
         maxCombo={gameState.maxCombo}
+        journeyStats={journeyStats}
         onRestart={handleRestart}
         onQuit={onQuit}
       />

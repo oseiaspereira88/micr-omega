@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import GameOverScreen from '../GameOverScreen';
 
@@ -86,5 +86,42 @@ describe('GameOverScreen', () => {
 
     const comboValue = screen.getByText('x0');
     expect(comboValue.closest('li')).toHaveTextContent('Combo Máximo');
+  });
+
+  it('exibe o resumo da jornada com métricas formatadas', () => {
+    const journeyStats = {
+      elapsedMs: 90500,
+      xpTotal: 1500,
+      mgTotal: 320,
+      evolutionsTotal: 5,
+      evolutionsByTier: {
+        small: 2,
+        medium: 1,
+        large: 2,
+        macro: 0,
+      },
+    };
+
+    render(
+      <GameOverScreen
+        score={5000}
+        level={7}
+        maxCombo={12}
+        onRestart={() => {}}
+        journeyStats={journeyStats}
+      />
+    );
+
+    expect(screen.getByRole('heading', { name: /resumo da jornada/i })).toBeInTheDocument();
+    expect(screen.getByText('Tempo decorrido')).toBeInTheDocument();
+    expect(screen.getByText('1m 30s')).toBeInTheDocument();
+    expect(screen.getByText('1.500 XP')).toBeInTheDocument();
+    expect(screen.getByText('320 MG')).toBeInTheDocument();
+
+    const evolutionCard = screen.getByText('Evoluções adquiridas').closest('div');
+    expect(evolutionCard).not.toBeNull();
+    const cardQueries = within(evolutionCard);
+    expect(cardQueries.getByText('5')).toBeInTheDocument();
+    expect(cardQueries.getByText('2 Pequenas · 1 Médias · 2 Grandes')).toBeInTheDocument();
   });
 });
