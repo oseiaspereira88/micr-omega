@@ -120,6 +120,16 @@ const TouchControls = ({
     [viewport.width],
   );
 
+  const heightScale = useMemo(
+    () => clamp(viewport.height / 800, 0.7, 1),
+    [viewport.height],
+  );
+
+  const touchVerticalScale = useMemo(
+    () => touchScale * heightScale,
+    [heightScale, touchScale],
+  );
+
   const isLandscape = viewport.width > viewport.height;
 
   const effectiveLayout = useMemo(() => {
@@ -224,7 +234,10 @@ const TouchControls = ({
         orientationClass,
         className,
       )}
-      style={{ '--touch-scale': touchScale.toFixed(3) }}
+      style={{
+        '--touch-scale': touchScale.toFixed(3),
+        '--touch-vertical-scale': touchVerticalScale.toFixed(3),
+      }}
     >
       <div
         className={styles.joystickZone}
