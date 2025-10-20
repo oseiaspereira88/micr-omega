@@ -387,16 +387,48 @@ const toLinearChannel = (value) => {
   return scaled <= 0.03928 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
 };
 
-const getRelativeLuminance = (hex) => {
-  const { r, g, b } = hexToRgb(hex);
+const getRelativeLuminanceFromChannels = (r, g, b) => {
   const linearR = toLinearChannel(r);
   const linearG = toLinearChannel(g);
   const linearB = toLinearChannel(b);
   return 0.2126 * linearR + 0.7152 * linearG + 0.0722 * linearB;
 };
 
-const getContrastingTextColor = (hex) =>
-  getRelativeLuminance(hex) > 0.48 ? '#0c111e' : '#f8fbff';
+const getRelativeLuminance = (hex) => {
+  const { r, g, b } = hexToRgb(hex);
+  return getRelativeLuminanceFromChannels(r, g, b);
+};
+
+const parseRgbaColor = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const match = value
+    .trim()
+    .match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(\d*\.?\d+))?\s*\)$/i);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, r, g, b] = match;
+
+  return {
+    r: clampColorChannel(Number.parseInt(r, 10)),
+    g: clampColorChannel(Number.parseInt(g, 10)),
+    b: clampColorChannel(Number.parseInt(b, 10)),
+  };
+};
+
+const getRelativeLuminanceFromRgba = (rgba) => {
+  const channels = parseRgbaColor(rgba);
+  if (!channels) {
+    return 0;
+  }
+
+  return getRelativeLuminanceFromChannels(channels.r, channels.g, channels.b);
+};
 
 const createMicroorganismPalette = (baseColor) => {
   const color = normalizeHexColor(baseColor ?? DEFAULT_SPECIES_COLOR);
@@ -408,9 +440,10 @@ const createMicroorganismPalette = (baseColor) => {
   const glowColor = adjustHexColor(color, 72);
   const hpFillColor = adjustHexColor(color, 16);
   const hpBorderColor = adjustHexColor(color, -52);
-  const labelColor = getContrastingTextColor(coreColor);
   const labelBackground =
     getRelativeLuminance(color) > 0.42 ? 'rgba(12, 17, 29, 0.82)' : 'rgba(245, 249, 255, 0.88)';
+  const labelColor =
+    getRelativeLuminanceFromRgba(labelBackground) > 0.48 ? '#0c111e' : '#f8fbff';
 
   const palette = {
     base: color,
