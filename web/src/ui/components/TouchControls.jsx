@@ -1,7 +1,34 @@
-import React, { useId } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import styles from './TouchControls.module.css';
 
 const joinClassNames = (...classes) => classes.filter(Boolean).join(' ');
+
+const clamp = (value, min, max) => {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(max, Math.max(min, value));
+};
+
+const getViewportSize = () => {
+  if (typeof window === 'undefined') {
+    return { width: 768, height: 1024 };
+  }
+
+  const visualViewport = window.visualViewport;
+  if (visualViewport) {
+    return {
+      width: visualViewport.width,
+      height: visualViewport.height,
+    };
+  }
+
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+};
 
 const clampProgress = value => {
   const numericValue = Number(value);
@@ -34,9 +61,75 @@ const TouchControls = ({
   onOpenEvolutionMenu,
   canEvolve,
   touchLayout = 'right',
+  isSidebarOpen = false,
+  autoInvertWhenSidebarOpen = false,
   className,
   ...a11yProps
 }) => {
+  const [viewport, setViewport] = useState(getViewportSize);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const scheduleFrame =
+      typeof window.requestAnimationFrame === 'function'
+        ? window.requestAnimationFrame.bind(window)
+        : callback => window.setTimeout(callback, 0);
+    const cancelFrame =
+      typeof window.cancelAnimationFrame === 'function'
+        ? window.cancelAnimationFrame.bind(window)
+        : window.clearTimeout.bind(window);
+
+    let animationFrameId = null;
+    const handleResize = () => {
+      if (animationFrameId !== null) {
+        cancelFrame(animationFrameId);
+      }
+
+      animationFrameId = scheduleFrame(() => {
+        animationFrameId = null;
+        setViewport(getViewportSize());
+      });
+    };
+
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+
+    const visualViewport = window.visualViewport;
+    if (visualViewport) {
+      visualViewport.addEventListener('resize', handleResize);
+    }
+
+    return () => {
+      if (animationFrameId !== null) {
+        cancelFrame(animationFrameId);
+      }
+
+      window.removeEventListener('resize', handleResize);
+      if (visualViewport) {
+        visualViewport.removeEventListener('resize', handleResize);
+      }
+    };
+  }, []);
+
+  const touchScale = useMemo(
+    () => clamp(viewport.width / 600, 0.8, 1.1),
+    [viewport.width],
+  );
+
+  const isLandscape = viewport.width > viewport.height;
+
+  const effectiveLayout = useMemo(() => {
+    if (!(autoInvertWhenSidebarOpen && isSidebarOpen)) {
+      return touchLayout;
+    }
+
+    return touchLayout === 'left' ? 'right' : 'left';
+  }, [autoInvertWhenSidebarOpen, isSidebarOpen, touchLayout]);
+
   const dashStatusId = useId();
   const skillStatusId = useId();
   const dashReady = dashCharge >= 30;
@@ -96,7 +189,9 @@ const TouchControls = ({
     event.preventDefault();
   };
 
-  const layoutClass = touchLayout === 'left' ? styles.layoutLeft : styles.layoutRight;
+  const layoutClass =
+    effectiveLayout === 'left' ? styles.layoutLeft : styles.layoutRight;
+  const orientationClass = isLandscape ? styles.landscape : null;
 
   const isTouchLikePointer = event => {
     const pointerType =
@@ -123,7 +218,13 @@ const TouchControls = ({
   return (
     <div
       {...a11yProps}
-      className={joinClassNames(styles.touchLayer, layoutClass, className)}
+      className={joinClassNames(
+        styles.touchLayer,
+        layoutClass,
+        orientationClass,
+        className,
+      )}
+      style={{ '--touch-scale': touchScale.toFixed(3) }}
     >
       <div
         className={styles.joystickZone}

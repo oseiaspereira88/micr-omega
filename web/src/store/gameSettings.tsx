@@ -20,6 +20,7 @@ export type GameSettings = {
   showTouchControls: boolean;
   showMinimap: boolean;
   touchLayout: TouchLayout;
+  autoSwapTouchLayoutWhenSidebarOpen: boolean;
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -28,6 +29,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   showTouchControls: false,
   showMinimap: featureToggles.minimap,
   touchLayout: "right",
+  autoSwapTouchLayoutWhenSidebarOpen: true,
 };
 
 const STORAGE_KEY = "micr-omega:game-settings";
@@ -124,12 +126,18 @@ const parseStoredSettings = (): GameSettings => {
       DEFAULT_SETTINGS.touchLayout,
     );
 
+    const autoSwapTouchLayoutWhenSidebarOpen = parseBoolean(
+      parsed.autoSwapTouchLayoutWhenSidebarOpen,
+      DEFAULT_SETTINGS.autoSwapTouchLayoutWhenSidebarOpen,
+    );
+
     return {
       audioEnabled,
       visualDensity,
       showTouchControls,
       showMinimap,
       touchLayout,
+      autoSwapTouchLayoutWhenSidebarOpen,
     };
   } catch (error) {
     console.warn("Não foi possível ler as configurações do jogo salvas", error);

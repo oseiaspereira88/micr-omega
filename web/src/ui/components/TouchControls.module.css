@@ -3,6 +3,12 @@
   inset: 0;
   pointer-events: none;
   z-index: 20;
+  --touch-scale: 1;
+  --touch-spacing: calc(var(--touch-scale) * 15px);
+  --touch-gap: calc(var(--touch-scale) * 80px);
+  --touch-horizontal-offset: calc(var(--touch-scale) * 95px);
+  --touch-joystick-size: calc(var(--touch-scale) * 110px);
+  --touch-joystick-knob: calc(var(--touch-scale) * 45px);
 }
 
 .layoutRight {
@@ -13,71 +19,56 @@
   direction: ltr;
 }
 
+.landscape .joystickZone {
+  top: calc(var(--safe-area-inset-top, 0px) + var(--touch-spacing));
+  bottom: auto;
+}
+
 .layoutRight .joystickZone {
-  left: calc(15px + var(--safe-area-inset-left, 0px));
+  left: calc(var(--safe-area-inset-left, 0px) + var(--touch-spacing));
   right: auto;
 }
 
 .layoutLeft .joystickZone {
-  right: calc(15px + var(--safe-area-inset-right, 0px));
+  right: calc(var(--safe-area-inset-right, 0px) + var(--touch-spacing));
   left: auto;
 }
 
-.layoutRight .attackButton {
-  right: calc(15px + var(--safe-area-inset-right, 0px));
-  left: auto;
-}
-
-.layoutLeft .attackButton {
-  left: calc(15px + var(--safe-area-inset-left, 0px));
-  right: auto;
-}
-
+.layoutRight .attackButton,
 .layoutRight .dashButton {
-  right: calc(15px + var(--safe-area-inset-right, 0px));
+  right: calc(var(--safe-area-inset-right, 0px) + var(--touch-spacing));
   left: auto;
 }
 
+.layoutLeft .attackButton,
 .layoutLeft .dashButton {
-  left: calc(15px + var(--safe-area-inset-left, 0px));
+  left: calc(var(--safe-area-inset-left, 0px) + var(--touch-spacing));
   right: auto;
 }
 
-.layoutRight .skillButton {
-  right: calc(95px + var(--safe-area-inset-right, 0px));
-  left: auto;
-}
-
-.layoutLeft .skillButton {
-  left: calc(95px + var(--safe-area-inset-left, 0px));
-  right: auto;
-}
-
-.layoutRight .cycleSkillButton {
-  right: calc(95px + var(--safe-area-inset-right, 0px));
-  left: auto;
-}
-
-.layoutLeft .cycleSkillButton {
-  left: calc(95px + var(--safe-area-inset-left, 0px));
-  right: auto;
-}
-
+.layoutRight .skillButton,
+.layoutRight .cycleSkillButton,
 .layoutRight .evolveButton {
-  right: calc(95px + var(--safe-area-inset-right, 0px));
+  right: calc(
+    var(--safe-area-inset-right, 0px) + var(--touch-spacing) + var(--touch-horizontal-offset)
+  );
   left: auto;
 }
 
+.layoutLeft .skillButton,
+.layoutLeft .cycleSkillButton,
 .layoutLeft .evolveButton {
-  left: calc(95px + var(--safe-area-inset-left, 0px));
+  left: calc(
+    var(--safe-area-inset-left, 0px) + var(--touch-spacing) + var(--touch-horizontal-offset)
+  );
   right: auto;
 }
 
 .joystickZone {
   position: absolute;
-  bottom: calc(15px + var(--safe-area-inset-bottom, 0px));
-  width: 110px;
-  height: 110px;
+  bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing));
+  width: var(--touch-joystick-size);
+  height: var(--touch-joystick-size);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
   border: 2px solid rgba(255, 255, 255, 0.3);
@@ -90,8 +81,8 @@
 }
 
 .joystickKnob {
-  width: 45px;
-  height: 45px;
+  width: var(--touch-joystick-knob);
+  height: var(--touch-joystick-knob);
   border-radius: 50%;
   border: 2px solid #fff;
   transition: transform 0.2s;
@@ -122,34 +113,36 @@
 }
 
 .attackButton {
-  bottom: calc(15px + var(--safe-area-inset-bottom, 0px));
-  width: 70px;
-  height: 70px;
-  font-size: 1.8rem;
+  bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing));
+  width: calc(var(--touch-scale) * 70px);
+  height: calc(var(--touch-scale) * 70px);
+  font-size: calc(var(--touch-scale) * 1.8rem);
   background: linear-gradient(135deg, #ff0066, #ff6600);
   box-shadow: 0 0 20px rgba(255, 0, 102, 0.5);
 }
 
 .dashButton {
-  bottom: calc(95px + var(--safe-area-inset-bottom, 0px));
-  width: 60px;
-  height: 60px;
-  font-size: 1.5rem;
+  bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap));
+  width: calc(var(--touch-scale) * 60px);
+  height: calc(var(--touch-scale) * 60px);
+  font-size: calc(var(--touch-scale) * 1.5rem);
 }
 
 .skillButton {
-  bottom: calc(95px + var(--safe-area-inset-bottom, 0px));
-  width: 65px;
-  height: 65px;
-  font-size: 1.6rem;
+  bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap));
+  width: calc(var(--touch-scale) * 65px);
+  height: calc(var(--touch-scale) * 65px);
+  font-size: calc(var(--touch-scale) * 1.6rem);
   color: #000;
 }
 
 .cycleSkillButton {
-  bottom: calc(175px + var(--safe-area-inset-bottom, 0px));
-  width: 55px;
-  height: 55px;
-  font-size: 1.4rem;
+  bottom: calc(
+    var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap) * 2
+  );
+  width: calc(var(--touch-scale) * 55px);
+  height: calc(var(--touch-scale) * 55px);
+  font-size: calc(var(--touch-scale) * 1.4rem);
   background: rgba(100, 100, 100, 0.35);
 }
 
@@ -175,10 +168,10 @@
 
 .cooldownLabel {
   position: absolute;
-  top: 6px;
+  top: calc(var(--touch-scale) * 6px);
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.65rem;
+  font-size: calc(var(--touch-scale) * 0.65rem);
   font-weight: 600;
   pointer-events: none;
   text-shadow: 0 0 3px rgba(0, 0, 0, 0.75);
@@ -193,7 +186,7 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.6rem;
+  font-size: calc(var(--touch-scale) * 0.6rem);
   font-weight: 600;
   pointer-events: none;
   z-index: 2;
@@ -201,7 +194,7 @@
 }
 
 .skillCostLabel {
-  bottom: 6px;
+  bottom: calc(var(--touch-scale) * 6px);
 }
 
 .skillLabelReady {
@@ -221,10 +214,10 @@
 }
 
 .evolveButton {
-  bottom: calc(15px + var(--safe-area-inset-bottom, 0px));
-  width: 60px;
-  height: 60px;
-  font-size: 1.5rem;
+  bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing));
+  width: calc(var(--touch-scale) * 60px);
+  height: calc(var(--touch-scale) * 60px);
+  font-size: calc(var(--touch-scale) * 1.5rem);
 }
 
 .disabled {
@@ -276,6 +269,44 @@
 
 .evolveLocked {
   background: rgba(100, 100, 100, 0.3);
+}
+
+@media (max-width: 400px) {
+  .layoutRight .skillButton,
+  .layoutRight .cycleSkillButton,
+  .layoutRight .evolveButton {
+    right: calc(var(--safe-area-inset-right, 0px) + var(--touch-spacing));
+  }
+
+  .layoutLeft .skillButton,
+  .layoutLeft .cycleSkillButton,
+  .layoutLeft .evolveButton {
+    left: calc(var(--safe-area-inset-left, 0px) + var(--touch-spacing));
+  }
+
+  .skillButton {
+    bottom: calc(
+      var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap) * 2
+    );
+  }
+
+  .dashButton {
+    bottom: calc(
+      var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap) * 3
+    );
+  }
+
+  .cycleSkillButton {
+    bottom: calc(
+      var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap) * 4
+    );
+  }
+
+  .evolveButton {
+    bottom: calc(
+      var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap) * 5
+    );
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
