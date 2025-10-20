@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styles from './HudBar.module.css';
 import {
   AFFINITY_ICONS,
@@ -50,6 +50,12 @@ const HudBar = ({
 }) => {
   const numberFormatter = useMemo(() => new Intl.NumberFormat('pt-BR'), []);
   const formatNumber = useCallback((value) => numberFormatter.format(value), [numberFormatter]);
+  const primaryBadgesRef = useRef(null);
+  const [primaryScrollState, setPrimaryScrollState] = useState({
+    overflow: false,
+    atStart: true,
+    atEnd: true,
+  });
 
   const safeLevel = Math.max(0, Math.floor(sanitizeNumber(level)));
   const safeScore = Math.max(0, Math.floor(sanitizeNumber(score)));
@@ -259,6 +265,100 @@ const HudBar = ({
     });
   }
 
+  const primaryBadgesSignature = useMemo(
+    () =>
+      primaryBadges
+        .map((badge) => `${badge.key}:${badge.value}`)
+        .join('|'),
+    [primaryBadges]
+  );
+
+  useEffect(() => {
+    const element = primaryBadgesRef.current;
+
+    if (!element) {
+      setPrimaryScrollState((prev) =>
+        prev.overflow || !prev.atStart || !prev.atEnd
+          ? { overflow: false, atStart: true, atEnd: true }
+          : prev
+      );
+      return;
+    }
+
+    let frameId;
+
+    const calculateState = () => {
+      const maxScrollLeft = Math.max(0, element.scrollWidth - element.clientWidth);
+      const hasOverflow = maxScrollLeft > 1;
+      const atStart = !hasOverflow || element.scrollLeft <= 1;
+      const atEnd = !hasOverflow || element.scrollLeft >= maxScrollLeft - 1;
+
+      setPrimaryScrollState((prev) => {
+        if (
+          prev.overflow === hasOverflow &&
+          prev.atStart === atStart &&
+          prev.atEnd === atEnd
+        ) {
+          return prev;
+        }
+
+        return { overflow: hasOverflow, atStart, atEnd };
+      });
+    };
+
+    const updateState = () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+      frameId = requestAnimationFrame(calculateState);
+    };
+
+    updateState();
+
+    element.addEventListener('scroll', updateState, { passive: true });
+
+    let resizeObserver;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateState);
+      resizeObserver.observe(element);
+    }
+
+    let mutationObserver;
+    if (typeof MutationObserver !== 'undefined') {
+      mutationObserver = new MutationObserver(updateState);
+      mutationObserver.observe(element, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+    }
+
+    window.addEventListener('resize', updateState);
+
+    return () => {
+      element.removeEventListener('scroll', updateState);
+      window.removeEventListener('resize', updateState);
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [primaryBadgesSignature]);
+
+  const primaryBadgesClassName = [
+    styles.primaryBadges,
+    primaryScrollState.overflow ? styles.primaryBadgesOverflow : '',
+    primaryScrollState.overflow && !primaryScrollState.atStart
+      ? styles.primaryBadgesCanScrollLeft
+      : '',
+    primaryScrollState.overflow && !primaryScrollState.atEnd
+      ? styles.primaryBadgesCanScrollRight
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   const showResistances = !minimized && resistanceEntries.length > 0;
   const showStatuses = !minimized && statusBadges.length > 0;
   const showProgress = !minimized;
@@ -406,7 +506,9 @@ const HudBar = ({
       </div>
 
       <div className={statsClassName}>
-        <div className={styles.primaryBadges}>{primaryBadges.map(renderBadge)}</div>
+        <div className={primaryBadgesClassName} ref={primaryBadgesRef}>
+          {primaryBadges.map(renderBadge)}
+        </div>
         {hasSecondary
           ? isMobileHud
             ? (
