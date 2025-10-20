@@ -45,6 +45,7 @@ const createRenderState = () => ({
   notifications: [],
   effects: [],
   particles: [],
+  impactParticleCooldowns: new Map(),
   lastMovementIntent: { x: 0, y: 0, active: false },
   lastMovementAngle: 0,
   progressionSequences: new Map(),
@@ -1037,7 +1038,7 @@ describe('updateGameState', () => {
     expect(sharedState.damagePopups[0]).toMatchObject({ variant: 'critical', value: 42 });
   });
 
-  it('emits fewer particles for smaller hits', () => {
+  it('throttles microorganism impact particles to one burst per cooldown window', () => {
     const renderState = createRenderState();
     const sharedState = createSharedState();
 
@@ -1050,7 +1051,8 @@ describe('updateGameState', () => {
           {
             type: 'attack',
             targetId: 'micro-1',
-            damage: 4,
+            attackerId: 'npc-attacker',
+            damage: 24,
           },
         ],
         drops: [],
@@ -1062,7 +1064,21 @@ describe('updateGameState', () => {
           {
             type: 'attack',
             targetId: 'micro-1',
-            damage: 120,
+            attackerId: 'npc-attacker',
+            damage: 18,
+          },
+        ],
+        drops: [],
+        memory: { threatManagers: {} },
+      })
+      .mockReturnValueOnce({
+        world: sharedState.world,
+        events: [
+          {
+            type: 'attack',
+            targetId: 'micro-1',
+            attackerId: 'npc-attacker',
+            damage: 30,
           },
         ],
         drops: [],
@@ -1076,13 +1092,11 @@ describe('updateGameState', () => {
         delta: 0.016,
         movementIntent: { x: 0, y: 0 },
         actionBuffer: { attacks: [] },
-        helpers: { createParticle },
+        helpers: { createParticle, now: 1000, damageParticleCooldownMs: 500 },
       });
 
-      const lowDamageCount = createParticle.mock.calls.length;
-      expect(lowDamageCount).toBeGreaterThan(0);
-
-      createParticle.mockClear();
+      const firstBurstCount = createParticle.mock.calls.length;
+      expect(firstBurstCount).toBeGreaterThan(0);
 
       updateGameState({
         renderState,
@@ -1090,11 +1104,22 @@ describe('updateGameState', () => {
         delta: 0.016,
         movementIntent: { x: 0, y: 0 },
         actionBuffer: { attacks: [] },
-        helpers: { createParticle },
+        helpers: { createParticle, now: 1300, damageParticleCooldownMs: 500 },
       });
 
-      const highDamageCount = createParticle.mock.calls.length;
-      expect(highDamageCount).toBeGreaterThan(lowDamageCount);
+      expect(createParticle.mock.calls.length).toBe(firstBurstCount);
+
+      updateGameState({
+        renderState,
+        sharedState,
+        delta: 0.016,
+        movementIntent: { x: 0, y: 0 },
+        actionBuffer: { attacks: [] },
+        helpers: { createParticle, now: 1800, damageParticleCooldownMs: 500 },
+      });
+
+      expect(createParticle.mock.calls.length).toBeGreaterThan(firstBurstCount);
+      expect(sharedState.damagePopups).toHaveLength(3);
     } finally {
       aiSpy.mockRestore();
     }
