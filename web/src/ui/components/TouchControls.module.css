@@ -4,11 +4,38 @@
   pointer-events: none;
   z-index: 20;
   --touch-scale: 1;
+  --touch-vertical-scale: 1;
   --touch-spacing: calc(var(--touch-scale) * 15px);
-  --touch-gap: calc(var(--touch-scale) * 80px);
+  --touch-gap: calc(var(--touch-scale) * var(--touch-vertical-scale) * 80px);
   --touch-horizontal-offset: calc(var(--touch-scale) * 95px);
   --touch-joystick-size: calc(var(--touch-scale) * 110px);
   --touch-joystick-knob: calc(var(--touch-scale) * 45px);
+  --touch-bottom-base: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing));
+  --touch-attack-bottom: clamp(
+    var(--touch-bottom-base),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.2),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.8)
+  );
+  --touch-dash-bottom: clamp(
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.7),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 1.05),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 1.6)
+  );
+  --touch-skill-bottom: clamp(
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.7),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 1.05),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 1.6)
+  );
+  --touch-cycle-bottom: clamp(
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 1.6),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 2.1),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 2.8)
+  );
+  --touch-evolve-bottom: clamp(
+    var(--touch-bottom-base),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.35),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 1.1)
+  );
 }
 
 .layoutRight {
@@ -22,6 +49,34 @@
 .landscape .joystickZone {
   top: calc(var(--safe-area-inset-top, 0px) + var(--touch-spacing));
   bottom: auto;
+}
+
+.landscape {
+  --touch-attack-bottom: clamp(
+    var(--touch-bottom-base),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.15),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.5)
+  );
+  --touch-dash-bottom: clamp(
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.5),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.9),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 1.3)
+  );
+  --touch-skill-bottom: clamp(
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.5),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.9),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 1.3)
+  );
+  --touch-cycle-bottom: clamp(
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 1.1),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 1.7),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 2.2)
+  );
+  --touch-evolve-bottom: clamp(
+    var(--touch-bottom-base),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.25),
+    calc(var(--touch-bottom-base) + var(--touch-gap) * 0.8)
+  );
 }
 
 .layoutRight .joystickZone {
@@ -113,7 +168,7 @@
 }
 
 .attackButton {
-  bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing));
+  bottom: var(--touch-attack-bottom);
   width: calc(var(--touch-scale) * 70px);
   height: calc(var(--touch-scale) * 70px);
   font-size: calc(var(--touch-scale) * 1.8rem);
@@ -122,14 +177,14 @@
 }
 
 .dashButton {
-  bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap));
+  bottom: var(--touch-dash-bottom);
   width: calc(var(--touch-scale) * 60px);
   height: calc(var(--touch-scale) * 60px);
   font-size: calc(var(--touch-scale) * 1.5rem);
 }
 
 .skillButton {
-  bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap));
+  bottom: var(--touch-skill-bottom);
   width: calc(var(--touch-scale) * 65px);
   height: calc(var(--touch-scale) * 65px);
   font-size: calc(var(--touch-scale) * 1.6rem);
@@ -137,9 +192,7 @@
 }
 
 .cycleSkillButton {
-  bottom: calc(
-    var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap) * 2
-  );
+  bottom: var(--touch-cycle-bottom);
   width: calc(var(--touch-scale) * 55px);
   height: calc(var(--touch-scale) * 55px);
   font-size: calc(var(--touch-scale) * 1.4rem);
@@ -214,7 +267,7 @@
 }
 
 .evolveButton {
-  bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing));
+  bottom: var(--touch-evolve-bottom);
   width: calc(var(--touch-scale) * 60px);
   height: calc(var(--touch-scale) * 60px);
   font-size: calc(var(--touch-scale) * 1.5rem);
@@ -272,6 +325,29 @@
 }
 
 @media (max-width: 400px) {
+  .touchLayer {
+    --touch-dash-bottom: clamp(
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.1),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.6),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.2)
+    );
+    --touch-skill-bottom: clamp(
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.6),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.2),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.8)
+    );
+    --touch-cycle-bottom: clamp(
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.2),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 3),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 3.6)
+    );
+    --touch-evolve-bottom: clamp(
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.2),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.8),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.4)
+    );
+  }
+
   .layoutRight .skillButton,
   .layoutRight .cycleSkillButton,
   .layoutRight .evolveButton {
@@ -282,30 +358,6 @@
   .layoutLeft .cycleSkillButton,
   .layoutLeft .evolveButton {
     left: calc(var(--safe-area-inset-left, 0px) + var(--touch-spacing));
-  }
-
-  .skillButton {
-    bottom: calc(
-      var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap) * 2
-    );
-  }
-
-  .dashButton {
-    bottom: calc(
-      var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap) * 3
-    );
-  }
-
-  .cycleSkillButton {
-    bottom: calc(
-      var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap) * 4
-    );
-  }
-
-  .evolveButton {
-    bottom: calc(
-      var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-gap) * 5
-    );
   }
 }
 
