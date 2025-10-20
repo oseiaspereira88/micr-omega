@@ -365,7 +365,7 @@
   overflow: hidden;
 }
 
-:global(.mobileHud) :local(.header) {
+:global([data-mobile-hud='true']) :local(.header) {
   position: relative;
   top: auto;
   left: auto;
@@ -381,11 +381,11 @@
   gap: 8px;
 }
 
-:global(.mobileHud) :local(.combatProfile) {
+:global([data-mobile-hud='true']) :local(.combatProfile) {
   justify-content: flex-start;
 }
 
-:global(.mobileHud) :local(.stats) {
+:global([data-mobile-hud='true']) :local(.stats) {
   position: relative;
   top: auto;
   left: auto;

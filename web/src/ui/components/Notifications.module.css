@@ -73,7 +73,7 @@
   }
 }
 
-:global(.mobileHud) :local(.container) {
+:global([data-mobile-hud='true']) :local(.container) {
   top: auto;
   bottom: calc(var(--hud-mobile-offset, 148px) + var(--safe-area-inset-bottom, 0px) + 12px);
   transform: translate(-50%, 0);
