@@ -101,6 +101,15 @@ const GameHud = ({
   const hudContentRef = useRef(null);
   const sidebarId = useId();
   const minimapToggleId = useId();
+  const audioToggleId = useId();
+  const { settings, updateSettings } = useGameSettings();
+  const audioEnabled = settings?.audioEnabled !== false;
+  const audioLabel = audioEnabled ? 'Som ligado' : 'Som desligado';
+  const isMinimapEnabled = Boolean(settings?.showMinimap);
+  const touchLayoutPreference = settings?.touchLayout === 'left' ? 'left' : 'right';
+  const autoSwapTouchLayoutWhenSidebarOpen = Boolean(
+    settings?.autoSwapTouchLayoutWhenSidebarOpen,
+  );
   const minimapPreviewClassName = useMemo(
     () =>
       [
@@ -108,6 +117,14 @@ const GameHud = ({
         isMinimapEnabled ? styles.minimapPreviewActive : styles.minimapPreviewInactive,
       ].join(' '),
     [isMinimapEnabled],
+  );
+  const audioPreviewClassName = useMemo(
+    () =>
+      [
+        styles.audioPreview,
+        audioEnabled ? styles.audioPreviewActive : styles.audioPreviewInactive,
+      ].join(' '),
+    [audioEnabled],
   );
 
   const showStatusOverlay = connectionStatus !== 'connected';
@@ -298,13 +315,6 @@ const GameHud = ({
     };
   }, [sidebarIsInactive]);
 
-  const { settings, updateSettings } = useGameSettings();
-  const isMinimapEnabled = Boolean(settings?.showMinimap);
-  const touchLayoutPreference = settings?.touchLayout === 'left' ? 'left' : 'right';
-  const autoSwapTouchLayoutWhenSidebarOpen = Boolean(
-    settings?.autoSwapTouchLayoutWhenSidebarOpen,
-  );
-
   const effectiveTouchLayout = useMemo(() => {
     if (!showTouchControls) {
       return null;
@@ -325,6 +335,10 @@ const GameHud = ({
   const handleToggleMinimap = useCallback(() => {
     updateSettings({ showMinimap: !isMinimapEnabled });
   }, [isMinimapEnabled, updateSettings]);
+
+  const handleToggleAudio = useCallback(() => {
+    updateSettings({ audioEnabled: !audioEnabled });
+  }, [audioEnabled, updateSettings]);
 
   const resolvedBossName = useMemo(() => {
     if (typeof bossName === 'string') {
@@ -693,6 +707,36 @@ const GameHud = ({
             ) : null}
           </div>
           <div className={styles.settingsPanel}>
+            <h3 className={styles.settingsHeading}>Áudio</h3>
+            <label className={styles.settingsToggle} htmlFor={audioToggleId}>
+              <div className={styles.settingsToggleInfo}>
+                <div className={audioPreviewClassName} aria-hidden="true">
+                  <span className={styles.audioPreviewIcon} aria-hidden="true">
+                    🔊
+                  </span>
+                </div>
+                <div className={styles.settingsToggleText}>
+                  <span className={styles.settingsToggleTitle}>Efeitos sonoros</span>
+                  <span className={styles.settingsToggleDescription}>
+                    Ative ou desative o áudio ambiente durante a partida.
+                  </span>
+                </div>
+              </div>
+              <div className={styles.settingsToggleControl}>
+                <input
+                  id={audioToggleId}
+                  type="checkbox"
+                  className={styles.toggleInput}
+                  checked={audioEnabled}
+                  onChange={handleToggleAudio}
+                  aria-checked={audioEnabled}
+                  aria-label={audioLabel}
+                />
+                <span className={styles.toggleStatusText} aria-live="polite" aria-atomic="true">
+                  {audioEnabled ? 'Som ligado' : 'Som desligado'}
+                </span>
+              </div>
+            </label>
             <h3 className={styles.settingsHeading}>Exibição</h3>
             <label className={styles.settingsToggle} htmlFor={minimapToggleId}>
               <div className={styles.settingsToggleInfo}>
