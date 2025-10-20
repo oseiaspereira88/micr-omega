@@ -37,6 +37,36 @@ const ArchetypeSelection = ({
   const previousFocusRef = useRef(null);
   const optionRefs = useRef(new Map());
   const [activeKey, setActiveKey] = useState(null);
+  const [isMobileOverlay, setIsMobileOverlay] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+
+    return window.matchMedia('(max-width: 600px)').matches;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      const mediaQuery = window.matchMedia('(max-width: 600px)');
+      const handleChange = (event) => {
+        setIsMobileOverlay(event.matches);
+      };
+
+      handleChange(mediaQuery);
+
+      if (typeof mediaQuery.addEventListener === 'function') {
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+      }
+
+      if (typeof mediaQuery.addListener === 'function') {
+        mediaQuery.addListener(handleChange);
+        return () => mediaQuery.removeListener(handleChange);
+      }
+    }
+
+    return undefined;
+  }, []);
 
   const options = useMemo(() => {
     return archetypeList.filter((entry) => !allowedSet || allowedSet.has(entry.key));
@@ -207,7 +237,7 @@ const ArchetypeSelection = ({
 
   return (
     <div
-      className={styles.overlay}
+      className={`${styles.overlay} ${isMobileOverlay ? styles.mobileOverlay : ''}`}
       tabIndex={-1}
       ref={overlayRef}
       onKeyDown={handleKeyDown}
@@ -221,14 +251,16 @@ const ArchetypeSelection = ({
         tabIndex={-1}
         ref={dialogRef}
       >
-        <h2 id={titleId} className={styles.title}>
-          Escolha seu arquétipo inicial
-        </h2>
-        <p id={descriptionId} className={styles.subtitle}>
-          Cada arquétipo define afinidades elementares, passivas únicas e habilidades
-          iniciais. Escolha com sabedoria: evoluções futuras expandirão essas
-          características.
-        </p>
+        <header className={styles.dialogHeader}>
+          <h2 id={titleId} className={styles.title}>
+            Escolha seu arquétipo inicial
+          </h2>
+          <p id={descriptionId} className={styles.subtitle}>
+            Cada arquétipo define afinidades elementares, passivas únicas e habilidades
+            iniciais. Escolha com sabedoria: evoluções futuras expandirão essas
+            características.
+          </p>
+        </header>
 
         <div
           className={styles.grid}
