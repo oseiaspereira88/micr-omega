@@ -179,6 +179,8 @@ const DENSITY_SCALE = {
   high: 1.4,
 };
 
+const DAMAGE_PARTICLE_COOLDOWN_MS = 500;
+
 const filterExpiredDamagePopups = (collection, now) => {
   if (!Array.isArray(collection) || collection.length === 0) {
     return [];
@@ -199,6 +201,43 @@ const filterExpiredDamagePopups = (collection, now) => {
 
     return expiresAt > now;
   });
+};
+
+const resolveDamageParticleKey = (entry) => {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  const explicitId =
+    typeof entry.id === 'string' || typeof entry.id === 'number'
+      ? `id:${entry.id}`
+      : typeof entry.entryId === 'string' || typeof entry.entryId === 'number'
+        ? `entry:${entry.entryId}`
+        : typeof entry.combatLogEntryId === 'string' || typeof entry.combatLogEntryId === 'number'
+          ? `entry:${entry.combatLogEntryId}`
+          : null;
+
+  if (explicitId) {
+    return explicitId;
+  }
+
+  const attacker = entry.attackerId ?? 'unknown-attacker';
+  const targetRaw =
+    entry.targetId ?? entry.targetObjectId ?? (entry.targetKind ? `${entry.targetKind}` : 'unknown-target');
+
+  return `${attacker}->${targetRaw}`;
+};
+
+const pruneDamageParticleCache = (cache, cutoffTimestamp) => {
+  if (!(cache instanceof Map) || !Number.isFinite(cutoffTimestamp)) {
+    return;
+  }
+
+  for (const [key, value] of cache.entries()) {
+    if (!Number.isFinite(value) || value <= cutoffTimestamp) {
+      cache.delete(key);
+    }
+  }
 };
 
 const collectSharedDamagePopups = (sharedState, now) => {
@@ -494,6 +533,16 @@ const processLocalCombatLogFeedback = (renderState, sharedState, localPlayerId, 
   const localPosition = resolveEntityPosition(localPlayer);
   const localColor = resolveEntityColor(localPlayer) || '#ff5f73';
 
+  let particleCooldowns =
+    renderState.lastDamageParticleByTarget instanceof Map
+      ? renderState.lastDamageParticleByTarget
+      : null;
+
+  if (!particleCooldowns) {
+    particleCooldowns = new Map();
+    renderState.lastDamageParticleByTarget = particleCooldowns;
+  }
+
   let lastProcessedEntry = cursor;
   let groupTimestamp = null;
   let groupSequence = -1;
@@ -507,6 +556,10 @@ const processLocalCombatLogFeedback = (renderState, sharedState, localPlayerId, 
     const timestamp = Number.isFinite(entry.timestamp) ? entry.timestamp : null;
     if (timestamp === null) {
       continue;
+    }
+
+    if (Number.isFinite(timestamp)) {
+      pruneDamageParticleCache(particleCooldowns, timestamp - DAMAGE_PARTICLE_COOLDOWN_MS);
     }
 
     if (groupTimestamp === timestamp) {
@@ -570,13 +623,30 @@ const processLocalCombatLogFeedback = (renderState, sharedState, localPlayerId, 
     const particleColor =
       targetPosition?.color || (isLocalTarget ? localColor : null) || localColor;
 
-    if (particleColor && typeof helpers.createParticle === 'function') {
+    let shouldCreateParticle = true;
+    let particleCooldownKey = null;
+
+    if (Number.isFinite(timestamp)) {
+      particleCooldownKey = resolveDamageParticleKey(entry);
+      if (particleCooldownKey) {
+        const lastSpawn = particleCooldowns.get(particleCooldownKey);
+        if (Number.isFinite(lastSpawn) && timestamp - lastSpawn < DAMAGE_PARTICLE_COOLDOWN_MS) {
+          shouldCreateParticle = false;
+        }
+      }
+    }
+
+    if (shouldCreateParticle && particleColor && typeof helpers.createParticle === 'function') {
       helpers.createParticle(
         popupPosition.x,
         popupPosition.y,
         particleColor,
         isLocalAttacker ? 4 : 3,
       );
+
+      if (particleCooldownKey) {
+        particleCooldowns.set(particleCooldownKey, timestamp);
+      }
     }
 
     lastProcessedEntry = { timestamp, sequence: groupSequence };
@@ -627,6 +697,7 @@ const createInitialRenderState = () => ({
   combatIndicators: [],
   damagePopups: [],
   damagePopupIndex: new Map(),
+  lastDamageParticleByTarget: new Map(),
   lastCombatLogEntry: null,
   lastCombatLogLength: 0,
   pendingInputs: {

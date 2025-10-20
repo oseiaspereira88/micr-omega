@@ -15,6 +15,53 @@ const mocks = vi.hoisted(() => {
     })),
     renderFrame: vi.fn(() => null),
     soundEffectsFactory: vi.fn(() => ({ playSound: vi.fn() })),
+    particleFactory: vi.fn((x, y, colorOrOptions, size) => {
+      if (x && typeof x === 'object') {
+        const particle = x;
+        const px = Number.isFinite(particle.x) ? particle.x : 0;
+        const py = Number.isFinite(particle.y) ? particle.y : 0;
+        const life = Number.isFinite(particle.life) ? particle.life : 1;
+        return [
+          {
+            x: px,
+            y: py,
+            life,
+            vx: Number.isFinite(particle.vx) ? particle.vx : 0,
+            vy: Number.isFinite(particle.vy) ? particle.vy : 0,
+            color: typeof particle.color === 'string' ? particle.color : '#ffffff',
+            size: Number.isFinite(particle.size) ? particle.size : 1,
+          },
+        ];
+      }
+
+      const px = Number.isFinite(x) ? x : 0;
+      const py = Number.isFinite(y) ? y : 0;
+      const options = colorOrOptions && typeof colorOrOptions === 'object' ? colorOrOptions : null;
+      const color =
+        typeof colorOrOptions === 'string'
+          ? colorOrOptions
+          : typeof options?.color === 'string'
+            ? options.color
+            : '#ffffff';
+      const particleSize = Number.isFinite(size)
+        ? size
+        : Number.isFinite(options?.size)
+          ? options.size
+          : 1;
+      const life = Number.isFinite(options?.life) ? options.life : 1;
+
+      return [
+        {
+          x: px,
+          y: py,
+          life,
+          vx: 0,
+          vy: 0,
+          color,
+          size: particleSize,
+        },
+      ];
+    }),
     restartGame: vi.fn(),
     selectArchetype: vi.fn(),
     checkEvolution: vi.fn(),
@@ -38,6 +85,10 @@ vi.mock('../render/renderFrame', () => ({
 
 vi.mock('../audio/soundEffects', () => ({
   createSoundEffects: (...args) => mocks.soundEffectsFactory(...args),
+}));
+
+vi.mock('../effects/particles', () => ({
+  createParticle: (...args) => mocks.particleFactory(...args),
 }));
 
 vi.mock('../ui/notifications', () => ({
@@ -117,6 +168,7 @@ describe('useGameLoop timing safeguards', () => {
     mocks.updateGameState.mockClear();
     mocks.renderFrame.mockClear();
     mocks.soundEffectsFactory.mockClear();
+    mocks.particleFactory.mockClear();
     mocks.selectArchetype.mockClear();
     mocks.addNotification.mockClear();
     mocks.checkEvolution.mockClear();
@@ -917,6 +969,7 @@ describe('useGameLoop combat log feedback', () => {
     mocks.updateGameState.mockClear();
     mocks.renderFrame.mockClear();
     mocks.soundEffectsFactory.mockClear();
+    mocks.particleFactory.mockClear();
     mocks.gameStoreListeners.clear();
     mocks.gameStoreState = {};
 
@@ -1168,6 +1221,99 @@ describe('useGameLoop combat log feedback', () => {
     });
 
     expect(capturedRenderState.damagePopups).toHaveLength(1);
+  });
+
+  it('throttles damage particles for rapid consecutive hits from the same attacker and target', async () => {
+    const canvas = createCanvas();
+    const dispatch = vi.fn();
+    let capturedRenderState = null;
+
+    const localPlayerId = 'player-1';
+    const targetMicroId = 'micro-84';
+
+    mocks.gameStoreState = {
+      playerId: localPlayerId,
+      players: {
+        [localPlayerId]: {
+          id: localPlayerId,
+          position: { x: 64, y: 80 },
+          combatStatus: { state: 'idle', targetPlayerId: null, targetObjectId: null },
+        },
+      },
+      remotePlayers: { byId: {} },
+      world: { microorganisms: [{ id: targetMicroId, position: { x: 200, y: 180 }, color: '#33ffaa' }] },
+      combatLog: [],
+    };
+
+    mocks.updateGameState.mockImplementation(({ renderState }) => {
+      capturedRenderState = renderState;
+      if (renderState) {
+        renderState.playersById.set(localPlayerId, {
+          id: localPlayerId,
+          renderPosition: { x: 72, y: 92 },
+          palette: { base: '#ff5f73' },
+        });
+        renderState.worldView.microorganisms = [
+          { id: targetMicroId, x: 200, y: 180, color: '#33ffaa' },
+        ];
+      }
+      return {
+        commands: { movement: null, attacks: [] },
+        localPlayerId,
+        hudSnapshot: null,
+      };
+    });
+
+    render(<HookWrapper canvas={canvas} dispatch={dispatch} />);
+
+    await waitFor(() => {
+      expect(typeof rafCallback).toBe('function');
+    });
+
+    const firstFrame = rafCallback;
+    act(() => {
+      firstFrame(16);
+    });
+
+    const baselineParticleCalls = mocks.particleFactory.mock.calls.length;
+    const baselineParticleCount = capturedRenderState?.particles?.length ?? 0;
+    const baselinePopupCount = capturedRenderState?.damagePopups?.length ?? 0;
+
+    const firstHit = {
+      timestamp: 5_000,
+      attackerId: localPlayerId,
+      targetKind: 'microorganism',
+      targetObjectId: targetMicroId,
+      damage: 9,
+      outcome: 'hit',
+      remainingHealth: 21,
+    };
+
+    const secondHit = {
+      ...firstHit,
+      timestamp: 5_300,
+      damage: 7,
+    };
+
+    mocks.gameStoreState = {
+      ...mocks.gameStoreState,
+      combatLog: [firstHit, secondHit],
+    };
+
+    act(() => {
+      notifyStoreSubscribers();
+    });
+
+    const secondFrame = rafCallback;
+    act(() => {
+      secondFrame(32);
+    });
+
+    expect(mocks.particleFactory.mock.calls.length - baselineParticleCalls).toBe(1);
+    const popupDelta = (capturedRenderState?.damagePopups?.length ?? 0) - baselinePopupCount;
+    expect(popupDelta).toBe(2);
+    const particleDelta = (capturedRenderState?.particles?.length ?? 0) - baselineParticleCount;
+    expect(particleDelta).toBe(1);
   });
 });
 
