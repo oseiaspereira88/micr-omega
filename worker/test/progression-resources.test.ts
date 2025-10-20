@@ -124,6 +124,36 @@ describe("RoomDO progression resource updates", () => {
     expect(fragmentTotal).toBeGreaterThan(0);
   });
 
+  it("restores progression state after durable object restart", async () => {
+    const mockState = new MockDurableObjectState();
+    const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+    const roomAny = room as any;
+    await roomAny.ready;
+
+    const player = createTestPlayer("keeper");
+    roomAny.players.set(player.id, player);
+    roomAny.markPlayersDirty();
+
+    roomAny.progressionState.set(player.id, {
+      sequence: 7,
+      dropPity: { fragment: 3, stableGene: 2 },
+    });
+    roomAny.markProgressionDirty();
+
+    await roomAny.flushSnapshots({ force: true });
+
+    const restarted = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+    const restartedAny = restarted as any;
+    await restartedAny.ready;
+
+    const restored = restartedAny.progressionState.get(player.id);
+    expect(restored).toBeDefined();
+    expect(restored).toMatchObject({
+      sequence: 7,
+      dropPity: { fragment: 3, stableGene: 2 },
+    });
+  });
+
   it("restores energy from organic matter to enable costly skills", async () => {
     const { roomAny } = await createRoom();
     const player = createTestPlayer("weaver");
