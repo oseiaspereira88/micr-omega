@@ -295,13 +295,41 @@
   bottom: auto;
   width: min(100%, 720px);
   margin: 0 auto;
-  padding-bottom: calc(16px + var(--safe-area-inset-bottom, 0px));
+  padding: clamp(12px, 4vw, 18px) 0 calc(16px + var(--safe-area-inset-bottom, 0px));
   pointer-events: none;
   z-index: 35;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 4vw, 18px);
 }
 
 .mainHudMobile > * {
   pointer-events: auto;
+}
+
+.mobileTopRegion,
+.mobileBottomRegion {
+  display: contents;
+}
+
+:global([data-mobile-hud='true']) :local(.mobileTopRegion) {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 3vw, 18px);
+}
+
+:global([data-mobile-hud='true']) :local(.mobileBottomRegion) {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(16px, 4vw, 24px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(18px, 5vw, 28px));
+  width: 100%;
+}
+
+:global([data-mobile-hud='true']) :local(.mobileBottomRegion) > * {
+  width: min(520px, 100%);
 }
 
 .opponentPanel {
