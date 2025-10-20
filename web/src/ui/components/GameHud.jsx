@@ -102,9 +102,12 @@ const GameHud = ({
   const sidebarId = useId();
   const minimapToggleId = useId();
   const audioToggleId = useId();
+  const audioToggleTitleId = useId();
+  const audioToggleDescriptionId = useId();
+  const audioToggleStatusId = useId();
   const { settings, updateSettings } = useGameSettings();
   const audioEnabled = settings?.audioEnabled !== false;
-  const audioLabel = audioEnabled ? 'Som ligado' : 'Som desligado';
+  const audioStatusLabel = audioEnabled ? 'Som ligado' : 'Som desligado';
   const isMinimapEnabled = Boolean(settings?.showMinimap);
   const touchLayoutPreference = settings?.touchLayout === 'left' ? 'left' : 'right';
   const autoSwapTouchLayoutWhenSidebarOpen = Boolean(
@@ -724,8 +727,16 @@ const GameHud = ({
                   </span>
                 </div>
                 <div className={styles.settingsToggleText}>
-                  <span className={styles.settingsToggleTitle}>Efeitos sonoros</span>
-                  <span className={styles.settingsToggleDescription}>
+                  <span
+                    id={audioToggleTitleId}
+                    className={styles.settingsToggleTitle}
+                  >
+                    Efeitos sonoros
+                  </span>
+                  <span
+                    id={audioToggleDescriptionId}
+                    className={styles.settingsToggleDescription}
+                  >
                     Ative ou desative o áudio ambiente durante a partida.
                   </span>
                 </div>
@@ -738,10 +749,16 @@ const GameHud = ({
                   checked={audioEnabled}
                   onChange={handleToggleAudio}
                   aria-checked={audioEnabled}
-                  aria-label={audioLabel}
+                  aria-labelledby={audioToggleTitleId}
+                  aria-describedby={`${audioToggleDescriptionId} ${audioToggleStatusId}`}
                 />
-                <span className={styles.toggleStatusText} aria-live="polite" aria-atomic="true">
-                  {audioEnabled ? 'Som ligado' : 'Som desligado'}
+                <span
+                  id={audioToggleStatusId}
+                  className={styles.toggleStatusText}
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {audioStatusLabel}
                 </span>
               </div>
             </label>

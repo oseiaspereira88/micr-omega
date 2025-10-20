@@ -421,14 +421,15 @@ describe('GameHud settings panel', () => {
     const openButton = screen.getByRole('button', { name: /mostrar painel/i });
     await user.click(openButton);
 
-    const audioToggle = await screen.findByRole('checkbox', { name: /som ligado/i });
+    const audioToggle = await screen.findByRole('checkbox', { name: /efeitos sonoros/i });
     expect(audioToggle).toBeChecked();
+    expect(audioToggle).toHaveAccessibleDescription(/som ligado/i);
 
     await user.click(audioToggle);
 
     await waitFor(() => {
       expect(audioToggle).not.toBeChecked();
-      expect(audioToggle).toHaveAccessibleName(/som desligado/i);
+      expect(audioToggle).toHaveAccessibleDescription(/som desligado/i);
     });
 
     await waitFor(() => {
@@ -450,8 +451,9 @@ describe('GameHud settings panel', () => {
     const secondOpenButton = screen.getByRole('button', { name: /mostrar painel/i });
     await secondUser.click(secondOpenButton);
 
-    const persistedToggle = await screen.findByRole('checkbox', { name: /som desligado/i });
+    const persistedToggle = await screen.findByRole('checkbox', { name: /efeitos sonoros/i });
     expect(persistedToggle).not.toBeChecked();
+    expect(persistedToggle).toHaveAccessibleDescription(/som desligado/i);
   });
 });
 

@@ -715,6 +715,22 @@
   text-align: right;
 }
 
+@media (max-width: 560px) {
+  .settingsToggle {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settingsToggleControl {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .toggleStatusText {
+    text-align: left;
+  }
+}
+
 .opponentHeading {
   margin: 0 0 8px;
   font-size: 0.95rem;
