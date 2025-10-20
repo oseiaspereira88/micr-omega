@@ -6,6 +6,7 @@ import { createSoundEffects } from '../audio/soundEffects';
 import { createSkills } from '../config';
 import { createParticle as generateParticle } from '../effects/particles';
 import { createVisualEffect as generateVisualEffect } from '../effects/visualEffects';
+import { updateStatusAuras } from '../effects/statusAuras';
 import { addNotification as appendNotification } from '../ui/notifications';
 import { renderFrame } from '../render/renderFrame';
 import { updateGameState } from './updateGameState';
@@ -1910,6 +1911,11 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
       });
 
       const state = renderStateRef.current;
+      updateStatusAuras(state, delta, {
+        events: sharedState?.statusEffects,
+        createParticle,
+        now,
+      });
       syncDamagePopups(state, sharedState, delta);
       processLocalCombatLogFeedback(state, sharedState, updateResult.localPlayerId, {
         createParticle,
