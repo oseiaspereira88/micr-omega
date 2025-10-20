@@ -60,6 +60,7 @@
 }
 
 .primaryBadges {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -113,11 +114,61 @@
   padding-bottom: 4px;
   margin: 0 -6px;
   scroll-snap-type: x proximity;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chipStrip .primaryBadges::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+
+.chipStrip .primaryBadges::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chipStrip .primaryBadges::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+}
+
+.primaryBadgesOverflow::before,
+.primaryBadgesOverflow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: clamp(24px, 6vw, 44px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 1;
+}
+
+.primaryBadgesOverflow::before {
+  left: 0;
+  background: linear-gradient(90deg, rgba(6, 10, 18, 0.9), rgba(6, 10, 18, 0));
+}
+
+.primaryBadgesOverflow::after {
+  right: 0;
+  background: linear-gradient(270deg, rgba(6, 10, 18, 0.9), rgba(6, 10, 18, 0));
+}
+
+.primaryBadgesCanScrollLeft::before {
+  opacity: 1;
+}
+
+.primaryBadgesCanScrollRight::after {
+  opacity: 1;
+}
+
+.chipStrip .primaryBadgesOverflow::before {
+  background: linear-gradient(90deg, rgba(10, 16, 28, 0.92), rgba(10, 16, 28, 0));
+}
+
+.chipStrip .primaryBadgesOverflow::after {
+  background: linear-gradient(270deg, rgba(10, 16, 28, 0.92), rgba(10, 16, 28, 0));
 }
 
 .chipStrip .primaryBadges > * {
