@@ -659,56 +659,60 @@ const GameHud = ({
           ref={hudContentRef}
           data-touch-controls-active={showTouchControls ? 'true' : 'false'}
         >
-          <HudBar
-            isMobileHud={isMobileHud}
-            level={level}
-            score={score}
-            energy={energy}
-            health={health}
-            maxHealth={maxHealth}
-            dashCharge={dashCharge}
-            combo={combo}
-            maxCombo={maxCombo}
-            activePowerUps={activePowerUps}
-            xp={xp}
-            geneticMaterial={geneticMaterial}
-            characteristicPoints={characteristicPoints}
-            geneFragments={geneFragments}
-            stableGenes={stableGenes}
-            evolutionSlots={evolutionSlots}
-            reroll={reroll}
-            dropPity={dropPity}
-            recentRewards={recentRewards}
-            element={element}
-            affinity={affinity}
-            elementLabel={elementLabel}
-            affinityLabel={affinityLabel}
-            resistances={resistances}
-            statusEffects={statusEffects}
-            isMinimized={isMinimapEnabled}
-          />
+          <div className={styles.mobileTopRegion}>
+            <HudBar
+              isMobileHud={isMobileHud}
+              level={level}
+              score={score}
+              energy={energy}
+              health={health}
+              maxHealth={maxHealth}
+              dashCharge={dashCharge}
+              combo={combo}
+              maxCombo={maxCombo}
+              activePowerUps={activePowerUps}
+              xp={xp}
+              geneticMaterial={geneticMaterial}
+              characteristicPoints={characteristicPoints}
+              geneFragments={geneFragments}
+              stableGenes={stableGenes}
+              evolutionSlots={evolutionSlots}
+              reroll={reroll}
+              dropPity={dropPity}
+              recentRewards={recentRewards}
+              element={element}
+              affinity={affinity}
+              elementLabel={elementLabel}
+              affinityLabel={affinityLabel}
+              resistances={resistances}
+              statusEffects={statusEffects}
+              isMinimized={isMinimapEnabled}
+            />
 
-          <BossHealthBar
-            active={bossActive}
-            health={bossHealth}
-            maxHealth={bossMaxHealth}
-            name={resolvedBossName}
-          />
+            <BossHealthBar
+              active={bossActive}
+              health={bossHealth}
+              maxHealth={bossMaxHealth}
+              name={resolvedBossName}
+            />
 
-          <SkillWheel
-            currentSkill={currentSkill}
-            skillList={skillData?.skillList ?? []}
-            hasMultipleSkills={skillData?.hasMultipleSkills}
-            skillCooldownLabel={skillData?.skillCooldownLabel ?? 'Sem habilidade'}
-            skillReadyPercent={skillData?.skillReadyPercent ?? 0}
-            onCycleSkill={onCycleSkill}
-            onUseSkill={onUseSkill}
-            touchControlsActive={showTouchControls}
-            showTouchControls={showTouchControls}
-            touchLayout={touchLayoutPreference}
-          />
+            <Notifications notifications={notifications} />
+          </div>
 
-          <Notifications notifications={notifications} />
+          <div className={styles.mobileBottomRegion}>
+            <SkillWheel
+              currentSkill={currentSkill}
+              skillList={skillData?.skillList ?? []}
+              hasMultipleSkills={skillData?.hasMultipleSkills}
+              skillCooldownLabel={skillData?.skillCooldownLabel ?? 'Sem habilidade'}
+              skillReadyPercent={skillData?.skillReadyPercent ?? 0}
+              onCycleSkill={onCycleSkill}
+              onUseSkill={onUseSkill}
+              touchControlsActive={showTouchControls}
+              showTouchControls={showTouchControls}
+              touchLayout={touchLayoutPreference}
+            />
+          </div>
         </div>
 
         {showTouchControls ? (

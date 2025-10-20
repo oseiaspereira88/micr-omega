@@ -20,21 +20,19 @@
 }
 
 .mobile:focus-within {
-  transform: translate(
-    calc(-50% + var(--skill-wheel-horizontal-offset, 0px)),
-    -2px
-  );
+  transform: translateX(var(--skill-wheel-horizontal-offset, 0px)) translateY(-2px);
 }
 
 .mobile {
-  position: fixed;
+  position: relative;
   top: auto;
   right: auto;
-  left: 50%;
-  bottom: calc(18px + var(--safe-area-inset-bottom, 0px));
+  left: auto;
+  bottom: auto;
   --skill-wheel-horizontal-offset: 0px;
-  transform: translateX(calc(-50% + var(--skill-wheel-horizontal-offset, 0px)));
-  width: min(520px, calc(100vw - 24px));
+  transform: translateX(var(--skill-wheel-horizontal-offset, 0px));
+  width: min(520px, calc(100% - 24px));
+  margin-inline: auto;
   padding: clamp(14px, 3.8vw, 22px) clamp(16px, 4.5vw, 28px);
   border-radius: 20px;
   display: flex;
@@ -45,8 +43,11 @@
 }
 
 .mobile.mobileWithTouchControls {
-  bottom: calc(var(--safe-area-inset-bottom, 0px) + 140px);
-  width: clamp(240px, calc(100vw - var(--touch-controls-footprint, 148px)), 480px);
+  width: clamp(
+    240px,
+    calc(100% - var(--touch-controls-footprint, 148px)),
+    480px
+  );
 }
 
 .mobile.mobileWithTouchControls .skills {
@@ -213,6 +214,12 @@
 
 .mobile .actionRow {
   gap: clamp(12px, 3vw, 18px);
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.mobile .actionButton {
+  width: 100%;
 }
 
 .actionButton {
@@ -275,17 +282,11 @@
 @keyframes skillWheelMobileEnter {
   from {
     opacity: 0;
-    transform: translate(
-      calc(-50% + var(--skill-wheel-horizontal-offset, 0px)),
-      12px
-    );
+    transform: translateX(var(--skill-wheel-horizontal-offset, 0px)) translateY(12px);
   }
 
   to {
     opacity: 1;
-    transform: translate(
-      calc(-50% + var(--skill-wheel-horizontal-offset, 0px)),
-      0
-    );
+    transform: translateX(var(--skill-wheel-horizontal-offset, 0px)) translateY(0);
   }
 }
