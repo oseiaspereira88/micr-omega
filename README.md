@@ -66,6 +66,27 @@ Scripts úteis adicionais:
 - `npm run tail:worker`: inicia o pipeline de tail estruturado (`wrangler tail` + arquivo NDJSON/Logflare).
 - `npm run report:metrics`: consolida métricas de sessões e erros a partir do último arquivo de log estruturado.
 
+### Variáveis de configuração do Worker
+
+O Durable Object aceita variáveis de ambiente opcionais para ajustar tempos de rodada, reconexão e limites de rate limiting sem recompilar o bundle. Todos os valores são opcionais; se não definidos, os defaults atuais são aplicados.
+
+| Variável | Default | Descrição |
+| --- | --- | --- |
+| `ROOM_MIN_PLAYERS_TO_START` | `1` | Número mínimo de jogadores conectados para iniciar uma rodada imediatamente. |
+| `ROOM_WAITING_START_DELAY_MS` | `15000` | Delay (ms) para disparar o alarme de início automático quando há jogadores aguardando e o limite mínimo não foi atingido. |
+| `ROOM_ROUND_DURATION_MS` | `120000` | Duração (ms) de uma rodada ativa antes do término automático. |
+| `ROOM_RESET_DELAY_MS` | `10000` | Intervalo (ms) entre o fim de uma rodada e o reset completo da sala. |
+| `ROOM_RECONNECT_WINDOW_MS` | `30000` | Janela (ms) durante a qual um jogador desconectado pode se reconectar sem perder progresso. |
+| `ROOM_INACTIVE_TIMEOUT_MS` | `45000` | Tempo máximo (ms) que um jogador pode ficar inativo antes de ser removido permanentemente. |
+| `ROOM_MAX_PLAYERS` | `100` | Capacidade máxima simultânea da sala. |
+| `ROOM_RATE_LIMIT_WINDOW_MS` | `60000` | Janela (ms) usada para contabilizar mensagens no rate limiting. |
+| `ROOM_MAX_MESSAGES_PER_CONNECTION` | `4200` | Número máximo de mensagens aceitas por conexão dentro da janela configurada. |
+| `ROOM_MAX_MESSAGES_GLOBAL` | `12000` | Teto mínimo global de mensagens processadas por sala dentro da janela. |
+| `ROOM_GLOBAL_RATE_LIMIT_HEADROOM` | `1.25` | Multiplicador aplicado ao limite por conexão ao calcular o orçamento global. |
+| `ROOM_RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS` | `5000` | Intervalo mínimo (ms) entre relatórios de utilização do rate limiting. |
+
+Defina esses valores no `wrangler.toml` (seção `[vars]`) ou no painel de variáveis da Cloudflare para cada ambiente (`Preview`, `Production`). Em ambientes locais com Miniflare, utilize `createMiniflare({ runtimeConfig: { ... } })` ou sobrescreva os bindings ao instanciar o Durable Object nos testes.
+
 Consulte `docs/load-testing.md` para instruções de execução do teste de carga com k6 (50–100 conexões simultâneas).
 
 ## Critério de ordenação do ranking

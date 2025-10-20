@@ -1,6 +1,11 @@
 import { build } from "esbuild";
 import { Miniflare } from "miniflare";
 
+import {
+  createRuntimeConfigBindings,
+  type RuntimeConfig,
+} from "../../src/config/runtime";
+
 let cachedScript: string | null = null;
 
 async function bundleWorker(): Promise<string> {
@@ -23,8 +28,20 @@ async function bundleWorker(): Promise<string> {
   return cachedScript;
 }
 
-export async function createMiniflare() {
+export interface CreateMiniflareOptions {
+  bindings?: Record<string, unknown>;
+  runtimeConfig?: Partial<RuntimeConfig>;
+}
+
+export async function createMiniflare(options: CreateMiniflareOptions = {}) {
   const script = await bundleWorker();
+  const runtimeBindings = options.runtimeConfig
+    ? createRuntimeConfigBindings(options.runtimeConfig)
+    : {};
+  const bindings = {
+    ...runtimeBindings,
+    ...(options.bindings ?? {}),
+  };
   return new Miniflare({
     modules: true,
     script,
@@ -32,6 +49,7 @@ export async function createMiniflare() {
     durableObjects: {
       ROOM: { className: "RoomDO" },
     },
+    bindings,
   });
 }
 

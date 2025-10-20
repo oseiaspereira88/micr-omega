@@ -2,6 +2,11 @@ import { createMulberry32 } from "@micr-omega/shared";
 import type { Env } from "./index";
 import { createObservability, serializeError, type Observability } from "./observability";
 import {
+  DEFAULT_RUNTIME_CONFIG,
+  loadRuntimeConfig,
+  type RuntimeConfig,
+} from "./config/runtime";
+import {
   ROOM_ID_HEADER,
   deriveRoomIdFromUrl,
   parseRoomRoute,
@@ -172,6 +177,8 @@ export {
   GLOBAL_RATE_LIMIT_HEADROOM,
 } from "./networking";
 
+export { DEFAULT_RUNTIME_CONFIG } from "./config/runtime";
+
 export {
   WORLD_TICK_INTERVAL_MS,
   CONTACT_BUFFER,
@@ -213,14 +220,13 @@ export const hashReconnectToken = async (token: string): Promise<string> => {
   return hex;
 };
 
-const MIN_PLAYERS_TO_START = 1;
-const WAITING_START_DELAY_MS = 15_000;
-const WAITING_START_DELAY_ENABLED = MIN_PLAYERS_TO_START > 1;
-const ROUND_DURATION_MS = 120_000;
-const RESET_DELAY_MS = 10_000;
-const RECONNECT_WINDOW_MS = 30_000;
-const INACTIVE_TIMEOUT_MS = 45_000;
-export const MAX_PLAYERS = 100;
+export const DEFAULT_MIN_PLAYERS_TO_START = DEFAULT_RUNTIME_CONFIG.minPlayersToStart;
+export const DEFAULT_WAITING_START_DELAY_MS = DEFAULT_RUNTIME_CONFIG.waitingStartDelayMs;
+export const DEFAULT_ROUND_DURATION_MS = DEFAULT_RUNTIME_CONFIG.roundDurationMs;
+export const DEFAULT_RESET_DELAY_MS = DEFAULT_RUNTIME_CONFIG.resetDelayMs;
+export const DEFAULT_RECONNECT_WINDOW_MS = DEFAULT_RUNTIME_CONFIG.reconnectWindowMs;
+export const DEFAULT_INACTIVE_TIMEOUT_MS = DEFAULT_RUNTIME_CONFIG.inactiveTimeoutMs;
+export const DEFAULT_MAX_PLAYERS = DEFAULT_RUNTIME_CONFIG.maxPlayers;
 
 const MAX_COMBO_MULTIPLIER = 50;
 
@@ -844,6 +850,8 @@ export class RoomDO {
   private readonly state: DurableObjectState;
   private readonly ready: Promise<void>;
   private readonly observability: Observability;
+  private readonly config: RuntimeConfig;
+  private readonly waitingStartDelayEnabled: boolean;
 
   private readonly clientsBySocket = new Map<WebSocket, string>();
   private readonly activeSockets = new Set<WebSocket>();
@@ -852,10 +860,7 @@ export class RoomDO {
   private readonly nameToPlayerId = new Map<string, string>();
   private readonly connectionRateLimiters = new WeakMap<WebSocket, MessageRateLimiter>();
   private readonly rateLimitUtilizationLastReported = new WeakMap<WebSocket, number>();
-  private readonly globalRateLimiter = new MessageRateLimiter(
-    MAX_MESSAGES_GLOBAL,
-    RATE_LIMIT_WINDOW_MS
-  );
+  private readonly globalRateLimiter: MessageRateLimiter;
   private lastGlobalRateLimitReportAt = 0;
   private rankingCache: RankingEntry[] = [];
   private rankingDirty = true;
@@ -901,6 +906,13 @@ export class RoomDO {
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
+    this.config = loadRuntimeConfig(env);
+    this.waitingStartDelayEnabled =
+      this.config.minPlayersToStart > 1 && this.config.waitingStartDelayMs > 0;
+    this.globalRateLimiter = new MessageRateLimiter(
+      this.config.maxMessagesGlobal,
+      this.config.rateLimitWindowMs
+    );
     this.observability = createObservability(env, { component: "RoomDO" });
     this.ready = this.initialize();
     this.observability.log("info", "room_initialized");
@@ -1040,7 +1052,10 @@ export class RoomDO {
   private getConnectionLimiter(socket: WebSocket): MessageRateLimiter {
     let limiter = this.connectionRateLimiters.get(socket);
     if (!limiter) {
-      limiter = new MessageRateLimiter(MAX_MESSAGES_PER_CONNECTION, RATE_LIMIT_WINDOW_MS);
+      limiter = new MessageRateLimiter(
+        this.config.maxMessagesPerConnection,
+        this.config.rateLimitWindowMs
+      );
       this.connectionRateLimiters.set(socket, limiter);
     }
     return limiter;
@@ -1065,7 +1080,7 @@ export class RoomDO {
     }
 
     const lastReportedAt = this.rateLimitUtilizationLastReported.get(socket) ?? 0;
-    if (now - lastReportedAt < RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS) {
+    if (now - lastReportedAt < this.config.rateLimitUtilizationReportIntervalMs) {
       return;
     }
 
@@ -1090,7 +1105,7 @@ export class RoomDO {
       return;
     }
 
-    if (now - this.lastGlobalRateLimitReportAt < RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS) {
+    if (now - this.lastGlobalRateLimitReportAt < this.config.rateLimitUtilizationReportIntervalMs) {
       return;
     }
 
@@ -1106,9 +1121,11 @@ export class RoomDO {
   private getDynamicGlobalLimit(): number {
     const activeConnections = Math.max(1, this.activeSockets.size);
     const scaledLimit = Math.ceil(
-      activeConnections * MAX_MESSAGES_PER_CONNECTION * GLOBAL_RATE_LIMIT_HEADROOM
+      activeConnections *
+        this.config.maxMessagesPerConnection *
+        this.config.globalRateLimitHeadroom
     );
-    return Math.max(MAX_MESSAGES_GLOBAL, scaledLimit);
+    return Math.max(this.config.maxMessagesGlobal, scaledLimit);
   }
 
   private handleRateLimit(
@@ -3844,7 +3861,7 @@ export class RoomDO {
           const retryAfter = perConnectionLimiter.getRetryAfterMs(now);
           const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
           this.handleRateLimit(socket, "connection", retryAfter, knownPlayerId, {
-            limit: MAX_MESSAGES_PER_CONNECTION,
+            limit: this.config.maxMessagesPerConnection,
             activeConnections: this.activeSockets.size,
           });
           return;
@@ -3854,7 +3871,7 @@ export class RoomDO {
           socket,
           perConnectionLimiter,
           now,
-          MAX_MESSAGES_PER_CONNECTION
+          this.config.maxMessagesPerConnection
         );
 
         const globalLimit = this.getDynamicGlobalLimit();
@@ -4129,7 +4146,7 @@ export class RoomDO {
       }
     }
     let expiredPlayerRemoved = false;
-    if (player && now - player.lastSeenAt > RECONNECT_WINDOW_MS) {
+    if (player && now - player.lastSeenAt > this.config.reconnectWindowMs) {
       await this.removePlayer(player.id, "expired");
       expiredPlayerRemoved = true;
       player = undefined;
@@ -4149,7 +4166,8 @@ export class RoomDO {
     if (!player && existingByName) {
       const existing = this.players.get(existingByName);
       if (existing) {
-        const withinReconnectWindow = now - existing.lastSeenAt <= RECONNECT_WINDOW_MS;
+        const withinReconnectWindow =
+          now - existing.lastSeenAt <= this.config.reconnectWindowMs;
         const tokenMatches = providedReconnectTokenHash === existing.reconnectTokenHash;
         if (existing.connected) {
           this.send(socket, { type: "error", reason: "name_taken" });
@@ -4179,7 +4197,7 @@ export class RoomDO {
     let rankingShouldUpdate = false;
     let playerWasCreated = false;
 
-    if (!player && this.getConnectedPlayersCount() >= MAX_PLAYERS) {
+    if (!player && this.getConnectedPlayersCount() >= this.config.maxPlayers) {
       this.send(socket, { type: "error", reason: "room_full" });
       socket.close(1008, "room_full");
       return null;
@@ -4386,7 +4404,7 @@ export class RoomDO {
       phase: this.phase
     });
 
-    const reconnectUntil = now + RECONNECT_WINDOW_MS;
+    const reconnectUntil = now + this.config.reconnectWindowMs;
 
     if (rankingShouldUpdate) {
       this.markRankingDirty();
@@ -4416,7 +4434,8 @@ export class RoomDO {
     };
 
     const willStartImmediately =
-      this.phase === "waiting" && this.getConnectedPlayersCount() >= MIN_PLAYERS_TO_START;
+      this.phase === "waiting" &&
+      this.getConnectedPlayersCount() >= this.config.minPlayersToStart;
 
     if (!willStartImmediately) {
       this.broadcast(joinBroadcast, socket);
@@ -4975,7 +4994,7 @@ export class RoomDO {
       if (!player.connected) {
         continue;
       }
-      if (now - player.lastSeenAt <= INACTIVE_TIMEOUT_MS) {
+      if (now - player.lastSeenAt <= this.config.inactiveTimeoutMs) {
         continue;
       }
       const socket = this.socketsByPlayer.get(player.id);
@@ -5155,13 +5174,13 @@ export class RoomDO {
       return;
     }
 
-    if (activePlayers.length >= MIN_PLAYERS_TO_START) {
+    if (activePlayers.length >= this.config.minPlayersToStart) {
       await this.startGame();
       return;
     }
 
-    if (WAITING_START_DELAY_ENABLED && !this.alarmSchedule.has("waiting_start")) {
-      const at = Date.now() + WAITING_START_DELAY_MS;
+    if (this.waitingStartDelayEnabled && !this.alarmSchedule.has("waiting_start")) {
+      const at = Date.now() + this.config.waitingStartDelayMs;
       this.alarmSchedule.set("waiting_start", at);
       await this.persistAndSyncAlarms();
     }
@@ -5185,7 +5204,7 @@ export class RoomDO {
     this.phase = "active";
     this.roundId = crypto.randomUUID();
     this.roundStartedAt = Date.now();
-    this.roundEndsAt = this.roundStartedAt + ROUND_DURATION_MS;
+    this.roundEndsAt = this.roundStartedAt + this.config.roundDurationMs;
     this.alarmSchedule.delete("waiting_start");
     this.alarmSchedule.set("round_end", this.roundEndsAt);
     await this.persistAndSyncAlarms();
@@ -5228,7 +5247,7 @@ export class RoomDO {
     this.cancelWorldTick();
     this.roundEndsAt = Date.now();
     this.alarmSchedule.delete("round_end");
-    this.alarmSchedule.set("reset", Date.now() + RESET_DELAY_MS);
+    this.alarmSchedule.set("reset", Date.now() + this.config.resetDelayMs);
     await this.persistAndSyncAlarms();
     this.invalidateGameStateSnapshot();
 
@@ -5590,7 +5609,10 @@ export class RoomDO {
       }
       const seenDelta = reference - player.lastSeenAt;
       const activeDelta = reference - player.lastActiveAt;
-      if (seenDelta > RECONNECT_WINDOW_MS && activeDelta > INACTIVE_TIMEOUT_MS) {
+      if (
+        seenDelta > this.config.reconnectWindowMs &&
+        activeDelta > this.config.inactiveTimeoutMs
+      ) {
         await this.removePlayer(player.id, "inactive");
         removedSomeone = true;
       }
@@ -5720,7 +5742,7 @@ export class RoomDO {
     const now = Date.now();
     for (const player of this.players.values()) {
       if (!player.connected) {
-        const expiresAt = player.lastSeenAt + RECONNECT_WINDOW_MS;
+        const expiresAt = player.lastSeenAt + this.config.reconnectWindowMs;
         if (expiresAt <= now) {
           nextCleanup = now;
           break;

@@ -1,5 +1,6 @@
 import { RoomDO } from "./RoomDO";
 import { createObservability, type ObservabilityBindings } from "./observability";
+import type { RuntimeConfigBindings } from "./config/runtime";
 import {
   ROOM_ID_HEADER,
   deriveRoomIdFromUrl,
@@ -8,7 +9,7 @@ import {
   normalizePathname,
 } from "./room-routing";
 
-export interface Env extends ObservabilityBindings {
+export interface Env extends ObservabilityBindings, RuntimeConfigBindings {
   ROOM: DurableObjectNamespace;
 }
 

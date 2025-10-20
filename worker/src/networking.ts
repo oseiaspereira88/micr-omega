@@ -1,8 +1,11 @@
-export const RATE_LIMIT_WINDOW_MS = 60_000;
-export const MAX_MESSAGES_PER_CONNECTION = 4_200;
-export const MAX_MESSAGES_GLOBAL = 12_000;
-export const GLOBAL_RATE_LIMIT_HEADROOM = 1.25;
-export const RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS = 5_000;
+import { DEFAULT_RUNTIME_CONFIG } from "./config/runtime";
+
+export const RATE_LIMIT_WINDOW_MS = DEFAULT_RUNTIME_CONFIG.rateLimitWindowMs;
+export const MAX_MESSAGES_PER_CONNECTION = DEFAULT_RUNTIME_CONFIG.maxMessagesPerConnection;
+export const MAX_MESSAGES_GLOBAL = DEFAULT_RUNTIME_CONFIG.maxMessagesGlobal;
+export const GLOBAL_RATE_LIMIT_HEADROOM = DEFAULT_RUNTIME_CONFIG.globalRateLimitHeadroom;
+export const RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS =
+  DEFAULT_RUNTIME_CONFIG.rateLimitUtilizationReportIntervalMs;
 export const MAX_CLIENT_MESSAGE_SIZE_BYTES = 16 * 1024;
 
 export class MessageRateLimiter {

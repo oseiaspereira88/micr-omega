@@ -3,11 +3,16 @@ import type { DurableObjectState, WebSocket } from "@cloudflare/workers-types";
 
 import { RoomDO } from "../src/RoomDO";
 import type { Env } from "../src";
+import { createRuntimeConfigBindings, type RuntimeConfig } from "../src/config/runtime";
 import { MockDurableObjectState } from "./utils/mock-state";
 
-async function createRoom() {
+async function createRoom(configOverrides?: Partial<RuntimeConfig>) {
   const mockState = new MockDurableObjectState();
-  const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+  const envOverrides = configOverrides ? createRuntimeConfigBindings(configOverrides) : {};
+  const room = new RoomDO(
+    mockState as unknown as DurableObjectState,
+    envOverrides as Env
+  );
   await (room as any).ready;
   mockState.storageImpl.resetCounts();
   return { room, mockState };
@@ -173,6 +178,63 @@ describe("RoomDO alarms", () => {
 
       expect(secondPlayerId).toBeTypeOf("string");
       expect(roomAny.alarmSchedule.has("world_tick")).toBe(true);
+    } finally {
+      if (originalWebSocket === undefined) {
+        delete (globalThis as any).WebSocket;
+      } else {
+        (globalThis as any).WebSocket = originalWebSocket;
+      }
+    }
+  });
+
+  it("schedules waiting start alarm using the configured delay", async () => {
+    const waitingDelayMs = 12_345;
+    const minPlayersToStart = 3;
+
+    const originalWebSocket = globalThis.WebSocket;
+    (globalThis as any).WebSocket = { OPEN: 1 };
+
+    try {
+      const { room } = await createRoom({
+        minPlayersToStart,
+        waitingStartDelayMs: waitingDelayMs,
+      });
+      const roomAny = room as any;
+
+      const socket = {
+        readyState: 1,
+        send: vi.fn(),
+        close: vi.fn(),
+      } as unknown as WebSocket;
+
+      const beforeJoin = Date.now();
+      await roomAny.handleJoin(socket, { type: "join", name: "Solo" });
+      const afterJoin = Date.now();
+
+      expect(roomAny.alarmSchedule.has("waiting_start")).toBe(true);
+      const scheduledAt = roomAny.alarmSchedule.get("waiting_start");
+
+      expect(typeof scheduledAt).toBe("number");
+      expect(scheduledAt).toBeGreaterThanOrEqual(beforeJoin + waitingDelayMs);
+      expect(scheduledAt).toBeLessThanOrEqual(afterJoin + waitingDelayMs + 50);
+
+      const secondSocket = {
+        readyState: 1,
+        send: vi.fn(),
+        close: vi.fn(),
+      } as unknown as WebSocket;
+
+      await roomAny.handleJoin(secondSocket, { type: "join", name: "Duo" });
+      expect(roomAny.alarmSchedule.has("waiting_start")).toBe(true);
+
+      const thirdSocket = {
+        readyState: 1,
+        send: vi.fn(),
+        close: vi.fn(),
+      } as unknown as WebSocket;
+
+      await roomAny.handleJoin(thirdSocket, { type: "join", name: "Trio" });
+      expect(roomAny.alarmSchedule.has("waiting_start")).toBe(false);
     } finally {
       if (originalWebSocket === undefined) {
         delete (globalThis as any).WebSocket;
