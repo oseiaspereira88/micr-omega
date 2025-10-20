@@ -65,15 +65,26 @@ describe('GameOverScreen', () => {
     );
 
     expect(screen.getByText('1.234.567')).toBeInTheDocument();
-    expect(screen.getByText('🧬 Nível Alcançado: 8.901')).toBeInTheDocument();
-    expect(screen.getByText('🔥 Combo Máximo: x23.456')).toBeInTheDocument();
+
+    const levelValue = screen.getByText('8.901');
+    expect(levelValue).toBeInTheDocument();
+    expect(levelValue.closest('li')).toHaveTextContent('Nível Alcançado');
+
+    const comboValue = screen.getByText('x23.456');
+    expect(comboValue).toBeInTheDocument();
+    expect(comboValue.closest('li')).toHaveTextContent('Combo Máximo');
   });
 
   it('usa 0 como fallback quando os valores são ausentes ou inválidos', () => {
     render(<GameOverScreen score={undefined} level={NaN} maxCombo={null} onRestart={() => {}} />);
 
-    expect(screen.getByText('0')).toBeInTheDocument();
-    expect(screen.getByText('🧬 Nível Alcançado: 0')).toBeInTheDocument();
-    expect(screen.getByText('🔥 Combo Máximo: x0')).toBeInTheDocument();
+    const summary = screen.getByText('Pontuação Final').closest('section');
+    expect(summary).toHaveTextContent('0');
+
+    const levelLabel = screen.getByText('Nível Alcançado');
+    expect(levelLabel.closest('li')).toHaveTextContent('0');
+
+    const comboValue = screen.getByText('x0');
+    expect(comboValue.closest('li')).toHaveTextContent('Combo Máximo');
   });
 });
