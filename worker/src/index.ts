@@ -34,7 +34,33 @@ export default {
         roomId: ROOM_ID,
         path: url.pathname
       });
-      return stub.fetch(request);
+      try {
+        return await stub.fetch(request);
+      } catch (error) {
+        observability.logError("ws_upgrade_forward_failed", error, {
+          roomId: ROOM_ID,
+          path: url.pathname
+        });
+
+        if (isWebSocketRequest(request)) {
+          const pair = new WebSocketPair();
+          const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
+
+          try {
+            server.accept();
+            server.close(1011, "internal_error");
+          } catch (closeError) {
+            observability.logError("ws_upgrade_cleanup_failed", closeError, {
+              roomId: ROOM_ID,
+              path: url.pathname
+            });
+          }
+
+          return new Response(null, { status: 101, webSocket: client });
+        }
+
+        return new Response("Internal Server Error", { status: 500 });
+      }
     }
 
     observability.log("warn", "unexpected_route", {
