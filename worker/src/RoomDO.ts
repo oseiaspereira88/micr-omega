@@ -3062,14 +3062,17 @@ export class RoomDO {
 
   private commitWorldTickScheduleChange(): void {
     this.markAlarmsDirty();
-    void this.syncAlarms().catch((error) => {
-      this.observability.logError("alarm_sync_failed", error, {
-        category: "persistence",
+    void this.syncAlarms()
+      .then(() => {
+        if (!this.persistentAlarmsDirty) {
+          this.alarmsDirty = false;
+        }
+      })
+      .catch((error) => {
+        this.observability.logError("alarm_sync_failed", error, {
+          category: "persistence",
+        });
       });
-    });
-    if (!this.persistentAlarmsDirty) {
-      this.alarmsDirty = false;
-    }
   }
 
   private queueSnapshotStatePersist(): void {

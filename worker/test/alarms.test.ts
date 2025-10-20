@@ -99,6 +99,32 @@ describe("RoomDO alarms", () => {
     expect(mockState.storageImpl.getPutCount("alarms")).toBe(0);
   });
 
+  it("keeps alarms marked dirty when syncing alarms fails", async () => {
+    const { room } = await createRoom();
+    const roomAny = room as any;
+
+    const syncError = new Error("sync failed");
+    const syncAlarmsSpy = vi.spyOn(roomAny, "syncAlarms").mockRejectedValue(syncError);
+    const logErrorSpy = vi
+      .spyOn(roomAny.observability, "logError")
+      .mockImplementation(() => undefined);
+
+    roomAny.alarmsDirty = false;
+    roomAny.persistentAlarmsDirty = false;
+
+    roomAny.commitWorldTickScheduleChange();
+
+    expect(syncAlarmsSpy).toHaveBeenCalledTimes(1);
+
+    await Promise.resolve();
+
+    expect(roomAny.alarmsDirty).toBe(true);
+    expect(roomAny.persistentAlarmsDirty).toBe(false);
+
+    syncAlarmsSpy.mockRestore();
+    logErrorSpy.mockRestore();
+  });
+
   it("pauses world ticks when everyone disconnects until a new player joins", async () => {
     const { room } = await createRoom();
     const roomAny = room as any;
