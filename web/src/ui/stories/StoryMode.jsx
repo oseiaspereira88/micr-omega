@@ -1,6 +1,7 @@
 import React from 'react';
 
 import ParticleEffectsStory from './ParticleEffectsStory.jsx';
+import styles from './StoryMode.module.css';
 
 const STORY_MAP = {
   'particle-glow': {
@@ -33,26 +34,14 @@ const StoryMode = ({ storyId }) => {
   const { Component, title, description } = STORY_MAP[resolvedId] ?? STORY_MAP['particle-glow'];
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'radial-gradient(circle at top, #0a1628, #04070d)',
-        color: '#f7f9ff',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '48px 16px',
-        gap: '24px',
-      }}
-    >
-      <header style={{ textAlign: 'center', maxWidth: '520px' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>{title}</h1>
-        <p style={{ margin: 0, color: '#c1c9ff' }}>{description}</p>
+    <div className={styles.container}>
+      <header className={styles.header}>
+        <h1 className={styles.title}>{title}</h1>
+        <p className={styles.description}>{description}</p>
       </header>
       <Component />
-      <p style={{ margin: 0, color: '#6f7abf', fontSize: '0.85rem' }}>
-        Use <code style={{ color: '#d7dbff' }}>?mode=story&amp;story=particle-glow</code> to open this showcase.
+      <p className={styles.showcaseHint}>
+        Use <code>?mode=story&amp;story=particle-glow</code> to open this showcase.
       </p>
     </div>
   );

@@ -1,6 +1,6 @@
 .container {
   width: 100vw;
-  height: 100vh;
+  height: var(--app-viewport-height, 100vh);
   background: #000;
   display: flex;
   flex-direction: column;
@@ -12,7 +12,7 @@
 
 .canvas {
   width: 100vw;
-  height: 100vh;
+  height: var(--app-viewport-height, 100vh);
   touch-action: none;
   display: block;
 }

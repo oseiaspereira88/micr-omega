@@ -13,7 +13,7 @@
 
 .page {
   position: relative;
-  min-height: 100vh;
+  min-height: var(--app-viewport-height, 100vh);
   padding: 64px clamp(32px, 6vw, 96px);
   font-family: 'Rajdhani', 'Segoe UI', sans-serif;
   color: var(--micr-text);

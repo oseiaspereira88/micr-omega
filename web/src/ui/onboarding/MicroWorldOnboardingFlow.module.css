@@ -2,7 +2,7 @@
 
 .flowRoot {
   position: relative;
-  min-height: 100vh;
+  min-height: var(--app-viewport-height, 100vh);
   padding: clamp(32px, 6vw, 72px) clamp(24px, 6vw, 88px);
   display: flex;
   flex-direction: column;
