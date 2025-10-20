@@ -4396,28 +4396,55 @@ export class RoomDO {
 
     socket.addEventListener("message", (event) => {
       void (async () => {
+        const rawData = event.data;
+
+        const rejectOversizedPayload = (bytes: number): void => {
+          this.observability.log("warn", "client_payload_invalid", {
+            stage: "size",
+            bytes,
+            category: "protocol_error"
+          });
+          this.observability.recordMetric("protocol_errors", 1, {
+            type: "payload_too_large",
+            bytes,
+          });
+          this.send(socket, { type: "error", reason: "invalid_payload" });
+          socket.close(1009, "invalid_payload");
+        };
+
         let data: string;
+        let payloadByteLength: number;
         try {
-          data = await (async (rawData: unknown): Promise<string> => {
-            if (typeof rawData === "string") {
-              return rawData;
+          if (typeof rawData === "string") {
+            data = rawData;
+            payloadByteLength = TEXT_ENCODER.encode(rawData).byteLength;
+          } else if (rawData instanceof ArrayBuffer) {
+            payloadByteLength = rawData.byteLength;
+            if (payloadByteLength > MAX_CLIENT_MESSAGE_SIZE_BYTES) {
+              rejectOversizedPayload(payloadByteLength);
+              return;
             }
-
-            if (rawData instanceof ArrayBuffer) {
-              return TEXT_DECODER.decode(rawData);
+            data = TEXT_DECODER.decode(rawData);
+          } else if (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(rawData)) {
+            const view = rawData as ArrayBufferView;
+            payloadByteLength = view.byteLength;
+            if (payloadByteLength > MAX_CLIENT_MESSAGE_SIZE_BYTES) {
+              rejectOversizedPayload(payloadByteLength);
+              return;
             }
-
-            if (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(rawData)) {
-              return TEXT_DECODER.decode(rawData as ArrayBufferView);
+            data = TEXT_DECODER.decode(view);
+          } else if (typeof Blob !== "undefined" && rawData instanceof Blob) {
+            payloadByteLength = rawData.size;
+            if (payloadByteLength > MAX_CLIENT_MESSAGE_SIZE_BYTES) {
+              rejectOversizedPayload(payloadByteLength);
+              return;
             }
-
-            if (typeof Blob !== "undefined" && rawData instanceof Blob) {
-              const arrayBuffer = await rawData.arrayBuffer();
-              return TEXT_DECODER.decode(arrayBuffer);
-            }
-
-            return String(rawData);
-          })(event.data);
+            const arrayBuffer = await rawData.arrayBuffer();
+            data = TEXT_DECODER.decode(arrayBuffer);
+          } else {
+            data = String(rawData);
+            payloadByteLength = TEXT_ENCODER.encode(data).byteLength;
+          }
         } catch (error) {
           this.observability.log("warn", "client_payload_invalid", {
             stage: "decode",
@@ -4432,24 +4459,12 @@ export class RoomDO {
           return;
         }
 
-        const now = Date.now();
-
-        const payloadByteLength = TEXT_ENCODER.encode(data).length;
-
         if (payloadByteLength > MAX_CLIENT_MESSAGE_SIZE_BYTES) {
-          this.observability.log("warn", "client_payload_invalid", {
-            stage: "size",
-            bytes: payloadByteLength,
-            category: "protocol_error"
-          });
-          this.observability.recordMetric("protocol_errors", 1, {
-            type: "payload_too_large",
-            bytes: payloadByteLength
-          });
-          this.send(socket, { type: "error", reason: "invalid_payload" });
-          socket.close(1009, "invalid_payload");
+          rejectOversizedPayload(payloadByteLength);
           return;
         }
+
+        const now = Date.now();
 
         const perConnectionLimiter = this.getConnectionLimiter(socket);
         if (!perConnectionLimiter.consume(now)) {

@@ -180,6 +180,52 @@ describe("RoomDO", () => {
     }
   });
 
+  it("accepts binary frames within the size limit", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const joinedPromise = onceMessage<{ type: string }>(socket, "joined");
+
+      const payload = textEncoder.encode(JSON.stringify({ type: "join", name: "Binary" }));
+      expect(payload.byteLength).toBeLessThan(MAX_CLIENT_MESSAGE_SIZE_BYTES);
+
+      socket.send(payload);
+
+      const joined = await joinedPromise;
+      expect(joined.type).toBe("joined");
+
+      socket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
+  it("rejects binary frames that exceed the size limit", async () => {
+    const mf = await createMiniflare();
+    try {
+      const socket = await openSocket(mf);
+      const errorPromise = onceMessage<{ type: string; reason: string }>(socket, "error");
+      const closePromise = new Promise<CloseEvent>((resolve) => {
+        socket.addEventListener("close", (event) => resolve(event as CloseEvent), {
+          once: true,
+        });
+      });
+
+      const oversizedPayload = new Uint8Array(MAX_CLIENT_MESSAGE_SIZE_BYTES + 1);
+      oversizedPayload.fill("a".charCodeAt(0));
+
+      socket.send(oversizedPayload);
+
+      const error = await errorPromise;
+      expect(error.reason).toBe("invalid_payload");
+
+      const closeEvent = await closePromise;
+      expect(closeEvent.code).toBe(1009);
+    } finally {
+      await mf.dispose();
+    }
+  });
+
   it("rejects invalid player names", async () => {
     const mf = await createMiniflare();
     try {
