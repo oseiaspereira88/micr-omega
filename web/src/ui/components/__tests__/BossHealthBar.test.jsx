@@ -10,9 +10,10 @@ describe('BossHealthBar', () => {
 
     expect(screen.getByText('0%')).toBeInTheDocument();
 
-    const progress = screen.getByRole('progressbar', { name: /mega-organismo/i });
+    const progress = screen.getByRole('progressbar', { name: /mega-organismo - vida/i });
     expect(Number(progress.getAttribute('aria-valuenow'))).toBe(0);
     expect(progress.getAttribute('aria-describedby')).toBeTruthy();
+    expect(progress).toHaveAttribute('aria-valuetext', '0% (0 de 1)');
 
     const fill = progress.firstElementChild;
     expect(fill).not.toBeNull();
@@ -27,8 +28,9 @@ describe('BossHealthBar', () => {
     );
 
     expect(screen.getByText(/⚠️ Colosso Primevo/)).toBeInTheDocument();
-    const progress = screen.getByRole('progressbar', { name: /colosso primevo/i });
+    const progress = screen.getByRole('progressbar', { name: /colosso primevo - vida/i });
     expect(progress).toBeInTheDocument();
+    expect(progress).toHaveAttribute('aria-valuetext', '50% (250 de 500)');
 
     expect(progress.querySelectorAll('[data-segment-marker]')).toHaveLength(3);
 
