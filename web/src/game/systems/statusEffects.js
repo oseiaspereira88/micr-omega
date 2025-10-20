@@ -16,6 +16,16 @@ const roundTo = (value, precision = 3) => {
   return Math.round(value * factor) / factor;
 };
 
+/**
+ * STATUS_METADATA descreve as características de cada status de combate.
+ *   - Os campos dentro de `aura` são opcionais e servem para guiar efeitos visuais:
+ *     - `radius`: alcance visual sugerido (48 a 96 unidades costumam produzir bons resultados).
+ *     - `colors`: lista de cores CSS; use pelo menos uma cor ou assuma `definition.color` como fallback.
+ *     - `waveAmplitude`: deslocamento máximo da animação de ondas (entre 4 e 18 para variações sutis).
+ *     - `rotationSpeed`: velocidade de rotação em radianos/segundo (0.1 a 1 mantém o efeito legível).
+ *     - `intensityCurve`: curva normalizada (0 a 1) aplicada ao pulso do brilho.
+ *   - Caso um status não defina `aura`, consumidores devem renderizar um efeito neutro ou omitir a aura.
+ */
 export const STATUS_METADATA = Object.freeze({
   [STATUS_EFFECTS.FISSURE]: {
     label: 'Fissura',
@@ -28,6 +38,13 @@ export const STATUS_METADATA = Object.freeze({
     dot: { element: ELEMENT_TYPES.CHEMICAL, damagePerSecond: 6 },
     defensePenaltyPerStack: 0.03,
     effect: 'fissure',
+    aura: {
+      radius: 78,
+      colors: ['#ff6b6b', '#ffb347'],
+      waveAmplitude: 12,
+      rotationSpeed: 0.45,
+      intensityCurve: [0, 0.75, 0.35],
+    },
   },
   [STATUS_EFFECTS.CORROSION]: {
     label: 'Corrosão',
@@ -40,6 +57,13 @@ export const STATUS_METADATA = Object.freeze({
     dot: { element: ELEMENT_TYPES.ACID, damagePerSecond: 8 },
     defensePenaltyPerStack: 0.05,
     effect: 'corrosion',
+    aura: {
+      radius: 72,
+      colors: ['#ffb347', '#ffe66d', '#6bcb77'],
+      waveAmplitude: 16,
+      rotationSpeed: 0.32,
+      intensityCurve: [0.1, 0.85, 0.25],
+    },
   },
   [STATUS_EFFECTS.PHOTOLESION]: {
     label: 'Fotolesão',
@@ -52,6 +76,13 @@ export const STATUS_METADATA = Object.freeze({
     dot: { element: ELEMENT_TYPES.THERMAL, damagePerSecond: 5 },
     criticalBonusPerStack: 0.1,
     effect: 'photolesion',
+    aura: {
+      radius: 84,
+      colors: ['#fff3b0', '#ffd93d', '#ff6b6b'],
+      waveAmplitude: 9,
+      rotationSpeed: 0.6,
+      intensityCurve: [0.2, 1, 0.5],
+    },
   },
   [STATUS_EFFECTS.ENTANGLED]: {
     label: 'Enredamento',
@@ -63,6 +94,13 @@ export const STATUS_METADATA = Object.freeze({
     movementPenaltyPerStack: 0.25,
     controlWeight: 1.5,
     effect: 'entangled',
+    aura: {
+      radius: 64,
+      colors: ['#7f8cff', '#a7b6ff'],
+      waveAmplitude: 14,
+      rotationSpeed: -0.28,
+      intensityCurve: [0.05, 0.65, 0.3],
+    },
   },
 });
 
