@@ -351,6 +351,7 @@ const TouchControls = ({
         styles.touchLayer,
         layoutClass,
         orientationClass,
+        isSidebarOpen ? styles.sidebarHidden : null,
         showButtonLegends ? styles.showLegends : null,
         className,
       )}

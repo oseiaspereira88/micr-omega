@@ -41,6 +41,19 @@
   );
 }
 
+.sidebarHidden {
+  opacity: 0;
+  pointer-events: none !important;
+  touch-action: none !important;
+}
+
+.sidebarHidden *,
+.sidebarHidden *::before,
+.sidebarHidden *::after {
+  pointer-events: none !important;
+  touch-action: none !important;
+}
+
 .layoutRight {
   direction: ltr;
 }

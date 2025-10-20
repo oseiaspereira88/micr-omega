@@ -496,6 +496,8 @@ const GameHud = ({
   const sidebarToggleLabel = isSidebarOpen
     ? 'Ocultar painel'
     : 'Mostrar painel';
+  const touchControlsDisabled = hudDisabled || isSidebarOpen;
+  const touchControlsClassName = hudDisabled ? styles.hudElementDisabled : undefined;
 
   useEffect(() => {
     if (!isMobileHud) {
@@ -872,9 +874,9 @@ const GameHud = ({
             touchLayout={touchLayoutPreference}
             isSidebarOpen={isSidebarOpen}
             autoInvertWhenSidebarOpen={settings.autoSwapTouchLayoutWhenSidebarOpen}
-            className={hudDisabled ? styles.hudElementDisabled : undefined}
-            aria-hidden={hudDisabled ? true : undefined}
-            inert={hudDisabled ? 'true' : undefined}
+            className={touchControlsClassName}
+            aria-hidden={touchControlsDisabled ? true : undefined}
+            inert={touchControlsDisabled ? 'true' : undefined}
           />
         ) : null}
       </div>
