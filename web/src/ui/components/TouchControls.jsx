@@ -411,6 +411,9 @@ const TouchControls = ({
           <span className={styles.buttonIcon} aria-hidden="true">
             ⚔️
           </span>
+          <span className={styles.buttonLabel} aria-hidden="true">
+            Ataque
+          </span>
           {showButtonLegends && (
             <span
               className={styles.buttonLegend}
@@ -454,6 +457,12 @@ const TouchControls = ({
           <span className={styles.buttonIcon} aria-hidden="true">💨</span>
           <span className={joinClassNames(styles.cooldownLabel, styles.dashLabel)}>
             {dashReady ? 'Pronto' : `${dashChargePercent}%`}
+          </span>
+          <span
+            className={joinClassNames(styles.buttonLabel, styles.buttonLabelBottom)}
+            aria-hidden="true"
+          >
+            Dash
           </span>
           {showButtonLegends && (
             <span
@@ -524,6 +533,18 @@ const TouchControls = ({
           >
             {hasCurrentSkill ? (showSkillCooldown ? '' : currentSkillCost) : '--'}
           </span>
+          <span
+            className={joinClassNames(
+              styles.buttonLabel,
+              styles.buttonLabelTop,
+              hasCurrentSkill && !skillDisabled
+                ? styles.buttonLabelHighlight
+                : styles.buttonLabelMuted,
+            )}
+            aria-hidden="true"
+          >
+            Habilidade
+          </span>
           {showButtonLegends && (
             <span
               className={styles.buttonLegend}
@@ -570,6 +591,12 @@ const TouchControls = ({
           <span className={styles.buttonIcon} aria-hidden="true">
             🔄
           </span>
+          <span
+            className={joinClassNames(styles.buttonLabel, styles.buttonLabelBottom)}
+            aria-hidden="true"
+          >
+            Trocar
+          </span>
           {showButtonLegends && (
             <span
               className={styles.buttonLegend}
@@ -596,6 +623,12 @@ const TouchControls = ({
         >
           <span className={styles.buttonIcon} aria-hidden="true">
             🧬
+          </span>
+          <span
+            className={joinClassNames(styles.buttonLabel, styles.buttonLabelBottom)}
+            aria-hidden="true"
+          >
+            Evoluir
           </span>
           {showButtonLegends && (
             <span

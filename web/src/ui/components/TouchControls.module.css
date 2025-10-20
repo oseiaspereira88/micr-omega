@@ -235,6 +235,39 @@
   pointer-events: none;
 }
 
+.buttonLabel {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + var(--touch-scale) * 12px);
+  transform: translate(-50%, -50%);
+  font-size: calc(var(--touch-scale) * 0.55rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #fff;
+  pointer-events: none;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.75);
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.buttonLabelBottom {
+  top: calc(50% + var(--touch-scale) * 14px);
+}
+
+.buttonLabelTop {
+  top: calc(50% - var(--touch-scale) * 16px);
+}
+
+.buttonLabelHighlight {
+  color: #fff;
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.85);
+}
+
+.buttonLabelMuted {
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.65);
+}
+
 .buttonLegend {
   position: absolute;
   top: 100%;
