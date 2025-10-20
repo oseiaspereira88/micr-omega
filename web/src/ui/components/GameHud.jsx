@@ -449,6 +449,7 @@ const GameHud = ({
     showTouchControls && effectiveTouchLayout === 'right'
       ? styles.sidebarToggleTouchLayoutRight
       : '',
+    isSidebarOpen ? styles.sidebarToggleOpen : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -466,6 +467,15 @@ const GameHud = ({
   ]
     .filter(Boolean)
     .join(' ');
+  const sidebarToggleIconClassName = [
+    styles.sidebarToggleIcon,
+    isSidebarOpen ? styles.sidebarToggleIconOpen : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const sidebarToggleLabel = isSidebarOpen
+    ? 'Ocultar painel'
+    : 'Mostrar painel';
 
   useEffect(() => {
     if (!isMobileHud) {
@@ -537,8 +547,17 @@ const GameHud = ({
         disabled={hudDisabled}
         aria-disabled={hudDisabled ? true : undefined}
         inert={hudDisabled ? 'true' : undefined}
+        aria-label={sidebarToggleLabel}
       >
-        {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
+        <span
+          className={sidebarToggleIconClassName}
+          aria-hidden="true"
+        >
+          <span className={styles.sidebarToggleIconBar} />
+        </span>
+        <span className={styles.sidebarToggleLabel} aria-live="polite">
+          {sidebarToggleLabel}
+        </span>
       </button>
 
       <div
