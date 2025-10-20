@@ -48,6 +48,21 @@ const ELEMENT_PARTICLE_COLORS = {
 const resolveElementColor = (element, fallback) =>
   ELEMENT_PARTICLE_COLORS[element] ?? fallback ?? '#ffffff';
 
+const resolveScaledParticleCount = (
+  damage,
+  { base = 8, min = Math.max(1, Math.round(base * 0.4)), max = Math.max(base, Math.round(base * 1.5)) } = {},
+) => {
+  const safeDamage = Number.isFinite(damage) ? Math.max(0, damage) : 0;
+  if (safeDamage <= 0) return 0;
+
+  const lowerBound = Math.max(0, min);
+  const upperBound = Math.max(lowerBound, max);
+  const normalized = safeDamage / (safeDamage + 15);
+  const scaled = Math.round(lowerBound + (upperBound - lowerBound) * normalized);
+
+  return Math.max(lowerBound, Math.min(upperBound, scaled));
+};
+
 export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   if (!state || !enemy) return false;
 
@@ -62,12 +77,17 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
       enemy.health = Math.max(0, enemy.health - normalizedDamage);
       const color = STATUS_METADATA[status]?.color ?? enemy.color;
       createEffect?.(state, enemy.x, enemy.y, getStatusEffectVisual(status), color);
+      const dripCount = resolveScaledParticleCount(normalizedDamage, {
+        base: 4,
+        min: 2,
+        max: 6,
+      });
       createParticle?.(
         state,
         createStatusDrip(enemy.x, enemy.y, {
           color,
           life: 1.1,
-          count: 4,
+          count: dripCount,
           direction: Math.PI / 2,
         }),
       );
@@ -184,7 +204,8 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
         targetResistances: organism.resistances ?? {},
         situationalModifiers,
       });
-      const damage = Math.max(1, damageResult.damage);
+      const trueDamage = Number.isFinite(damageResult.damage) ? damageResult.damage : 0;
+      const damage = Math.max(1, trueDamage);
       state.health -= damage;
       addNotification?.(state, `-${damage} HP`);
       playSound?.('damage');
@@ -310,47 +331,67 @@ export const performAttack = (state, helpers = {}) => {
         combo: { value: state.combo, multiplier: comboMultiplier },
         hooks: organism.comboHooks ?? {},
       });
-      const damage = Math.max(1, damageResult.damage);
+      const trueDamage = Number.isFinite(damageResult.damage) ? damageResult.damage : 0;
+      const damage = Math.max(1, trueDamage);
       enemy.health -= damage;
 
       createEffect?.(state, enemy.x, enemy.y, 'hit', organism.color);
       const attackDirection = Math.atan2(enemy.y - organism.y, enemy.x - organism.x);
       const elementColor = resolveElementColor(attackElement, organism.color);
-      let impactParticles;
+      if (trueDamage > 0) {
+        let impactParticles;
 
-      if (criticalHit) {
-        impactParticles = createCriticalSparks(enemy.x, enemy.y, {
-          color: elementColor,
-          highlight: '#ffffff',
-          direction: attackDirection,
-          count: 10,
-          speed: 9,
-        });
-      } else if (damageResult.relation === 'advantage') {
-        impactParticles = createElementalBurst(enemy.x, enemy.y, {
-          color: elementColor,
-          direction: attackDirection,
-          count: 14,
-          life: 1.1,
-          speed: 8,
-        });
-      } else if (damageResult.relation === 'disadvantage') {
-        impactParticles = createStatusDrip(enemy.x, enemy.y, {
-          color: elementColor,
-          direction: attackDirection + Math.PI / 2,
-          count: 6,
-          life: 0.8,
-        });
-      } else {
-        impactParticles = createElementalBurst(enemy.x, enemy.y, {
-          color: elementColor,
-          direction: attackDirection,
-          count: 10,
-          life: 0.85,
-          speed: 6,
-        });
+        if (criticalHit) {
+          impactParticles = createCriticalSparks(enemy.x, enemy.y, {
+            color: elementColor,
+            highlight: '#ffffff',
+            direction: attackDirection,
+            count: resolveScaledParticleCount(trueDamage, {
+              base: 10,
+              min: 4,
+              max: 14,
+            }),
+            speed: 9,
+          });
+        } else if (damageResult.relation === 'advantage') {
+          impactParticles = createElementalBurst(enemy.x, enemy.y, {
+            color: elementColor,
+            direction: attackDirection,
+            count: resolveScaledParticleCount(trueDamage, {
+              base: 14,
+              min: 6,
+              max: 18,
+            }),
+            life: 1.1,
+            speed: 8,
+          });
+        } else if (damageResult.relation === 'disadvantage') {
+          impactParticles = createStatusDrip(enemy.x, enemy.y, {
+            color: elementColor,
+            direction: attackDirection + Math.PI / 2,
+            count: resolveScaledParticleCount(trueDamage, {
+              base: 6,
+              min: 2,
+              max: 9,
+            }),
+            life: 0.8,
+          });
+        } else {
+          impactParticles = createElementalBurst(enemy.x, enemy.y, {
+            color: elementColor,
+            direction: attackDirection,
+            count: resolveScaledParticleCount(trueDamage, {
+              base: 10,
+              min: 4,
+              max: 14,
+            }),
+            life: 0.85,
+            speed: 6,
+          });
+        }
+
+        createParticle?.(state, impactParticles);
       }
-      createParticle?.(state, impactParticles);
 
       enemy.vx += (dx / dist) * 5;
       enemy.vy += (dy / dist) * 5;
