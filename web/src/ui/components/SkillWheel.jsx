@@ -144,6 +144,12 @@ const SkillWheel = ({
 
   const readinessPercent = Math.max(0, Math.min(100, Math.round(skillReadyPercent)));
   const readinessStatus = readinessPercent >= 100 ? 'Pronta' : `${readinessPercent}% recarregada`;
+  const progressWheelClassName = [
+    styles.progressWheel,
+    readinessPercent >= 100 ? styles.progressWheelReady : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const cycleButtonLabel = usesTouchGuidance
     ? '🔁 Trocar habilidade'
@@ -208,11 +214,17 @@ const SkillWheel = ({
           aria-valuemax={100}
           aria-valuenow={readinessPercent}
           aria-valuetext={readinessStatus}
-          className={styles.progressFill}
+          className={progressWheelClassName}
           style={{
-            width: `${readinessPercent}%`,
+            '--readiness': readinessPercent,
           }}
-        />
+        >
+          <div className={styles.progressValue}>
+            <span className={styles.progressValueText}>
+              {readinessPercent >= 100 ? 'Pronta' : `${readinessPercent}%`}
+            </span>
+          </div>
+        </div>
       </div>
       <span
         id={statusMessageId}
