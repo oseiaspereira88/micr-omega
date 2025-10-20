@@ -467,7 +467,11 @@ const GameHud = ({
         {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
       </button>
 
-      <div className={hudClassName} data-mobile-hud={isMobileHud ? 'true' : 'false'}>
+      <div
+        className={hudClassName}
+        data-mobile-hud={isMobileHud ? 'true' : 'false'}
+        data-touch-controls={showTouchControls ? 'true' : 'false'}
+      >
         <div
           className={`${styles.canvasOverlay} ${
             showStatusOverlay ? styles.canvasOverlayVisible : ''
