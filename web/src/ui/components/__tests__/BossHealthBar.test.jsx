@@ -12,10 +12,13 @@ describe('BossHealthBar', () => {
 
     const progress = screen.getByRole('progressbar', { name: /mega-organismo/i });
     expect(Number(progress.getAttribute('aria-valuenow'))).toBe(0);
+    expect(progress.getAttribute('aria-describedby')).toBeTruthy();
 
     const fill = progress.firstElementChild;
     expect(fill).not.toBeNull();
     expect(fill).toHaveStyle({ width: '0%' });
+
+    expect(screen.getByText(/enfurecido!/i)).toBeInTheDocument();
   });
 
   it('renders custom boss name when provided', () => {
@@ -26,6 +29,10 @@ describe('BossHealthBar', () => {
     expect(screen.getByText(/⚠️ Colosso Primevo/)).toBeInTheDocument();
     const progress = screen.getByRole('progressbar', { name: /colosso primevo/i });
     expect(progress).toBeInTheDocument();
+
+    expect(progress.querySelectorAll('[data-segment-marker]')).toHaveLength(3);
+
+    expect(screen.getByText(/fase 3/i)).toBeInTheDocument();
   });
 });
 
