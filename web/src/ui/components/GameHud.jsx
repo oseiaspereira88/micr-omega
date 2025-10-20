@@ -95,6 +95,8 @@ const GameHud = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarRef = useRef(null);
   const toggleButtonRef = useRef(null);
+  const hudRootRef = useRef(null);
+  const hudContentRef = useRef(null);
   const sidebarId = useId();
   const minimapToggleId = useId();
 
@@ -451,6 +453,44 @@ const GameHud = ({
     .filter(Boolean)
     .join(' ');
 
+  useEffect(() => {
+    const hudRoot = hudRootRef.current;
+    const hudContent = hudContentRef.current;
+
+    if (!hudRoot) {
+      return undefined;
+    }
+
+    if (!isMobileHud || !hudContent) {
+      hudRoot.style.removeProperty('--hud-mobile-offset');
+      return undefined;
+    }
+
+    const updateOffset = () => {
+      const height = hudContent.getBoundingClientRect().height;
+      hudRoot.style.setProperty('--hud-mobile-offset', `${height}px`);
+    };
+
+    if (typeof window === 'undefined' || typeof window.ResizeObserver !== 'function') {
+      updateOffset();
+      return () => {
+        hudRoot.style.removeProperty('--hud-mobile-offset');
+      };
+    }
+
+    const resizeObserver = new window.ResizeObserver(() => {
+      updateOffset();
+    });
+
+    resizeObserver.observe(hudContent);
+    updateOffset();
+
+    return () => {
+      resizeObserver.disconnect();
+      hudRoot.style.removeProperty('--hud-mobile-offset');
+    };
+  }, [isMobileHud]);
+
   return (
     <>
       <button
@@ -467,7 +507,11 @@ const GameHud = ({
         {isSidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}
       </button>
 
-      <div className={hudClassName} data-mobile-hud={isMobileHud ? 'true' : 'false'}>
+      <div
+        className={hudClassName}
+        data-mobile-hud={isMobileHud ? 'true' : 'false'}
+        ref={hudRootRef}
+      >
         <div
           className={`${styles.canvasOverlay} ${
             showStatusOverlay ? styles.canvasOverlayVisible : ''
@@ -612,6 +656,7 @@ const GameHud = ({
           className={mainHudClassName}
           aria-hidden={hudDisabled ? true : undefined}
           inert={hudDisabled ? 'true' : undefined}
+          ref={hudContentRef}
         >
           <HudBar
             isMobileHud={isMobileHud}
