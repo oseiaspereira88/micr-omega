@@ -99,6 +99,14 @@
   z-index: 32;
 }
 
+:global([data-touch-controls-active='true']) .chipStrip {
+  pointer-events: none;
+}
+
+:global([data-touch-controls-active='true']) .chipStrip > * {
+  pointer-events: auto;
+}
+
 .chipStrip .primaryBadges {
   flex-wrap: nowrap;
   overflow-x: auto;

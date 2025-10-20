@@ -2,7 +2,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 20;
+  z-index: 60;
   --touch-scale: 1;
   --touch-vertical-scale: 1;
   --touch-spacing: calc(var(--touch-scale) * 15px);
