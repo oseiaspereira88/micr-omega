@@ -15,6 +15,7 @@ import CameraControls from './CameraControls';
 import styles from './GameHud.module.css';
 import RankingPanel from '../../components/RankingPanel';
 import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
+import useIsTouchDevice from '../../hooks/useIsTouchDevice';
 import { shallowEqual, useGameStore } from '../../store/gameStore';
 import { useGameSettings } from '../../store/gameSettings';
 
@@ -102,14 +103,31 @@ const GameHud = ({
   const sidebarId = useId();
   const minimapToggleId = useId();
   const audioToggleId = useId();
+  const touchToggleId = useId();
+  const touchLayoutSelectId = useId();
+  const touchLayoutDescriptionId = useId();
+  const touchLayoutHelperId = useId();
+  const touchLayoutAutoSwapToggleId = useId();
+  const touchLayoutAutoSwapDescriptionId = useId();
+  const touchLayoutAutoSwapHelperId = useId();
   const { settings, updateSettings } = useGameSettings();
   const audioEnabled = settings?.audioEnabled !== false;
   const audioLabel = audioEnabled ? 'Som ligado' : 'Som desligado';
   const isMinimapEnabled = Boolean(settings?.showMinimap);
+  const showTouchControlsSetting = Boolean(settings?.showTouchControls);
   const touchLayoutPreference = settings?.touchLayout === 'left' ? 'left' : 'right';
   const autoSwapTouchLayoutWhenSidebarOpen = Boolean(
     settings?.autoSwapTouchLayoutWhenSidebarOpen,
   );
+  const isTouchDevice = useIsTouchDevice();
+  const canShowTouchSettings = isTouchDevice || showTouchControlsSetting;
+  const isTouchLayoutDisabled = !isTouchDevice || !showTouchControlsSetting;
+  const touchLayoutDescribedBy = showTouchControlsSetting
+    ? touchLayoutDescriptionId
+    : `${touchLayoutDescriptionId} ${touchLayoutHelperId}`;
+  const touchLayoutAutoSwapDescribedBy = showTouchControlsSetting
+    ? touchLayoutAutoSwapDescriptionId
+    : `${touchLayoutAutoSwapDescriptionId} ${touchLayoutAutoSwapHelperId}`;
   const minimapPreviewClassName = useMemo(
     () =>
       [
@@ -125,6 +143,16 @@ const GameHud = ({
         audioEnabled ? styles.audioPreviewActive : styles.audioPreviewInactive,
       ].join(' '),
     [audioEnabled],
+  );
+  const touchControlsPreviewClassName = useMemo(
+    () =>
+      [
+        styles.touchControlsPreview,
+        showTouchControlsSetting
+          ? styles.touchControlsPreviewActive
+          : styles.touchControlsPreviewInactive,
+      ].join(' '),
+    [showTouchControlsSetting],
   );
 
   const showStatusOverlay = connectionStatus !== 'connected';
@@ -339,6 +367,28 @@ const GameHud = ({
   const handleToggleAudio = useCallback(() => {
     updateSettings({ audioEnabled: !audioEnabled });
   }, [audioEnabled, updateSettings]);
+
+  const handleToggleTouchControls = useCallback(
+    (event) => {
+      updateSettings({ showTouchControls: event.target.checked });
+    },
+    [updateSettings],
+  );
+
+  const handleTouchLayoutChange = useCallback(
+    (event) => {
+      const value = event.target.value === 'left' ? 'left' : 'right';
+      updateSettings({ touchLayout: value });
+    },
+    [updateSettings],
+  );
+
+  const handleToggleAutoSwapTouchLayout = useCallback(
+    (event) => {
+      updateSettings({ autoSwapTouchLayoutWhenSidebarOpen: event.target.checked });
+    },
+    [updateSettings],
+  );
 
   const handleDesktopEvolutionClick = useCallback(() => {
     if (typeof onOpenEvolutionMenu === 'function') {
@@ -770,6 +820,117 @@ const GameHud = ({
                 </span>
               </div>
             </label>
+            {canShowTouchSettings ? (
+              <>
+                <h3 className={styles.settingsHeading}>Controles touch</h3>
+                <label className={styles.settingsToggle} htmlFor={touchToggleId}>
+                  <div className={styles.settingsToggleInfo}>
+                    <div className={touchControlsPreviewClassName} aria-hidden="true">
+                      <span className={styles.touchControlsPreviewIcon} aria-hidden="true">
+                        🕹️
+                      </span>
+                    </div>
+                    <div className={styles.settingsToggleText}>
+                      <span className={styles.settingsToggleTitle}>Mostrar controles</span>
+                      <span className={styles.settingsToggleDescription}>
+                        Ative os botões virtuais durante a partida.
+                      </span>
+                      {!isTouchDevice ? (
+                        <span className={styles.settingsToggleHelper}>
+                          Disponível apenas em dispositivos com tela sensível ao toque.
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className={styles.settingsToggleControl}>
+                    <input
+                      id={touchToggleId}
+                      type="checkbox"
+                      className={styles.toggleInput}
+                      checked={showTouchControlsSetting}
+                      onChange={handleToggleTouchControls}
+                      aria-checked={showTouchControlsSetting}
+                      aria-label="Exibir controles touch"
+                    />
+                    <span className={styles.toggleStatusText} aria-live="polite" aria-atomic="true">
+                      {showTouchControlsSetting ? 'Ativos' : 'Ocultos'}
+                    </span>
+                  </div>
+                </label>
+                <div className={styles.settingsField}>
+                  <div className={styles.settingsFieldInfo}>
+                    <label className={styles.settingsFieldTitle} htmlFor={touchLayoutSelectId}>
+                      Layout dos controles touch
+                    </label>
+                    <span
+                      className={styles.settingsFieldDescription}
+                      id={touchLayoutDescriptionId}
+                    >
+                      Escolha o lado onde os botões de ação ficam posicionados.
+                    </span>
+                    {!showTouchControlsSetting ? (
+                      <span className={styles.settingsFieldHelper} id={touchLayoutHelperId}>
+                        Ative os controles touch para escolher o layout.
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className={styles.settingsSelectWrapper}>
+                    <select
+                      id={touchLayoutSelectId}
+                      className={styles.settingsSelect}
+                      value={touchLayoutPreference}
+                      onChange={handleTouchLayoutChange}
+                      disabled={isTouchLayoutDisabled}
+                      aria-label="Layout dos controles touch"
+                      aria-disabled={isTouchLayoutDisabled ? 'true' : undefined}
+                      aria-describedby={touchLayoutDescribedBy}
+                    >
+                      <option value="right">Botões à direita</option>
+                      <option value="left">Botões à esquerda</option>
+                    </select>
+                  </div>
+                </div>
+                <label className={styles.settingsToggle} htmlFor={touchLayoutAutoSwapToggleId}>
+                  <div className={styles.settingsToggleInfo}>
+                    <div className={styles.settingsToggleText}>
+                      <span className={styles.settingsToggleTitle}>Ajustar ao painel lateral</span>
+                      <span
+                        className={styles.settingsToggleDescription}
+                        id={touchLayoutAutoSwapDescriptionId}
+                      >
+                        Inverta o lado dos botões automaticamente quando o painel lateral estiver
+                        aberto.
+                      </span>
+                      {!showTouchControlsSetting ? (
+                        <span
+                          className={styles.settingsToggleHelper}
+                          id={touchLayoutAutoSwapHelperId}
+                        >
+                          Ative os controles touch para configurar este ajuste.
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className={styles.settingsToggleControl}>
+                    <input
+                      id={touchLayoutAutoSwapToggleId}
+                      type="checkbox"
+                      className={styles.toggleInput}
+                      checked={autoSwapTouchLayoutWhenSidebarOpen}
+                      onChange={handleToggleAutoSwapTouchLayout}
+                      disabled={isTouchLayoutDisabled}
+                      aria-checked={autoSwapTouchLayoutWhenSidebarOpen}
+                      aria-label="Ajustar layout automaticamente quando o painel lateral estiver aberto"
+                      aria-disabled={isTouchLayoutDisabled ? 'true' : undefined}
+                      aria-describedby={touchLayoutAutoSwapDescribedBy}
+                    />
+                    <span className={styles.toggleStatusText} aria-live="polite" aria-atomic="true">
+                      {autoSwapTouchLayoutWhenSidebarOpen ? 'Ativado' : 'Desativado'}
+                    </span>
+                  </div>
+                </label>
+              </>
+            ) : null}
           </div>
         </div>
 

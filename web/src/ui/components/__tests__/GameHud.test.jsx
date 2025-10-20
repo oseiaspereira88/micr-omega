@@ -1,11 +1,12 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 
 import GameHud from '../GameHud';
 import { gameStore } from '../../../store/gameStore';
 import { GameSettingsProvider } from '../../../store/gameSettings';
+import * as touchDeviceModule from '../../../hooks/useIsTouchDevice';
 
 const originalMatchMedia = window.matchMedia;
 const createMatchMedia = (matches = false) =>
@@ -18,14 +19,21 @@ const createMatchMedia = (matches = false) =>
     removeListener: vi.fn(),
     dispatchEvent: vi.fn(),
   }));
+const useIsTouchDeviceSpy = vi.spyOn(touchDeviceModule, 'default');
 
 beforeEach(() => {
   window.matchMedia = createMatchMedia(false);
   window.localStorage.clear();
+  useIsTouchDeviceSpy.mockReturnValue(false);
 });
 
 afterEach(() => {
   window.matchMedia = originalMatchMedia;
+  useIsTouchDeviceSpy.mockReset();
+});
+
+afterAll(() => {
+  useIsTouchDeviceSpy.mockRestore();
 });
 
 const BASE_PROPS = {
@@ -452,6 +460,90 @@ describe('GameHud settings panel', () => {
 
     const persistedToggle = await screen.findByRole('checkbox', { name: /som desligado/i });
     expect(persistedToggle).not.toBeChecked();
+  });
+
+  it('não exibe preferências de controles touch quando o dispositivo não é compatível', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>,
+    );
+
+    const openButton = screen.getByRole('button', { name: /mostrar painel/i });
+    await user.click(openButton);
+
+    expect(
+      screen.queryByRole('heading', { name: /controles touch/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('permite configurar controles touch quando disponível', async () => {
+    useIsTouchDeviceSpy.mockReturnValue(true);
+    const user = userEvent.setup();
+    const storageKey = 'micr-omega:game-settings';
+
+    render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>,
+    );
+
+    const openButton = screen.getByRole('button', { name: /mostrar painel/i });
+    await user.click(openButton);
+
+    const touchToggle = await screen.findByRole('checkbox', {
+      name: /exibir controles touch/i,
+    });
+    expect(touchToggle).not.toBeChecked();
+
+    const touchLayoutSelect = screen.getByRole('combobox', {
+      name: /layout dos controles touch/i,
+    });
+    expect(touchLayoutSelect).toBeDisabled();
+
+    const autoSwapToggle = screen.getByRole('checkbox', {
+      name: /ajustar layout automaticamente quando o painel lateral estiver aberto/i,
+    });
+    expect(autoSwapToggle).toBeDisabled();
+
+    await user.click(touchToggle);
+
+    await waitFor(() => {
+      expect(touchToggle).toBeChecked();
+    });
+
+    await waitFor(() => {
+      const stored = window.localStorage.getItem(storageKey);
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored);
+      expect(parsed.showTouchControls).toBe(true);
+    });
+
+    expect(touchLayoutSelect).not.toBeDisabled();
+    expect(autoSwapToggle).not.toBeDisabled();
+
+    await user.selectOptions(touchLayoutSelect, 'left');
+
+    await waitFor(() => {
+      expect(touchLayoutSelect).toHaveValue('left');
+      const stored = window.localStorage.getItem(storageKey);
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored);
+      expect(parsed.touchLayout).toBe('left');
+    });
+
+    expect(autoSwapToggle).toBeChecked();
+    await user.click(autoSwapToggle);
+
+    await waitFor(() => {
+      expect(autoSwapToggle).not.toBeChecked();
+      const stored = window.localStorage.getItem(storageKey);
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored);
+      expect(parsed.autoSwapTouchLayoutWhenSidebarOpen).toBe(false);
+    });
   });
 });
 
