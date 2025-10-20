@@ -1,5 +1,43 @@
 const randomRange = (min, max, rng = Math.random) => rng() * (max - min) + min;
 
+const hexPattern = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+const normalizeHex = (color) => {
+  if (typeof color !== 'string') {
+    return null;
+  }
+
+  const trimmed = color.trim();
+  if (!hexPattern.test(trimmed)) {
+    return null;
+  }
+
+  if (trimmed.length === 4) {
+    const [hash, r, g, b] = trimmed;
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+
+  return trimmed.length === 7 ? trimmed.toLowerCase() : null;
+};
+
+const adjustHexColor = (color, variance, rng = Math.random) => {
+  const normalized = normalizeHex(color);
+  if (!normalized || !Number.isFinite(variance) || variance <= 0) {
+    return color;
+  }
+
+  const random = typeof rng === 'function' ? rng : Math.random;
+  const factor = 1 + (random() * 2 - 1) * variance;
+  const clampChannel = (value) => Math.max(0, Math.min(255, Math.round(value)));
+  const r = parseInt(normalized.slice(1, 3), 16);
+  const g = parseInt(normalized.slice(3, 5), 16);
+  const b = parseInt(normalized.slice(5, 7), 16);
+
+  const toHex = (value) => clampChannel(value).toString(16).padStart(2, '0');
+
+  return `#${toHex(r * factor)}${toHex(g * factor)}${toHex(b * factor)}`;
+};
+
 const clampNumber = (value, fallback) => (Number.isFinite(value) ? value : fallback);
 
 const isParticleLike = (particle) =>
@@ -142,6 +180,95 @@ export const createStatusDrip = (
       stretch: 0.6,
       rng: random,
     });
+    return particle;
+  }).filter(isParticleLike);
+};
+
+export const createStatusAura = (
+  x,
+  y,
+  {
+    color = '#66ccff',
+    palette,
+    life = 1.4,
+    fade,
+    count = 12,
+    radius = 18,
+    angularSpeed = 0.9,
+    oscillationAmplitude = 3,
+    oscillationFrequency = 2.4,
+    colorVariance = 0.15,
+    intensityVariance = 0.4,
+    pulseSpeed = 0,
+    pulseAmplitude = 0.25,
+    glowStrength = 1.2,
+    blend = 'lighter',
+    size = 3,
+    rng = Math.random,
+  } = {},
+) => {
+  const random = typeof rng === 'function' ? rng : Math.random;
+  const total = Math.max(0, Math.round(count));
+  if (total === 0) {
+    return [];
+  }
+
+  const resolvedLife = Number.isFinite(life) ? Math.max(0.1, life) : 1.4;
+  const resolvedFade = Number.isFinite(fade)
+    ? Math.max(0.001, fade)
+    : Math.max(0.01, resolvedLife / 60);
+  const resolvedRadius = Number.isFinite(radius) ? Math.max(0, radius) : 18;
+  const resolvedAngularSpeed = Number.isFinite(angularSpeed) ? angularSpeed : 0.9;
+  const resolvedOscillationAmplitude = Number.isFinite(oscillationAmplitude)
+    ? Math.max(0, oscillationAmplitude)
+    : 3;
+  const resolvedOscillationFrequency = Number.isFinite(oscillationFrequency)
+    ? Math.max(0, oscillationFrequency)
+    : 2.4;
+  const paletteArray = Array.isArray(palette) && palette.length > 0 ? palette : null;
+  const resolvedPulseSpeed = Number.isFinite(pulseSpeed) ? pulseSpeed : 0;
+  const resolvedPulseAmplitude = Number.isFinite(pulseAmplitude) ? Math.max(0, pulseAmplitude) : 0.25;
+  const baseGlowStrength = Number.isFinite(glowStrength) ? Math.max(0, glowStrength) : 0;
+
+  return Array.from({ length: total }, (_, index) => {
+    const baseAngle = (index / total) * Math.PI * 2;
+    const oscillationPhase = random() * Math.PI * 2;
+    const colorSource = paletteArray ? paletteArray[index % paletteArray.length] : color;
+    const variedColor = adjustHexColor(colorSource, colorVariance, random);
+    const variedGlowStrength = baseGlowStrength * (1 - intensityVariance / 2 + random() * intensityVariance);
+    const particle = createParticle(x + Math.cos(baseAngle) * resolvedRadius, y + Math.sin(baseAngle) * resolvedRadius, {
+      color: variedColor,
+      life: resolvedLife * (0.8 + random() * 0.4),
+      fade: resolvedFade,
+      gravity: 0,
+      speed: 0,
+      blend,
+      size,
+      rng: random,
+      pulseSpeed: resolvedPulseSpeed,
+      pulseAmplitude: resolvedPulseAmplitude,
+      glowStrength: variedGlowStrength,
+    });
+
+    if (!isParticleLike(particle)) {
+      return null;
+    }
+
+    particle.vx = -Math.sin(baseAngle) * resolvedAngularSpeed * resolvedRadius;
+    particle.vy = Math.cos(baseAngle) * resolvedAngularSpeed * resolvedRadius;
+    particle.angularVelocity = resolvedAngularSpeed;
+    particle.orbit = {
+      centerX: x,
+      centerY: y,
+      radius: resolvedRadius,
+      oscillationAmplitude: resolvedOscillationAmplitude,
+      oscillationFrequency: resolvedOscillationFrequency,
+      oscillationPhase,
+    };
+    particle.pulseSpeed = resolvedPulseSpeed;
+    particle.pulseAmplitude = resolvedPulseAmplitude;
+    particle.glowStrength = Math.max(0, variedGlowStrength);
+
     return particle;
   }).filter(isParticleLike);
 };
