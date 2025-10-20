@@ -63,6 +63,13 @@ const resolveScaledParticleCount = (
   return Math.max(lowerBound, Math.min(upperBound, scaled));
 };
 
+const clampNumber = (value, min, max, fallback = min) => {
+  if (!Number.isFinite(value)) return fallback;
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+};
+
 export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   if (!state || !enemy) return false;
 
@@ -70,33 +77,106 @@ export const updateEnemy = (state, helpers = {}, enemy, delta = 0) => {
   const organism = state.organism;
   if (!organism) return false;
 
+  const statusDripTracker = enemy._statusDripTracker;
+  const safeDelta = Number.isFinite(delta) ? Math.max(0, delta) : 0;
+  if (statusDripTracker?.statuses) {
+    Object.values(statusDripTracker.statuses).forEach((entry) => {
+      if (!entry) return;
+      entry.elapsed = Math.min(5, Math.max(0, (entry.elapsed ?? 0) + safeDelta));
+    });
+  }
+
+  const recordStatusDripTelemetry = (event, payload = 0) => {
+    if (!state.debug) return;
+    state.debug.particleCounts = state.debug.particleCounts || {};
+    const bucket =
+      state.debug.particleCounts.statusDrip ||
+      (state.debug.particleCounts.statusDrip = { emissions: 0, particles: 0, suppressed: 0 });
+
+    if (event === 'suppressed') {
+      bucket.suppressed = (bucket.suppressed ?? 0) + 1;
+    } else if (event === 'emission') {
+      bucket.emissions = (bucket.emissions ?? 0) + 1;
+      bucket.particles = (bucket.particles ?? 0) + Math.max(0, payload);
+    }
+  };
+
   tickStatusEffects(enemy, delta, {
     onDamage: ({ damage, status }) => {
       const normalizedDamage = Math.max(0, damage);
       if (normalizedDamage <= 0) return;
       enemy.health = Math.max(0, enemy.health - normalizedDamage);
-      const color = STATUS_METADATA[status]?.color ?? enemy.color;
-      createEffect?.(state, enemy.x, enemy.y, getStatusEffectVisual(status), color);
-      const dripCount = resolveScaledParticleCount(normalizedDamage, {
-        base: 4,
-        min: 2,
-        max: 6,
+      const statusDefinition = STATUS_METADATA[status] ?? {};
+      const aura = statusDefinition.aura ?? {};
+      const auraIntensity = clampNumber(aura.intensity, 0.55, 1.6, 1);
+      const auraInterval = clampNumber(aura.interval, 0.25, 0.8, 0.45);
+      const auraAccumulation = clampNumber(aura.accumulation, 0.6, 3, 1.2);
+      const auraBurstThreshold = clampNumber(aura.burstThreshold, 2, 9, 4.5) / auraIntensity;
+
+      const tracker =
+        enemy._statusDripTracker ||
+        (enemy._statusDripTracker = { statuses: Object.create(null) });
+      tracker.statuses = tracker.statuses || Object.create(null);
+      const entry = tracker.statuses[status] || { pendingDamage: 0, elapsed: safeDelta };
+      if (tracker.statuses[status]) {
+        entry.elapsed = Math.min(5, Math.max(0, (entry.elapsed ?? 0) + safeDelta));
+      }
+      entry.pendingDamage = Math.max(0, (entry.pendingDamage ?? 0) + normalizedDamage);
+      tracker.statuses[status] = entry;
+
+      const shouldBurst = normalizedDamage >= auraBurstThreshold;
+      const accumulatedReady = entry.elapsed >= auraInterval && entry.pendingDamage >= auraAccumulation;
+
+      const effectColor = statusDefinition.color ?? enemy.color;
+      createEffect?.(state, enemy.x, enemy.y, getStatusEffectVisual(status), effectColor);
+
+      if (!shouldBurst && !accumulatedReady) {
+        recordStatusDripTelemetry('suppressed');
+        return;
+      }
+
+      const totalDamage = entry.pendingDamage;
+      entry.pendingDamage = 0;
+      entry.elapsed = 0;
+
+      const dripColor =
+        typeof aura.color === 'string' && aura.color.trim().length > 0
+          ? aura.color
+          : effectColor;
+      const countBase = resolveScaledParticleCount(totalDamage, {
+        base: 3,
+        min: 1,
+        max: 5,
       });
-      createParticle?.(
-        state,
-        createStatusDrip(enemy.x, enemy.y, {
-          color,
-          life: 1.1,
-          count: dripCount,
-          direction: Math.PI / 2,
-        }),
-      );
+      const countScale = clampNumber(0.55 + auraIntensity * 0.35, 0.55, 1.2, 0.8);
+      const dripCount = Math.max(1, Math.round(countBase * countScale));
+      const dripLife = clampNumber(0.55 + auraIntensity * 0.25, 0.55, 1, 0.75);
+      const fade = clampNumber(0.012 + (1.2 - Math.min(auraIntensity, 1.2)) * 0.0025, 0.01, 0.02, 0.014);
+      const gravity = clampNumber(0.2 + Math.max(0, 1.1 - auraIntensity) * 0.08, 0.15, 0.32, 0.22);
+      const particles = createStatusDrip(enemy.x, enemy.y, {
+        color: dripColor,
+        life: dripLife,
+        count: dripCount,
+        direction: Math.PI / 2,
+        fade,
+        gravity,
+        blend: auraIntensity > 1.15 ? 'lighter' : 'source-over',
+      });
+      const emittedCount = Array.isArray(particles) ? particles.length : 0;
+      if (emittedCount > 0) {
+        createParticle?.(state, particles);
+      }
+      recordStatusDripTelemetry('emission', emittedCount);
       pushDamagePopup(state, {
         x: enemy.x,
         y: enemy.y,
         value: normalizedDamage,
         variant: 'status',
       });
+    },
+    onExpire: ({ status }) => {
+      if (!enemy._statusDripTracker?.statuses) return;
+      delete enemy._statusDripTracker.statuses[status];
     },
   });
 

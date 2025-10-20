@@ -28,6 +28,13 @@ export const STATUS_METADATA = Object.freeze({
     dot: { element: ELEMENT_TYPES.CHEMICAL, damagePerSecond: 6 },
     defensePenaltyPerStack: 0.03,
     effect: 'fissure',
+    aura: {
+      color: '#ff8a8a',
+      intensity: 1.15,
+      interval: 0.32,
+      accumulation: 1.6,
+      burstThreshold: 4.8,
+    },
   },
   [STATUS_EFFECTS.CORROSION]: {
     label: 'Corrosão',
@@ -40,6 +47,13 @@ export const STATUS_METADATA = Object.freeze({
     dot: { element: ELEMENT_TYPES.ACID, damagePerSecond: 8 },
     defensePenaltyPerStack: 0.05,
     effect: 'corrosion',
+    aura: {
+      color: '#ffd27f',
+      intensity: 1.05,
+      interval: 0.36,
+      accumulation: 1.4,
+      burstThreshold: 5.5,
+    },
   },
   [STATUS_EFFECTS.PHOTOLESION]: {
     label: 'Fotolesão',
@@ -52,6 +66,13 @@ export const STATUS_METADATA = Object.freeze({
     dot: { element: ELEMENT_TYPES.THERMAL, damagePerSecond: 5 },
     criticalBonusPerStack: 0.1,
     effect: 'photolesion',
+    aura: {
+      color: '#fff2a3',
+      intensity: 0.9,
+      interval: 0.42,
+      accumulation: 1.2,
+      burstThreshold: 4,
+    },
   },
   [STATUS_EFFECTS.ENTANGLED]: {
     label: 'Enredamento',
