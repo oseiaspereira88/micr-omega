@@ -35,8 +35,17 @@ export async function createMiniflare() {
   });
 }
 
-export async function openSocket(mf: Miniflare) {
-  const response = await mf.dispatchFetch("http://localhost/", {
+export async function openSocket(mf: Miniflare, target?: string | URL) {
+  let requestUrl: string;
+  if (!target) {
+    requestUrl = "http://localhost/";
+  } else if (target instanceof URL) {
+    requestUrl = target.toString();
+  } else {
+    requestUrl = new URL(target, "http://localhost/").toString();
+  }
+
+  const response = await mf.dispatchFetch(requestUrl, {
     headers: { Upgrade: "websocket" },
   });
   if (response.status !== 101 || !response.webSocket) {

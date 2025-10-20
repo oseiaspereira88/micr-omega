@@ -2,6 +2,13 @@ import { createMulberry32 } from "@micr-omega/shared";
 import type { Env } from "./index";
 import { createObservability, serializeError, type Observability } from "./observability";
 import {
+  ROOM_ID_HEADER,
+  deriveRoomIdFromUrl,
+  parseRoomRoute,
+  routeExpectsWebSocket,
+  sanitizeRoomId,
+} from "./room-routing";
+import {
   ORGANIC_COLLECTION_ENERGY_MULTIPLIER,
   ORGANIC_COLLECTION_MG_MULTIPLIER,
   ORGANIC_COLLECTION_SCORE_MULTIPLIER,
@@ -1554,26 +1561,43 @@ export class RoomDO {
   async fetch(request: Request): Promise<Response> {
     await this.ready;
     const url = new URL(request.url);
-    const pathname = url.pathname === "" ? "/" : url.pathname;
-    const isSupportedRoute = pathname === "/" || pathname === "/ws";
+    const route = parseRoomRoute(url.pathname);
+    const expectsWebSocket = routeExpectsWebSocket(route);
+    const derivedRoom = deriveRoomIdFromUrl(url, route);
+    const forwardedRoom = sanitizeRoomId(request.headers.get(ROOM_ID_HEADER));
+    const roomId = forwardedRoom ?? derivedRoom.roomId;
 
     const baseHeaders = {
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
     } as const;
 
-    if (!isSupportedRoute) {
+    if (!route || !expectsWebSocket) {
       return new Response("Not Found", { status: 404, headers: baseHeaders });
+    }
+
+    if (forwardedRoom && forwardedRoom !== derivedRoom.roomId) {
+      this.observability.log("warn", "room_id_mismatch", {
+        forwardedRoomId: forwardedRoom,
+        derivedRoomId: derivedRoom.roomId,
+        route: route.kind,
+      });
+      return new Response("Bad Request", { status: 400, headers: baseHeaders });
     }
 
     if (request.method !== "GET") {
       this.observability.log("warn", "room_invalid_method", {
         method: request.method,
+        roomId,
       });
       return new Response("Method Not Allowed", { status: 405, headers: baseHeaders });
     }
 
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+      this.observability.log("warn", "room_upgrade_missing", {
+        route: route.kind,
+        roomId,
+      });
       return new Response("Expected WebSocket", { status: 426, headers: baseHeaders });
     }
 
@@ -1582,11 +1606,17 @@ export class RoomDO {
     server.accept();
 
     this.setupSession(server).catch((error) => {
-      this.observability.logError("room_session_failed", error);
+      this.observability.logError("room_session_failed", error, {
+        roomId,
+        route: route.kind,
+      });
       try {
         server.close(1011, "internal_error");
       } catch (err) {
-        this.observability.logError("room_session_close_failed", err);
+        this.observability.logError("room_session_close_failed", err, {
+          roomId,
+          route: route.kind,
+        });
       }
     });
 
