@@ -9,9 +9,11 @@
 .mobileHud {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
   min-height: var(--app-viewport-height, 100vh);
-  padding: 0 clamp(12px, 4vw, 24px);
+  padding: calc(16px + var(--safe-area-inset-top, 0px))
+    clamp(12px, 4vw, 24px)
+    0;
 }
 
 .canvasOverlay {
