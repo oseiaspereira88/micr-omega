@@ -333,6 +333,64 @@ describe('updateGameState', () => {
     expect(actionBuffer.attacks).toHaveLength(0);
   });
 
+  it('assigns contrasting microorganism label colors based on palette luminance', () => {
+    const renderState = createRenderState();
+    const sharedState = createSharedState();
+
+    sharedState.world.microorganisms = [
+      {
+        id: 'micro-bright',
+        kind: 'microorganism',
+        species: 'lumen',
+        name: 'Bright Weft',
+        level: 3,
+        position: { x: 4, y: -6 },
+        movementVector: { x: 0, y: 0 },
+        orientation: { angle: 0 },
+        health: { current: 5, max: 5 },
+        color: '#f5f9ff',
+      },
+      {
+        id: 'micro-dark',
+        kind: 'microorganism',
+        species: 'umbra',
+        name: 'Duskwave',
+        level: 3,
+        position: { x: -8, y: 10 },
+        movementVector: { x: 0, y: 0 },
+        orientation: { angle: 0 },
+        health: { current: 5, max: 5 },
+        color: '#10223a',
+      },
+    ];
+    sharedState.world.organicMatter = [];
+    sharedState.world.obstacles = [];
+    sharedState.world.roomObjects = [];
+
+    updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    const brightMicroorganism = renderState.worldView.microorganisms.find(
+      (micro) => micro.id === 'micro-bright'
+    );
+    const darkMicroorganism = renderState.worldView.microorganisms.find(
+      (micro) => micro.id === 'micro-dark'
+    );
+
+    expect(brightMicroorganism).toBeDefined();
+    expect(brightMicroorganism?.labelBackground).toBe('rgba(12, 17, 29, 0.82)');
+    expect(brightMicroorganism?.labelColor).toBe('#f8fbff');
+
+    expect(darkMicroorganism).toBeDefined();
+    expect(darkMicroorganism?.labelBackground).toBe('rgba(245, 249, 255, 0.88)');
+    expect(darkMicroorganism?.labelColor).toBe('#0c111e');
+  });
+
   it('interpolates remote players and updates camera', () => {
     const renderState = createRenderState();
     const sharedState = createSharedState();
