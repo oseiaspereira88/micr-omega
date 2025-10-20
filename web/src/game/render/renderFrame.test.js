@@ -46,10 +46,10 @@ const createState = () => ({
         x: 120,
         y: 80,
         size: 14,
-        color: '#88c0ff',
-        coreColor: '#99d1ff',
-        outerColor: '#88c0ff',
-        shadowColor: '#36546f',
+        color: '#1b2739',
+        coreColor: '#213049',
+        outerColor: '#1b2739',
+        shadowColor: '#0d141f',
         health: { current: 6, max: 12 },
         healthValue: 6,
         maxHealth: 12,
@@ -60,11 +60,17 @@ const createState = () => ({
         species: 'amoeba',
         aggression: 'hostile',
         attributes: { speed: 1.1 },
-        palette: { base: '#88c0ff', core: '#99d1ff', outer: '#88c0ff', label: '#0c111e' },
+        palette: {
+          base: '#1b2739',
+          core: '#213049',
+          outer: '#1b2739',
+          label: '#f8fbff',
+          labelBackground: 'rgba(12, 17, 29, 0.82)',
+        },
         label: 'Amoeba Nova · Lv 9',
-        labelColor: '#0c111e',
-        hpFillColor: '#8fc6ff',
-        hpBorderColor: '#24354a',
+        labelColor: '#f8fbff',
+        hpFillColor: '#2c3f5c',
+        hpBorderColor: '#0b111b',
       },
     ],
   },
@@ -107,10 +113,10 @@ describe('renderFrame', () => {
       x: 120,
       y: 80,
       size: 14,
-      color: '#88c0ff',
-      coreColor: '#99d1ff',
-      outerColor: '#88c0ff',
-      shadowColor: '#36546f',
+      color: '#1b2739',
+      coreColor: '#213049',
+      outerColor: '#1b2739',
+      shadowColor: '#0d141f',
       health: 6,
       maxHealth: 12,
       boss: true,
@@ -122,7 +128,12 @@ describe('renderFrame', () => {
       label: 'Amoeba Nova · Lv 9',
     });
     expect(enemyState.enemies[0].animPhase).toBeCloseTo(state.worldView.microorganisms[0].animPhase);
-    expect(enemyState.enemies[0].palette).toMatchObject({ base: '#88c0ff', core: '#99d1ff' });
-    expect(enemyState.enemies[0].labelColor).toBe('#0c111e');
+    expect(enemyState.enemies[0].palette).toMatchObject({
+      base: '#1b2739',
+      core: '#213049',
+      label: '#f8fbff',
+      labelBackground: 'rgba(12, 17, 29, 0.82)',
+    });
+    expect(enemyState.enemies[0].labelColor).toBe('#f8fbff');
   });
 });

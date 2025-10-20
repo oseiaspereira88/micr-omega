@@ -5,6 +5,12 @@ import { enemyRenderer } from './enemyRenderer.js';
 const createMockContext = () => {
   const radialGradientMock = { addColorStop: vi.fn() };
   const linearGradientMock = { addColorStop: vi.fn() };
+  let fillStyle = '#000000';
+  let strokeStyle = '#000000';
+  const fillTextMock = vi.fn(function fillTextRecorder(text, x, y) {
+    fillTextMock.styles.push(this.fillStyle);
+  });
+  fillTextMock.styles = [];
   return {
     save: vi.fn(),
     restore: vi.fn(),
@@ -20,20 +26,31 @@ const createMockContext = () => {
     closePath: vi.fn(),
     fillRect: vi.fn(),
     strokeRect: vi.fn(),
-    fillText: vi.fn(),
+    fillText: fillTextMock,
     measureText: vi.fn((text) => ({ width: text.length * 7 })),
     createRadialGradient: vi.fn(() => radialGradientMock),
     createLinearGradient: vi.fn(() => linearGradientMock),
     canvas: { width: 800, height: 600 },
     globalAlpha: 1,
-    fillStyle: '#000000',
-    strokeStyle: '#000000',
+    get fillStyle() {
+      return fillStyle;
+    },
+    set fillStyle(value) {
+      fillStyle = value;
+    },
+    get strokeStyle() {
+      return strokeStyle;
+    },
+    set strokeStyle(value) {
+      strokeStyle = value;
+    },
     lineWidth: 1,
     shadowBlur: 0,
     shadowColor: '#000000',
     font: '',
     textAlign: '',
     textBaseline: '',
+    __fillTextStyles: fillTextMock.styles,
   };
 };
 
@@ -63,30 +80,29 @@ describe('enemyRenderer', () => {
       size: 18,
       health: 20,
       maxHealth: 20,
-      color: '#88c0ff',
-      coreColor: '#9ad4ff',
-      outerColor: '#88c0ff',
-      shadowColor: '#36546f',
+      color: '#1b2739',
+      coreColor: '#23324d',
+      outerColor: '#1b2739',
+      shadowColor: '#0d141f',
       name: 'Specimen',
       level: 5,
       species: 'amoeba',
       palette: {
-        base: '#88c0ff',
-        core: '#9ad4ff',
-        outer: '#88c0ff',
-        shadow: '#2d4055',
-        accent: '#addbff',
-        detail: '#2d4055',
-        glow: '#b6e4ff',
-        hpFill: '#8fc6ff',
-        hpBorder: '#1f2b3a',
-        label: '#0c111e',
+        base: '#1b2739',
+        core: '#23324d',
+        outer: '#1b2739',
+        shadow: '#0d141f',
+        accent: '#30486d',
+        detail: '#0d141f',
+        glow: '#3d5e8d',
+        hpFill: '#2c3f5c',
+        hpBorder: '#0b111b',
         labelBackground: 'rgba(12, 17, 29, 0.82)',
       },
       label: 'Specimen · Lv 5',
-      labelColor: '#0c111e',
-      hpFillColor: '#8fc6ff',
-      hpBorderColor: '#1f2b3a',
+      labelColor: '#f8fbff',
+      hpFillColor: '#2c3f5c',
+      hpBorderColor: '#0b111b',
       animPhase: 0,
     };
 
@@ -95,6 +111,8 @@ describe('enemyRenderer', () => {
     expect(ctx.fillText).toHaveBeenCalledWith(expect.stringContaining('Lv 5'), expect.any(Number), expect.any(Number));
     expect(ctx.createLinearGradient).toHaveBeenCalled();
     expect(enemy.animPhase).toBeGreaterThan(0);
+    const lastFillStyle = ctx.__fillTextStyles[ctx.__fillTextStyles.length - 1];
+    expect(lastFillStyle).toBe('#f8fbff');
   });
 
   it('adds directional detailing for paramecium species', () => {
