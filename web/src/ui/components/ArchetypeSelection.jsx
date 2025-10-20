@@ -4,6 +4,7 @@ import {
   ELEMENT_LABELS,
 } from '../../shared/combat';
 import { archetypeList } from '../../game/config/archetypes';
+import { SKILL_METADATA } from '../../game/config/skillMetadata';
 import styles from './ArchetypeSelection.module.css';
 
 const formatStat = (label, value) => `${label}: ${value}`;
@@ -316,11 +317,25 @@ const ArchetypeSelection = ({
 
                 <div className={styles.sectionLabel}>Habilidades iniciais</div>
                 <div className={styles.skillList}>
-                  {entry.startingSkills.map((skill) => (
-                    <span key={`${entry.key}-skill-${skill}`} className={styles.skillBadge}>
-                      {skill}
-                    </span>
-                  ))}
+                  {entry.startingSkills.map((skill) => {
+                    const metadata = SKILL_METADATA[skill];
+                    if (!metadata) {
+                      return (
+                        <span key={`${entry.key}-skill-${skill}`} className={styles.skillBadge}>
+                          {skill}
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <span key={`${entry.key}-skill-${skill}`} className={styles.skillBadge}>
+                        <span className={styles.skillIcon} aria-hidden="true">
+                          {metadata.icon}
+                        </span>
+                        <span className={styles.skillName}>{metadata.name}</span>
+                      </span>
+                    );
+                  })}
                 </div>
               </button>
             );

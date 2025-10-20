@@ -1,6 +1,7 @@
 export { forms } from './forms';
 export { archetypes, archetypeList, applyArchetypeToState } from './archetypes';
 export { createSkills } from './skills';
+export { SKILL_METADATA, skillMetadataList, getSkillMetadata } from './skillMetadata';
 export { smallEvolutions } from './smallEvolutions';
 export { mediumEvolutions } from './mediumEvolutions';
 export { majorEvolutions } from './majorEvolutions';
