@@ -30,6 +30,7 @@ const BASE_PROPS = {
   skillCooldownLabel: 'Pronta',
   skillReadyPercent: 100,
   onCycleSkill: () => {},
+  onUseSkill: () => {},
 };
 
 describe('SkillWheel control hints', () => {
@@ -38,6 +39,10 @@ describe('SkillWheel control hints', () => {
 
     expect(
       screen.getByRole('button', { name: '🔁 Trocar habilidade (R)' }),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole('button', { name: '✨ Usar habilidade (Q)' }),
     ).toBeInTheDocument();
 
     expect(
@@ -53,7 +58,11 @@ describe('SkillWheel control hints', () => {
     ).toBeInTheDocument();
 
     expect(
-      screen.getByText('Toque no botão de habilidade para usar.'),
+      screen.getByRole('button', { name: '✨ Usar habilidade' }),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText('Toque em “Usar habilidade” ou deslize para trocar.'),
     ).toBeInTheDocument();
   });
 });
