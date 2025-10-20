@@ -20,12 +20,6 @@ const SkillWheel = ({
   showTouchControls = false,
   touchLayout = 'right',
 }) => {
-  const shouldRender = currentSkill || skillList.length > 0;
-
-  if (!shouldRender) {
-    return null;
-  }
-
   const resolvedLayout = layout ?? (touchControlsActive ? 'mobile' : 'desktop');
   const isMobileLayout = resolvedLayout === 'mobile';
   const usesTouchGuidance = touchControlsActive || isMobileLayout;
@@ -104,6 +98,39 @@ const SkillWheel = ({
       ? styles.mobileOffsetLeft
       : styles.mobileOffsetRight
     : '';
+  const shouldRender = currentSkill || skillList.length > 0;
+
+  if (!shouldRender) {
+    const emptyClassName = [
+      styles.container,
+      isMobileLayout ? styles.mobile : '',
+      touchControlsActive ? styles.mobileWithTouchControls : '',
+      touchOffsetClass,
+      styles.empty,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    return (
+      <div
+        ref={containerRef}
+        className={emptyClassName}
+        data-touch-footprint={
+          Number.isFinite(touchControlsFootprint)
+            ? Math.round(touchControlsFootprint)
+            : undefined
+        }
+      >
+        <div className={styles.emptyContent}>
+          <span className={styles.emptyIcon} aria-hidden="true">
+            🛠️
+          </span>
+          <p className={styles.emptyMessage}>Nenhuma habilidade disponível no momento.</p>
+          <p className={styles.emptyHint}>Equipe uma habilidade para vê-la aqui.</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleCycleClick = () => {
     onCycleSkill?.(1);
