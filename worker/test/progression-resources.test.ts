@@ -18,12 +18,12 @@ import type {
 import type { Env } from "../src";
 import { MockDurableObjectState } from "./utils/mock-state";
 
-async function createRoom() {
-  const mockState = new MockDurableObjectState();
+async function createRoom(existingState?: MockDurableObjectState) {
+  const mockState = existingState ?? new MockDurableObjectState();
   const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
   const roomAny = room as any;
   await roomAny.ready;
-  return { roomAny } as const;
+  return { roomAny, mockState } as const;
 }
 
 function createTestPlayer(id: string): any {
@@ -424,5 +424,34 @@ describe("RoomDO progression resource updates", () => {
     const spawnedIds = new Set(respawnDiff.upsertOrganicMatter!.map((matter) => matter.id));
     expect(spawnedIds.size).toBe(group.size);
     expect(roomAny.organicRespawnQueue).toHaveLength(0);
+  });
+
+  it("persists progression counters across restarts", async () => {
+    const { roomAny, mockState } = await createRoom();
+    const player = createTestPlayer("archivist");
+    roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    roomAny.ensureProgressionState(player.id);
+    roomAny.recordKillProgression(player, { targetId: "sample", dropTier: "minion" });
+
+    const diff = roomAny.flushPendingProgression();
+    expect(diff).not.toBeNull();
+
+    const currentState = roomAny.progressionState.get(player.id);
+    expect(currentState).toBeDefined();
+    const snapshot = {
+      sequence: currentState!.sequence,
+      dropPity: { ...currentState!.dropPity },
+    };
+    expect(snapshot.sequence).toBeGreaterThan(0);
+
+    await roomAny.flushSnapshots({ force: true });
+
+    const { roomAny: restartedRoom } = await createRoom(mockState);
+    const restoredState = restartedRoom.progressionState.get(player.id);
+    expect(restoredState).toBeDefined();
+    expect(restoredState!.sequence).toBe(snapshot.sequence);
+    expect(restoredState!.dropPity).toEqual(snapshot.dropPity);
   });
 });
