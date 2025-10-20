@@ -10,7 +10,10 @@
   --touch-horizontal-offset: calc(var(--touch-scale) * 95px);
   --touch-joystick-size: calc(var(--touch-scale) * 110px);
   --touch-joystick-knob: calc(var(--touch-scale) * 45px);
-  --touch-bottom-base: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing));
+  --touch-legend-space: 0px;
+  --touch-bottom-base: calc(
+    var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-legend-space)
+  );
   --touch-attack-bottom: clamp(
     var(--touch-bottom-base),
     calc(var(--touch-bottom-base) + var(--touch-gap) * 0.2),
@@ -40,6 +43,10 @@
 
 .layoutRight {
   direction: ltr;
+}
+
+.showLegends {
+  /* Utility class to allow legend-specific overrides when active */
 }
 
 .layoutLeft {
@@ -154,7 +161,7 @@
   touch-action: none;
   pointer-events: auto;
   color: #fff;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .actionGroup {
@@ -213,6 +220,41 @@
   position: relative;
   z-index: 1;
   pointer-events: none;
+}
+
+.buttonLegend {
+  position: absolute;
+  top: 100%;
+  margin-top: calc(var(--touch-scale) * 8px);
+  padding: calc(var(--touch-scale) * 3px) calc(var(--touch-scale) * 8px);
+  border-radius: 999px;
+  font-size: calc(var(--touch-scale) * 0.65rem);
+  font-weight: 600;
+  line-height: 1.15;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.72);
+  white-space: nowrap;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.layoutRight .buttonLegend {
+  right: 0;
+  transform: translateX(-10%);
+  text-align: right;
+}
+
+.layoutLeft .buttonLegend {
+  left: 0;
+  transform: translateX(10%);
+  text-align: left;
+}
+
+.landscape .buttonLegend {
+  font-size: calc(var(--touch-scale) * 0.6rem);
+  margin-top: calc(var(--touch-scale) * 6px);
+  padding: calc(var(--touch-scale) * 2.5px) calc(var(--touch-scale) * 6px);
 }
 
 .cooldownOverlay {
