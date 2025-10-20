@@ -9,12 +9,30 @@ import { MockDurableObjectState } from "./utils/mock-state";
 import { getDefaultSkillList } from "../src/skills";
 import type { OrganicMatter, SharedWorldStateDiff, CombatLogEntry } from "../src/types";
 
-async function createRoom() {
-  const mockState = new MockDurableObjectState();
+const RNG_STATE_KEY = "rng_state";
+
+type TestRngState = {
+  organicMatterRespawn: number;
+  progression: number;
+};
+
+async function createRoom(options: {
+  state?: MockDurableObjectState;
+  rngState?: TestRngState;
+} = {}) {
+  const mockState = options.state ?? new MockDurableObjectState();
+  if (options.rngState) {
+    const snapshot =
+      typeof structuredClone === "function"
+        ? structuredClone(options.rngState)
+        : { ...options.rngState };
+    mockState.storageImpl.data.set(RNG_STATE_KEY, snapshot);
+  }
+
   const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
   const roomAny = room as any;
   await roomAny.ready;
-  return { roomAny } as const;
+  return { roomAny, mockState } as const;
 }
 
 function createTestPlayer(id: string): any {
@@ -139,5 +157,35 @@ describe("organic respawn randomness", () => {
         },
       ),
     );
+  });
+
+  it("continues organic respawn RNG sequences after restart", async () => {
+    const seeds: TestRngState = {
+      organicMatterRespawn: 0x9e3779b9,
+      progression: 0x85ebca6b,
+    };
+
+    const { roomAny: baselineRoom } = await createRoom({ rngState: seeds });
+    const baselineFirst = baselineRoom.createOrganicRespawnRng();
+    const baselineFirstValues = [baselineFirst.rng(), baselineFirst.rng()];
+    const baselineSecond = baselineRoom.createOrganicRespawnRng();
+    const baselineSecondValues = [baselineSecond.rng(), baselineSecond.rng()];
+
+    const restartState = new MockDurableObjectState();
+    restartState.storageImpl.data.set(RNG_STATE_KEY, { ...seeds });
+
+    const { roomAny: initialRoom } = await createRoom({ state: restartState });
+    const initialGroup = initialRoom.createOrganicRespawnRng();
+    const initialValues = [initialGroup.rng(), initialGroup.rng()];
+    expect(initialGroup.seed).toBe(baselineFirst.seed);
+    expect(initialValues).toEqual(baselineFirstValues);
+
+    await initialRoom.persistRngState();
+
+    const { roomAny: resumedRoom } = await createRoom({ state: restartState });
+    const resumedGroup = resumedRoom.createOrganicRespawnRng();
+    const resumedValues = [resumedGroup.rng(), resumedGroup.rng()];
+    expect(resumedGroup.seed).toBe(baselineSecond.seed);
+    expect(resumedValues).toEqual(baselineSecondValues);
   });
 });
