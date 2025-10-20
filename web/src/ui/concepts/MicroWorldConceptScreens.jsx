@@ -81,14 +81,25 @@ const conceptSteps = [
         </div>
         <div className={styles.sectionGallery}>
           <ScreenPreview title="Main Menu — Desktop" canvasClass={styles.menuCanvas}>
-            <MainMenuScreen />
+            <MainMenuScreen
+              isSettingsComingSoon
+              isStoreComingSoon
+              isMissionsComingSoon
+              isFriendsComingSoon
+            />
           </ScreenPreview>
           <ScreenPreview
             title="Main Menu — Mobile"
             orientation="mobile"
             canvasClass={`${styles.menuCanvas} ${styles.menuMobileCanvas}`}
           >
-            <MainMenuScreen variant="mobile" />
+            <MainMenuScreen
+              variant="mobile"
+              isSettingsComingSoon
+              isStoreComingSoon
+              isMissionsComingSoon
+              isFriendsComingSoon
+            />
           </ScreenPreview>
         </div>
       </section>
@@ -113,14 +124,18 @@ const conceptSteps = [
         </div>
         <div className={styles.sectionGallery}>
           <ScreenPreview title="Lobby — Desktop" canvasClass={styles.lobbyCanvas}>
-            <LobbyScreen />
+            <LobbyScreen isCreateRoomComingSoon isUnlockRoomComingSoon />
           </ScreenPreview>
           <ScreenPreview
             title="Lobby — Mobile"
             orientation="mobile"
             canvasClass={`${styles.lobbyCanvas} ${styles.lobbyMobileCanvas}`}
           >
-            <LobbyScreen variant="mobile" />
+            <LobbyScreen
+              variant="mobile"
+              isCreateRoomComingSoon
+              isUnlockRoomComingSoon
+            />
           </ScreenPreview>
         </div>
       </section>

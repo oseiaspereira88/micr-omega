@@ -43,7 +43,6 @@ const STAGE_METADATA = {
 
 const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
   const [activeStage, setActiveStage] = useState('splash');
-  const [feedbackNotice, setFeedbackNotice] = useState(null);
   const splashTimerRef = useRef(null);
   const viewportVariant = useMenuViewportVariant();
   const variant = viewportVariant ?? 'desktop';
@@ -114,10 +113,6 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
     }
   }, [activeStage]);
 
-  const pushFeedbackNotice = useCallback((message) => {
-    setFeedbackNotice(message);
-  }, [setFeedbackNotice]);
-
   const handlePlay = useCallback(() => {
     goToStage('lobby');
   }, [goToStage]);
@@ -135,52 +130,6 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
       });
     }
   }, [onComplete]);
-
-  const handleCreateRoom = useCallback(() => {
-    pushFeedbackNotice('Criação de salas privadas chegará em breve. Enquanto isso, use as salas públicas!');
-  }, [pushFeedbackNotice]);
-
-  const handleUnlockRoom = useCallback((roomId) => {
-    const roomNameMap = {
-      'cluster-sinaptico': 'Cluster Sináptico',
-      'ninho-lumen': 'Ninho Lúmen',
-    };
-    const resolvedName = roomNameMap[roomId] ?? 'Sala premium';
-
-    pushFeedbackNotice(
-      `${resolvedName} requer acesso à loja premium, que ainda não está disponível nesta versão de prévia.`,
-    );
-  }, [pushFeedbackNotice]);
-
-  const handleOpenSettings = useCallback(() => {
-    pushFeedbackNotice('As configurações avançadas estarão disponíveis em breve.');
-  }, [pushFeedbackNotice]);
-
-  const handleOpenStore = useCallback(() => {
-    pushFeedbackNotice('A loja virtual será habilitada em uma atualização futura.');
-  }, [pushFeedbackNotice]);
-
-  const handleOpenMissions = useCallback(() => {
-    pushFeedbackNotice('O painel de missões está em construção. Fique de olho nas próximas builds!');
-  }, [pushFeedbackNotice]);
-
-  const handleOpenFriends = useCallback(() => {
-    pushFeedbackNotice('A lista de amigos estará disponível em breve.');
-  }, [pushFeedbackNotice]);
-
-  useEffect(() => {
-    if (!feedbackNotice) {
-      return undefined;
-    }
-
-    const timeout = setTimeout(() => {
-      setFeedbackNotice(null);
-    }, 4000);
-
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, [feedbackNotice]);
 
   const timelineItems = useMemo(
     () =>
@@ -223,28 +172,23 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
               <MainMenuScreen
                 variant={variant}
                 onPlay={handlePlay}
-                onOpenSettings={handleOpenSettings}
-                onOpenStore={handleOpenStore}
-                onOpenMissions={handleOpenMissions}
-                onOpenFriends={handleOpenFriends}
+                isSettingsComingSoon
+                isStoreComingSoon
+                isMissionsComingSoon
+                isFriendsComingSoon
               />
             )}
             {activeStage === 'lobby' && (
               <LobbyScreen
                 variant={variant}
                 onJoinPublic={handleEnterPublic}
-                onCreateRoom={handleCreateRoom}
-                onUnlockRoom={handleUnlockRoom}
+                isCreateRoomComingSoon
+                isUnlockRoomComingSoon
               />
             )}
           </div>
         </div>
       </div>
-      {feedbackNotice && (
-        <div className={styles.feedbackToast} role="status" aria-live="polite">
-          {feedbackNotice}
-        </div>
-      )}
       {shouldShowStatusCard && (
         <div className={styles.statusRow}>
           <div className={styles.statusPrimary}>

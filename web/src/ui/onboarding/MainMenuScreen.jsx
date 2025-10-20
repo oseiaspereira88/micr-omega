@@ -8,6 +8,10 @@ const MainMenuScreen = ({
   onOpenStore,
   onOpenMissions,
   onOpenFriends,
+  isSettingsComingSoon = false,
+  isStoreComingSoon = false,
+  isMissionsComingSoon = false,
+  isFriendsComingSoon = false,
 }) => {
   const testId = variant === 'mobile' ? 'main-menu-screen-mobile' : 'main-menu-screen';
   const className = [styles.root, variant === 'mobile' ? styles.mobile : ''].filter(Boolean).join(' ');
@@ -18,24 +22,28 @@ const MainMenuScreen = ({
       label: 'Configurações',
       onClick: onOpenSettings,
       testId: 'main-menu-settings',
+      isComingSoon: isSettingsComingSoon,
     },
     {
       key: 'store',
       label: 'Loja',
       onClick: onOpenStore,
       testId: 'main-menu-store',
+      isComingSoon: isStoreComingSoon,
     },
     {
       key: 'missions',
       label: 'Missões',
       onClick: onOpenMissions,
       testId: 'main-menu-missions',
+      isComingSoon: isMissionsComingSoon,
     },
     {
       key: 'friends',
       label: 'Amigos',
       onClick: onOpenFriends,
       testId: 'main-menu-friends',
+      isComingSoon: isFriendsComingSoon,
     },
   ];
 
@@ -97,7 +105,8 @@ const MainMenuScreen = ({
           </div>
           <div className={styles.storeActions}>
             {storeActions.map((action) => {
-                const isDisabled = typeof action.onClick !== 'function';
+                const hasHandler = typeof action.onClick === 'function';
+                const isDisabled = action.isComingSoon || !hasHandler;
                 const buttonClassName = [
                   styles.storeButton,
                   isDisabled ? styles.storeButtonDisabled : '',
@@ -114,11 +123,20 @@ const MainMenuScreen = ({
                     onClick={isDisabled ? undefined : action.onClick}
                     disabled={isDisabled}
                     aria-disabled={isDisabled || undefined}
+                    aria-label={
+                      action.isComingSoon
+                        ? `${action.label} indisponível. Recurso em breve.`
+                        : !hasHandler
+                          ? `${action.label} indisponível.`
+                        : undefined
+                    }
                   >
                     <span className={styles.storeButtonLabel}>{action.label}</span>
-                    <span className={styles.storeButtonMeta} aria-hidden={isDisabled ? undefined : true}>
-                      Em breve
-                    </span>
+                    {action.isComingSoon && (
+                      <span className={styles.storeButtonMeta} role="status">
+                        <span className={styles.storeButtonBadge}>Em breve</span>
+                      </span>
+                    )}
                   </button>
                 );
               })}
