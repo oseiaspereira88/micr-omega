@@ -416,6 +416,53 @@ describe('GameHud settings panel', () => {
     });
   });
 
+  it('permite alternar efeitos sonoros via configurações do jogo', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>,
+    );
+
+    const openButton = screen.getByRole('button', { name: /mostrar painel/i });
+    await user.click(openButton);
+
+    const audioToggle = await screen.findByRole('checkbox', {
+      name: /efeitos sonoros/i,
+    });
+    expect(audioToggle).toBeChecked();
+    expect(screen.getByText(/som ligado/i)).toBeInTheDocument();
+
+    await user.click(audioToggle);
+
+    await waitFor(() => {
+      expect(audioToggle).not.toBeChecked();
+      expect(screen.getByText(/som desligado/i)).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      const stored = window.localStorage.getItem('micr-omega:game-settings');
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored ?? '{}');
+      expect(parsed.audioEnabled).toBe(false);
+    });
+
+    await user.click(audioToggle);
+
+    await waitFor(() => {
+      expect(audioToggle).toBeChecked();
+      expect(screen.getByText(/som ligado/i)).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      const stored = window.localStorage.getItem('micr-omega:game-settings');
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored ?? '{}');
+      expect(parsed.audioEnabled).toBe(true);
+    });
+  });
+
   it('exibe o toggle de áudio e persiste a preferência do usuário', async () => {
     const user = userEvent.setup();
     const storageKey = 'micr-omega:game-settings';
@@ -429,14 +476,17 @@ describe('GameHud settings panel', () => {
     const openButton = screen.getByRole('button', { name: /mostrar painel/i });
     await user.click(openButton);
 
-    const audioToggle = await screen.findByRole('checkbox', { name: /som ligado/i });
+    const audioToggle = await screen.findByRole('checkbox', {
+      name: /efeitos sonoros/i,
+    });
     expect(audioToggle).toBeChecked();
 
     await user.click(audioToggle);
 
     await waitFor(() => {
       expect(audioToggle).not.toBeChecked();
-      expect(audioToggle).toHaveAccessibleName(/som desligado/i);
+      expect(audioToggle).toHaveAccessibleName(/efeitos sonoros/i);
+      expect(screen.getByText(/som desligado/i)).toBeInTheDocument();
     });
 
     await waitFor(() => {
@@ -458,8 +508,11 @@ describe('GameHud settings panel', () => {
     const secondOpenButton = screen.getByRole('button', { name: /mostrar painel/i });
     await secondUser.click(secondOpenButton);
 
-    const persistedToggle = await screen.findByRole('checkbox', { name: /som desligado/i });
+    const persistedToggle = await screen.findByRole('checkbox', {
+      name: /efeitos sonoros/i,
+    });
     expect(persistedToggle).not.toBeChecked();
+    expect(screen.getByText(/som desligado/i)).toBeInTheDocument();
   });
 
   it('não exibe preferências de controles touch quando o dispositivo não é compatível', async () => {

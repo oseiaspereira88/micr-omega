@@ -103,6 +103,7 @@ const GameHud = ({
   const sidebarId = useId();
   const minimapToggleId = useId();
   const audioToggleId = useId();
+  const audioStatusId = useId();
   const touchToggleId = useId();
   const touchLayoutSelectId = useId();
   const touchLayoutDescriptionId = useId();
@@ -112,7 +113,8 @@ const GameHud = ({
   const touchLayoutAutoSwapHelperId = useId();
   const { settings, updateSettings } = useGameSettings();
   const audioEnabled = settings?.audioEnabled !== false;
-  const audioLabel = audioEnabled ? 'Som ligado' : 'Som desligado';
+  const audioToggleLabel = 'Efeitos sonoros';
+  const audioStatusLabel = audioEnabled ? 'Som ligado' : 'Som desligado';
   const isMinimapEnabled = Boolean(settings?.showMinimap);
   const showTouchControlsSetting = Boolean(settings?.showTouchControls);
   const touchLayoutPreference = settings?.touchLayout === 'left' ? 'left' : 'right';
@@ -788,10 +790,16 @@ const GameHud = ({
                   checked={audioEnabled}
                   onChange={handleToggleAudio}
                   aria-checked={audioEnabled}
-                  aria-label={audioLabel}
+                  aria-label={audioToggleLabel}
+                  aria-describedby={audioStatusId}
                 />
-                <span className={styles.toggleStatusText} aria-live="polite" aria-atomic="true">
-                  {audioEnabled ? 'Som ligado' : 'Som desligado'}
+                <span
+                  id={audioStatusId}
+                  className={styles.toggleStatusText}
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {audioStatusLabel}
                 </span>
               </div>
             </label>
