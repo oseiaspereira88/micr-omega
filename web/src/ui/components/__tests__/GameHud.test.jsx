@@ -198,6 +198,64 @@ describe('GameHud touch controls', () => {
   });
 });
 
+describe('GameHud evolution controls', () => {
+  let originalConnectionStatus;
+
+  beforeEach(() => {
+    const state = gameStore.getState();
+    originalConnectionStatus = state.connectionStatus;
+
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'connected', joinError: null });
+    });
+  });
+
+  afterEach(() => {
+    act(() => {
+      gameStore.setPartial({
+        connectionStatus: originalConnectionStatus,
+        joinError: null,
+      });
+    });
+  });
+
+  it('renderiza o botão de evolução no desktop quando possível evoluir', async () => {
+    const onOpenEvolutionMenu = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <GameSettingsProvider>
+        <GameHud
+          {...BASE_PROPS}
+          canEvolve
+          onOpenEvolutionMenu={onOpenEvolutionMenu}
+        />
+      </GameSettingsProvider>,
+    );
+
+    const evolutionButton = screen.getByTestId('desktop-evolution-button');
+
+    await user.click(evolutionButton);
+
+    expect(onOpenEvolutionMenu).toHaveBeenCalledTimes(1);
+  });
+
+  it('não renderiza o botão de evolução quando os controles touch estão ativos', () => {
+    render(
+      <GameSettingsProvider>
+        <GameHud
+          {...BASE_PROPS}
+          showTouchControls
+          canEvolve
+          joystick={{ isPointerActive: false, position: { x: 0, y: 0 } }}
+        />
+      </GameSettingsProvider>,
+    );
+
+    expect(screen.queryByTestId('desktop-evolution-button')).not.toBeInTheDocument();
+  });
+});
+
 describe('GameHud sidebar accessibility', () => {
   let originalConnectionStatus;
 

@@ -101,6 +101,12 @@ const GameHud = ({
   const hudContentRef = useRef(null);
   const sidebarId = useId();
   const minimapToggleId = useId();
+  const { settings, updateSettings } = useGameSettings();
+  const isMinimapEnabled = Boolean(settings?.showMinimap);
+  const touchLayoutPreference = settings?.touchLayout === 'left' ? 'left' : 'right';
+  const autoSwapTouchLayoutWhenSidebarOpen = Boolean(
+    settings?.autoSwapTouchLayoutWhenSidebarOpen,
+  );
   const minimapPreviewClassName = useMemo(
     () =>
       [
@@ -297,13 +303,6 @@ const GameHud = ({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [sidebarIsInactive]);
-
-  const { settings, updateSettings } = useGameSettings();
-  const isMinimapEnabled = Boolean(settings?.showMinimap);
-  const touchLayoutPreference = settings?.touchLayout === 'left' ? 'left' : 'right';
-  const autoSwapTouchLayoutWhenSidebarOpen = Boolean(
-    settings?.autoSwapTouchLayoutWhenSidebarOpen,
-  );
 
   const effectiveTouchLayout = useMemo(() => {
     if (!showTouchControls) {
@@ -769,18 +768,31 @@ const GameHud = ({
           </div>
 
           <div className={styles.mobileBottomRegion}>
-            <SkillWheel
-              currentSkill={currentSkill}
-              skillList={skillData?.skillList ?? []}
-              hasMultipleSkills={skillData?.hasMultipleSkills}
-              skillCooldownLabel={skillData?.skillCooldownLabel ?? 'Sem habilidade'}
-              skillReadyPercent={skillData?.skillReadyPercent ?? 0}
-              onCycleSkill={onCycleSkill}
-              onUseSkill={onUseSkill}
-              touchControlsActive={showTouchControls}
-              showTouchControls={showTouchControls}
-              touchLayout={touchLayoutPreference}
-            />
+            <div className={styles.skillWheelRow}>
+              <SkillWheel
+                currentSkill={currentSkill}
+                skillList={skillData?.skillList ?? []}
+                hasMultipleSkills={skillData?.hasMultipleSkills}
+                skillCooldownLabel={skillData?.skillCooldownLabel ?? 'Sem habilidade'}
+                skillReadyPercent={skillData?.skillReadyPercent ?? 0}
+                onCycleSkill={onCycleSkill}
+                onUseSkill={onUseSkill}
+                touchControlsActive={showTouchControls}
+                showTouchControls={showTouchControls}
+                touchLayout={touchLayoutPreference}
+              />
+              {!showTouchControls && canEvolve ? (
+                <button
+                  type="button"
+                  className={styles.desktopEvolutionButton}
+                  onClick={onOpenEvolutionMenu}
+                  aria-label="Abrir menu de evolução"
+                  data-testid="desktop-evolution-button"
+                >
+                  Evolução
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
 
