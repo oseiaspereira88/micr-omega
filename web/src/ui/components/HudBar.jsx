@@ -185,6 +185,8 @@ const HudBar = ({
       style={style}
       aria-label={ariaLabel}
       title={ariaLabel}
+      role="status"
+      aria-live="polite"
     >
       <span className={styles.badgeIcon} aria-hidden="true">
         {icon}

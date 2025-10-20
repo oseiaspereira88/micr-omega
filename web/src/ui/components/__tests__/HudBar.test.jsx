@@ -6,12 +6,20 @@ import HudBar from '../HudBar';
 
 const expectDefaultMetrics = () => {
   expect(screen.getByText('MicrΩ • Nv.0 • 0 pts')).toBeInTheDocument();
-  expect(screen.getByLabelText('Energia atual: 0')).toBeInTheDocument();
-  expect(screen.getByLabelText('Vida atual: 0 de 0')).toBeInTheDocument();
-  expect(screen.getByLabelText('Carga de dash disponível: 0%')).toBeInTheDocument();
-  expect(screen.getByLabelText('Material genético disponível: 0')).toBeInTheDocument();
   expect(
-    screen.getByLabelText('Pontos de característica disponíveis: 0 de 0')
+    screen.getByRole('status', { name: 'Energia atual: 0' })
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('status', { name: 'Vida atual: 0 de 0' })
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('status', { name: 'Carga de dash disponível: 0%' })
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('status', { name: 'Material genético disponível: 0' })
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('status', { name: 'Pontos de característica disponíveis: 0 de 0' })
   ).toBeInTheDocument();
   expect(screen.getByText('XP 0 / 1')).toBeInTheDocument();
   expect(screen.getByText('Pequena: 0/0')).toBeInTheDocument();
@@ -124,15 +132,29 @@ describe('HudBar', () => {
     );
 
     expect(screen.getByText('MicrΩ • Nv.42 • 1.234.567 pts')).toBeInTheDocument();
-    expect(screen.getByLabelText('Energia atual: 8.900')).toBeInTheDocument();
-    expect(screen.getByLabelText('Vida atual: 12.345 de 67.890')).toBeInTheDocument();
-    expect(screen.getByLabelText('Carga de dash disponível: 75%')).toBeInTheDocument();
-    expect(screen.getByLabelText('Material genético disponível: 987.654')).toBeInTheDocument();
     expect(
-      screen.getByLabelText('Pontos de característica disponíveis: 4.321 de 98.765')
+      screen.getByRole('status', { name: 'Energia atual: 8.900' })
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('Combo atual: x2.345')).toBeInTheDocument();
-    expect(screen.getByLabelText('Melhor combo: x67.890')).toBeInTheDocument();
+    expect(
+      screen.getByRole('status', { name: 'Vida atual: 12.345 de 67.890' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('status', { name: 'Carga de dash disponível: 75%' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('status', { name: 'Material genético disponível: 987.654' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('status', {
+        name: 'Pontos de característica disponíveis: 4.321 de 98.765',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('status', { name: 'Combo atual: x2.345' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('status', { name: 'Melhor combo: x67.890' })
+    ).toBeInTheDocument();
     expect(screen.getByText('XP 123.456 / 789.012')).toBeInTheDocument();
     expect(screen.getByText('Pequena: 12/3.456')).toBeInTheDocument();
     expect(screen.getByText('Média: 78/9.012')).toBeInTheDocument();
