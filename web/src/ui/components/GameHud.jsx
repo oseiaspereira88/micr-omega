@@ -657,6 +657,7 @@ const GameHud = ({
           aria-hidden={hudDisabled ? true : undefined}
           inert={hudDisabled ? 'true' : undefined}
           ref={hudContentRef}
+          data-touch-controls-active={showTouchControls ? 'true' : 'false'}
         >
           <HudBar
             isMobileHud={isMobileHud}
