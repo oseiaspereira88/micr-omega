@@ -461,6 +461,52 @@
   width: min(520px, 100%);
 }
 
+.desktopSkillControls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: auto;
+  flex-wrap: wrap;
+}
+
+.desktopEvolutionButton {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(90deg, rgba(119, 72, 255, 0.88), rgba(93, 134, 255, 0.88));
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(26, 22, 58, 0.32);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.desktopEvolutionButton:hover,
+.desktopEvolutionButton:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(26, 22, 58, 0.38);
+  background: linear-gradient(90deg, rgba(135, 92, 255, 0.94), rgba(113, 152, 255, 0.94));
+}
+
+.desktopEvolutionButton:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 16px rgba(26, 22, 58, 0.3);
+}
+
+.desktopEvolutionButton:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.65);
+  outline-offset: 2px;
+}
+
 .opponentPanel {
   pointer-events: auto;
   background: rgba(10, 14, 24, 0.85);

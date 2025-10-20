@@ -340,6 +340,12 @@ const GameHud = ({
     updateSettings({ audioEnabled: !audioEnabled });
   }, [audioEnabled, updateSettings]);
 
+  const handleDesktopEvolutionClick = useCallback(() => {
+    if (typeof onOpenEvolutionMenu === 'function') {
+      onOpenEvolutionMenu();
+    }
+  }, [onOpenEvolutionMenu]);
+
   const resolvedBossName = useMemo(() => {
     if (typeof bossName === 'string') {
       const trimmed = bossName.trim();
@@ -813,18 +819,31 @@ const GameHud = ({
           </div>
 
           <div className={styles.mobileBottomRegion}>
-            <SkillWheel
-              currentSkill={currentSkill}
-              skillList={skillData?.skillList ?? []}
-              hasMultipleSkills={skillData?.hasMultipleSkills}
-              skillCooldownLabel={skillData?.skillCooldownLabel ?? 'Sem habilidade'}
-              skillReadyPercent={skillData?.skillReadyPercent ?? 0}
-              onCycleSkill={onCycleSkill}
-              onUseSkill={onUseSkill}
-              touchControlsActive={showTouchControls}
-              showTouchControls={showTouchControls}
-              touchLayout={touchLayoutPreference}
-            />
+            <div className={styles.desktopSkillControls}>
+              <SkillWheel
+                currentSkill={currentSkill}
+                skillList={skillData?.skillList ?? []}
+                hasMultipleSkills={skillData?.hasMultipleSkills}
+                skillCooldownLabel={skillData?.skillCooldownLabel ?? 'Sem habilidade'}
+                skillReadyPercent={skillData?.skillReadyPercent ?? 0}
+                onCycleSkill={onCycleSkill}
+                onUseSkill={onUseSkill}
+                touchControlsActive={showTouchControls}
+                showTouchControls={showTouchControls}
+                touchLayout={touchLayoutPreference}
+              />
+              {!showTouchControls && canEvolve && typeof onOpenEvolutionMenu === 'function' ? (
+                <button
+                  type="button"
+                  className={styles.desktopEvolutionButton}
+                  onClick={handleDesktopEvolutionClick}
+                  aria-label="Abrir menu de evolução"
+                  data-desktop-evolution-button="true"
+                >
+                  Evoluir
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
 
