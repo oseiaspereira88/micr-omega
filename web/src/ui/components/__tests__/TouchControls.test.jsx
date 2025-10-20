@@ -171,4 +171,24 @@ describe('TouchControls', () => {
     expect(skillButton).not.toHaveAttribute('aria-valuemax');
     expect(skillButton).not.toHaveAttribute('aria-valuenow');
   });
+
+  it('não dispara a habilidade ao tocar quando estiver desabilitada', () => {
+    const onUseSkill = vi.fn();
+
+    const { getByRole } = render(
+      <TouchControls
+        {...baseProps}
+        onUseSkill={onUseSkill}
+        hasCurrentSkill
+        currentSkillIcon="🔥"
+        skillDisabled
+      />
+    );
+
+    const skillButton = getByRole('button', { name: 'Usar habilidade — indisponível' });
+
+    fireEvent.touchStart(skillButton);
+
+    expect(onUseSkill).not.toHaveBeenCalled();
+  });
 });
