@@ -17,6 +17,8 @@ const SkillWheel = ({
   onUseSkill,
   touchControlsActive = false,
   layout,
+  showTouchControls = false,
+  touchLayout = 'right',
 }) => {
   const shouldRender = currentSkill || skillList.length > 0;
 
@@ -28,6 +30,80 @@ const SkillWheel = ({
   const isMobileLayout = resolvedLayout === 'mobile';
   const usesTouchGuidance = touchControlsActive || isMobileLayout;
   const statusMessageId = React.useId();
+  const containerRef = React.useRef(null);
+  const [touchControlsFootprint, setTouchControlsFootprint] = React.useState(null);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const scheduleFrame =
+      typeof window.requestAnimationFrame === 'function'
+        ? window.requestAnimationFrame.bind(window)
+        : callback => window.setTimeout(callback, 0);
+    const cancelFrame =
+      typeof window.cancelAnimationFrame === 'function'
+        ? window.cancelAnimationFrame.bind(window)
+        : window.clearTimeout.bind(window);
+
+    const updateFootprint = () => {
+      if (!containerRef.current) {
+        return;
+      }
+
+      const computedStyle = window.getComputedStyle(containerRef.current);
+      const footprintValue = computedStyle
+        .getPropertyValue('--touch-controls-footprint')
+        .trim();
+      const numericValue = Number.parseFloat(footprintValue);
+
+      if (Number.isFinite(numericValue) && numericValue > 0) {
+        setTouchControlsFootprint(numericValue);
+      } else {
+        setTouchControlsFootprint(null);
+      }
+    };
+
+    updateFootprint();
+
+    let frameId = scheduleFrame(updateFootprint);
+    let resizeObserver;
+
+    if (containerRef.current && typeof window.ResizeObserver === 'function') {
+      resizeObserver = new window.ResizeObserver(() => {
+        updateFootprint();
+      });
+      resizeObserver.observe(containerRef.current);
+    }
+
+    window.addEventListener('resize', updateFootprint);
+
+    return () => {
+      window.removeEventListener('resize', updateFootprint);
+      if (frameId !== null) {
+        cancelFrame(frameId);
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, [touchControlsActive, showTouchControls, touchLayout]);
+
+  const resolvedTouchLayout = touchLayout === 'left' ? 'left' : 'right';
+  const hasMeasuredFootprint = Number.isFinite(touchControlsFootprint)
+    ? touchControlsFootprint > 0
+    : true;
+  const shouldOffsetForTouchControls =
+    isMobileLayout &&
+    touchControlsActive &&
+    showTouchControls &&
+    hasMeasuredFootprint;
+  const touchOffsetClass = shouldOffsetForTouchControls
+    ? resolvedTouchLayout === 'left'
+      ? styles.mobileOffsetLeft
+      : styles.mobileOffsetRight
+    : '';
 
   const handleCycleClick = () => {
     onCycleSkill?.(1);
@@ -85,13 +161,22 @@ const SkillWheel = ({
     styles.container,
     isMobileLayout ? styles.mobile : '',
     touchControlsActive ? styles.mobileWithTouchControls : '',
+    touchOffsetClass,
   ]
     .filter(Boolean)
     .join(' ');
   const showUseButton = Boolean(currentSkill && onUseSkill);
 
   return (
-    <div className={containerClassName}>
+    <div
+      ref={containerRef}
+      className={containerClassName}
+      data-touch-footprint={
+        Number.isFinite(touchControlsFootprint)
+          ? Math.round(touchControlsFootprint)
+          : undefined
+      }
+    >
       <div className={styles.header}>
         <span className={styles.title}>
           {currentSkill ? `${currentSkill.icon} ${currentSkill.name}` : 'Sem habilidade ativa'}

@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import styles from './TouchControls.module.css';
 
 const joinClassNames = (...classes) => classes.filter(Boolean).join(' ');
@@ -67,6 +67,7 @@ const TouchControls = ({
   ...a11yProps
 }) => {
   const [viewport, setViewport] = useState(getViewportSize);
+  const actionGroupRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -203,6 +204,96 @@ const TouchControls = ({
     effectiveLayout === 'left' ? styles.layoutLeft : styles.layoutRight;
   const orientationClass = isLandscape ? styles.landscape : null;
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const group = actionGroupRef.current;
+    if (!group) {
+      return undefined;
+    }
+
+    const hudElement = group.closest('[data-mobile-hud]');
+    if (!hudElement) {
+      return undefined;
+    }
+
+    let frameId = null;
+    const scheduleFrame =
+      typeof window.requestAnimationFrame === 'function'
+        ? window.requestAnimationFrame.bind(window)
+        : callback => window.setTimeout(callback, 0);
+    const cancelFrame =
+      typeof window.cancelAnimationFrame === 'function'
+        ? window.cancelAnimationFrame.bind(window)
+        : window.clearTimeout.bind(window);
+
+    const measureFootprint = () => {
+      frameId = null;
+
+      const buttons = group.querySelectorAll('button');
+      if (!buttons.length) {
+        hudElement.style.removeProperty('--touch-controls-footprint');
+        return;
+      }
+
+      let minLeft = Infinity;
+      let maxRight = -Infinity;
+
+      buttons.forEach(button => {
+        const rect = button.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) {
+          return;
+        }
+
+        minLeft = Math.min(minLeft, rect.left);
+        maxRight = Math.max(maxRight, rect.right);
+      });
+
+      if (!Number.isFinite(minLeft) || !Number.isFinite(maxRight) || maxRight <= minLeft) {
+        hudElement.style.removeProperty('--touch-controls-footprint');
+        return;
+      }
+
+      const footprint = Math.ceil(maxRight - minLeft);
+      hudElement.style.setProperty('--touch-controls-footprint', `${footprint}px`);
+    };
+
+    const scheduleMeasure = () => {
+      if (frameId !== null) {
+        return;
+      }
+
+      frameId = scheduleFrame(measureFootprint);
+    };
+
+    scheduleMeasure();
+
+    let resizeObserver = null;
+
+    if (typeof window.ResizeObserver === 'function') {
+      resizeObserver = new window.ResizeObserver(scheduleMeasure);
+      resizeObserver.observe(group);
+      group.querySelectorAll('button').forEach(button => {
+        resizeObserver?.observe(button);
+      });
+    }
+
+    window.addEventListener('resize', scheduleMeasure);
+
+    return () => {
+      window.removeEventListener('resize', scheduleMeasure);
+      if (frameId !== null) {
+        cancelFrame(frameId);
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      hudElement.style.removeProperty('--touch-controls-footprint');
+    };
+  }, [effectiveLayout, touchScale]);
+
   const isTouchLikePointer = event => {
     const pointerType =
       typeof event.pointerType === 'string' ? event.pointerType.toLowerCase() : event.pointerType;
@@ -263,174 +354,176 @@ const TouchControls = ({
         />
       </div>
 
-      <button
-        type="button"
-        className={joinClassNames(styles.button, styles.attackButton)}
-        aria-label="Executar ataque básico"
-        onTouchStart={event => {
-          event.preventDefault();
-          onAttackPress?.();
-        }}
-        onTouchEnd={handleAttackReleaseEvent}
-        onTouchCancel={handleAttackReleaseEvent}
-        onPointerUp={handleAttackReleaseEvent}
-        onPointerCancel={handleAttackReleaseEvent}
-        onMouseDown={onAttackPress}
-        onMouseUp={handleAttackReleaseEvent}
-        onMouseLeave={handleAttackReleaseEvent}
-        onClick={event => {
-          event.preventDefault();
-          onAttack?.();
-        }}
-      >
-        ⚔️
-      </button>
+      <div ref={actionGroupRef} className={styles.actionGroup}>
+        <button
+          type="button"
+          className={joinClassNames(styles.button, styles.attackButton)}
+          aria-label="Executar ataque básico"
+          onTouchStart={event => {
+            event.preventDefault();
+            onAttackPress?.();
+          }}
+          onTouchEnd={handleAttackReleaseEvent}
+          onTouchCancel={handleAttackReleaseEvent}
+          onPointerUp={handleAttackReleaseEvent}
+          onPointerCancel={handleAttackReleaseEvent}
+          onMouseDown={onAttackPress}
+          onMouseUp={handleAttackReleaseEvent}
+          onMouseLeave={handleAttackReleaseEvent}
+          onClick={event => {
+            event.preventDefault();
+            onAttack?.();
+          }}
+        >
+          ⚔️
+        </button>
 
-      <button
-        type="button"
-        className={joinClassNames(
-          styles.button,
-          styles.dashButton,
-          dashReady ? styles.chargeReady : styles.chargeEmpty,
-          dashReady ? null : styles.disabled,
-        )}
-        onClick={onDash}
-        aria-label={dashAriaLabel}
-        aria-disabled={!dashReady}
-        aria-describedby={dashStatusId}
-        onTouchStart={event => {
-          event.preventDefault();
-          if (dashReady) {
-            onDash?.();
-          }
-        }}
-        onTouchEnd={handleDashTouchEnd}
-        onTouchCancel={handleDashTouchEnd}
-        disabled={!dashReady}
-      >
-        {!dashReady && (
-          <div
-            className={styles.cooldownOverlay}
-            aria-hidden="true"
-            style={{ '--cooldown-progress': `${100 - dashChargePercent}%` }}
-          />
-        )}
-        <span className={styles.buttonIcon}>💨</span>
-        <span className={joinClassNames(styles.cooldownLabel, styles.dashLabel)}>
-          {dashReady ? 'Pronto' : `${dashChargePercent}%`}
-        </span>
-      </button>
-      <span
-        id={dashStatusId}
-        className={styles.visuallyHidden}
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {dashValueText}
-      </span>
-
-      <button
-        type="button"
-        className={joinClassNames(
-          styles.button,
-          styles.skillButton,
-          skillDisabled ? styles.skillDisabled : styles.skillReady,
-          skillDisabled ? styles.disabled : null,
-        )}
-        onClick={onUseSkill}
-        aria-label={skillAriaLabel}
-        aria-disabled={skillDisabled}
-        aria-describedby={skillStatusId}
-        onTouchStart={event => {
-          event.preventDefault();
-          onUseSkill?.();
-        }}
-        onTouchEnd={handleSkillTouchEnd}
-        onTouchCancel={handleSkillTouchEnd}
-        disabled={skillDisabled}
-        title={skillAriaLabel}
-      >
-        {showSkillCooldown && (
-          <div
-            className={joinClassNames(styles.cooldownOverlay, styles.skillCooldownOverlay)}
-            aria-hidden="true"
-            style={{ '--cooldown-progress': `${100 - skillCooldownPercentClamped}%` }}
-          />
-        )}
-        <span className={styles.buttonIcon}>
-          {hasCurrentSkill ? currentSkillIcon : '🌀'}
-        </span>
-        {showSkillCooldown && (
-          <span
-            className={joinClassNames(styles.cooldownLabel, styles.skillCooldownLabel)}
-          >
-            {skillCooldownDisplay}
-          </span>
-        )}
-        <span
+        <button
+          type="button"
           className={joinClassNames(
-            styles.skillLabel,
-            showSkillCooldown ? styles.skillLabelHidden : styles.skillCostLabel,
-            skillLabelColorClass,
+            styles.button,
+            styles.dashButton,
+            dashReady ? styles.chargeReady : styles.chargeEmpty,
+            dashReady ? null : styles.disabled,
           )}
+          onClick={onDash}
+          aria-label={dashAriaLabel}
+          aria-disabled={!dashReady}
+          aria-describedby={dashStatusId}
+          onTouchStart={event => {
+            event.preventDefault();
+            if (dashReady) {
+              onDash?.();
+            }
+          }}
+          onTouchEnd={handleDashTouchEnd}
+          onTouchCancel={handleDashTouchEnd}
+          disabled={!dashReady}
+        >
+          {!dashReady && (
+            <div
+              className={styles.cooldownOverlay}
+              aria-hidden="true"
+              style={{ '--cooldown-progress': `${100 - dashChargePercent}%` }}
+            />
+          )}
+          <span className={styles.buttonIcon}>💨</span>
+          <span className={joinClassNames(styles.cooldownLabel, styles.dashLabel)}>
+            {dashReady ? 'Pronto' : `${dashChargePercent}%`}
+          </span>
+        </button>
+        <span
+          id={dashStatusId}
+          className={styles.visuallyHidden}
+          role="status"
           aria-live="polite"
           aria-atomic="true"
         >
-          {hasCurrentSkill ? (showSkillCooldown ? '' : currentSkillCost) : '--'}
+          {dashValueText}
         </span>
-      </button>
-      <span
-        id={skillStatusId}
-        className={styles.visuallyHidden}
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {skillValueText}
-      </span>
 
-      <button
-        type="button"
-        className={joinClassNames(
-          styles.button,
-          styles.cycleSkillButton,
-          hasCurrentSkill ? styles.cycleSkillReady : styles.disabled,
-        )}
-        onClick={event => {
-          event.preventDefault();
-          onCycleSkill?.();
-        }}
-        aria-label={cycleSkillAriaLabel}
-        aria-disabled={!hasCurrentSkill}
-        onTouchStart={event => {
-          event.preventDefault();
-          if (hasCurrentSkill) {
+        <button
+          type="button"
+          className={joinClassNames(
+            styles.button,
+            styles.skillButton,
+            skillDisabled ? styles.skillDisabled : styles.skillReady,
+            skillDisabled ? styles.disabled : null,
+          )}
+          onClick={onUseSkill}
+          aria-label={skillAriaLabel}
+          aria-disabled={skillDisabled}
+          aria-describedby={skillStatusId}
+          onTouchStart={event => {
+            event.preventDefault();
+            onUseSkill?.();
+          }}
+          onTouchEnd={handleSkillTouchEnd}
+          onTouchCancel={handleSkillTouchEnd}
+          disabled={skillDisabled}
+          title={skillAriaLabel}
+        >
+          {showSkillCooldown && (
+            <div
+              className={joinClassNames(styles.cooldownOverlay, styles.skillCooldownOverlay)}
+              aria-hidden="true"
+              style={{ '--cooldown-progress': `${100 - skillCooldownPercentClamped}%` }}
+            />
+          )}
+          <span className={styles.buttonIcon}>
+            {hasCurrentSkill ? currentSkillIcon : '🌀'}
+          </span>
+          {showSkillCooldown && (
+            <span
+              className={joinClassNames(styles.cooldownLabel, styles.skillCooldownLabel)}
+            >
+              {skillCooldownDisplay}
+            </span>
+          )}
+          <span
+            className={joinClassNames(
+              styles.skillLabel,
+              showSkillCooldown ? styles.skillLabelHidden : styles.skillCostLabel,
+              skillLabelColorClass,
+            )}
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {hasCurrentSkill ? (showSkillCooldown ? '' : currentSkillCost) : '--'}
+          </span>
+        </button>
+        <span
+          id={skillStatusId}
+          className={styles.visuallyHidden}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {skillValueText}
+        </span>
+
+        <button
+          type="button"
+          className={joinClassNames(
+            styles.button,
+            styles.cycleSkillButton,
+            hasCurrentSkill ? styles.cycleSkillReady : styles.disabled,
+          )}
+          onClick={event => {
+            event.preventDefault();
             onCycleSkill?.();
-          }
-        }}
-        onTouchEnd={handleCycleSkillTouchEnd}
-        onTouchCancel={handleCycleSkillTouchEnd}
-        disabled={!hasCurrentSkill}
-      >
-        🔄
-      </button>
+          }}
+          aria-label={cycleSkillAriaLabel}
+          aria-disabled={!hasCurrentSkill}
+          onTouchStart={event => {
+            event.preventDefault();
+            if (hasCurrentSkill) {
+              onCycleSkill?.();
+            }
+          }}
+          onTouchEnd={handleCycleSkillTouchEnd}
+          onTouchCancel={handleCycleSkillTouchEnd}
+          disabled={!hasCurrentSkill}
+        >
+          🔄
+        </button>
 
-      <button
-        type="button"
-        className={joinClassNames(
-          styles.button,
-          styles.evolveButton,
-          canEvolve ? styles.evolveReady : styles.evolveLocked,
-          canEvolve ? null : styles.disabled,
-        )}
-        onClick={onOpenEvolutionMenu}
-        aria-label={evolveAriaLabel}
-        aria-disabled={!canEvolve}
-        disabled={!canEvolve}
-      >
-        🧬
-      </button>
+        <button
+          type="button"
+          className={joinClassNames(
+            styles.button,
+            styles.evolveButton,
+            canEvolve ? styles.evolveReady : styles.evolveLocked,
+            canEvolve ? null : styles.disabled,
+          )}
+          onClick={onOpenEvolutionMenu}
+          aria-label={evolveAriaLabel}
+          aria-disabled={!canEvolve}
+          disabled={!canEvolve}
+        >
+          🧬
+        </button>
+      </div>
     </div>
   );
 };
