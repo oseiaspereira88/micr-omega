@@ -34,6 +34,7 @@ describe('status aura helpers', () => {
         status: 'fissure',
         stacks: 2,
         durationMs: 600,
+        sourcePlayerId: 'player-1',
       },
     ];
 
@@ -61,6 +62,7 @@ describe('status aura helpers', () => {
       status: 'corrosion',
       stacks: 1,
       durationMs: 800,
+      sourcePlayerId: 'player-1',
     };
 
     updateStatusAuras(state, 0.05, { events: [applyEvent], createParticle: createParticleStub, now: 0 });
@@ -72,6 +74,7 @@ describe('status aura helpers', () => {
       status: 'corrosion',
       stacks: 0,
       durationMs: 0,
+      sourcePlayerId: 'player-1',
     };
 
     updateStatusAuras(state, 0.05, { events: [removalEvent], createParticle: createParticleStub, now: 100 });
