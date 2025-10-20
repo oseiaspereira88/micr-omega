@@ -113,3 +113,96 @@ describe('spawnOrganicMatter cluster layouts', () => {
     expect(last.y).toBeCloseTo(baseY + last.layout.localY, 5);
   });
 });
+
+describe('spawnOrganicMatter randomness overrides', () => {
+  const richType = {
+    colors: ['#112233', '#445566'],
+    shapes: ['sphere', 'spike'],
+    sizes: [2, 5],
+    energy: 1,
+    health: 1
+  };
+
+  const types = { test: richType };
+
+  it('keeps cluster and appearance stable when seeds repeat', () => {
+    const randomness = {
+      groups: [
+        {
+          cluster: { seed: 1337 },
+          appearance: { seed: 4242 }
+        }
+      ]
+    };
+
+    const run = (sequence) =>
+      spawnOrganicMatter({
+        count: 1,
+        worldSize: 200,
+        types,
+        rng: createSequenceRng(sequence),
+        randomness
+      });
+
+    const first = run([0, 0.25, 0.5, 0.75]);
+    const second = run([0, 0.85, 0.15, 0.35]);
+
+    expect(first.length).toBeGreaterThan(0);
+    expect(second.length).toBe(first.length);
+    const primary = first[0];
+    const secondary = second[0];
+    expect(secondary.layout.shape).toBe(primary.layout.shape);
+    expect(secondary.layout.size).toBe(primary.layout.size);
+    expect(secondary.shape).toBe(primary.shape);
+    expect(secondary.color).toBe(primary.color);
+  });
+
+  it('produces different visuals when seeds change', () => {
+    const baseSequence = [0, 0.2, 0.6, 0.8];
+    const baseRandomness = {
+      groups: [
+        {
+          cluster: { seed: 7331 },
+          appearance: { seed: 9001 }
+        }
+      ]
+    };
+    const alternateRandomness = {
+      groups: [
+        {
+          cluster: { seed: 1338 },
+          appearance: { seed: 9002 }
+        }
+      ]
+    };
+
+    const base = spawnOrganicMatter({
+      count: 1,
+      worldSize: 150,
+      types,
+      rng: createSequenceRng(baseSequence),
+      randomness: baseRandomness
+    });
+
+    const alternate = spawnOrganicMatter({
+      count: 1,
+      worldSize: 150,
+      types,
+      rng: createSequenceRng(baseSequence),
+      randomness: alternateRandomness
+    });
+
+    expect(base.length).toBeGreaterThan(0);
+    expect(alternate.length).toBeGreaterThan(0);
+    const basePrimary = base[0];
+    const alternatePrimary = alternate[0];
+    const sameCluster =
+      basePrimary.layout.shape === alternatePrimary.layout.shape &&
+      basePrimary.layout.size === alternatePrimary.layout.size;
+    const sameAppearance =
+      basePrimary.shape === alternatePrimary.shape &&
+      basePrimary.color === alternatePrimary.color;
+
+    expect(sameCluster && sameAppearance).toBe(false);
+  });
+});

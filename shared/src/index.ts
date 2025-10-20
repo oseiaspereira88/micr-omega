@@ -928,3 +928,6 @@ export const sanitizeArchetypeKey = (archetype: string): ArchetypeKey | null => 
   }
   return result.data;
 };
+
+export { createMulberry32, createSeededRandom, randomFromSeed } from "./random";
+export type { SeededRandom } from "./random";

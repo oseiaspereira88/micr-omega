@@ -1,3 +1,4 @@
+import { createMulberry32 } from "@micr-omega/shared";
 import type { Env } from "./index";
 import { createObservability, serializeError, type Observability } from "./observability";
 import {
@@ -1089,6 +1090,7 @@ type PendingOrganicRespawnGroup = {
   templates: PendingOrganicRespawnTemplate[];
   delayRangeMs: { min: number; max: number };
   respawnAt: number;
+  randomSeed: number;
 };
 
 const clampToWorldBounds = (position: Vector2): Vector2 => ({
@@ -1426,6 +1428,8 @@ export class RoomDO {
   private roomObjects = new Map<string, RoomObject>();
   private entitySequence = 0;
   private organicMatterRespawnRng: () => number = Math.random;
+  private organicGroupRngFactory: (seed: number) => () => number = (seed) =>
+    createMulberry32(seed);
   private organicRespawnQueue: PendingOrganicRespawnGroup[] = [];
   private obstacles = new Map<string, Obstacle>();
   private microorganismBehavior = new Map<string, MicroorganismBehaviorState>();
@@ -2878,8 +2882,31 @@ export class RoomDO {
     return { worldChanged, scoresChanged };
   }
 
-  private findOrganicMatterRespawnPosition(origin: Vector2, attempts = 12): Vector2 | null {
-    const rng = this.organicMatterRespawnRng;
+  private normalizeOrganicRespawnSeed(value: number): number {
+    if (!Number.isFinite(value) || value <= 0) {
+      return 1;
+    }
+    const normalized = Math.floor(value * 0x1_0000_0000) >>> 0;
+    if (normalized === 0) {
+      return 1;
+    }
+    return normalized;
+  }
+
+  private createOrganicRespawnRng(): { seed: number; rng: () => number } {
+    const base = this.organicMatterRespawnRng();
+    const seed = this.normalizeOrganicRespawnSeed(base);
+    return {
+      seed,
+      rng: this.organicGroupRngFactory(seed),
+    };
+  }
+
+  private findOrganicMatterRespawnPosition(
+    origin: Vector2,
+    attempts = 12,
+    rng: () => number = this.organicMatterRespawnRng,
+  ): Vector2 | null {
     const minimumDistance = PLAYER_COLLECT_RADIUS * 1.1;
     const distanceSpread = Math.max(PLAYER_COLLECT_RADIUS * 0.6, 1);
 
@@ -3555,18 +3582,18 @@ export class RoomDO {
     ];
 
     const pendingRespawnGroups: PendingOrganicRespawnGroup[] = [];
-    const rng = this.organicMatterRespawnRng;
     let index = 0;
     while (index < collectedEntries.length) {
+      const { seed: groupSeed, rng: groupRng } = this.createOrganicRespawnRng();
       const remaining = collectedEntries.length - index;
-      const baseSize = Math.min(remaining, Math.floor(rng() * 3) + 3);
+      const baseSize = Math.min(remaining, Math.floor(groupRng() * 3) + 3);
       const clusterSize = Math.max(1, baseSize);
-      const anchor = this.findOrganicMatterRespawnPosition(player.position, 18);
+      const anchor = this.findOrganicMatterRespawnPosition(player.position, 18, groupRng);
       if (!anchor) {
         break;
       }
 
-      const patternIndex = Math.floor(rng() * ORGANIC_CLUSTER_PATTERNS.length);
+      const patternIndex = Math.floor(groupRng() * ORGANIC_CLUSTER_PATTERNS.length);
       const clusterShape =
         ORGANIC_CLUSTER_PATTERNS[patternIndex] ?? ORGANIC_CLUSTER_PATTERNS[0];
       const templates: PendingOrganicRespawnTemplate[] = [];
@@ -3590,7 +3617,7 @@ export class RoomDO {
 
       const delayRangeMs = ORGANIC_RESPAWN_DELAY_RANGE_MS;
       const delayVariance = Math.max(0, delayRangeMs.max - delayRangeMs.min);
-      const delay = delayRangeMs.min + rng() * delayVariance;
+      const delay = delayRangeMs.min + groupRng() * delayVariance;
 
       pendingRespawnGroups.push({
         anchor,
@@ -3599,6 +3626,7 @@ export class RoomDO {
         templates,
         delayRangeMs,
         respawnAt: now + Math.max(delay, delayRangeMs.min),
+        randomSeed: groupSeed,
       });
 
       index += templates.length;
@@ -3618,6 +3646,7 @@ export class RoomDO {
           templates: [],
           delayRangeMs: ORGANIC_RESPAWN_DELAY_RANGE_MS,
           respawnAt: now,
+          randomSeed: 0,
         });
       }
     }
