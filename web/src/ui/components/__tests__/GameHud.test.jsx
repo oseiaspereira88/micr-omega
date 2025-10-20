@@ -7,6 +7,26 @@ import GameHud from '../GameHud';
 import { gameStore } from '../../../store/gameStore';
 import { GameSettingsProvider } from '../../../store/gameSettings';
 
+const originalMatchMedia = window.matchMedia;
+const createMatchMedia = (matches = false) =>
+  vi.fn().mockImplementation((query) => ({
+    matches,
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+
+beforeEach(() => {
+  window.matchMedia = createMatchMedia(false);
+});
+
+afterEach(() => {
+  window.matchMedia = originalMatchMedia;
+});
+
 const BASE_PROPS = {
   level: 1,
   score: 0,
@@ -250,6 +270,51 @@ describe('GameHud sidebar accessibility', () => {
 
     await waitFor(() => expect(toggleButton).toHaveFocus());
     expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+describe('GameHud mobile layout', () => {
+  let originalConnectionStatus;
+  let originalJoinError;
+
+  beforeEach(() => {
+    const state = gameStore.getState();
+    originalConnectionStatus = state.connectionStatus;
+    originalJoinError = state.joinError;
+
+    window.matchMedia = createMatchMedia(true);
+
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'connected', joinError: null });
+    });
+  });
+
+  afterEach(() => {
+    act(() => {
+      gameStore.setPartial({
+        connectionStatus: originalConnectionStatus,
+        joinError: originalJoinError,
+      });
+    });
+  });
+
+  it('habilita o modo mobile e mantém o painel acessível', () => {
+    render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>,
+    );
+
+    const hud = document.querySelector('[data-mobile-hud="true"]');
+    expect(hud).not.toBeNull();
+
+    const toggleButton = screen.getByRole('button', { name: /mostrar painel/i });
+    expect(toggleButton).toBeVisible();
+    expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
+
+    const accordionSummary = screen.getByText('Detalhes do status');
+    expect(accordionSummary.tagName.toLowerCase()).toBe('summary');
+    expect(accordionSummary.closest('details')).not.toBeNull();
   });
 });
 
