@@ -218,6 +218,7 @@ const pushSharedDamagePopup = (sharedState, payload = {}, fallbackVariant = 'nor
 const PARTICLE_COUNT_SCALE = 8;
 const PARTICLE_COUNT_MIN = 2;
 const PARTICLE_COUNT_MAX = 18;
+const IMPACT_PARTICLE_COOLDOWN_MS = 500;
 
 const deriveParticleCount = (damage) => {
   if (!Number.isFinite(damage)) {
@@ -246,7 +247,50 @@ const spawnImpactParticles = (helpers, x, y, color, count) => {
   }
 };
 
-const spawnImpactVisuals = ({ helpers, sharedState, x, y, damage, profile }) => {
+const resolveImpactParticleCooldownKey = (payload = {}, fallbackAttackerId = null) => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const targetCandidate =
+    payload.targetId ??
+    payload.targetObjectId ??
+    payload.targetPlayerId ??
+    payload.target ??
+    null;
+
+  if (targetCandidate === undefined || targetCandidate === null) {
+    return null;
+  }
+
+  const attackerCandidate = payload.attackerId ?? fallbackAttackerId ?? 'unknown';
+  return `${String(attackerCandidate)}->${String(targetCandidate)}`;
+};
+
+const getImpactParticleCooldowns = (renderState) => {
+  if (!renderState || typeof renderState !== 'object') {
+    return null;
+  }
+
+  if (!(renderState.impactParticleCooldowns instanceof Map)) {
+    renderState.impactParticleCooldowns = new Map();
+  }
+
+  return renderState.impactParticleCooldowns;
+};
+
+const spawnImpactVisuals = ({
+  renderState,
+  helpers,
+  sharedState,
+  x,
+  y,
+  damage,
+  profile,
+  cooldownKey,
+  now,
+  cooldownMs,
+}) => {
   if (!profile) {
     return;
   }
@@ -262,7 +306,29 @@ const spawnImpactVisuals = ({ helpers, sharedState, x, y, damage, profile }) => 
     helpers.createEffect(x, y, profile.effectType, profile.effectColor);
   }
 
-  spawnImpactParticles(helpers, x, y, profile.particleColor, particleCount);
+  const cooldownDuration = Number.isFinite(cooldownMs)
+    ? Math.max(0, cooldownMs)
+    : IMPACT_PARTICLE_COOLDOWN_MS;
+  const timestamp = Number.isFinite(now) ? now : Date.now();
+  const shouldThrottle = cooldownKey && cooldownDuration > 0;
+  let cooldowns = null;
+  let shouldCreateParticles = true;
+
+  if (shouldThrottle) {
+    cooldowns = getImpactParticleCooldowns(renderState);
+    const lastSpawn = cooldowns?.get(cooldownKey);
+    if (Number.isFinite(lastSpawn) && timestamp - lastSpawn < cooldownDuration) {
+      shouldCreateParticles = false;
+    }
+  }
+
+  if (shouldCreateParticles) {
+    spawnImpactParticles(helpers, x, y, profile.particleColor, particleCount);
+
+    if (shouldThrottle && cooldowns) {
+      cooldowns.set(cooldownKey, timestamp);
+    }
+  }
 
   if (sharedState) {
     pushSharedDamagePopup(
@@ -1915,12 +1981,16 @@ export const updateGameState = ({
       const profile = getImpactVisualProfile(event);
       const damage = Number.isFinite(event?.damage) ? event.damage : 0;
       spawnImpactVisuals({
+        renderState,
         helpers,
         sharedState,
         x: position.x,
         y: position.y,
         damage,
         profile,
+        cooldownKey: resolveImpactParticleCooldownKey(event),
+        now: helpers.now,
+        cooldownMs: helpers.damageParticleCooldownMs,
       });
     });
   }
@@ -1952,12 +2022,16 @@ export const updateGameState = ({
       const profile = getImpactVisualProfile(attack);
       const damage = Number.isFinite(attack?.damage) ? attack.damage : 0;
       spawnImpactVisuals({
+        renderState,
         helpers,
         sharedState,
         x: position.x,
         y: position.y,
         damage,
         profile,
+        cooldownKey: resolveImpactParticleCooldownKey(attack, sharedState.playerId),
+        now: helpers.now,
+        cooldownMs: helpers.damageParticleCooldownMs,
       });
     });
   }
