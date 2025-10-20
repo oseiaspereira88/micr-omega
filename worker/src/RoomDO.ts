@@ -80,6 +80,17 @@ import {
 
 const TEXT_ENCODER = new TextEncoder();
 
+export const hashReconnectToken = async (token: string): Promise<string> => {
+  const encoded = TEXT_ENCODER.encode(token);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  const bytes = new Uint8Array(digest);
+  let hex = "";
+  for (const byte of bytes) {
+    hex += byte.toString(16).padStart(2, "0");
+  }
+  return hex;
+};
+
 const MIN_PLAYERS_TO_START = 1;
 const WAITING_START_DELAY_MS = 15_000;
 const WAITING_START_DELAY_ENABLED = MIN_PLAYERS_TO_START > 1;
@@ -283,7 +294,8 @@ type StoredPlayer = {
   combatAttributes: CombatAttributes;
   evolutionState: PlayerEvolutionState;
   archetypeKey: string | null;
-  reconnectToken: string;
+  reconnectTokenHash: string;
+  reconnectToken?: string;
   skillState?: StoredPlayerSkillState;
   totalSessionDurationMs?: number;
   sessionCount?: number;
@@ -305,6 +317,8 @@ type StoredPlayerSnapshot = Omit<
       | "evolutionState"
       | "archetypeKey"
       | "skillState"
+      | "reconnectToken"
+      | "reconnectTokenHash"
       | "dashCharge"
       | "dashCooldownMs"
       | "geneFragments"
@@ -1763,6 +1777,7 @@ export class RoomDO {
 
   private async initialize(): Promise<void> {
     const storedPlayers = await this.state.storage.get<StoredPlayerSnapshot[]>(PLAYERS_KEY);
+    let needsLegacyHashMigration = false;
     if (storedPlayers) {
       const now = Date.now();
       for (const stored of storedPlayers) {
@@ -1771,8 +1786,20 @@ export class RoomDO {
           ? sanitizeArchetypeKey(stored.archetypeKey)
           : null;
         const skillState = createPlayerSkillState(stored.skillState);
-        const reconnectToken =
-          sanitizeReconnectToken(stored.reconnectToken) ?? generateReconnectToken();
+        let reconnectTokenHash = sanitizeReconnectToken(stored.reconnectTokenHash);
+        const legacyReconnectToken = sanitizeReconnectToken(stored.reconnectToken);
+        if (!reconnectTokenHash && legacyReconnectToken) {
+          reconnectTokenHash = await hashReconnectToken(legacyReconnectToken);
+          needsLegacyHashMigration = true;
+        }
+
+        if (!reconnectTokenHash) {
+          const fallbackToken = generateReconnectToken();
+          reconnectTokenHash = await hashReconnectToken(fallbackToken);
+          needsLegacyHashMigration = true;
+        }
+
+        const reconnectToken = generateReconnectToken();
 
         const normalized: StoredPlayer = {
           id: stored.id,
@@ -1798,13 +1825,14 @@ export class RoomDO {
           combatAttributes: createCombatAttributes(stored.combatAttributes),
           evolutionState,
           archetypeKey: archetypeKey ?? null,
-          reconnectToken,
+          reconnectTokenHash,
           skillState: clonePlayerSkillState(skillState),
           totalSessionDurationMs: stored.totalSessionDurationMs ?? 0,
           sessionCount: stored.sessionCount ?? 0
         };
         const player: PlayerInternal = {
           ...normalized,
+          reconnectToken,
           connected: false,
           lastActiveAt: now,
           lastSeenAt: now,
@@ -1827,6 +1855,9 @@ export class RoomDO {
         this.players.set(player.id, player);
         this.nameToPlayerId.set(player.name.toLowerCase(), player.id);
         this.ensureProgressionState(player.id);
+      }
+      if (needsLegacyHashMigration) {
+        this.markPlayersDirty();
       }
     }
 
@@ -4614,6 +4645,9 @@ export class RoomDO {
 
     const payload = validation.data;
     const providedReconnectToken = sanitizeReconnectToken(payload.reconnectToken);
+    const providedReconnectTokenHash = providedReconnectToken
+      ? await hashReconnectToken(providedReconnectToken)
+      : null;
     const now = Date.now();
     await this.cleanupInactivePlayers(now);
 
@@ -4634,7 +4668,10 @@ export class RoomDO {
     if (payload.playerId) {
       const candidate = this.players.get(payload.playerId);
       if (candidate) {
-        if (!providedReconnectToken || providedReconnectToken !== candidate.reconnectToken) {
+        if (
+          !providedReconnectTokenHash ||
+          providedReconnectTokenHash !== candidate.reconnectTokenHash
+        ) {
           this.send(socket, { type: "error", reason: "invalid_token" });
           socket.close(1008, "invalid_token");
           return null;
@@ -4664,7 +4701,7 @@ export class RoomDO {
       const existing = this.players.get(existingByName);
       if (existing) {
         const withinReconnectWindow = now - existing.lastSeenAt <= RECONNECT_WINDOW_MS;
-        const tokenMatches = providedReconnectToken === existing.reconnectToken;
+        const tokenMatches = providedReconnectTokenHash === existing.reconnectTokenHash;
         if (existing.connected) {
           this.send(socket, { type: "error", reason: "name_taken" });
           socket.close(1008, "name_taken");
@@ -4705,6 +4742,7 @@ export class RoomDO {
       const evolutionState = createEvolutionState();
       const skillState = createPlayerSkillState();
       const reconnectToken = generateReconnectToken();
+      const reconnectTokenHash = await hashReconnectToken(reconnectToken);
       player = {
         id,
         name: normalizedName,
@@ -4726,6 +4764,7 @@ export class RoomDO {
         evolutionState,
         archetypeKey: null,
         reconnectToken,
+        reconnectTokenHash,
         connected: true,
         lastActiveAt: now,
         lastSeenAt: now,
@@ -4840,8 +4879,11 @@ export class RoomDO {
     this.socketsByPlayer.set(player.id, socket);
 
     const previousReconnectToken = player.reconnectToken;
+    const previousReconnectTokenHash = player.reconnectTokenHash;
     const reconnectToken = generateReconnectToken();
+    const reconnectTokenHash = await hashReconnectToken(reconnectToken);
     player.reconnectToken = reconnectToken;
+    player.reconnectTokenHash = reconnectTokenHash;
 
     this.markPlayersDirty();
 
@@ -4871,6 +4913,7 @@ export class RoomDO {
       this.queueSnapshotStatePersist();
       this.queueSyncAlarms();
       player.reconnectToken = previousReconnectToken;
+      player.reconnectTokenHash = previousReconnectTokenHash;
       this.observability.logError("player_snapshot_flush_failed", error, {
         category: "persistence",
         playerId: player.id,
@@ -6287,7 +6330,7 @@ export class RoomDO {
         combatAttributes: cloneCombatAttributes(player.combatAttributes),
         evolutionState: cloneEvolutionState(player.evolutionState),
         archetypeKey: player.archetypeKey ?? null,
-        reconnectToken: player.reconnectToken,
+        reconnectTokenHash: player.reconnectTokenHash,
         skillState: clonePlayerSkillState(skillState),
         totalSessionDurationMs: player.totalSessionDurationMs ?? 0,
         sessionCount: player.sessionCount ?? 0
