@@ -21,6 +21,7 @@ const createMatchMedia = (matches = false) =>
 
 beforeEach(() => {
   window.matchMedia = createMatchMedia(false);
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -315,6 +316,76 @@ describe('GameHud mobile layout', () => {
     const accordionSummary = screen.getByText('Detalhes do status');
     expect(accordionSummary.tagName.toLowerCase()).toBe('summary');
     expect(accordionSummary.closest('details')).not.toBeNull();
+  });
+});
+
+describe('GameHud settings panel', () => {
+  let originalConnectionStatus;
+  let originalJoinError;
+
+  beforeEach(() => {
+    const state = gameStore.getState();
+    originalConnectionStatus = state.connectionStatus;
+    originalJoinError = state.joinError;
+
+    act(() => {
+      gameStore.setPartial({ connectionStatus: 'connected', joinError: null });
+    });
+  });
+
+  afterEach(() => {
+    act(() => {
+      gameStore.setPartial({
+        connectionStatus: originalConnectionStatus,
+        joinError: originalJoinError,
+      });
+    });
+  });
+
+  it('exibe o toggle de áudio e persiste a preferência do usuário', async () => {
+    const user = userEvent.setup();
+    const storageKey = 'micr-omega:game-settings';
+
+    const firstRender = render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>,
+    );
+
+    const openButton = screen.getByRole('button', { name: /mostrar painel/i });
+    await user.click(openButton);
+
+    const audioToggle = await screen.findByRole('checkbox', { name: /som ligado/i });
+    expect(audioToggle).toBeChecked();
+
+    await user.click(audioToggle);
+
+    await waitFor(() => {
+      expect(audioToggle).not.toBeChecked();
+      expect(audioToggle).toHaveAccessibleName(/som desligado/i);
+    });
+
+    await waitFor(() => {
+      const stored = window.localStorage.getItem(storageKey);
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored);
+      expect(parsed.audioEnabled).toBe(false);
+    });
+
+    firstRender.unmount();
+
+    const secondUser = userEvent.setup();
+    render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>,
+    );
+
+    const secondOpenButton = screen.getByRole('button', { name: /mostrar painel/i });
+    await secondUser.click(secondOpenButton);
+
+    const persistedToggle = await screen.findByRole('checkbox', { name: /som desligado/i });
+    expect(persistedToggle).not.toBeChecked();
   });
 });
 
