@@ -1,0 +1,36 @@
+.container {
+  min-height: var(--app-viewport-height, 100vh);
+  background: radial-gradient(circle at top, #0a1628, #04070d);
+  color: #f7f9ff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  gap: 24px;
+}
+
+.header {
+  text-align: center;
+  max-width: 520px;
+}
+
+.title {
+  font-size: 2rem;
+  margin: 0 0 8px;
+}
+
+.description {
+  margin: 0;
+  color: #c1c9ff;
+}
+
+.showcaseHint {
+  margin: 0;
+  color: #6f7abf;
+  font-size: 0.85rem;
+}
+
+.showcaseHint code {
+  color: #d7dbff;
+}

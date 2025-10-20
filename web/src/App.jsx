@@ -3,6 +3,7 @@ import GameApp from './GameApp.jsx';
 import MicroWorldOnboardingFlow from './ui/onboarding/MicroWorldOnboardingFlow.jsx';
 import MicroWorldConceptScreens from './ui/concepts/MicroWorldConceptScreens.jsx';
 import StoryMode from './ui/stories/StoryMode.jsx';
+import useDynamicViewportHeight from './hooks/useDynamicViewportHeight.js';
 
 const readSearchParams = () => {
   if (typeof window === 'undefined') {
@@ -55,6 +56,7 @@ const detectStoryId = () => {
 };
 
 const App = () => {
+  useDynamicViewportHeight();
   const [displayMode, setDisplayMode] = useState(() => detectInitialMode());
   const [storyId] = useState(() => detectStoryId());
 
