@@ -1,0 +1,1253 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants for menu and lobby stages > desktop-flow 1`] = `
+<div>
+  <div
+    class="_flowRoot_5a269c"
+    data-testid="micro-world-onboarding-flow"
+  >
+    <div
+      class="_backgroundLayer_5a269c"
+    />
+    <header
+      class="_header_5a269c"
+    >
+      <span
+        class="_phaseLabel_5a269c"
+      >
+        Coordenação de Missão
+      </span>
+      <h1
+        class="_title_5a269c"
+      >
+        Lobby Micr•Omega
+      </h1>
+      <p
+        class="_description_5a269c"
+      >
+        Selecione a sala ideal, organize seu time e sincronize as regras de partida antes de iniciar a invasão.
+      </p>
+    </header>
+    <div
+      class="_stageArea_5a269c"
+    >
+      <div
+        class="_stageShell_5a269c"
+      >
+        <div
+          class="_stageGlow_5a269c"
+        />
+        <div
+          class="_stageContent_5a269c"
+        >
+          <div
+            class="_root_6bb24e"
+            data-testid="lobby-screen"
+          >
+            <div
+              class="_backdrop_6bb24e"
+            />
+            <div
+              class="_shell_6bb24e"
+            >
+              <aside
+                class="_sidebar_6bb24e"
+              >
+                <h3>
+                  Criar Sala
+                </h3>
+                <p>
+                  Monte partidas privadas com regras avançadas e convide o seu esquadrão.
+                </p>
+                <button
+                  aria-disabled="false"
+                  class="_createButton_6bb24e"
+                  type="button"
+                >
+                  Criar nova sala
+                </button>
+                <div
+                  class="_sidebarHighlights_6bb24e"
+                >
+                  <div
+                    class="_statusCard_6bb24e"
+                  >
+                    <span>
+                      🏓 Ping médio: 22ms
+                    </span>
+                    <span>
+                      Conexão estável
+                    </span>
+                  </div>
+                  <div
+                    class="_statusCard_6bb24e"
+                  >
+                    <span>
+                      🔥 3 salas premium disponíveis
+                    </span>
+                    <span>
+                      Atualizadas a cada 5 min
+                    </span>
+                  </div>
+                </div>
+              </aside>
+              <section
+                class="_rooms_6bb24e"
+              >
+                <div
+                  class="_filters_6bb24e"
+                >
+                  <button
+                    aria-pressed="true"
+                    class="_filterChip_6bb24e _filterChipActive_6bb24e"
+                    type="button"
+                  >
+                    Região: Global
+                  </button>
+                  <button
+                    aria-pressed="false"
+                    class="_filterChip_6bb24e _filterChipInactive_6bb24e"
+                    type="button"
+                  >
+                    Idioma: PT-BR
+                  </button>
+                  <button
+                    aria-pressed="false"
+                    class="_filterChip_6bb24e _filterChipInactive_6bb24e"
+                    type="button"
+                  >
+                    Modo: Co-op
+                  </button>
+                </div>
+                <div
+                  class="_roomList_6bb24e"
+                >
+                  <article
+                    class="_roomCard_6bb24e"
+                  >
+                    <div>
+                      <h4>
+                        Sala Pública — Gratuita
+                      </h4>
+                      <p>
+                        Entre imediatamente com qualquer jogador online 🌍
+                      </p>
+                    </div>
+                    <div
+                      class="_roomMeta_6bb24e"
+                    >
+                      <span>
+                        Jogadores: 24 / 40
+                      </span>
+                      <span>
+                        Ping 26ms
+                      </span>
+                      <button
+                        class="_joinButton_6bb24e"
+                        data-testid="lobby-join-public"
+                        type="button"
+                      >
+                        Entrar agora
+                      </button>
+                    </div>
+                  </article>
+                  <article
+                    class="_roomCard_6bb24e"
+                  >
+                    <div>
+                      <h4>
+                        Cluster Sináptico
+                      </h4>
+                      <p>
+                        Modos mutantes exclusivos com bônus de XP
+                      </p>
+                    </div>
+                    <div
+                      class="_roomMeta_6bb24e"
+                    >
+                      <span>
+                        Jogadores: 8 / 12
+                      </span>
+                      <span
+                        class="_locked_6bb24e"
+                      >
+                        🔒 Premium
+                      </span>
+                      <button
+                        aria-disabled="false"
+                        class="_unlockButton_6bb24e"
+                        title="Desbloquear 120💎"
+                        type="button"
+                      >
+                        Desbloquear 120💎
+                      </button>
+                    </div>
+                  </article>
+                  <article
+                    class="_roomCard_6bb24e"
+                  >
+                    <div>
+                      <h4>
+                        Ninho Lúmen
+                      </h4>
+                      <p>
+                        Experiência narrativa cooperativa por capítulos
+                      </p>
+                    </div>
+                    <div
+                      class="_roomMeta_6bb24e"
+                    >
+                      <span>
+                        Jogadores: 2 / 6
+                      </span>
+                      <span
+                        class="_locked_6bb24e"
+                      >
+                        🔒 Premium
+                      </span>
+                      <button
+                        aria-disabled="false"
+                        class="_unlockButton_6bb24e"
+                        title="Desbloquear 95💎"
+                        type="button"
+                      >
+                        Desbloquear 95💎
+                      </button>
+                    </div>
+                  </article>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants for menu and lobby stages > desktop-lobby 1`] = `
+<div
+  class="_root_6bb24e"
+  data-testid="lobby-screen"
+>
+  <div
+    class="_backdrop_6bb24e"
+  />
+  <div
+    class="_shell_6bb24e"
+  >
+    <aside
+      class="_sidebar_6bb24e"
+    >
+      <h3>
+        Criar Sala
+      </h3>
+      <p>
+        Monte partidas privadas com regras avançadas e convide o seu esquadrão.
+      </p>
+      <button
+        aria-disabled="false"
+        class="_createButton_6bb24e"
+        type="button"
+      >
+        Criar nova sala
+      </button>
+      <div
+        class="_sidebarHighlights_6bb24e"
+      >
+        <div
+          class="_statusCard_6bb24e"
+        >
+          <span>
+            🏓 Ping médio: 22ms
+          </span>
+          <span>
+            Conexão estável
+          </span>
+        </div>
+        <div
+          class="_statusCard_6bb24e"
+        >
+          <span>
+            🔥 3 salas premium disponíveis
+          </span>
+          <span>
+            Atualizadas a cada 5 min
+          </span>
+        </div>
+      </div>
+    </aside>
+    <section
+      class="_rooms_6bb24e"
+    >
+      <div
+        class="_filters_6bb24e"
+      >
+        <button
+          aria-pressed="true"
+          class="_filterChip_6bb24e _filterChipActive_6bb24e"
+          type="button"
+        >
+          Região: Global
+        </button>
+        <button
+          aria-pressed="false"
+          class="_filterChip_6bb24e _filterChipInactive_6bb24e"
+          type="button"
+        >
+          Idioma: PT-BR
+        </button>
+        <button
+          aria-pressed="false"
+          class="_filterChip_6bb24e _filterChipInactive_6bb24e"
+          type="button"
+        >
+          Modo: Co-op
+        </button>
+      </div>
+      <div
+        class="_roomList_6bb24e"
+      >
+        <article
+          class="_roomCard_6bb24e"
+        >
+          <div>
+            <h4>
+              Sala Pública — Gratuita
+            </h4>
+            <p>
+              Entre imediatamente com qualquer jogador online 🌍
+            </p>
+          </div>
+          <div
+            class="_roomMeta_6bb24e"
+          >
+            <span>
+              Jogadores: 24 / 40
+            </span>
+            <span>
+              Ping 26ms
+            </span>
+            <button
+              class="_joinButton_6bb24e"
+              data-testid="lobby-join-public"
+              type="button"
+            >
+              Entrar agora
+            </button>
+          </div>
+        </article>
+        <article
+          class="_roomCard_6bb24e"
+        >
+          <div>
+            <h4>
+              Cluster Sináptico
+            </h4>
+            <p>
+              Modos mutantes exclusivos com bônus de XP
+            </p>
+          </div>
+          <div
+            class="_roomMeta_6bb24e"
+          >
+            <span>
+              Jogadores: 8 / 12
+            </span>
+            <span
+              class="_locked_6bb24e"
+            >
+              🔒 Premium
+            </span>
+            <button
+              aria-disabled="false"
+              class="_unlockButton_6bb24e"
+              title="Desbloquear 120💎"
+              type="button"
+            >
+              Desbloquear 120💎
+            </button>
+          </div>
+        </article>
+        <article
+          class="_roomCard_6bb24e"
+        >
+          <div>
+            <h4>
+              Ninho Lúmen
+            </h4>
+            <p>
+              Experiência narrativa cooperativa por capítulos
+            </p>
+          </div>
+          <div
+            class="_roomMeta_6bb24e"
+          >
+            <span>
+              Jogadores: 2 / 6
+            </span>
+            <span
+              class="_locked_6bb24e"
+            >
+              🔒 Premium
+            </span>
+            <button
+              aria-disabled="false"
+              class="_unlockButton_6bb24e"
+              title="Desbloquear 95💎"
+              type="button"
+            >
+              Desbloquear 95💎
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
+  </div>
+</div>
+`;
+
+exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants for menu and lobby stages > desktop-main-menu 1`] = `
+<div
+  class="_root_87a75a"
+  data-testid="main-menu-screen"
+>
+  <div
+    class="_backdrop_87a75a"
+  />
+  <div
+    class="_shell_87a75a"
+  >
+    <section
+      class="_primary_87a75a"
+    >
+      <header
+        class="_profile_87a75a"
+      >
+        <div
+          class="_avatar_87a75a"
+        >
+          <span
+            class="_avatarInitials_87a75a"
+          >
+            AR
+          </span>
+        </div>
+        <div>
+          <p
+            class="_profileName_87a75a"
+          >
+            Artemis_Rift
+          </p>
+          <p
+            class="_profileMeta_87a75a"
+          >
+            Lvl 42 • XP 78%
+          </p>
+        </div>
+      </header>
+      <button
+        class="_playButton_87a75a"
+        data-testid="main-menu-play"
+        type="button"
+      >
+        Play
+      </button>
+      <div
+        class="_badgeRow_87a75a"
+      >
+        <div
+          class="_badge_87a75a"
+        >
+          <strong>
+            Operação
+          </strong>
+          <span>
+            Cluster Lúmen ativo
+          </span>
+        </div>
+        <div
+          class="_badge_87a75a"
+        >
+          <strong>
+            Esquadrão
+          </strong>
+          <span>
+            Synapse Nova • Online
+          </span>
+        </div>
+        <div
+          class="_badge_87a75a"
+        >
+          <strong>
+            Recompensa
+          </strong>
+          <span>
+            XP bônus +32% hoje
+          </span>
+        </div>
+      </div>
+    </section>
+    <aside
+      class="_secondary_87a75a"
+    >
+      <div
+        class="_banner_87a75a"
+      >
+        <strong>
+          Destaques da Temporada
+        </strong>
+        <span>
+          Mutação "Aurora" liberada • Evento Eclipse Azul
+        </span>
+      </div>
+      <div
+        class="_feed_87a75a"
+      >
+        <div
+          class="_feedItem_87a75a"
+        >
+          <strong>
+            Ranked
+          </strong>
+          <span>
+            Top 5% • Próximo reset em 3d
+          </span>
+        </div>
+        <div
+          class="_feedItem_87a75a"
+        >
+          <strong>
+            Contratos
+          </strong>
+          <span>
+            2 missões lendárias disponíveis
+          </span>
+        </div>
+        <div
+          class="_feedItem_87a75a"
+        >
+          <strong>
+            Comunidade
+          </strong>
+          <span>
+            Eventos cooperativos ao vivo
+          </span>
+        </div>
+      </div>
+      <div
+        class="_storeActions_87a75a"
+      >
+        <button
+          class="_storeButton_87a75a"
+          data-testid="main-menu-settings"
+          type="button"
+        >
+          <span
+            class="_storeButtonLabel_87a75a"
+          >
+            Configurações
+          </span>
+          <span
+            aria-hidden="true"
+            class="_storeButtonMeta_87a75a"
+          >
+            Em breve
+          </span>
+        </button>
+        <button
+          class="_storeButton_87a75a"
+          data-testid="main-menu-store"
+          type="button"
+        >
+          <span
+            class="_storeButtonLabel_87a75a"
+          >
+            Loja
+          </span>
+          <span
+            aria-hidden="true"
+            class="_storeButtonMeta_87a75a"
+          >
+            Em breve
+          </span>
+        </button>
+        <button
+          class="_storeButton_87a75a"
+          data-testid="main-menu-missions"
+          type="button"
+        >
+          <span
+            class="_storeButtonLabel_87a75a"
+          >
+            Missões
+          </span>
+          <span
+            aria-hidden="true"
+            class="_storeButtonMeta_87a75a"
+          >
+            Em breve
+          </span>
+        </button>
+        <button
+          class="_storeButton_87a75a"
+          data-testid="main-menu-friends"
+          type="button"
+        >
+          <span
+            class="_storeButtonLabel_87a75a"
+          >
+            Amigos
+          </span>
+          <span
+            aria-hidden="true"
+            class="_storeButtonMeta_87a75a"
+          >
+            Em breve
+          </span>
+        </button>
+      </div>
+      <div
+        class="_footer_87a75a"
+      >
+        <span>
+          v1.3.0
+        </span>
+        <span>
+          •
+        </span>
+        <span>
+          Micr•Omega Protocol
+        </span>
+      </div>
+    </aside>
+  </div>
+</div>
+`;
+
+exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants for menu and lobby stages > mobile-flow 1`] = `
+<div>
+  <div
+    class="_flowRoot_5a269c"
+    data-testid="micro-world-onboarding-flow"
+  >
+    <div
+      class="_backgroundLayer_5a269c"
+    />
+    <header
+      class="_header_5a269c"
+    >
+      <span
+        class="_phaseLabel_5a269c"
+      >
+        Coordenação de Missão
+      </span>
+      <h1
+        class="_title_5a269c"
+      >
+        Lobby Micr•Omega
+      </h1>
+      <p
+        class="_description_5a269c"
+      >
+        Selecione a sala ideal, organize seu time e sincronize as regras de partida antes de iniciar a invasão.
+      </p>
+    </header>
+    <div
+      class="_stageArea_5a269c"
+    >
+      <div
+        class="_stageShell_5a269c"
+      >
+        <div
+          class="_stageGlow_5a269c"
+        />
+        <div
+          class="_stageContent_5a269c"
+        >
+          <div
+            class="_root_6bb24e _mobile_6bb24e"
+            data-testid="lobby-screen-mobile"
+          >
+            <div
+              class="_backdrop_6bb24e"
+            />
+            <div
+              class="_shell_6bb24e _mobileShell_6bb24e"
+            >
+              <aside
+                class="_sidebar_6bb24e _mobileSidebar_6bb24e"
+              >
+                <h3>
+                  Criar Sala
+                </h3>
+                <p>
+                  Monte partidas privadas com regras avançadas e convide o seu esquadrão.
+                </p>
+                <button
+                  aria-disabled="false"
+                  class="_createButton_6bb24e"
+                  type="button"
+                >
+                  Criar nova sala
+                </button>
+                <div
+                  class="_sidebarHighlights_6bb24e _sidebarHighlightsMobile_6bb24e"
+                >
+                  <div
+                    class="_statusCard_6bb24e"
+                  >
+                    <span>
+                      🏓 Ping médio: 22ms
+                    </span>
+                    <span>
+                      Conexão estável
+                    </span>
+                  </div>
+                  <div
+                    class="_statusCard_6bb24e"
+                  >
+                    <span>
+                      🔥 3 salas premium disponíveis
+                    </span>
+                    <span>
+                      Atualizadas a cada 5 min
+                    </span>
+                  </div>
+                </div>
+              </aside>
+              <section
+                class="_rooms_6bb24e _mobileRooms_6bb24e"
+              >
+                <div
+                  class="_filters_6bb24e _mobileFilters_6bb24e"
+                >
+                  <button
+                    aria-pressed="true"
+                    class="_filterChip_6bb24e _filterChipActive_6bb24e"
+                    type="button"
+                  >
+                    Região: Global
+                  </button>
+                  <button
+                    aria-pressed="false"
+                    class="_filterChip_6bb24e _filterChipInactive_6bb24e"
+                    type="button"
+                  >
+                    Idioma: PT-BR
+                  </button>
+                  <button
+                    aria-pressed="false"
+                    class="_filterChip_6bb24e _filterChipInactive_6bb24e"
+                    type="button"
+                  >
+                    Modo: Co-op
+                  </button>
+                </div>
+                <div
+                  class="_roomList_6bb24e _mobileRoomList_6bb24e"
+                >
+                  <article
+                    class="_roomCard_6bb24e"
+                  >
+                    <div>
+                      <h4>
+                        Sala Pública — Gratuita
+                      </h4>
+                      <p>
+                        Entre imediatamente com qualquer jogador online 🌍
+                      </p>
+                    </div>
+                    <div
+                      class="_roomMeta_6bb24e"
+                    >
+                      <span>
+                        Jogadores: 24 / 40
+                      </span>
+                      <span>
+                        Ping 26ms
+                      </span>
+                      <button
+                        class="_joinButton_6bb24e"
+                        data-testid="lobby-join-public"
+                        type="button"
+                      >
+                        Entrar agora
+                      </button>
+                    </div>
+                  </article>
+                  <article
+                    class="_roomCard_6bb24e"
+                  >
+                    <div>
+                      <h4>
+                        Cluster Sináptico
+                      </h4>
+                      <p>
+                        Modos mutantes exclusivos com bônus de XP
+                      </p>
+                    </div>
+                    <div
+                      class="_roomMeta_6bb24e"
+                    >
+                      <span>
+                        Jogadores: 8 / 12
+                      </span>
+                      <span
+                        class="_locked_6bb24e"
+                      >
+                        🔒 Premium
+                      </span>
+                      <button
+                        aria-disabled="false"
+                        class="_unlockButton_6bb24e"
+                        title="Desbloquear 120💎"
+                        type="button"
+                      >
+                        Desbloquear 120💎
+                      </button>
+                    </div>
+                  </article>
+                  <article
+                    class="_roomCard_6bb24e"
+                  >
+                    <div>
+                      <h4>
+                        Ninho Lúmen
+                      </h4>
+                      <p>
+                        Experiência narrativa cooperativa por capítulos
+                      </p>
+                    </div>
+                    <div
+                      class="_roomMeta_6bb24e"
+                    >
+                      <span>
+                        Jogadores: 2 / 6
+                      </span>
+                      <span
+                        class="_locked_6bb24e"
+                      >
+                        🔒 Premium
+                      </span>
+                      <button
+                        aria-disabled="false"
+                        class="_unlockButton_6bb24e"
+                        title="Desbloquear 95💎"
+                        type="button"
+                      >
+                        Desbloquear 95💎
+                      </button>
+                    </div>
+                  </article>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants for menu and lobby stages > mobile-lobby 1`] = `
+<div
+  class="_root_6bb24e _mobile_6bb24e"
+  data-testid="lobby-screen-mobile"
+>
+  <div
+    class="_backdrop_6bb24e"
+  />
+  <div
+    class="_shell_6bb24e _mobileShell_6bb24e"
+  >
+    <aside
+      class="_sidebar_6bb24e _mobileSidebar_6bb24e"
+    >
+      <h3>
+        Criar Sala
+      </h3>
+      <p>
+        Monte partidas privadas com regras avançadas e convide o seu esquadrão.
+      </p>
+      <button
+        aria-disabled="false"
+        class="_createButton_6bb24e"
+        type="button"
+      >
+        Criar nova sala
+      </button>
+      <div
+        class="_sidebarHighlights_6bb24e _sidebarHighlightsMobile_6bb24e"
+      >
+        <div
+          class="_statusCard_6bb24e"
+        >
+          <span>
+            🏓 Ping médio: 22ms
+          </span>
+          <span>
+            Conexão estável
+          </span>
+        </div>
+        <div
+          class="_statusCard_6bb24e"
+        >
+          <span>
+            🔥 3 salas premium disponíveis
+          </span>
+          <span>
+            Atualizadas a cada 5 min
+          </span>
+        </div>
+      </div>
+    </aside>
+    <section
+      class="_rooms_6bb24e _mobileRooms_6bb24e"
+    >
+      <div
+        class="_filters_6bb24e _mobileFilters_6bb24e"
+      >
+        <button
+          aria-pressed="true"
+          class="_filterChip_6bb24e _filterChipActive_6bb24e"
+          type="button"
+        >
+          Região: Global
+        </button>
+        <button
+          aria-pressed="false"
+          class="_filterChip_6bb24e _filterChipInactive_6bb24e"
+          type="button"
+        >
+          Idioma: PT-BR
+        </button>
+        <button
+          aria-pressed="false"
+          class="_filterChip_6bb24e _filterChipInactive_6bb24e"
+          type="button"
+        >
+          Modo: Co-op
+        </button>
+      </div>
+      <div
+        class="_roomList_6bb24e _mobileRoomList_6bb24e"
+      >
+        <article
+          class="_roomCard_6bb24e"
+        >
+          <div>
+            <h4>
+              Sala Pública — Gratuita
+            </h4>
+            <p>
+              Entre imediatamente com qualquer jogador online 🌍
+            </p>
+          </div>
+          <div
+            class="_roomMeta_6bb24e"
+          >
+            <span>
+              Jogadores: 24 / 40
+            </span>
+            <span>
+              Ping 26ms
+            </span>
+            <button
+              class="_joinButton_6bb24e"
+              data-testid="lobby-join-public"
+              type="button"
+            >
+              Entrar agora
+            </button>
+          </div>
+        </article>
+        <article
+          class="_roomCard_6bb24e"
+        >
+          <div>
+            <h4>
+              Cluster Sináptico
+            </h4>
+            <p>
+              Modos mutantes exclusivos com bônus de XP
+            </p>
+          </div>
+          <div
+            class="_roomMeta_6bb24e"
+          >
+            <span>
+              Jogadores: 8 / 12
+            </span>
+            <span
+              class="_locked_6bb24e"
+            >
+              🔒 Premium
+            </span>
+            <button
+              aria-disabled="false"
+              class="_unlockButton_6bb24e"
+              title="Desbloquear 120💎"
+              type="button"
+            >
+              Desbloquear 120💎
+            </button>
+          </div>
+        </article>
+        <article
+          class="_roomCard_6bb24e"
+        >
+          <div>
+            <h4>
+              Ninho Lúmen
+            </h4>
+            <p>
+              Experiência narrativa cooperativa por capítulos
+            </p>
+          </div>
+          <div
+            class="_roomMeta_6bb24e"
+          >
+            <span>
+              Jogadores: 2 / 6
+            </span>
+            <span
+              class="_locked_6bb24e"
+            >
+              🔒 Premium
+            </span>
+            <button
+              aria-disabled="false"
+              class="_unlockButton_6bb24e"
+              title="Desbloquear 95💎"
+              type="button"
+            >
+              Desbloquear 95💎
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
+  </div>
+</div>
+`;
+
+exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants for menu and lobby stages > mobile-main-menu 1`] = `
+<div
+  class="_root_87a75a _mobile_87a75a"
+  data-testid="main-menu-screen-mobile"
+>
+  <div
+    class="_backdrop_87a75a"
+  />
+  <div
+    class="_shell_87a75a"
+  >
+    <section
+      class="_primary_87a75a"
+    >
+      <header
+        class="_profile_87a75a"
+      >
+        <div
+          class="_avatar_87a75a"
+        >
+          <span
+            class="_avatarInitials_87a75a"
+          >
+            AR
+          </span>
+        </div>
+        <div>
+          <p
+            class="_profileName_87a75a"
+          >
+            Artemis_Rift
+          </p>
+          <p
+            class="_profileMeta_87a75a"
+          >
+            Lvl 42 • XP 78%
+          </p>
+        </div>
+      </header>
+      <button
+        class="_playButton_87a75a"
+        data-testid="main-menu-play"
+        type="button"
+      >
+        Play
+      </button>
+      <div
+        class="_badgeRow_87a75a"
+      >
+        <div
+          class="_badge_87a75a"
+        >
+          <strong>
+            Operação
+          </strong>
+          <span>
+            Cluster Lúmen ativo
+          </span>
+        </div>
+        <div
+          class="_badge_87a75a"
+        >
+          <strong>
+            Esquadrão
+          </strong>
+          <span>
+            Synapse Nova • Online
+          </span>
+        </div>
+        <div
+          class="_badge_87a75a"
+        >
+          <strong>
+            Recompensa
+          </strong>
+          <span>
+            XP bônus +32% hoje
+          </span>
+        </div>
+      </div>
+    </section>
+    <aside
+      class="_secondary_87a75a"
+    >
+      <div
+        class="_banner_87a75a"
+      >
+        <strong>
+          Destaques da Temporada
+        </strong>
+        <span>
+          Mutação "Aurora" liberada • Evento Eclipse Azul
+        </span>
+      </div>
+      <div
+        class="_feed_87a75a"
+      >
+        <div
+          class="_feedItem_87a75a"
+        >
+          <strong>
+            Ranked
+          </strong>
+          <span>
+            Top 5% • Próximo reset em 3d
+          </span>
+        </div>
+        <div
+          class="_feedItem_87a75a"
+        >
+          <strong>
+            Contratos
+          </strong>
+          <span>
+            2 missões lendárias disponíveis
+          </span>
+        </div>
+        <div
+          class="_feedItem_87a75a"
+        >
+          <strong>
+            Comunidade
+          </strong>
+          <span>
+            Eventos cooperativos ao vivo
+          </span>
+        </div>
+      </div>
+      <div
+        class="_storeActions_87a75a"
+      >
+        <button
+          class="_storeButton_87a75a"
+          data-testid="main-menu-settings"
+          type="button"
+        >
+          <span
+            class="_storeButtonLabel_87a75a"
+          >
+            Configurações
+          </span>
+          <span
+            aria-hidden="true"
+            class="_storeButtonMeta_87a75a"
+          >
+            Em breve
+          </span>
+        </button>
+        <button
+          class="_storeButton_87a75a"
+          data-testid="main-menu-store"
+          type="button"
+        >
+          <span
+            class="_storeButtonLabel_87a75a"
+          >
+            Loja
+          </span>
+          <span
+            aria-hidden="true"
+            class="_storeButtonMeta_87a75a"
+          >
+            Em breve
+          </span>
+        </button>
+        <button
+          class="_storeButton_87a75a"
+          data-testid="main-menu-missions"
+          type="button"
+        >
+          <span
+            class="_storeButtonLabel_87a75a"
+          >
+            Missões
+          </span>
+          <span
+            aria-hidden="true"
+            class="_storeButtonMeta_87a75a"
+          >
+            Em breve
+          </span>
+        </button>
+        <button
+          class="_storeButton_87a75a"
+          data-testid="main-menu-friends"
+          type="button"
+        >
+          <span
+            class="_storeButtonLabel_87a75a"
+          >
+            Amigos
+          </span>
+          <span
+            aria-hidden="true"
+            class="_storeButtonMeta_87a75a"
+          >
+            Em breve
+          </span>
+        </button>
+      </div>
+      <div
+        class="_footer_87a75a"
+      >
+        <span>
+          v1.3.0
+        </span>
+        <span>
+          •
+        </span>
+        <span>
+          Micr•Omega Protocol
+        </span>
+      </div>
+    </aside>
+  </div>
+</div>
+`;

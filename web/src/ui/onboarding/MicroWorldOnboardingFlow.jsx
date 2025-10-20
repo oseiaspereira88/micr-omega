@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import SplashScreen from './SplashScreen.jsx';
 import MainMenuScreen from './MainMenuScreen.jsx';
 import LobbyScreen from './LobbyScreen.jsx';
+import useMenuViewportVariant from './useMenuViewportVariant.ts';
 import styles from './MicroWorldOnboardingFlow.module.css';
 
 const STAGE_SEQUENCE = ['splash', 'menu', 'lobby'];
@@ -44,6 +45,8 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
   const [activeStage, setActiveStage] = useState('splash');
   const [feedbackNotice, setFeedbackNotice] = useState(null);
   const splashTimerRef = useRef(null);
+  const viewportVariant = useMenuViewportVariant();
+  const variant = viewportVariant ?? 'desktop';
 
   const clearSplashTimer = useCallback(() => {
     if (splashTimerRef.current) {
@@ -218,6 +221,7 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
             {activeStage === 'splash' && <SplashScreen />}
             {activeStage === 'menu' && (
               <MainMenuScreen
+                variant={variant}
                 onPlay={handlePlay}
                 onOpenSettings={handleOpenSettings}
                 onOpenStore={handleOpenStore}
@@ -227,6 +231,7 @@ const MicroWorldOnboardingFlow = ({ onAdvance, onComplete }) => {
             )}
             {activeStage === 'lobby' && (
               <LobbyScreen
+                variant={variant}
                 onJoinPublic={handleEnterPublic}
                 onCreateRoom={handleCreateRoom}
                 onUnlockRoom={handleUnlockRoom}
