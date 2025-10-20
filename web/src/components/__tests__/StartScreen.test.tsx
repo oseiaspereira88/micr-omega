@@ -51,6 +51,76 @@ const resetStore = () => {
 const renderWithProviders = (ui: React.ReactNode) =>
   render(<GameSettingsProvider>{ui}</GameSettingsProvider>);
 
+type MatchMediaController = {
+  setMatches: (matches: boolean) => void;
+  restore: () => void;
+};
+
+const setupMatchMedia = (matches: boolean): MatchMediaController => {
+  const previous = window.matchMedia;
+  let currentMatches = matches;
+  const registries = new Set<Set<(event: MediaQueryListEvent) => void>>();
+
+  const matchMediaMock = vi.fn().mockImplementation((query: string) => {
+    const listeners = new Set<(event: MediaQueryListEvent) => void>();
+    const mediaQueryList = {
+      media: query,
+      onchange: null,
+      addEventListener: (_event: string, listener: EventListenerOrEventListenerObject) => {
+        const handler = listener as (event: MediaQueryListEvent) => void;
+        listeners.add(handler);
+      },
+      removeEventListener: (_event: string, listener: EventListenerOrEventListenerObject) => {
+        const handler = listener as (event: MediaQueryListEvent) => void;
+        listeners.delete(handler);
+      },
+      addListener: (listener: (event: MediaQueryListEvent) => void) => {
+        listeners.add(listener);
+      },
+      removeListener: (listener: (event: MediaQueryListEvent) => void) => {
+        listeners.delete(listener);
+      },
+      dispatchEvent: (event: Event) => {
+        listeners.forEach((listener) => listener(event as MediaQueryListEvent));
+        return true;
+      },
+    } as MediaQueryList;
+
+    Object.defineProperty(mediaQueryList, "matches", {
+      configurable: true,
+      get: () => currentMatches,
+    });
+
+    registries.add(listeners);
+
+    return mediaQueryList;
+  });
+
+  window.matchMedia = matchMediaMock as unknown as typeof window.matchMedia;
+
+  return {
+    setMatches(next: boolean) {
+      if (next === currentMatches) {
+        return;
+      }
+      currentMatches = next;
+      registries.forEach((listeners) => {
+        listeners.forEach((listener) =>
+          listener({ matches: next } as MediaQueryListEvent)
+        );
+      });
+    },
+    restore() {
+      registries.clear();
+      if (previous) {
+        window.matchMedia = previous;
+      } else {
+        delete (window as typeof window & { matchMedia?: typeof window.matchMedia }).matchMedia;
+      }
+    },
+  };
+};
+
 describe("StartScreen", () => {
   beforeEach(() => {
     resetStore();
@@ -144,6 +214,47 @@ describe("StartScreen", () => {
     await waitFor(() => {
       expect(nameInput).toHaveFocus();
     });
+  });
+
+  it("mantém o foco preso no layout móvel com barra inferior", async () => {
+    const controller = setupMatchMedia(true);
+
+    act(() => {
+      gameStore.actions.setConnectionStatus("connected");
+      gameStore.actions.setPlayerId("player-1");
+    });
+
+    try {
+      renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+      const dialog = screen.getByRole("dialog", { name: /micro/i });
+      const nameInput = screen.getByLabelText(/nome do jogador/i);
+      const quitButton = screen.getByRole("button", { name: /desconectar/i });
+
+      await waitFor(() => {
+        expect(dialog).toHaveFocus();
+      });
+
+      fireEvent.keyDown(dialog, { key: "Tab" });
+
+      await waitFor(() => {
+        expect(nameInput).toHaveFocus();
+      });
+
+      fireEvent.keyDown(nameInput, { key: "Tab", shiftKey: true });
+
+      await waitFor(() => {
+        expect(quitButton).toHaveFocus();
+      });
+
+      fireEvent.keyDown(quitButton, { key: "Tab" });
+
+      await waitFor(() => {
+        expect(nameInput).toHaveFocus();
+      });
+    } finally {
+      controller.restore();
+    }
   });
 
   it("persiste o nome sanitizado e envia as configurações", () => {
