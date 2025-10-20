@@ -1036,6 +1036,71 @@ describe('updateGameState', () => {
     expect(sharedState.damagePopups).toHaveLength(1);
     expect(sharedState.damagePopups[0]).toMatchObject({ variant: 'critical', value: 42 });
   });
+
+  it('skips impact visuals when damage is zero or missing', () => {
+    const renderState = createRenderState();
+    const sharedState = createSharedState();
+
+    sharedState.world.microorganisms.push(
+      {
+        id: 'npc-attacker',
+        species: 'amoeba',
+        position: { x: 0, y: 0 },
+        movementVector: { x: 0, y: 0 },
+        health: { current: 6, max: 6 },
+      },
+      {
+        id: 'npc-target',
+        species: 'bacteria',
+        position: { x: 30, y: -12 },
+        movementVector: { x: 0, y: 0 },
+        health: { current: 6, max: 6 },
+      }
+    );
+
+    const createEffect = vi.fn();
+    const createParticle = vi.fn();
+    const aiSpy = vi.spyOn(aiModule, 'resolveNpcCombat').mockReturnValue({
+      world: sharedState.world,
+      events: [
+        {
+          type: 'attack',
+          attackerId: 'npc-attacker',
+          targetId: 'npc-target',
+          damage: 0,
+        },
+      ],
+      drops: [],
+      memory: { threatManagers: {} },
+    });
+
+    try {
+      updateGameState({
+        renderState,
+        sharedState,
+        delta: 0.016,
+        movementIntent: { x: 0, y: 0 },
+        actionBuffer: {
+          attacks: [
+            {
+              kind: 'basic',
+              timestamp: 456,
+              targetObjectId: 'micro-1',
+              state: 'engaged',
+              damage: undefined,
+            },
+          ],
+        },
+        helpers: { createEffect, createParticle },
+      });
+    } finally {
+      aiSpy.mockRestore();
+    }
+
+    expect(createEffect).not.toHaveBeenCalled();
+    expect(createParticle).not.toHaveBeenCalled();
+    expect(sharedState.damagePopups).toHaveLength(0);
+  });
 });
 
 describe('progression utilities', () => {
