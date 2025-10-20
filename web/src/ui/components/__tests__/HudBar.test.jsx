@@ -36,6 +36,7 @@ const expectDefaultMetrics = () => {
   expect(screen.getByText('Frags +0')).toBeInTheDocument();
   expect(screen.getByText('Genes +0')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', 'XP 0 de 1 (0%)');
   expect(screen.queryByText(/combo/i)).not.toBeInTheDocument();
 };
 
@@ -173,6 +174,10 @@ describe('HudBar', () => {
     expect(screen.getByText('MG +456.789')).toBeInTheDocument();
     expect(screen.getByText('Frags +101.112')).toBeInTheDocument();
     expect(screen.getByText('Genes +131.415')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuetext',
+      'XP 123.456 de 789.012 (16%)'
+    );
   });
 });
 

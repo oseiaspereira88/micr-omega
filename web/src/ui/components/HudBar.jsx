@@ -75,6 +75,9 @@ const HudBar = ({
   const xpCurrent = Math.max(0, Math.floor(sanitizeNumber(xp?.current)));
   const xpNext = Math.max(1, Math.floor(sanitizeNumber(xp?.next ?? 1, 1)));
   const xpPercent = Math.max(0, Math.min(1, xpCurrent / xpNext));
+  const xpValueText = `XP ${formatNumber(xpCurrent)} de ${formatNumber(xpNext)} (${Math.round(
+    xpPercent * 100
+  )}%)`;
 
   const mgCurrent = Math.max(0, Math.floor(sanitizeNumber(geneticMaterial?.current)));
   const pcAvailable = Math.max(0, Math.floor(sanitizeNumber(characteristicPoints?.available)));
@@ -417,6 +420,7 @@ const HudBar = ({
                   aria-valuenow={Math.round(xpPercent * 100)}
                   aria-valuemin={0}
                   aria-valuemax={100}
+                  aria-valuetext={xpValueText}
                 >
                   <div className={styles.xpFill} style={{ width: `${xpPercent * 100}%` }} />
                 </div>
