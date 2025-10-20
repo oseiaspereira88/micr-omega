@@ -132,6 +132,7 @@ const TouchControls = ({
   );
 
   const isLandscape = viewport.width > viewport.height;
+  const showButtonLegends = !isLandscape || viewport.height >= 600;
 
   const effectiveLayout = useMemo(() => {
     if (!(autoInvertWhenSidebarOpen && isSidebarOpen)) {
@@ -232,32 +233,56 @@ const TouchControls = ({
     const measureFootprint = () => {
       frameId = null;
 
-      const buttons = group.querySelectorAll('button');
-      if (!buttons.length) {
+      const interactiveElements = group.querySelectorAll(
+        'button, [data-touch-legend="true"]',
+      );
+      if (!interactiveElements.length) {
         hudElement.style.removeProperty('--touch-controls-footprint');
+        hudElement.style.removeProperty('--touch-controls-footprint-height');
         return;
       }
 
       let minLeft = Infinity;
       let maxRight = -Infinity;
+      let minTop = Infinity;
+      let maxBottom = -Infinity;
 
-      buttons.forEach(button => {
-        const rect = button.getBoundingClientRect();
+      interactiveElements.forEach(element => {
+        const rect = element.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) {
           return;
         }
 
         minLeft = Math.min(minLeft, rect.left);
         maxRight = Math.max(maxRight, rect.right);
+        minTop = Math.min(minTop, rect.top);
+        maxBottom = Math.max(maxBottom, rect.bottom);
       });
 
-      if (!Number.isFinite(minLeft) || !Number.isFinite(maxRight) || maxRight <= minLeft) {
+      const horizontalValid =
+        Number.isFinite(minLeft) && Number.isFinite(maxRight) && maxRight > minLeft;
+      const verticalValid =
+        Number.isFinite(minTop) && Number.isFinite(maxBottom) && maxBottom > minTop;
+
+      if (!horizontalValid) {
         hudElement.style.removeProperty('--touch-controls-footprint');
-        return;
+      } else {
+        const horizontalFootprint = Math.ceil(maxRight - minLeft);
+        hudElement.style.setProperty(
+          '--touch-controls-footprint',
+          `${horizontalFootprint}px`,
+        );
       }
 
-      const footprint = Math.ceil(maxRight - minLeft);
-      hudElement.style.setProperty('--touch-controls-footprint', `${footprint}px`);
+      if (verticalValid) {
+        const verticalFootprint = Math.ceil(maxBottom - minTop);
+        hudElement.style.setProperty(
+          '--touch-controls-footprint-height',
+          `${verticalFootprint}px`,
+        );
+      } else {
+        hudElement.style.removeProperty('--touch-controls-footprint-height');
+      }
     };
 
     const scheduleMeasure = () => {
@@ -275,9 +300,11 @@ const TouchControls = ({
     if (typeof window.ResizeObserver === 'function') {
       resizeObserver = new window.ResizeObserver(scheduleMeasure);
       resizeObserver.observe(group);
-      group.querySelectorAll('button').forEach(button => {
-        resizeObserver?.observe(button);
-      });
+      group
+        .querySelectorAll('button, [data-touch-legend="true"]')
+        .forEach(element => {
+          resizeObserver?.observe(element);
+        });
     }
 
     window.addEventListener('resize', scheduleMeasure);
@@ -291,8 +318,9 @@ const TouchControls = ({
         resizeObserver.disconnect();
       }
       hudElement.style.removeProperty('--touch-controls-footprint');
+      hudElement.style.removeProperty('--touch-controls-footprint-height');
     };
-  }, [effectiveLayout, touchScale]);
+  }, [effectiveLayout, touchScale, showButtonLegends]);
 
   const isTouchLikePointer = event => {
     const pointerType =
@@ -323,11 +351,15 @@ const TouchControls = ({
         styles.touchLayer,
         layoutClass,
         orientationClass,
+        showButtonLegends ? styles.showLegends : null,
         className,
       )}
       style={{
         '--touch-scale': touchScale.toFixed(3),
         '--touch-vertical-scale': touchVerticalScale.toFixed(3),
+        '--touch-legend-space': showButtonLegends
+          ? `${Math.round(touchScale * 26)}px`
+          : '0px',
       }}
     >
       <div
@@ -375,7 +407,18 @@ const TouchControls = ({
             onAttack?.();
           }}
         >
-          ⚔️
+          <span className={styles.buttonIcon} aria-hidden="true">
+            ⚔️
+          </span>
+          {showButtonLegends && (
+            <span
+              className={styles.buttonLegend}
+              aria-hidden="true"
+              data-touch-legend="true"
+            >
+              Ataque
+            </span>
+          )}
         </button>
 
         <button
@@ -407,10 +450,19 @@ const TouchControls = ({
               style={{ '--cooldown-progress': `${100 - dashChargePercent}%` }}
             />
           )}
-          <span className={styles.buttonIcon}>💨</span>
+          <span className={styles.buttonIcon} aria-hidden="true">💨</span>
           <span className={joinClassNames(styles.cooldownLabel, styles.dashLabel)}>
             {dashReady ? 'Pronto' : `${dashChargePercent}%`}
           </span>
+          {showButtonLegends && (
+            <span
+              className={styles.buttonLegend}
+              aria-hidden="true"
+              data-touch-legend="true"
+            >
+              Dash
+            </span>
+          )}
         </button>
         <span
           id={dashStatusId}
@@ -450,7 +502,7 @@ const TouchControls = ({
               style={{ '--cooldown-progress': `${100 - skillCooldownPercentClamped}%` }}
             />
           )}
-          <span className={styles.buttonIcon}>
+          <span className={styles.buttonIcon} aria-hidden="true">
             {hasCurrentSkill ? currentSkillIcon : '🌀'}
           </span>
           {showSkillCooldown && (
@@ -471,6 +523,15 @@ const TouchControls = ({
           >
             {hasCurrentSkill ? (showSkillCooldown ? '' : currentSkillCost) : '--'}
           </span>
+          {showButtonLegends && (
+            <span
+              className={styles.buttonLegend}
+              aria-hidden="true"
+              data-touch-legend="true"
+            >
+              Habilidade
+            </span>
+          )}
         </button>
         <span
           id={skillStatusId}
@@ -505,7 +566,18 @@ const TouchControls = ({
           onTouchCancel={handleCycleSkillTouchEnd}
           disabled={!hasCurrentSkill}
         >
-          🔄
+          <span className={styles.buttonIcon} aria-hidden="true">
+            🔄
+          </span>
+          {showButtonLegends && (
+            <span
+              className={styles.buttonLegend}
+              aria-hidden="true"
+              data-touch-legend="true"
+            >
+              Trocar
+            </span>
+          )}
         </button>
 
         <button
@@ -521,7 +593,18 @@ const TouchControls = ({
           aria-disabled={!canEvolve}
           disabled={!canEvolve}
         >
-          🧬
+          <span className={styles.buttonIcon} aria-hidden="true">
+            🧬
+          </span>
+          {showButtonLegends && (
+            <span
+              className={styles.buttonLegend}
+              aria-hidden="true"
+              data-touch-legend="true"
+            >
+              Evoluir
+            </span>
+          )}
         </button>
       </div>
     </div>
