@@ -117,6 +117,7 @@ const OBSTACLE_PADDING = 12;
 
 const MICRO_LOW_HEALTH_THRESHOLD = 0.3;
 const MICRO_RETARGET_COOLDOWN_MS = 500;
+const MICRO_CONTACT_INVULNERABILITY_MS = PLAYER_ATTACK_COOLDOWN_MS + 400;
 const MICRO_FLEE_DURATION_MS = 2_000;
 const MICRO_PATROL_RADIUS = 140;
 const MICRO_WAYPOINT_REACH_DISTANCE = 16;
@@ -4149,6 +4150,11 @@ export class RoomDO {
           variant,
           createdAt: now,
         });
+        const nextInvulnerableUntil = Math.max(
+          closest.player.invulnerableUntil ?? 0,
+          now + MICRO_CONTACT_INVULNERABILITY_MS,
+        );
+        closest.player.invulnerableUntil = nextInvulnerableUntil;
       }
       updatedPlayers.set(closest.player.id, closest.player);
       behavior.lastAttackAt = now;
