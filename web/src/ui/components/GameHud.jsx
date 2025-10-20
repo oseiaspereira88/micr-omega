@@ -284,6 +284,27 @@ const GameHud = ({
 
   const { settings, updateSettings } = useGameSettings();
   const isMinimapEnabled = Boolean(settings?.showMinimap);
+  const touchLayoutPreference = settings?.touchLayout === 'left' ? 'left' : 'right';
+  const autoSwapTouchLayoutWhenSidebarOpen = Boolean(
+    settings?.autoSwapTouchLayoutWhenSidebarOpen,
+  );
+
+  const effectiveTouchLayout = useMemo(() => {
+    if (!showTouchControls) {
+      return null;
+    }
+
+    if (autoSwapTouchLayoutWhenSidebarOpen && isSidebarOpen) {
+      return touchLayoutPreference === 'left' ? 'right' : 'left';
+    }
+
+    return touchLayoutPreference;
+  }, [
+    autoSwapTouchLayoutWhenSidebarOpen,
+    isSidebarOpen,
+    showTouchControls,
+    touchLayoutPreference,
+  ]);
 
   const handleToggleMinimap = useCallback(() => {
     updateSettings({ showMinimap: !isMinimapEnabled });
@@ -405,6 +426,13 @@ const GameHud = ({
     styles.sidebarToggle,
     isMobileHud ? styles.sidebarToggleFloating : '',
     hudDisabled ? styles.hudElementDisabled : '',
+    showTouchControls ? styles.sidebarToggleTouchControls : '',
+    showTouchControls && effectiveTouchLayout === 'left'
+      ? styles.sidebarToggleTouchLayoutLeft
+      : '',
+    showTouchControls && effectiveTouchLayout === 'right'
+      ? styles.sidebarToggleTouchLayoutRight
+      : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -657,7 +685,7 @@ const GameHud = ({
             hasCurrentSkill={Boolean(currentSkill)}
             onOpenEvolutionMenu={onOpenEvolutionMenu}
             canEvolve={canEvolve}
-            touchLayout={settings.touchLayout}
+            touchLayout={touchLayoutPreference}
             isSidebarOpen={isSidebarOpen}
             autoInvertWhenSidebarOpen={settings.autoSwapTouchLayoutWhenSidebarOpen}
             className={hudDisabled ? styles.hudElementDisabled : undefined}
