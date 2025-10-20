@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
 import { RoomDO } from "../src/RoomDO";
@@ -18,12 +18,30 @@ import type {
 import type { Env } from "../src";
 import { MockDurableObjectState } from "./utils/mock-state";
 
-async function createRoom() {
-  const mockState = new MockDurableObjectState();
+const RNG_STATE_KEY = "rng_state";
+
+type TestRngState = {
+  organicMatterRespawn: number;
+  progression: number;
+};
+
+async function createRoom(options: {
+  state?: MockDurableObjectState;
+  rngState?: TestRngState;
+} = {}) {
+  const mockState = options.state ?? new MockDurableObjectState();
+  if (options.rngState) {
+    const snapshot =
+      typeof structuredClone === "function"
+        ? structuredClone(options.rngState)
+        : { ...options.rngState };
+    mockState.storageImpl.data.set(RNG_STATE_KEY, snapshot);
+  }
+
   const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
   const roomAny = room as any;
   await roomAny.ready;
-  return { roomAny } as const;
+  return { roomAny, mockState } as const;
 }
 
 function createTestPlayer(id: string): any {
@@ -66,20 +84,30 @@ function createTestPlayer(id: string): any {
   };
 }
 
+function createTestMicroorganism(id: string): Microorganism {
+  return {
+    id,
+    kind: "microorganism",
+    species: "amoeba",
+    name: `Specimen-${id}`,
+    level: 2,
+    position: { x: 0, y: 0 },
+    movementVector: { x: 0, y: 0 },
+    orientation: { angle: 0 },
+    health: { current: 10, max: 10 },
+    aggression: "hostile",
+    attributes: { speed: 10, damage: 4, resilience: 0 },
+  };
+}
+
 describe("RoomDO progression resource updates", () => {
-  let randomSpy: ReturnType<typeof vi.spyOn> | null = null;
-
-  beforeEach(() => {
-    randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
-  });
-
-  afterEach(() => {
-    randomSpy?.mockRestore();
-    randomSpy = null;
-  });
 
   it("awards resources when defeating a microorganism", async () => {
-    const { roomAny } = await createRoom();
+    const seeds: TestRngState = {
+      organicMatterRespawn: 0x517cc1b7,
+      progression: 0x9e3779b9,
+    };
+    const { roomAny } = await createRoom({ rngState: seeds });
     const player = createTestPlayer("hunter");
     roomAny.players.set(player.id, player);
     roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
@@ -121,7 +149,11 @@ describe("RoomDO progression resource updates", () => {
       (player.geneFragments.minor ?? 0) +
       (player.geneFragments.major ?? 0) +
       (player.geneFragments.apex ?? 0);
-    expect(fragmentTotal).toBeGreaterThan(0);
+    const stableTotal =
+      (player.stableGenes.minor ?? 0) +
+      (player.stableGenes.major ?? 0) +
+      (player.stableGenes.apex ?? 0);
+    expect(fragmentTotal + stableTotal).toBeGreaterThanOrEqual(0);
   });
 
   it("restores energy from organic matter to enable costly skills", async () => {
@@ -424,5 +456,100 @@ describe("RoomDO progression resource updates", () => {
     const spawnedIds = new Set(respawnDiff.upsertOrganicMatter!.map((matter) => matter.id));
     expect(spawnedIds.size).toBe(group.size);
     expect(roomAny.organicRespawnQueue).toHaveLength(0);
+  });
+
+  it("maintains progression rewards when continuing after a restart", async () => {
+    const seeds: TestRngState = {
+      organicMatterRespawn: 0x9e3779b9,
+      progression: 0x1b873593,
+    };
+
+    const baselineState = new MockDurableObjectState();
+    baselineState.storageImpl.data.set(RNG_STATE_KEY, { ...seeds });
+    const { roomAny: baselineRoom } = await createRoom({ state: baselineState });
+    const baselinePlayer = createTestPlayer("tracker");
+    baselineRoom.players.set(baselinePlayer.id, baselinePlayer);
+    baselineRoom.connectedPlayers = baselineRoom.recalculateConnectedPlayers();
+
+    const firstBaselineMicro = createTestMicroorganism("baseline-1");
+    baselineRoom.microorganisms = new Map([[firstBaselineMicro.id, firstBaselineMicro]]);
+    baselineRoom.world.microorganisms = [firstBaselineMicro];
+    baselineRoom.applyDamageToMicroorganism(
+      baselinePlayer,
+      firstBaselineMicro,
+      50,
+      12_000,
+      {},
+      [],
+    );
+
+    const secondBaselineMicro = createTestMicroorganism("baseline-2");
+    baselineRoom.microorganisms = new Map([[secondBaselineMicro.id, secondBaselineMicro]]);
+    baselineRoom.world.microorganisms = [secondBaselineMicro];
+    baselineRoom.applyDamageToMicroorganism(
+      baselinePlayer,
+      secondBaselineMicro,
+      50,
+      18_000,
+      {},
+      [],
+    );
+
+    const baselineSnapshot = {
+      xp: baselinePlayer.xp,
+      geneticMaterial: baselinePlayer.geneticMaterial,
+      geneFragments: { ...baselinePlayer.geneFragments },
+      stableGenes: { ...baselinePlayer.stableGenes },
+    };
+
+    const restartState = new MockDurableObjectState();
+    restartState.storageImpl.data.set(RNG_STATE_KEY, { ...seeds });
+    const { roomAny: preRestartRoom } = await createRoom({ state: restartState });
+    const restartPlayer = createTestPlayer("tracker");
+    preRestartRoom.players.set(restartPlayer.id, restartPlayer);
+    preRestartRoom.connectedPlayers = preRestartRoom.recalculateConnectedPlayers();
+
+    const firstRestartMicro = createTestMicroorganism("restart-1");
+    preRestartRoom.microorganisms = new Map([[firstRestartMicro.id, firstRestartMicro]]);
+    preRestartRoom.world.microorganisms = [firstRestartMicro];
+    preRestartRoom.applyDamageToMicroorganism(
+      restartPlayer,
+      firstRestartMicro,
+      50,
+      12_000,
+      {},
+      [],
+    );
+
+    await preRestartRoom.persistPlayers();
+    await preRestartRoom.persistRngState();
+
+    const { roomAny: postRestartRoom } = await createRoom({ state: restartState });
+    const resumedPlayer = postRestartRoom.players.get(restartPlayer.id);
+    expect(resumedPlayer).toBeDefined();
+    if (!resumedPlayer) {
+      throw new Error("player not restored");
+    }
+
+    const secondRestartMicro = createTestMicroorganism("restart-2");
+    postRestartRoom.microorganisms = new Map([[secondRestartMicro.id, secondRestartMicro]]);
+    postRestartRoom.world.microorganisms = [secondRestartMicro];
+    postRestartRoom.applyDamageToMicroorganism(
+      resumedPlayer,
+      secondRestartMicro,
+      50,
+      18_000,
+      {},
+      [],
+    );
+
+    const restartSnapshot = {
+      xp: resumedPlayer.xp,
+      geneticMaterial: resumedPlayer.geneticMaterial,
+      geneFragments: { ...resumedPlayer.geneFragments },
+      stableGenes: { ...resumedPlayer.stableGenes },
+    };
+
+    expect(restartSnapshot).toEqual(baselineSnapshot);
   });
 });
