@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 
 import GameHud from '../GameHud';
 import { gameStore } from '../../../store/gameStore';
-import { GameSettingsProvider } from '../../../store/gameSettings';
+import { GameSettingsProvider, useGameSettings } from '../../../store/gameSettings';
 import * as touchDeviceModule from '../../../hooks/useIsTouchDevice';
 
 const previewMock = vi.fn();
@@ -104,6 +104,20 @@ const BASE_PROPS = {
   cameraZoom: 1,
   onCameraZoomChange: vi.fn(),
   opponents: [],
+};
+
+const CameraSettingsHarness = (props) => {
+  const { updateSettings } = useGameSettings();
+
+  return (
+    <GameHud
+      {...BASE_PROPS}
+      {...props}
+      onCameraZoomChange={(value) => {
+        updateSettings({ cameraZoom: value });
+      }}
+    />
+  );
 };
 
 describe('GameHud connection status overlay', () => {
@@ -533,6 +547,52 @@ describe('GameHud settings panel', () => {
     expect(persistedSlider).toHaveValue('45');
     expect(screen.getByRole('button', { name: /ativar som/i })).toBeInTheDocument();
     expect(screen.getByText(/som desligado/i)).toBeInTheDocument();
+  });
+
+  it('persiste a preferência de zoom da câmera após reiniciar o HUD', async () => {
+    const user = userEvent.setup();
+    const storageKey = 'micr-omega:game-settings';
+
+    const firstRender = render(
+      <GameSettingsProvider>
+        <CameraSettingsHarness />
+      </GameSettingsProvider>,
+    );
+
+    const openButton = screen.getByRole('button', { name: /mostrar painel/i });
+    await user.click(openButton);
+
+    const zoomSlider = await screen.findByRole('slider', {
+      name: /controle de zoom da câmera/i,
+    });
+    expect(zoomSlider).toHaveValue('1');
+
+    fireEvent.change(zoomSlider, { target: { value: '0.8' } });
+
+    await waitFor(() => {
+      expect(zoomSlider).toHaveValue('0.8');
+      const stored = window.localStorage.getItem(storageKey);
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored ?? '{}');
+      expect(parsed.cameraZoom).toBeCloseTo(0.8, 5);
+    });
+
+    firstRender.unmount();
+
+    const secondUser = userEvent.setup();
+    render(
+      <GameSettingsProvider>
+        <CameraSettingsHarness />
+      </GameSettingsProvider>,
+    );
+
+    const secondOpenButton = screen.getByRole('button', { name: /mostrar painel/i });
+    await secondUser.click(secondOpenButton);
+
+    const persistedSlider = await screen.findByRole('slider', {
+      name: /controle de zoom da câmera/i,
+    });
+    expect(persistedSlider).toHaveValue('0.8');
   });
 
   it('executa a prévia de áudio ao clicar em Testar som', async () => {

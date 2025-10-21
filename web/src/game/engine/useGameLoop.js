@@ -41,6 +41,7 @@ const DEFAULT_SETTINGS = {
   visualDensity: 'medium',
   showTouchControls: false,
   showMinimap: featureToggles.minimap,
+  cameraZoom: 1,
 };
 
 const normalizeMasterVolume = (value) => {
@@ -744,7 +745,7 @@ const resolveTimestamp = (timestamp) => {
   return Date.now();
 };
 
-const useGameLoop = ({ canvasRef, dispatch, settings }) => {
+const useGameLoop = ({ canvasRef, dispatch, settings, updateSettings }) => {
   const audioCtxRef = useRef(null);
   const audioWarningLoggedRef = useRef(false);
   const animationFrameRef = useRef(null);
@@ -755,6 +756,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   const dispatchRef = useRef(dispatch);
   const commandCallbackRef = useRef(settings?.onCommandBatch ?? null);
   const evolutionCallbackRef = useRef(settings?.onEvolutionDelta ?? null);
+  const updateSettingsRef = useRef(updateSettings ?? null);
 
   useEffect(() => {
     dispatchRef.current = dispatch;
@@ -763,7 +765,8 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   useEffect(() => {
     commandCallbackRef.current = settings?.onCommandBatch ?? null;
     evolutionCallbackRef.current = settings?.onEvolutionDelta ?? null;
-  }, [settings]);
+    updateSettingsRef.current = updateSettings ?? null;
+  }, [settings, updateSettings]);
 
   useEffect(() => {
     sharedStateRef.current = gameStore.getState();
@@ -1173,6 +1176,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
 
       camera.zoom = clamped;
       syncHudState(state);
+      updateSettingsRef.current?.({ cameraZoom: clamped });
     },
     [syncHudState]
   );

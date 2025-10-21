@@ -22,6 +22,7 @@ export type GameSettings = {
   showMinimap: boolean;
   touchLayout: TouchLayout;
   autoSwapTouchLayoutWhenSidebarOpen: boolean;
+  cameraZoom: number;
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -32,6 +33,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   showMinimap: featureToggles.minimap,
   touchLayout: "right",
   autoSwapTouchLayoutWhenSidebarOpen: true,
+  cameraZoom: 1,
 };
 
 const STORAGE_KEY = "micr-omega:game-settings";
@@ -121,6 +123,37 @@ const parseMasterVolume = (value: unknown, fallback: number): number => {
   return clampVolume(fallback);
 };
 
+const clampCameraZoom = (value: number): number => {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+
+  if (value < 0.6) {
+    return 0.6;
+  }
+
+  if (value > 1.2) {
+    return 1.2;
+  }
+
+  return value;
+};
+
+const parseCameraZoom = (value: unknown, fallback: number): number => {
+  if (typeof value === "number") {
+    return clampCameraZoom(value);
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return clampCameraZoom(parsed);
+    }
+  }
+
+  return clampCameraZoom(fallback);
+};
+
 const parseStoredSettings = (): GameSettings => {
   if (typeof window === "undefined") {
     return { ...DEFAULT_SETTINGS };
@@ -166,6 +199,8 @@ const parseStoredSettings = (): GameSettings => {
       DEFAULT_SETTINGS.autoSwapTouchLayoutWhenSidebarOpen,
     );
 
+    const cameraZoom = parseCameraZoom(parsed.cameraZoom, DEFAULT_SETTINGS.cameraZoom);
+
     return {
       audioEnabled,
       masterVolume,
@@ -174,6 +209,7 @@ const parseStoredSettings = (): GameSettings => {
       showMinimap,
       touchLayout,
       autoSwapTouchLayoutWhenSidebarOpen,
+      cameraZoom,
     };
   } catch (error) {
     console.warn("Não foi possível ler as configurações do jogo salvas", error);
