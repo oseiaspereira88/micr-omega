@@ -497,6 +497,7 @@ const HudBar = ({
   return (
     <>
       <div className={styles.header}>
+        <span className={`${styles.statusLight} ${styles.statusLightLeft}`} aria-hidden="true" />
         <div className={styles.title}>MicrΩ • Nv.{safeLevel} • {formatNumber(safeScore)} pts</div>
         <div className={styles.combatProfile}>
           <span className={styles.combatTag} title={`Elemento ${elementName}`}>
@@ -509,6 +510,7 @@ const HudBar = ({
             {affinityIcon} {affinityName}
           </span>
         </div>
+        <span className={`${styles.statusLight} ${styles.statusLightRight}`} aria-hidden="true" />
       </div>
 
       <div className={statsClassName}>
