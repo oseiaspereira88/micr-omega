@@ -63,7 +63,7 @@ vi.mock('./components/ToastStack', () => ({
 
 vi.mock('./store/gameSettings', () => ({
   __esModule: true,
-  useGameSettings: () => ({ settings: {} }),
+  useGameSettings: () => ({ settings: {}, updateSettings: vi.fn() }),
   GameSettingsProvider: ({ children }) => <>{children}</>,
 }));
 

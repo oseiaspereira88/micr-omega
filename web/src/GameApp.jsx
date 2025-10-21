@@ -43,7 +43,7 @@ const GameApp = () => {
   });
   const joinError = useGameStore((state) => state.joinError);
   const connectionStatus = useGameStore((state) => state.connectionStatus);
-  const { settings } = useGameSettings();
+  const { settings, updateSettings } = useGameSettings();
   const [toasts, setToasts] = useState([]);
   const timersRef = useRef(new Map());
   const [isGameActive, setIsGameActive] = useState(false);
@@ -586,6 +586,7 @@ const GameApp = () => {
       {isGameActive ? (
         <MicroOmegaGame
           settings={resolvedSettings}
+          updateSettings={updateSettings}
           onQuit={handleQuit}
           onReconnect={connect}
         />

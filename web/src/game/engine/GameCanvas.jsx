@@ -124,7 +124,18 @@ export const formatEvolutionRequirements = (requirements = {}) => {
   return parts.length > 0 ? parts.join(' · ') : 'Nenhum requisito adicional';
 };
 
-const GameCanvas = ({ settings, onQuit, onReconnect }) => {
+const clampCameraZoom = (value) => {
+  const parsed = Number.isFinite(value) ? value : 1;
+  if (parsed < 0.6) {
+    return 0.6;
+  }
+  if (parsed > 1.2) {
+    return 1.2;
+  }
+  return parsed;
+};
+
+const GameCanvas = ({ settings, updateSettings, onQuit, onReconnect }) => {
   const canvasRef = useRef(null);
   const gameState = useGameState();
   const dispatch = useGameDispatch();
@@ -147,6 +158,7 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
     canvasRef,
     dispatch,
     settings,
+    updateSettings,
   });
 
   const isTouchDevice = useIsTouchDevice();
@@ -193,6 +205,26 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
     maxCombo,
     activePowerUps,
   } = gameState;
+
+  const desiredCameraZoom = useMemo(() => {
+    if (Number.isFinite(settings?.cameraZoom)) {
+      return clampCameraZoom(settings.cameraZoom);
+    }
+    return null;
+  }, [settings?.cameraZoom]);
+
+  useEffect(() => {
+    if (!Number.isFinite(desiredCameraZoom)) {
+      return;
+    }
+
+    const currentZoom = Number.isFinite(cameraZoom) ? cameraZoom : 1;
+    if (Math.abs(currentZoom - desiredCameraZoom) < 0.0001) {
+      return;
+    }
+
+    setCameraZoom(desiredCameraZoom);
+  }, [desiredCameraZoom, cameraZoom, setCameraZoom]);
 
   useEffect(() => {
     const now = Date.now();
@@ -529,7 +561,13 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
         onOpenEvolutionMenu={inputActions.openEvolutionMenu}
         canEvolve={canEvolve}
         showTouchControls={Boolean(settings?.showTouchControls && isTouchDevice)}
-        cameraZoom={cameraZoom ?? gameState.camera?.zoom ?? 1}
+        cameraZoom={
+          Number.isFinite(desiredCameraZoom)
+            ? desiredCameraZoom
+            : Number.isFinite(cameraZoom)
+              ? cameraZoom
+              : gameState.camera?.zoom ?? 1
+        }
         onCameraZoomChange={setCameraZoom}
         onQuit={onQuit}
         onReconnect={onReconnect}

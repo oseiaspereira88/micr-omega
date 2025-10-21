@@ -24,6 +24,17 @@ import useSoundPreview from '../../hooks/useSoundPreview';
 const MOBILE_HUD_QUERY = '(max-width: 900px)';
 const SIDEBAR_TRANSITION_DURATION_MS = 350;
 
+const clampCameraZoom = (zoom) => {
+  const value = Number.isFinite(zoom) ? zoom : 1;
+  if (value < 0.6) {
+    return 0.6;
+  }
+  if (value > 1.2) {
+    return 1.2;
+  }
+  return value;
+};
+
 const COMBAT_STATE_LABELS = {
   idle: 'Ocioso',
   engaged: 'Em combate',
@@ -135,6 +146,9 @@ const GameHud = ({
   const autoSwapTouchLayoutWhenSidebarOpen = Boolean(
     settings?.autoSwapTouchLayoutWhenSidebarOpen,
   );
+  const settingsCameraZoom = Number.isFinite(settings?.cameraZoom)
+    ? clampCameraZoom(settings.cameraZoom)
+    : null;
   const isTouchDevice = useIsTouchDevice();
   const canShowTouchSettings = isTouchDevice || showTouchControlsSetting;
   const isTouchLayoutDisabled = !isTouchDevice || !showTouchControlsSetting;
@@ -792,7 +806,10 @@ const GameHud = ({
                 </ul>
               </div>
             ) : null}
-            <CameraControls zoom={cameraZoom} onChange={onCameraZoomChange} />
+            <CameraControls
+              zoom={settingsCameraZoom ?? clampCameraZoom(cameraZoom)}
+              onChange={onCameraZoomChange}
+            />
             {onQuit ? (
               <button type="button" className={styles.leaveButton} onClick={onQuit}>
                 Sair da sala
