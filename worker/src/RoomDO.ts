@@ -236,6 +236,7 @@ const WORLD_KEY = "world";
 const ALARM_KEY = "alarms";
 const SNAPSHOT_STATE_KEY = "snapshot_state";
 const RNG_STATE_KEY = "rng_state";
+const PROGRESSION_KEY = "progression";
 
 const SNAPSHOT_FLUSH_INTERVAL_MS = 500;
 const PLAYER_ATTACK_COOLDOWN_MS = 800;
@@ -307,6 +308,7 @@ type AlarmSnapshot = Record<PersistentAlarmType, number | null>;
 type SnapshotState = {
   playersDirty: boolean;
   worldDirty: boolean;
+  progressionDirty: boolean;
   pendingSnapshotAlarm: number | null;
 };
 
@@ -905,6 +907,7 @@ export class RoomDO {
   private persistentAlarmsDirty = false;
   private playersDirty = false;
   private worldDirty = false;
+  private progressionDirty = false;
   private pendingSnapshotAlarm: number | null = null;
   private gameStateSnapshot: SharedGameState | null = null;
   private gameStateSnapshotDirty = true;
@@ -1198,6 +1201,38 @@ export class RoomDO {
     this.initializeRngState(storedRngState ?? null);
     await this.persistRngState();
 
+    const storedProgression = await this.state.storage.get<
+      Record<string, PlayerProgressionState>
+    >(PROGRESSION_KEY);
+    const restoredProgression = new Map<string, PlayerProgressionState>();
+    if (storedProgression && typeof storedProgression === "object") {
+      for (const [playerId, snapshot] of Object.entries(storedProgression)) {
+        if (!snapshot || typeof snapshot !== "object") {
+          continue;
+        }
+        const dropPitySource = (snapshot as PlayerProgressionState).dropPity ?? {
+          fragment: 0,
+          stableGene: 0,
+        };
+        const sanitizedDropPity = {
+          fragment: Number.isFinite(dropPitySource.fragment)
+            ? Math.max(0, Number(dropPitySource.fragment))
+            : 0,
+          stableGene: Number.isFinite(dropPitySource.stableGene)
+            ? Math.max(0, Number(dropPitySource.stableGene))
+            : 0,
+        };
+        const sanitizedSequence = Number.isFinite(snapshot.sequence)
+          ? Math.max(0, Math.trunc(Number(snapshot.sequence)))
+          : 0;
+        restoredProgression.set(playerId, {
+          sequence: sanitizedSequence,
+          dropPity: sanitizedDropPity,
+        });
+      }
+    }
+    this.progressionState = restoredProgression;
+
     const storedPlayers = await this.state.storage.get<StoredPlayerSnapshot[]>(PLAYERS_KEY);
     let needsLegacyHashMigration = false;
     if (storedPlayers) {
@@ -1304,10 +1339,12 @@ export class RoomDO {
     if (storedSnapshotState) {
       this.playersDirty = storedSnapshotState.playersDirty ?? false;
       this.worldDirty = storedSnapshotState.worldDirty ?? false;
+      this.progressionDirty = storedSnapshotState.progressionDirty ?? false;
       this.pendingSnapshotAlarm = storedSnapshotState.pendingSnapshotAlarm ?? null;
     } else {
       this.playersDirty = false;
       this.worldDirty = false;
+      this.progressionDirty = false;
       this.pendingSnapshotAlarm = null;
     }
 
@@ -1338,7 +1375,7 @@ export class RoomDO {
     }
 
     let snapshotAlarmModified = false;
-    if (this.playersDirty || this.worldDirty) {
+    if (this.playersDirty || this.worldDirty || this.progressionDirty) {
       const now = Date.now();
       const desired = this.pendingSnapshotAlarm ?? now + SNAPSHOT_FLUSH_INTERVAL_MS;
       const normalized = Math.max(now, desired);
@@ -2673,12 +2710,23 @@ export class RoomDO {
     }
   }
 
+  private markProgressionDirty(): void {
+    const wasDirty = this.progressionDirty;
+    this.progressionDirty = true;
+    this.invalidateGameStateSnapshot();
+    const pendingChanged = this.scheduleSnapshotFlush();
+    if (!wasDirty || pendingChanged) {
+      this.queueSnapshotStatePersist();
+    }
+  }
+
   private async flushSnapshots(options: { force?: boolean } = {}): Promise<void> {
     const { force = false } = options;
     const shouldPersistPlayers = force || this.playersDirty;
     const shouldPersistWorld = force || this.worldDirty;
+    let shouldPersistProgression = force || this.progressionDirty;
 
-    if (!shouldPersistPlayers && !shouldPersistWorld) {
+    if (!shouldPersistPlayers && !shouldPersistWorld && !shouldPersistProgression) {
       if (force && this.pendingSnapshotAlarm !== null) {
         this.pendingSnapshotAlarm = null;
         this.alarmSchedule.delete("snapshot");
@@ -2690,15 +2738,21 @@ export class RoomDO {
 
     this.playersDirty = false;
     this.worldDirty = false;
+    this.progressionDirty = false;
     this.pendingSnapshotAlarm = null;
     this.alarmSchedule.delete("snapshot");
 
     if (shouldPersistPlayers) {
       await this.persistPlayers();
+      shouldPersistProgression = false;
     }
 
     if (shouldPersistWorld) {
       await this.persistWorld();
+    }
+
+    if (shouldPersistProgression) {
+      await this.persistProgression();
     }
 
     await this.persistRngState();
@@ -5509,7 +5563,7 @@ export class RoomDO {
     if (!state) {
       state = { dropPity: { fragment: 0, stableGene: 0 }, sequence: 0 };
       this.progressionState.set(playerId, state);
-      this.invalidateGameStateSnapshot();
+      this.markProgressionDirty();
     }
     return state;
   }
@@ -5579,7 +5633,7 @@ export class RoomDO {
 
     state.dropPity = clonePityCounters(dropResults.pity);
     pending.dropPity = clonePityCounters(dropResults.pity);
-    this.invalidateGameStateSnapshot();
+    this.markProgressionDirty();
   }
 
   private flushPendingProgression(): SharedProgressionState | null {
@@ -5588,6 +5642,7 @@ export class RoomDO {
     }
 
     const players: SharedProgressionState["players"] = {};
+    let progressionChanged = false;
     for (const [playerId, stream] of this.pendingProgression.entries()) {
       const state = this.ensureProgressionState(playerId);
       players[playerId] = {
@@ -5597,12 +5652,19 @@ export class RoomDO {
         objectives: stream.objectives ? stream.objectives.map((entry) => ({ ...entry })) : undefined,
         kills: stream.kills ? stream.kills.map((entry) => ({ ...entry })) : undefined,
       };
-      state.sequence = stream.sequence;
+      if (state.sequence !== stream.sequence) {
+        progressionChanged = true;
+        state.sequence = stream.sequence;
+      }
       this.pendingProgression.delete(playerId);
     }
 
     if (Object.keys(players).length === 0) {
       return null;
+    }
+
+    if (progressionChanged) {
+      this.markProgressionDirty();
     }
 
     return { players };
@@ -5702,9 +5764,11 @@ export class RoomDO {
       }
     }
 
-    this.progressionState.delete(playerId);
+    const removedProgression = this.progressionState.delete(playerId);
     this.pendingProgression.delete(playerId);
-    this.invalidateGameStateSnapshot();
+    if (removedProgression) {
+      this.markProgressionDirty();
+    }
 
     return player;
   }
@@ -5920,6 +5984,33 @@ export class RoomDO {
       };
     });
     await this.state.storage.put(PLAYERS_KEY, snapshot);
+    await this.persistProgression();
+  }
+
+  private async persistProgression(): Promise<void> {
+    if (this.progressionState.size === 0) {
+      await this.state.storage.delete(PROGRESSION_KEY);
+      return;
+    }
+
+    const snapshot: Record<string, PlayerProgressionState> = {};
+    for (const [playerId, state] of this.progressionState.entries()) {
+      const dropPity = clonePityCounters(state.dropPity);
+      dropPity.fragment = Number.isFinite(dropPity.fragment)
+        ? Math.max(0, Number(dropPity.fragment))
+        : 0;
+      dropPity.stableGene = Number.isFinite(dropPity.stableGene)
+        ? Math.max(0, Number(dropPity.stableGene))
+        : 0;
+      snapshot[playerId] = {
+        sequence: Number.isFinite(state.sequence)
+          ? Math.max(0, Math.trunc(Number(state.sequence)))
+          : 0,
+        dropPity,
+      };
+    }
+
+    await this.state.storage.put(PROGRESSION_KEY, snapshot);
   }
 
   private async persistWorld(): Promise<void> {
@@ -5935,7 +6026,12 @@ export class RoomDO {
   }
 
   private async persistSnapshotState(): Promise<void> {
-    if (!this.playersDirty && !this.worldDirty && this.pendingSnapshotAlarm === null) {
+    if (
+      !this.playersDirty &&
+      !this.worldDirty &&
+      !this.progressionDirty &&
+      this.pendingSnapshotAlarm === null
+    ) {
       await this.state.storage.delete(SNAPSHOT_STATE_KEY);
       return;
     }
@@ -5943,6 +6039,7 @@ export class RoomDO {
     const snapshotState: SnapshotState = {
       playersDirty: this.playersDirty,
       worldDirty: this.worldDirty,
+      progressionDirty: this.progressionDirty,
       pendingSnapshotAlarm: this.pendingSnapshotAlarm,
     };
 

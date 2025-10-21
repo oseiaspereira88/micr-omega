@@ -19,6 +19,7 @@ import type { Env } from "../src";
 import { MockDurableObjectState } from "./utils/mock-state";
 
 const RNG_STATE_KEY = "rng_state";
+const PROGRESSION_KEY = "progression";
 
 type TestRngState = {
   organicMatterRespawn: number;
@@ -551,5 +552,32 @@ describe("RoomDO progression resource updates", () => {
     };
 
     expect(restartSnapshot).toEqual(baselineSnapshot);
+  });
+
+  it("restores progression state after a restart", async () => {
+    const mockState = new MockDurableObjectState();
+    const { roomAny } = await createRoom({ state: mockState });
+    const player = createTestPlayer("revival");
+    roomAny.players.set(player.id, player);
+    roomAny.connectedPlayers = roomAny.recalculateConnectedPlayers();
+
+    const restoredDropPity = { fragment: 0.42, stableGene: 2.5 };
+    roomAny.progressionState.set(player.id, {
+      sequence: 17,
+      dropPity: restoredDropPity,
+    });
+    roomAny.markPlayersDirty();
+    roomAny.markProgressionDirty();
+
+    await roomAny.flushSnapshots({ force: true });
+
+    const stored = mockState.storageImpl.data.get(PROGRESSION_KEY) as
+      | Record<string, { sequence: number; dropPity: { fragment: number; stableGene: number } }>
+      | undefined;
+    expect(stored?.[player.id]).toEqual({ sequence: 17, dropPity: restoredDropPity });
+
+    const { roomAny: restarted } = await createRoom({ state: mockState });
+    const restoredState = restarted.progressionState.get(player.id);
+    expect(restoredState).toEqual({ sequence: 17, dropPity: restoredDropPity });
   });
 });
