@@ -90,10 +90,18 @@ export const cloneHealthState = (health: HealthState): HealthState => ({
   max: health.max,
 });
 
+export type CharacteristicPointsHistoryEntry =
+  | number
+  | {
+      level: number;
+      points: number;
+    };
+
 export type CharacteristicPointsState = {
   total: number;
   available: number;
   spent: number;
+  perLevel: CharacteristicPointsHistoryEntry[];
 };
 
 export const createCharacteristicPointsState = (
@@ -111,20 +119,37 @@ export const createCharacteristicPointsState = (
     available = remaining;
   }
 
+  const perLevelSource = Array.isArray(state?.perLevel) ? state.perLevel ?? [] : [];
+  const perLevel = perLevelSource.map((entry) => (typeof entry === 'object' ? { ...entry } : entry));
+
   return {
     total,
     available,
     spent,
+    perLevel,
   };
 };
 
 export const cloneCharacteristicPointsState = (
-  state: CharacteristicPointsState,
-): CharacteristicPointsState => ({
-  total: state.total,
-  available: state.available,
-  spent: state.spent,
-});
+  state?: CharacteristicPointsState | null,
+): CharacteristicPointsState => {
+  const source = state ?? { total: 0, available: 0, spent: 0, perLevel: [] };
+
+  const total = sanitizeNonNegative(source.total);
+  const spent = sanitizeNonNegative(source.spent);
+  const available = Math.min(sanitizeNonNegative(source.available), Math.max(0, total - spent));
+
+  const perLevel = Array.isArray(source.perLevel)
+    ? source.perLevel.map((entry) => (typeof entry === 'object' ? { ...entry } : entry))
+    : [];
+
+  return {
+    total,
+    available,
+    spent,
+    perLevel,
+  };
+};
 
 export const createCombatStatusState = (status?: CombatStatus): CombatStatus => ({
   state: status?.state ?? "idle",

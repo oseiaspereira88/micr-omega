@@ -30,7 +30,12 @@ describe("RoomDO characteristic points serialization", () => {
 
       const playerEntry = joinedPayload.state.players[0];
       expect(playerEntry).toBeDefined();
-      expect(playerEntry.characteristicPoints).toEqual({ total: 0, available: 0, spent: 0 });
+      expect(playerEntry.characteristicPoints).toEqual({
+        total: 0,
+        available: 0,
+        spent: 0,
+        perLevel: [],
+      });
     } finally {
       (globalThis as any).WebSocket = originalWebSocket;
     }
