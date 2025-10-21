@@ -35,7 +35,6 @@ export const incrementGeneCounter = (
 const MIN_XP_REQUIREMENT = 60;
 const BASE_XP_REQUIREMENT = 120;
 const XP_REQUIREMENT_GROWTH = 45;
-const MAX_LEVEL_ITERATIONS = 200;
 
 export const getXpRequirementForLevel = (level: number): number => {
   return Math.max(
@@ -44,21 +43,37 @@ export const getXpRequirementForLevel = (level: number): number => {
   );
 };
 
-export const getPlayerLevelFromXp = (xp: number): number => {
+export type PlayerLevelOptions = {
+  xpRequirementForLevel?: (level: number) => number;
+};
+
+export const getPlayerLevelFromXp = (
+  xp: number,
+  options?: PlayerLevelOptions,
+): number => {
   if (!Number.isFinite(xp)) {
     return 1;
   }
 
   let remaining = Math.max(0, Math.trunc(xp));
   let level = 1;
-  let requirement = getXpRequirementForLevel(level);
-  let iterations = 0;
+  const requirementForLevel = options?.xpRequirementForLevel ?? getXpRequirementForLevel;
+  let requirement = requirementForLevel(level);
+  let previousRequirement = 0;
 
-  while (remaining >= requirement && iterations < MAX_LEVEL_ITERATIONS) {
+  while (remaining >= requirement) {
     remaining -= requirement;
     level += 1;
-    requirement = getXpRequirementForLevel(level);
-    iterations += 1;
+    previousRequirement = requirement;
+    requirement = requirementForLevel(level);
+
+    if (
+      !Number.isFinite(requirement) ||
+      requirement <= 0 ||
+      requirement <= previousRequirement
+    ) {
+      break;
+    }
   }
 
   return Math.max(1, level);
