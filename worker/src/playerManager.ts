@@ -18,6 +18,14 @@ import { sanitizeArchetypeKey } from "./types";
 import type { StatusCollection } from "./statuses";
 import { getPlayerLevelFromXp, type GeneCounter } from "./progression";
 
+const sanitizeNonNegative = (value: unknown, fallback = 0): number => {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  const numeric = Number(value);
+  return numeric >= 0 ? numeric : fallback;
+};
+
 export const DEFAULT_COMBAT_ATTRIBUTES: CombatAttributes = {
   attack: 8,
   defense: 4,
@@ -80,6 +88,42 @@ export const createHealthState = (health?: HealthState): HealthState => {
 export const cloneHealthState = (health: HealthState): HealthState => ({
   current: health.current,
   max: health.max,
+});
+
+export type CharacteristicPointsState = {
+  total: number;
+  available: number;
+  spent: number;
+};
+
+export const createCharacteristicPointsState = (
+  state?: Partial<CharacteristicPointsState> | null,
+): CharacteristicPointsState => {
+  const total = sanitizeNonNegative(state?.total);
+  let spent = sanitizeNonNegative(state?.spent);
+  if (spent > total) {
+    spent = total;
+  }
+
+  let available = sanitizeNonNegative(state?.available);
+  const remaining = Math.max(0, total - spent);
+  if (available > remaining) {
+    available = remaining;
+  }
+
+  return {
+    total,
+    available,
+    spent,
+  };
+};
+
+export const cloneCharacteristicPointsState = (
+  state: CharacteristicPointsState,
+): CharacteristicPointsState => ({
+  total: state.total,
+  available: state.available,
+  spent: state.spent,
 });
 
 export const createCombatStatusState = (status?: CombatStatus): CombatStatus => ({
@@ -169,6 +213,7 @@ export type StoredPlayer = {
   stableGenes: GeneCounter;
   dashCharge: number;
   dashCooldownMs: number;
+  characteristicPoints: CharacteristicPointsState;
   position: Vector2;
   movementVector: Vector2;
   orientation: OrientationState;
@@ -443,6 +488,7 @@ export type StoredPlayerSnapshot = Omit<
       | "dashCooldownMs"
       | "geneFragments"
       | "stableGenes"
+      | "characteristicPoints"
     >
   >;
 

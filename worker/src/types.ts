@@ -83,6 +83,7 @@ export {
   orientationSchema,
   healthSchema,
   combatStatusSchema,
+  characteristicPointsSchema,
   microorganismSchema,
   organicMatterSchema,
   obstacleSchema,

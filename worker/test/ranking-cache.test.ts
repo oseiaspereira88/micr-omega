@@ -39,6 +39,7 @@ function createTestPlayer(id: string, overrides: Partial<Record<string, unknown>
     combatStatus: { state: "idle", targetPlayerId: null, targetObjectId: null },
     combatAttributes: { attack: 10, defense: 0, speed: 0, range: 50 },
     archetypeKey: null,
+    characteristicPoints: { total: 0, available: 0, spent: 0 },
     connected: true,
     lastActiveAt: now,
     lastSeenAt: now,

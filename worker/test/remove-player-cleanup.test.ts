@@ -28,6 +28,7 @@ async function createTestPlayer(id: string): Promise<any> {
     combatAttributes: { attack: 0, defense: 0, speed: 0, range: 0 },
     evolutionState: { pending: [], applied: [] },
     archetypeKey: null,
+    characteristicPoints: { total: 0, available: 0, spent: 0 },
     reconnectToken,
     reconnectTokenHash,
     connected: true,
