@@ -21,8 +21,27 @@ const resolveContext = (audioContextOrGetter) => {
   return () => audioContextOrGetter;
 };
 
-export const createSoundEffects = (audioContextOrGetter) => {
+const clampVolume = (value) => {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+
+  if (value < 0) {
+    return 0;
+  }
+
+  if (value > 1) {
+    return 1;
+  }
+
+  return value;
+};
+
+export const createSoundEffects = (audioContextOrGetter, options = {}) => {
   const getContext = resolveContext(audioContextOrGetter);
+  let masterVolume = clampVolume(
+    typeof options.initialMasterVolume === 'number' ? options.initialMasterVolume : 1,
+  );
 
   const playSound = (type = 'default') => {
     const ctx = getContext?.();
@@ -31,6 +50,10 @@ export const createSoundEffects = (audioContextOrGetter) => {
     }
 
     const profile = SOUND_PROFILES[type] || SOUND_PROFILES.default;
+    const effectiveVolume = clampVolume(masterVolume) * profile.volume;
+    if (effectiveVolume <= 0) {
+      return;
+    }
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
     if (!ctx.destination || typeof gainNode.connect !== 'function' || typeof oscillator.connect !== 'function') {
@@ -40,7 +63,7 @@ export const createSoundEffects = (audioContextOrGetter) => {
     oscillator.type = profile.wave;
     oscillator.frequency.value = profile.frequency;
 
-    gainNode.gain.setValueAtTime(profile.volume, ctx.currentTime);
+    gainNode.gain.setValueAtTime(effectiveVolume, ctx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + profile.decay);
 
     oscillator.connect(gainNode);
@@ -50,7 +73,15 @@ export const createSoundEffects = (audioContextOrGetter) => {
     oscillator.stop(ctx.currentTime + profile.duration);
   };
 
-  return { playSound };
+  const setMasterVolume = (value) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return;
+    }
+
+    masterVolume = clampVolume(value);
+  };
+
+  return { playSound, setMasterVolume };
 };
 
 export default createSoundEffects;

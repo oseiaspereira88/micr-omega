@@ -591,6 +591,74 @@
   margin-left: auto;
 }
 
+.settingsAudioControls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 220px;
+}
+
+.settingsSliderLabel {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.settingsSliderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settingsSliderInput {
+  width: min(220px, 45vw);
+  accent-color: #6f89ff;
+}
+
+.settingsSliderValue {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+  text-align: right;
+}
+
+.settingsAudioStatus {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.settingsAudioActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.settingsAudioButton {
+  background: rgba(32, 36, 62, 0.8);
+  color: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(111, 137, 255, 0.35);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.settingsAudioButton:hover:not(:disabled) {
+  background: rgba(42, 46, 72, 0.9);
+  border-color: rgba(111, 137, 255, 0.6);
+}
+
+.settingsAudioButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 540px) {
   .settingsToggle {
     align-items: flex-start;
@@ -605,6 +673,18 @@
     width: 100%;
     justify-content: space-between;
     margin-left: 0;
+  }
+
+  .settingsAudioControls {
+    width: 100%;
+  }
+
+  .settingsSliderRow {
+    flex-wrap: wrap;
+  }
+
+  .settingsAudioActions {
+    justify-content: flex-start;
   }
 }
 

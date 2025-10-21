@@ -10,6 +10,17 @@ import { INVALID_PLAYER_NAME_MESSAGE } from "../../utils/playerNameStorage";
 import React, { useEffect } from "react";
 import { featureToggles } from "../../config/featureToggles.js";
 
+const previewMock = vi.fn();
+const useSoundPreviewMock = vi.fn(() => ({
+  playPreview: previewMock,
+  isSupported: true,
+}));
+
+vi.mock("../../hooks/useSoundPreview", () => ({
+  __esModule: true,
+  default: (...args: unknown[]) => useSoundPreviewMock(...args),
+}));
+
 const baseState = gameStore.getState();
 
 const snapshot = (): GameStoreState => {
@@ -147,6 +158,8 @@ const setMobileLayout = (matches: boolean) => {
 describe("StartScreen", () => {
   beforeEach(() => {
     resetStore();
+    previewMock.mockClear();
+    useSoundPreviewMock.mockClear();
     if (typeof window !== "undefined") {
       window.localStorage.clear();
       mediaQueryMock = createMatchMediaMock();
@@ -312,9 +325,17 @@ describe("StartScreen", () => {
     const input = screen.getByLabelText(/nome do jogador/i);
     fireEvent.change(input, { target: { value: "  Alice  " } });
 
-    const audioToggle = screen.getByLabelText(/som ligado/i);
-    fireEvent.click(audioToggle); // desativa áudio
-    expect(audioToggle).toHaveAccessibleName(/som desligado/i);
+    const volumeSlider = screen.getByRole("slider", {
+      name: /volume dos efeitos sonoros/i,
+    });
+    fireEvent.change(volumeSlider, { target: { value: "72" } });
+
+    const muteButton = screen.getByRole("button", { name: /mutar som/i });
+    fireEvent.click(muteButton);
+    expect(
+      screen.getByRole("button", { name: /ativar som/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/som desligado/i)).toBeInTheDocument();
 
     const densitySelect = screen.getByLabelText(/densidade visual/i);
     fireEvent.change(densitySelect, { target: { value: "high" } });
@@ -349,6 +370,7 @@ describe("StartScreen", () => {
       name: "Alice",
       settings: {
         audioEnabled: false,
+        masterVolume: 0.72,
         visualDensity: "high",
         showTouchControls: true,
         showMinimap: featureToggles.minimap,
@@ -423,9 +445,16 @@ describe("StartScreen", () => {
       </GameSettingsProvider>
     );
 
-    const audioToggle = screen.getByLabelText(/som ligado/i);
-    fireEvent.click(audioToggle);
-    expect(audioToggle).toHaveAccessibleName(/som desligado/i);
+    const volumeSlider = screen.getByRole("slider", {
+      name: /volume dos efeitos sonoros/i,
+    });
+    fireEvent.change(volumeSlider, { target: { value: "30" } });
+
+    const muteButton = screen.getByRole("button", { name: /mutar som/i });
+    fireEvent.click(muteButton);
+    expect(
+      screen.getByRole("button", { name: /ativar som/i })
+    ).toBeInTheDocument();
 
     const densitySelect = screen.getByLabelText(/densidade visual/i);
     fireEvent.change(densitySelect, { target: { value: "low" } });
@@ -445,6 +474,7 @@ describe("StartScreen", () => {
       const lastCall = settingsSpy.mock.calls.at(-1);
       expect(lastCall?.[0]).toMatchObject({
         audioEnabled: false,
+        masterVolume: 0.3,
         visualDensity: "low",
         showTouchControls: true,
         showMinimap: featureToggles.minimap,
@@ -452,6 +482,15 @@ describe("StartScreen", () => {
         autoSwapTouchLayoutWhenSidebarOpen: false,
       });
     });
+  });
+
+  it("executa uma prévia de áudio ao clicar em Testar som", () => {
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+    const previewButton = screen.getByRole("button", { name: /testar som/i });
+    fireEvent.click(previewButton);
+
+    expect(previewMock).toHaveBeenCalledTimes(1);
   });
 
   it("mantém o layout selecionado ao reativar os controles touch", () => {

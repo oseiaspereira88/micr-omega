@@ -37,9 +37,26 @@ import { featureToggles } from '../../config/featureToggles.js';
 
 const DEFAULT_SETTINGS = {
   audioEnabled: true,
+  masterVolume: 1,
   visualDensity: 'medium',
   showTouchControls: false,
   showMinimap: featureToggles.minimap,
+};
+
+const normalizeMasterVolume = (value) => {
+  if (typeof value !== 'number' || Number.isNaN(value) || !Number.isFinite(value)) {
+    return 1;
+  }
+
+  if (value < 0) {
+    return 0;
+  }
+
+  if (value > 1) {
+    return 1;
+  }
+
+  return value;
 };
 
 const EVOLUTION_STAT_KEYS = ['attack', 'defense', 'speed', 'range'];
@@ -773,12 +790,30 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     renderSettingsRef.current = resolvedSettings;
   }, [resolvedSettings]);
 
+  const masterVolumeRef = useRef(normalizeMasterVolume(resolvedSettings.masterVolume));
+
+  useEffect(() => {
+    masterVolumeRef.current = normalizeMasterVolume(resolvedSettings.masterVolume);
+  }, [resolvedSettings.masterVolume]);
+
   const densityScale = useMemo(
     () => DENSITY_SCALE[resolvedSettings.visualDensity] ?? DENSITY_SCALE.medium,
     [resolvedSettings.visualDensity]
   );
 
-  const soundEffects = useMemo(() => createSoundEffects(() => audioCtxRef.current), []);
+  const soundEffects = useMemo(
+    () =>
+      createSoundEffects(() => audioCtxRef.current, {
+        initialMasterVolume: masterVolumeRef.current,
+      }),
+    [],
+  );
+
+  useEffect(() => {
+    const nextVolume = normalizeMasterVolume(resolvedSettings.masterVolume);
+    masterVolumeRef.current = nextVolume;
+    soundEffects?.setMasterVolume?.(nextVolume);
+  }, [resolvedSettings.masterVolume, soundEffects]);
 
   const resumeAudioContextIfSuspended = useCallback(() => {
     const ctx = audioCtxRef.current;
