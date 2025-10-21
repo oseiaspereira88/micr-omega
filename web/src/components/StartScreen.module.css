@@ -10,6 +10,7 @@
   color: #f5f7ff;
   min-height: var(--app-viewport-height, 100vh);
   overflow-y: auto;
+  font-family: var(--font-sans, system-ui);
 }
 
 .mobileRoot {
@@ -120,9 +121,11 @@
 
 .title {
   margin: 0;
-  font-size: clamp(1.65rem, 1.25rem + 1.15vw, 2.15rem);
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.7rem, 1.35rem + 1.2vw, 2.3rem);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .subtitle {
@@ -130,6 +133,7 @@
   font-size: 0.95rem;
   opacity: 0.8;
   max-width: 48ch;
+  font-family: var(--font-sans, system-ui);
 }
 
 .form {
@@ -163,10 +167,12 @@
 }
 
 .label {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   color: rgba(245, 247, 255, 0.85);
+  font-family: var(--font-display, inherit);
+  font-weight: 500;
 }
 
 .input {
@@ -177,6 +183,7 @@
   background: rgba(9, 11, 20, 0.85);
   color: inherit;
   transition: border 0.2s ease, box-shadow 0.2s ease;
+  font-family: var(--font-sans, system-ui);
 }
 
 .input:focus {
@@ -222,12 +229,16 @@
 
 .optionTitle {
   font-size: 1rem;
-  font-weight: 600;
+  font-family: var(--font-display, inherit);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .optionDescription {
   font-size: 0.9rem;
   color: rgba(245, 247, 255, 0.65);
+  font-family: var(--font-sans, system-ui);
 }
 
 .controls {

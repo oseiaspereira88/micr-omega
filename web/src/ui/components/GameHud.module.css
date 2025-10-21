@@ -3,7 +3,7 @@
   inset: 0;
   pointer-events: none;
   color: #fff;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-sans, system-ui);
 }
 
 .mobileHud {
@@ -47,6 +47,7 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.4);
   text-align: center;
+  font-family: var(--font-sans, system-ui);
 }
 
 .canvasOverlayStatus {
@@ -58,9 +59,11 @@
 
 .canvasOverlayTitle {
   margin: 0;
-  font-size: clamp(1.25rem, 3.6vw, 1.75rem);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.35rem, 3.8vw, 1.9rem);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .canvasOverlayMessage {
@@ -68,12 +71,14 @@
   font-size: clamp(0.95rem, 2.8vw, 1.05rem);
   color: rgba(255, 209, 209, 0.95);
   font-weight: 500;
+  font-family: var(--font-sans, system-ui);
 }
 
 .canvasOverlayHint {
   margin: 0;
   font-size: clamp(0.85rem, 2.4vw, 0.95rem);
   color: rgba(255, 255, 255, 0.75);
+  font-family: var(--font-sans, system-ui);
 }
 
 .canvasOverlayActions {

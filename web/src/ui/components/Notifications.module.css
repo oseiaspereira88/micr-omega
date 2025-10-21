@@ -16,7 +16,10 @@
   padding: 6px 14px;
   border-radius: 999px;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 500;
+  font-family: var(--font-display, system-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: #fff;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(10px);

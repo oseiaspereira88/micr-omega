@@ -12,6 +12,7 @@
   box-shadow: 0 10px 32px rgba(4, 10, 24, 0.55);
   pointer-events: auto;
   transition: transform 200ms ease, box-shadow 200ms ease, background 200ms ease;
+  font-family: var(--font-sans, system-ui);
 }
 
 .container:focus-within {
@@ -117,8 +118,11 @@
 }
 
 .title {
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(0.95rem, 0.8rem + 0.6vw, 1.05rem);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: #7dd3fc;
 }
 
@@ -206,8 +210,9 @@
 }
 
 .progressValueText {
-  font-size: clamp(0.8rem, 3.6vw, 1.15rem);
-  font-weight: 700;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(0.85rem, 3.6vw, 1.2rem);
+  font-weight: 600;
   color: #bae6fd;
   letter-spacing: 0.02em;
 }
@@ -368,7 +373,8 @@
 
 .emptyMessage {
   font-size: 0.85rem;
-  font-weight: 600;
+  font-family: var(--font-display, inherit);
+  font-weight: 500;
   color: #e0f2fe;
 }
 
