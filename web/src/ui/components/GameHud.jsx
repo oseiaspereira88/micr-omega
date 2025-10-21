@@ -12,6 +12,7 @@ import SkillWheel from './SkillWheel';
 import Notifications from './Notifications';
 import TouchControls from './TouchControls';
 import CameraControls from './CameraControls';
+import TouchLayoutPreview from './TouchLayoutPreview';
 import styles from './GameHud.module.css';
 import RankingPanel from '../../components/RankingPanel';
 import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
@@ -963,19 +964,26 @@ const GameHud = ({
                     ) : null}
                   </div>
                   <div className={styles.settingsSelectWrapper}>
-                    <select
-                      id={touchLayoutSelectId}
-                      className={styles.settingsSelect}
-                      value={touchLayoutPreference}
-                      onChange={handleTouchLayoutChange}
-                      disabled={isTouchLayoutDisabled}
-                      aria-label="Layout dos controles touch"
-                      aria-disabled={isTouchLayoutDisabled ? 'true' : undefined}
-                      aria-describedby={touchLayoutDescribedBy}
-                    >
-                      <option value="right">Botões à direita</option>
-                      <option value="left">Botões à esquerda</option>
-                    </select>
+                    <div className={styles.settingsSelectContent}>
+                      <select
+                        id={touchLayoutSelectId}
+                        className={styles.settingsSelect}
+                        value={touchLayoutPreference}
+                        onChange={handleTouchLayoutChange}
+                        disabled={isTouchLayoutDisabled}
+                        aria-label="Layout dos controles touch"
+                        aria-disabled={isTouchLayoutDisabled ? 'true' : undefined}
+                        aria-describedby={touchLayoutDescribedBy}
+                      >
+                        <option value="right">Botões à direita</option>
+                        <option value="left">Botões à esquerda</option>
+                      </select>
+                      <TouchLayoutPreview
+                        layout={touchLayoutPreference}
+                        className={styles.settingsTouchLayoutPreview}
+                        data-disabled={isTouchLayoutDisabled ? 'true' : undefined}
+                      />
+                    </div>
                   </div>
                 </div>
                 <label className={styles.settingsToggle} htmlFor={touchLayoutAutoSwapToggleId}>

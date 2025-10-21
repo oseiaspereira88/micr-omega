@@ -1,0 +1,157 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`TouchLayoutPreview > gera snapshots distintos e nomes acessíveis para cada layout > touch-layout-preview-left 1`] = `
+<DocumentFragment>
+  <div
+    aria-label="Prévia do layout com botões à esquerda"
+    class="_preview_21c337"
+    data-layout="left"
+    role="img"
+  >
+    <div
+      class="_device_21c337"
+    >
+      <div
+        class="_side_21c337 _leftSide_21c337"
+      >
+        <div
+          class="_joystickRing_21c337"
+        >
+          <div
+            class="_joystickHandle_21c337"
+          />
+        </div>
+        <div
+          class="_utilityRow_21c337"
+        >
+          <span
+            aria-hidden="true"
+            class="_utilityButton_21c337"
+          />
+          <span
+            aria-hidden="true"
+            class="_utilityBar_21c337"
+          />
+        </div>
+      </div>
+      <div
+        class="_side_21c337 _rightSide_21c337"
+      >
+        <div
+          class="_actionCluster_21c337"
+        >
+          <span
+            aria-hidden="true"
+            class="_actionButton_21c337"
+          />
+          <span
+            aria-hidden="true"
+            class="_actionButton_21c337"
+          />
+          <span
+            aria-hidden="true"
+            class="_actionButton_21c337"
+          />
+        </div>
+        <span
+          aria-hidden="true"
+          class="_skillButton_21c337"
+        />
+      </div>
+    </div>
+    <div
+      aria-hidden="true"
+      class="_labels_21c337"
+    >
+      <span
+        class="_label_21c337 _leftLabel_21c337"
+      >
+        Joystick
+      </span>
+      <span
+        class="_label_21c337 _rightLabel_21c337"
+      >
+        Ações
+      </span>
+    </div>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`TouchLayoutPreview > gera snapshots distintos e nomes acessíveis para cada layout > touch-layout-preview-right 1`] = `
+<DocumentFragment>
+  <div
+    aria-label="Prévia do layout com botões à direita"
+    class="_preview_21c337"
+    data-layout="right"
+    role="img"
+  >
+    <div
+      class="_device_21c337"
+    >
+      <div
+        class="_side_21c337 _leftSide_21c337"
+      >
+        <div
+          class="_joystickRing_21c337"
+        >
+          <div
+            class="_joystickHandle_21c337"
+          />
+        </div>
+        <div
+          class="_utilityRow_21c337"
+        >
+          <span
+            aria-hidden="true"
+            class="_utilityButton_21c337"
+          />
+          <span
+            aria-hidden="true"
+            class="_utilityBar_21c337"
+          />
+        </div>
+      </div>
+      <div
+        class="_side_21c337 _rightSide_21c337"
+      >
+        <div
+          class="_actionCluster_21c337"
+        >
+          <span
+            aria-hidden="true"
+            class="_actionButton_21c337"
+          />
+          <span
+            aria-hidden="true"
+            class="_actionButton_21c337"
+          />
+          <span
+            aria-hidden="true"
+            class="_actionButton_21c337"
+          />
+        </div>
+        <span
+          aria-hidden="true"
+          class="_skillButton_21c337"
+        />
+      </div>
+    </div>
+    <div
+      aria-hidden="true"
+      class="_labels_21c337"
+    >
+      <span
+        class="_label_21c337 _leftLabel_21c337"
+      >
+        Joystick
+      </span>
+      <span
+        class="_label_21c337 _rightLabel_21c337"
+      >
+        Ações
+      </span>
+    </div>
+  </div>
+</DocumentFragment>
+`;
