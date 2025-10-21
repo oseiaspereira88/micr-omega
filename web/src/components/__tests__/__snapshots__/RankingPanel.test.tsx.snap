@@ -24,7 +24,7 @@ exports[`RankingPanel > matches snapshot for a populated ranking 1`] = `
       class="_list_0f10a4"
     >
       <li
-        aria-label="1º lugar — Alice — 4.200 pontos — conectado"
+        aria-label="1º lugar — Alice — 4.200 pontos — 100% da pontuação do líder — conectado"
         class="_item_0f10a4 _top1_0f10a4"
         role="listitem"
       >
@@ -34,14 +34,46 @@ exports[`RankingPanel > matches snapshot for a populated ranking 1`] = `
           1
         </span>
         <div
-          class="_nameCell_0f10a4"
+          class="_mainCell_0f10a4"
         >
-          <span
-            class="_name_0f10a4"
-            title="Alice"
+          <div
+            class="_nameCell_0f10a4"
           >
-            Alice
-          </span>
+            <span
+              aria-hidden="true"
+              class="_avatar_0f10a4"
+            >
+              A
+            </span>
+            <div
+              class="_nameWrapper_0f10a4"
+            >
+              <span
+                class="_name_0f10a4"
+                title="Alice"
+              >
+                Alice
+              </span>
+            </div>
+          </div>
+          <div
+            class="_progressRow_0f10a4"
+          >
+            <div
+              aria-label="Progresso relativo de Alice"
+              aria-valuemax="100"
+              aria-valuemin="0"
+              aria-valuenow="100"
+              aria-valuetext="100% da pontuação do líder"
+              class="_progress_0f10a4"
+              role="progressbar"
+            >
+              <div
+                class="_progressFill_0f10a4"
+                style="width: 100%; opacity: 1;"
+              />
+            </div>
+          </div>
         </div>
         <span
           class="_score_0f10a4"
@@ -51,7 +83,7 @@ exports[`RankingPanel > matches snapshot for a populated ranking 1`] = `
       </li>
       <li
         aria-current="true"
-        aria-label="2º lugar — Você — 3.150 pontos — desconectado"
+        aria-label="2º lugar — Você — 3.150 pontos — 75% da pontuação do líder — desconectado"
         class="_item_0f10a4 _top2_0f10a4 _localPlayer_0f10a4"
         role="listitem"
       >
@@ -61,19 +93,51 @@ exports[`RankingPanel > matches snapshot for a populated ranking 1`] = `
           2
         </span>
         <div
-          class="_nameCell_0f10a4"
+          class="_mainCell_0f10a4"
         >
-          <span
-            class="_name_0f10a4"
-            title="Bruno"
+          <div
+            class="_nameCell_0f10a4"
           >
-            Bruno
-          </span>
-          <span
-            class="_localTag_0f10a4"
+            <span
+              aria-hidden="true"
+              class="_avatar_0f10a4"
+            >
+              B
+            </span>
+            <div
+              class="_nameWrapper_0f10a4"
+            >
+              <span
+                class="_name_0f10a4"
+                title="Bruno"
+              >
+                Bruno
+              </span>
+              <span
+                class="_localTag_0f10a4"
+              >
+                Você
+              </span>
+            </div>
+          </div>
+          <div
+            class="_progressRow_0f10a4"
           >
-            Você
-          </span>
+            <div
+              aria-label="Progresso relativo de Você"
+              aria-valuemax="100"
+              aria-valuemin="0"
+              aria-valuenow="75"
+              aria-valuetext="75% da pontuação do líder"
+              class="_progress_0f10a4"
+              role="progressbar"
+            >
+              <div
+                class="_progressFill_0f10a4"
+                style="width: 75%; opacity: 0.85;"
+              />
+            </div>
+          </div>
         </div>
         <span
           class="_score_0f10a4"

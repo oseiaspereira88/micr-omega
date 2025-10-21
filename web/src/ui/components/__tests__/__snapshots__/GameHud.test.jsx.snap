@@ -1,0 +1,63 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`GameHud settings panel > atualiza a prévia dos controles touch no painel de configurações 1`] = `
+<div
+  aria-hidden="true"
+  class="_root_21c337 _settingsTouchLayoutPreview_5222f2"
+  data-selected-layout="left"
+  data-testid="hud-touch-layout-preview"
+>
+  <div
+    class="_card_21c337 _cardLeft_21c337 _cardActive_21c337"
+    data-active="true"
+    data-layout="left"
+  >
+    <div
+      class="_cardContent_21c337"
+    >
+      <div
+        class="_stick_21c337"
+      />
+      <div
+        class="_buttons_21c337 _buttonsLeft_21c337"
+      >
+        <span
+          class="_button_21c337"
+        />
+        <span
+          class="_button_21c337 _buttonSecondary_21c337"
+        />
+        <span
+          class="_button_21c337 _buttonTertiary_21c337"
+        />
+      </div>
+    </div>
+  </div>
+  <div
+    class="_card_21c337 _cardRight_21c337 _cardInactive_21c337"
+    data-active="false"
+    data-layout="right"
+  >
+    <div
+      class="_cardContent_21c337"
+    >
+      <div
+        class="_stick_21c337"
+      />
+      <div
+        class="_buttons_21c337 _buttonsRight_21c337"
+      >
+        <span
+          class="_button_21c337"
+        />
+        <span
+          class="_button_21c337 _buttonSecondary_21c337"
+        />
+        <span
+          class="_button_21c337 _buttonTertiary_21c337"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;

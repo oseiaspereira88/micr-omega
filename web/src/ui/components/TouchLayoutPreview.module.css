@@ -1,0 +1,134 @@
+.root {
+  display: inline-flex;
+  gap: 0.75rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(12, 16, 28, 0.85), rgba(6, 8, 16, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(32, 44, 88, 0.25);
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.rootDisabled {
+  opacity: 0.65;
+  filter: saturate(0.6);
+}
+
+.card {
+  position: relative;
+  width: 60px;
+  aspect-ratio: 16 / 11;
+  border-radius: 14px;
+  background:
+    radial-gradient(
+      120% 120% at 30% 30%,
+      rgba(148, 180, 255, 0.18) 0%,
+      rgba(148, 180, 255, 0) 55%
+    ),
+    linear-gradient(135deg, rgba(18, 22, 38, 0.98), rgba(10, 12, 24, 0.96));
+  border: 1px solid rgba(132, 166, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(92, 126, 255, 0.18);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.cardLeft {}
+
+.cardRight {}
+
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(132, 166, 255, 0.25);
+  background: linear-gradient(180deg, rgba(14, 18, 32, 0.92), rgba(8, 10, 20, 0.92));
+}
+
+.cardContent {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem;
+}
+
+.cardLeft .cardContent {
+  flex-direction: row-reverse;
+}
+
+.cardRight .cardContent {
+  flex-direction: row;
+}
+
+.cardActive {
+  transform: translateY(-2px);
+  border-color: rgba(132, 166, 255, 0.55);
+  box-shadow:
+    inset 0 0 0 1px rgba(132, 166, 255, 0.35),
+    0 0 12px rgba(92, 126, 255, 0.35);
+}
+
+.cardInactive {
+  opacity: 0.55;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(12, 16, 28, 0.9);
+}
+
+.stick {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(112, 178, 255, 0.8), rgba(48, 82, 128, 0.5));
+  box-shadow:
+    inset 0 0 0 2px rgba(14, 18, 32, 0.85),
+    inset 0 0 6px rgba(12, 22, 44, 0.95),
+    0 4px 10px rgba(6, 10, 20, 0.65);
+}
+
+.buttons {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.buttonsRight {
+  justify-items: end;
+}
+
+.buttonsLeft {
+  justify-items: start;
+}
+
+.button {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 205, 128, 0.85), rgba(145, 96, 32, 0.75));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 235, 200, 0.4),
+    0 3px 6px rgba(6, 8, 16, 0.6);
+}
+
+.buttonSecondary {
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 188, 146, 0.85), rgba(152, 58, 32, 0.7));
+}
+
+.buttonTertiary {
+  width: 9px;
+  height: 9px;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 178, 216, 0.85), rgba(140, 54, 98, 0.7));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .root {
+    transition-duration: 0.01ms;
+    transition-delay: 0.01ms;
+  }
+}

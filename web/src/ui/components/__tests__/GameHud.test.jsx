@@ -598,6 +598,40 @@ describe('GameHud settings panel', () => {
       expect(parsed.autoSwapTouchLayoutWhenSidebarOpen).toBe(false);
     });
   });
+
+  it('atualiza a prévia dos controles touch no painel de configurações', async () => {
+    useIsTouchDeviceSpy.mockReturnValue(true);
+    const user = userEvent.setup();
+
+    render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>,
+    );
+
+    const openButton = screen.getByRole('button', { name: /mostrar painel/i });
+    await user.click(openButton);
+
+    const preview = await screen.findByTestId('hud-touch-layout-preview');
+    expect(preview).toHaveAttribute('aria-hidden', 'true');
+    expect(preview).toHaveAttribute('data-selected-layout', 'right');
+
+    const touchToggle = await screen.findByRole('checkbox', {
+      name: /exibir controles touch/i,
+    });
+    await user.click(touchToggle);
+
+    const touchLayoutSelect = await screen.findByRole('combobox', {
+      name: /layout dos controles touch/i,
+    });
+    await user.selectOptions(touchLayoutSelect, 'left');
+
+    await waitFor(() => {
+      expect(preview).toHaveAttribute('data-selected-layout', 'left');
+    });
+
+    expect(preview).toMatchSnapshot();
+  });
 });
 
 describe('GameHud boss health bar', () => {

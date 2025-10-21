@@ -35,6 +35,7 @@ import {
 import styles from "./StartScreen.module.css";
 import StartScreenPreview from "./StartScreenPreview";
 import ControlsGuide from "../ui/components/ControlsGuide";
+import TouchLayoutPreview from "../ui/components/TouchLayoutPreview";
 
 export const START_SCREEN_MOBILE_MEDIA_QUERY = "(max-width: 640px)";
 
@@ -773,20 +774,28 @@ const StartScreen = ({
                           </span>
                         ) : null}
                       </div>
-                      <select
-                        id={touchLayoutSelectId}
-                        name="touch-layout"
-                        className={`${styles.select} ${styles.input}`.trim()}
-                        value={settings.touchLayout}
-                        onChange={handleTouchLayoutChange}
-                        disabled={isTouchLayoutDisabled}
-                        aria-label="Layout dos controles touch"
-                        aria-disabled={isTouchLayoutDisabled}
-                        aria-describedby={touchLayoutDescribedBy}
-                      >
-                        <option value="right">Botões à direita</option>
-                        <option value="left">Botões à esquerda</option>
-                      </select>
+                      <div className={styles.touchLayoutControlGroup}>
+                        <select
+                          id={touchLayoutSelectId}
+                          name="touch-layout"
+                          className={`${styles.select} ${styles.input}`.trim()}
+                          value={settings.touchLayout}
+                          onChange={handleTouchLayoutChange}
+                          disabled={isTouchLayoutDisabled}
+                          aria-label="Layout dos controles touch"
+                          aria-disabled={isTouchLayoutDisabled}
+                          aria-describedby={touchLayoutDescribedBy}
+                        >
+                          <option value="right">Botões à direita</option>
+                          <option value="left">Botões à esquerda</option>
+                        </select>
+                        <TouchLayoutPreview
+                          layout={settings.touchLayout}
+                          disabled={isTouchLayoutDisabled}
+                          className={styles.touchLayoutPreview}
+                          data-testid="start-touch-layout-preview"
+                        />
+                      </div>
                     </div>
 
                     <div className={styles.optionRow}>

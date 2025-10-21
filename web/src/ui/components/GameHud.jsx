@@ -13,6 +13,7 @@ import Notifications from './Notifications';
 import TouchControls from './TouchControls';
 import CameraControls from './CameraControls';
 import styles from './GameHud.module.css';
+import TouchLayoutPreview from './TouchLayoutPreview';
 import RankingPanel from '../../components/RankingPanel';
 import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
 import useIsTouchDevice from '../../hooks/useIsTouchDevice';
@@ -146,17 +147,6 @@ const GameHud = ({
       ].join(' '),
     [audioEnabled],
   );
-  const touchControlsPreviewClassName = useMemo(
-    () =>
-      [
-        styles.touchControlsPreview,
-        showTouchControlsSetting
-          ? styles.touchControlsPreviewActive
-          : styles.touchControlsPreviewInactive,
-      ].join(' '),
-    [showTouchControlsSetting],
-  );
-
   const showStatusOverlay = connectionStatus !== 'connected';
   const hudDisabled = showStatusOverlay;
   const sidebarIsInactive = hudDisabled || !isSidebarOpen;
@@ -833,11 +823,13 @@ const GameHud = ({
                 <h3 className={styles.settingsHeading}>Controles touch</h3>
                 <label className={styles.settingsToggle} htmlFor={touchToggleId}>
                   <div className={styles.settingsToggleInfo}>
-                    <div className={touchControlsPreviewClassName} aria-hidden="true">
-                      <span className={styles.touchControlsPreviewIcon} aria-hidden="true">
-                        🕹️
-                      </span>
-                    </div>
+                    <TouchLayoutPreview
+                      layout={touchLayoutPreference}
+                      disabled={isTouchLayoutDisabled}
+                      className={styles.settingsTouchLayoutPreview}
+                      aria-hidden="true"
+                      data-testid="hud-touch-layout-preview"
+                    />
                     <div className={styles.settingsToggleText}>
                       <span className={styles.settingsToggleTitle}>Mostrar controles</span>
                       <span className={styles.settingsToggleDescription}>
@@ -896,6 +888,12 @@ const GameHud = ({
                       <option value="right">Botões à direita</option>
                       <option value="left">Botões à esquerda</option>
                     </select>
+                    <TouchLayoutPreview
+                      layout={touchLayoutPreference}
+                      disabled={isTouchLayoutDisabled}
+                      className={styles.settingsTouchLayoutPreview}
+                      aria-hidden="true"
+                    />
                   </div>
                 </div>
                 <label className={styles.settingsToggle} htmlFor={touchLayoutAutoSwapToggleId}>

@@ -221,6 +221,18 @@
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.touchLayoutControlGroup {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.touchLayoutPreview {
+  flex: 0 0 auto;
+}
+
 .optionContent {
   display: flex;
   flex-direction: column;
@@ -489,6 +501,15 @@
 
   .toggleWrapper {
     justify-content: space-between;
+  }
+
+  .touchLayoutControlGroup {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .touchLayoutPreview {
+    margin-inline-start: auto;
   }
 }
 
