@@ -1208,8 +1208,24 @@ export class RoomDO {
 
   private async initialize(): Promise<void> {
     const storedRngState = await this.state.storage.get<RngState>(RNG_STATE_KEY);
-    this.initializeRngState(storedRngState ?? null);
-    await this.flushQueuedRngStatePersist({ force: true });
+    const {
+      restoredFromStorage,
+      mutated: rngStateChanged,
+      sanitizedKeys,
+    } = this.initializeRngState(storedRngState ?? null);
+
+    if (rngStateChanged) {
+      await this.flushQueuedRngStatePersist({ force: true });
+    }
+
+    const rngLogMetadata =
+      sanitizedKeys.length > 0 ? { sanitizedKeys } : undefined;
+
+    if (restoredFromStorage) {
+      this.observability.log("info", "rng_state_restored", rngLogMetadata);
+    } else {
+      this.observability.log("info", "rng_state_initialized", rngLogMetadata);
+    }
 
     const storedProgression = await this.state.storage.get<
       Record<string, PlayerProgressionState>
@@ -2551,16 +2567,32 @@ export class RoomDO {
     };
   }
 
-  private initializeRngState(stored?: RngState | null): void {
-    const organicSeed = this.normalizeRngSeed(
-      stored?.organicMatterRespawn ?? this.generateRandomSeed(),
-    );
-    const progressionSeed = this.normalizeRngSeed(
-      stored?.progression ?? this.generateRandomSeed(),
-    );
-    const microorganismSeed = this.normalizeRngSeed(
-      stored?.microorganismWaypoint ?? this.generateRandomSeed(),
-    );
+  private initializeRngState(
+    stored?: RngState | null,
+  ): { restoredFromStorage: boolean; mutated: boolean; sanitizedKeys: string[] } {
+    let restoredFromStorage = Boolean(stored);
+    let mutated = false;
+    const sanitizedKeys: string[] = [];
+
+    const resolveSeed = (key: keyof RngState): number => {
+      const storedValue = stored?.[key];
+      if (!Number.isFinite(storedValue) || storedValue! <= 0) {
+        restoredFromStorage = false;
+        mutated = true;
+        return this.normalizeRngSeed(this.generateRandomSeed());
+      }
+
+      const normalized = this.normalizeRngSeed(storedValue as number);
+      if (normalized !== storedValue) {
+        mutated = true;
+        sanitizedKeys.push(key);
+      }
+      return normalized;
+    };
+
+    const organicSeed = resolveSeed("organicMatterRespawn");
+    const progressionSeed = resolveSeed("progression");
+    const microorganismSeed = resolveSeed("microorganismWaypoint");
 
     this.rngState = {
       organicMatterRespawn: organicSeed,
@@ -2577,6 +2609,8 @@ export class RoomDO {
       "microorganismWaypoint",
       microorganismSeed,
     );
+
+    return { restoredFromStorage, mutated, sanitizedKeys };
   }
 
   private queueRngStatePersist(): void {
@@ -5547,8 +5581,10 @@ export class RoomDO {
     this.roundEndsAt = null;
     const worldDiff = this.regenerateWorldForPrimarySpawn();
 
-    this.initializeRngState();
-    await this.flushQueuedRngStatePersist({ force: true });
+    const { mutated: rngStateChanged } = this.initializeRngState();
+    if (rngStateChanged) {
+      await this.flushQueuedRngStatePersist({ force: true });
+    }
 
     const resetTimestamp = Date.now();
     for (const player of this.players.values()) {
