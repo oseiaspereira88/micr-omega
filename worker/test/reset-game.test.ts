@@ -344,6 +344,7 @@ describe("RoomDO resetGame", () => {
       health: { current: 50, max: 100 },
       combatStatus: { state: "idle", targetPlayerId: null, targetObjectId: null, lastAttackAt: now },
       combatAttributes: { attack: 0, defense: 0, speed: 0, range: 0 },
+      characteristicPoints: { total: 0, available: 0, spent: 0 },
       connected: true,
       connectedAt: now,
       lastActiveAt: now,

@@ -29,6 +29,7 @@ const createStoredPlayer = (
   dashCharge: DEFAULT_DASH_CHARGE,
   dashCooldownMs: 0,
   archetypeKey: null,
+  characteristicPoints: { total: 0, available: 0, spent: 0 },
   reconnectTokenHash: "hash-1",
   totalSessionDurationMs: 0,
   sessionCount: 0,

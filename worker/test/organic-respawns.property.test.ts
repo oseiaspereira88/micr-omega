@@ -57,6 +57,7 @@ function createTestPlayer(id: string): any {
     combatStatus: { state: "idle", targetPlayerId: null, targetObjectId: null },
     combatAttributes: { attack: 12, defense: 4, speed: 140, range: 80 },
     archetypeKey: null,
+    characteristicPoints: { total: 0, available: 0, spent: 0 },
     connected: true,
     lastActiveAt: now,
     lastSeenAt: now,
