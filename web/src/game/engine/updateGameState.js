@@ -123,7 +123,15 @@ const DEFAULT_RESOURCE_STUB = {
   level: 1,
 };
 
-const DEFAULT_EVOLUTION_SLOTS = createResourceProfile().evolutionSlots;
+const DEFAULT_RESOURCE_PROFILE = createResourceProfile();
+const DEFAULT_CHARACTERISTIC_POINTS =
+  DEFAULT_RESOURCE_PROFILE.characteristicPoints || {
+    total: 0,
+    available: 0,
+    spent: 0,
+    perLevel: [],
+  };
+const DEFAULT_EVOLUTION_SLOTS = DEFAULT_RESOURCE_PROFILE.evolutionSlots;
 
 const DAMAGE_VISUAL_VARIANTS = {
   normal: {
@@ -507,6 +515,44 @@ const mergeNumericRecord = (defaults, ...sources) => {
 
 const mergeGeneCounters = (...sources) =>
   mergeNumericRecord({ minor: 0, major: 0, apex: 0 }, ...sources);
+
+const cloneCharacteristicPointsPerLevel = (entries = []) =>
+  (Array.isArray(entries) ? entries : [])
+    .filter((entry) => entry !== undefined && entry !== null)
+    .map((entry) => (typeof entry === 'object' ? { ...entry } : entry));
+
+const mergeCharacteristicPoints = (...sources) => {
+  const result = {
+    total: safeNumber(DEFAULT_CHARACTERISTIC_POINTS.total, 0),
+    available: safeNumber(DEFAULT_CHARACTERISTIC_POINTS.available, 0),
+    spent: safeNumber(DEFAULT_CHARACTERISTIC_POINTS.spent, 0),
+    perLevel: cloneCharacteristicPointsPerLevel(DEFAULT_CHARACTERISTIC_POINTS.perLevel),
+  };
+
+  sources.forEach((source) => {
+    if (!source || typeof source !== 'object') return;
+
+    if (Number.isFinite(source.total)) {
+      result.total = source.total;
+    }
+    if (Number.isFinite(source.available)) {
+      result.available = source.available;
+    }
+    if (Number.isFinite(source.spent)) {
+      result.spent = source.spent;
+    }
+    if (Array.isArray(source.perLevel)) {
+      result.perLevel = cloneCharacteristicPointsPerLevel(source.perLevel);
+    }
+  });
+
+  return {
+    total: safeNumber(result.total, 0),
+    available: safeNumber(result.available, 0),
+    spent: safeNumber(result.spent, 0),
+    perLevel: cloneCharacteristicPointsPerLevel(result.perLevel),
+  };
+};
 
 const mergeEvolutionSlots = (...sources) => {
   const keys = ['small', 'medium', 'large', 'macro'];
@@ -1097,6 +1143,10 @@ const createRenderPlayer = (sharedPlayer, appearance) => {
   );
   const geneFragments = mergeGeneCounters(sharedPlayer.geneFragments);
   const stableGenes = mergeGeneCounters(sharedPlayer.stableGenes);
+  const characteristicPoints = mergeCharacteristicPoints(
+    sharedPlayer.characteristicPoints,
+    sharedPlayer.resources?.characteristicPoints
+  );
   const hasServerEvolutionSlots =
     sharedPlayer.evolutionSlots && typeof sharedPlayer.evolutionSlots === 'object';
   const evolutionSlots = hasServerEvolutionSlots
@@ -1131,6 +1181,7 @@ const createRenderPlayer = (sharedPlayer, appearance) => {
     energy,
     geneFragments,
     stableGenes,
+    characteristicPoints,
     evolutionSlots,
     resources: {
       energy,
@@ -1138,6 +1189,7 @@ const createRenderPlayer = (sharedPlayer, appearance) => {
       geneticMaterial: geneticMaterialResource,
       geneFragments,
       stableGenes,
+      characteristicPoints,
       ...(evolutionSlots ? { evolutionSlots } : {}),
       dropPity: mergeNumericRecord({ fragment: 0, stableGene: 0 }),
       dashCharge,
@@ -1261,6 +1313,11 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
     );
     const geneFragmentsResource = mergeGeneCounters(previousResources.geneFragments, player.geneFragments);
     const stableGenesResource = mergeGeneCounters(previousResources.stableGenes, player.stableGenes);
+    const characteristicPointsResource = mergeCharacteristicPoints(
+      previousResources.characteristicPoints,
+      player.resources?.characteristicPoints,
+      player.characteristicPoints
+    );
     const dropPityResource = mergeNumericRecord(
       { fragment: 0, stableGene: 0 },
       previousResources.dropPity
@@ -1291,6 +1348,7 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
       geneticMaterial: geneticMaterialResource,
       geneFragments: geneFragmentsResource,
       stableGenes: stableGenesResource,
+      characteristicPoints: characteristicPointsResource,
       dropPity: dropPityResource,
       dashCharge: dashChargeValue,
     };
@@ -1303,6 +1361,7 @@ const updateRenderPlayers = (renderState, sharedPlayers, delta, localPlayerId) =
     existing.energy = energyValue;
     existing.geneFragments = geneFragmentsResource;
     existing.stableGenes = stableGenesResource;
+    existing.characteristicPoints = characteristicPointsResource;
     if (evolutionSlotState) {
       existing.evolutionSlots = evolutionSlotState;
     } else {
@@ -1572,18 +1631,11 @@ const buildHudSnapshot = (
     resourceBag.geneticMaterial
   );
 
-  const characteristicPointsSource =
-    resourceBag.characteristicPoints ?? safePreviousHud?.characteristicPoints ?? {};
-  const characteristicPoints = {
-    total: safeNumber(characteristicPointsSource.total, 0),
-    available: safeNumber(characteristicPointsSource.available, 0),
-    spent: safeNumber(characteristicPointsSource.spent, 0),
-    perLevel: Array.isArray(resourceBag.characteristicPoints?.perLevel)
-      ? [...resourceBag.characteristicPoints.perLevel]
-      : Array.isArray(safePreviousHud?.characteristicPoints?.perLevel)
-      ? [...safePreviousHud.characteristicPoints.perLevel]
-      : [],
-  };
+  const characteristicPoints = mergeCharacteristicPoints(
+    safePreviousHud?.characteristicPoints,
+    resourceBag.characteristicPoints,
+    localPlayer?.characteristicPoints
+  );
 
   const evolutionSlots = mergeEvolutionSlots(
     fallbackEvolutionSlots,
@@ -1883,6 +1935,18 @@ const buildHudSnapshot = (
     resourceBag && typeof resourceBag === 'object'
       ? { ...resourceBag }
       : {};
+
+  if (previousBag?.characteristicPoints && typeof previousBag.characteristicPoints === 'object') {
+    previousBag.characteristicPoints = {
+      ...previousBag.characteristicPoints,
+      perLevel: cloneCharacteristicPointsPerLevel(previousBag.characteristicPoints.perLevel),
+    };
+  }
+
+  normalizedBag.characteristicPoints = {
+    ...characteristicPoints,
+    perLevel: cloneCharacteristicPointsPerLevel(characteristicPoints.perLevel),
+  };
 
   if (previousBag && typeof previousBag.xp === 'object') {
     previousBag.xp = { ...previousBag.xp };

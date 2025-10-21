@@ -156,17 +156,29 @@ const geneCounterSchema = z.object({
   apex: z.number().finite().nonnegative().default(0),
 });
 
+const characteristicPointsHistorySchema = z.union([
+  z.number().finite().nonnegative(),
+  z.object({
+    level: z.number().finite().nonnegative(),
+    points: z.number().finite().nonnegative(),
+  }),
+]);
+
 export const characteristicPointsSchema = z
   .object({
     total: z.number().finite().nonnegative().optional(),
     available: z.number().finite().nonnegative().optional(),
     spent: z.number().finite().nonnegative().optional(),
+    perLevel: z.array(characteristicPointsHistorySchema).optional(),
   })
   .partial()
   .transform((value) => ({
     total: value.total ?? 0,
     available: value.available ?? 0,
     spent: value.spent ?? 0,
+    perLevel: Array.isArray(value.perLevel)
+      ? value.perLevel.map((entry) => (typeof entry === "object" ? { ...entry } : entry))
+      : [],
   }));
 
 const evolutionSlotSchema = z.object({

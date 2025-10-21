@@ -546,6 +546,61 @@ describe('updateGameState', () => {
     expect(hudSnapshot.geneticMaterial).toEqual(
       expect.objectContaining({ current: expect.any(Number), total: expect.any(Number) })
     );
+    expect(hudSnapshot.characteristicPoints).toEqual(
+      expect.objectContaining({
+        total: expect.any(Number),
+        available: expect.any(Number),
+        spent: expect.any(Number),
+      })
+    );
+    expect(hudSnapshot.resourceBag.characteristicPoints).toEqual(
+      expect.objectContaining({
+        total: expect.any(Number),
+        available: expect.any(Number),
+        spent: expect.any(Number),
+      })
+    );
+  });
+
+  it('propagates characteristic points from the render player on the first frame', () => {
+    const renderState = createRenderState();
+    const characteristicPoints = {
+      total: 6,
+      available: 4,
+      spent: 2,
+      perLevel: [{ level: 2, points: 4 }],
+    };
+
+    const localPlayer = {
+      ...createPlayer({ id: 'p1', name: 'Local' }),
+      characteristicPoints,
+    };
+
+    const sharedState = createSharedState({
+      playerId: 'p1',
+      players: [localPlayer],
+    });
+
+    const { hudSnapshot } = updateGameState({
+      renderState,
+      sharedState,
+      delta: 0.016,
+      movementIntent: { x: 0, y: 0 },
+      actionBuffer: { attacks: [] },
+    });
+
+    expect(hudSnapshot.characteristicPoints).toEqual({
+      total: 6,
+      available: 4,
+      spent: 2,
+      perLevel: [{ level: 2, points: 4 }],
+    });
+    expect(hudSnapshot.resourceBag.characteristicPoints).toEqual({
+      total: 6,
+      available: 4,
+      spent: 2,
+      perLevel: [{ level: 2, points: 4 }],
+    });
   });
 
   it('keeps the highest known level when server snapshot is stale', () => {
