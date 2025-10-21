@@ -17,6 +17,7 @@
   column-gap: 16px;
   row-gap: 10px;
   align-items: center;
+  font-family: var(--font-sans, system-ui);
 }
 
 .infoSection {
@@ -32,10 +33,13 @@
   font-size: 0.85rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  font-family: var(--font-display, inherit);
+  letter-spacing: 0.08em;
 }
 
 .name {
-  font-weight: 600;
+  font-family: var(--font-display, inherit);
+  font-weight: 500;
   color: #ffe9fb;
   white-space: nowrap;
   overflow: hidden;
@@ -45,6 +49,8 @@
 .percent {
   color: #ffd9ef;
   font-variant-numeric: tabular-nums;
+  font-family: var(--font-display, inherit);
+  font-weight: 500;
 }
 
 .legend {
@@ -52,6 +58,9 @@
   color: rgba(255, 214, 230, 0.9);
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  font-family: var(--font-display, inherit);
+  letter-spacing: 0.08em;
+  font-weight: 500;
 }
 
 .portraitSlot {
