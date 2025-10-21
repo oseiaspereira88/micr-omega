@@ -315,6 +315,7 @@ type SnapshotState = {
 type RngState = {
   organicMatterRespawn: number;
   progression: number;
+  microorganismWaypoint: number;
 };
 
 type ApplyPlayerActionResult = {
@@ -889,9 +890,14 @@ export class RoomDO {
   private organicMatterOrder = new Map<string, number>();
   private roomObjects = new Map<string, RoomObject>();
   private entitySequence = 0;
-  private rngState: RngState = { organicMatterRespawn: 1, progression: 1 };
+  private rngState: RngState = {
+    organicMatterRespawn: 1,
+    progression: 1,
+    microorganismWaypoint: 1,
+  };
   private organicMatterRespawnRng: () => number = Math.random;
   private progressionRng: () => number = Math.random;
+  private microorganismWaypointRng: () => number = Math.random;
   private organicGroupRngFactory: (seed: number) => () => number = (seed) =>
     createMulberry32(seed);
   private organicRespawnQueue: PendingOrganicRespawnGroup[] = [];
@@ -2554,10 +2560,14 @@ export class RoomDO {
     const progressionSeed = this.normalizeRngSeed(
       stored?.progression ?? this.generateRandomSeed(),
     );
+    const microorganismSeed = this.normalizeRngSeed(
+      stored?.microorganismWaypoint ?? this.generateRandomSeed(),
+    );
 
     this.rngState = {
       organicMatterRespawn: organicSeed,
       progression: progressionSeed,
+      microorganismWaypoint: microorganismSeed,
     };
 
     this.organicMatterRespawnRng = this.createPersistentRng(
@@ -2565,6 +2575,10 @@ export class RoomDO {
       organicSeed,
     );
     this.progressionRng = this.createPersistentRng("progression", progressionSeed);
+    this.microorganismWaypointRng = this.createPersistentRng(
+      "microorganismWaypoint",
+      microorganismSeed,
+    );
   }
 
   private queueRngStatePersist(): void {
@@ -2870,8 +2884,9 @@ export class RoomDO {
 
   private generateMicroorganismWaypoint(origin: Vector2): Vector2 {
     for (let attempt = 0; attempt < 6; attempt += 1) {
-      const angle = Math.random() * Math.PI * 2;
-      const distance = MICRO_PATROL_RADIUS * (0.4 + Math.random() * 0.6);
+      const angle = this.microorganismWaypointRng() * Math.PI * 2;
+      const distance =
+        MICRO_PATROL_RADIUS * (0.4 + this.microorganismWaypointRng() * 0.6);
       const candidate = this.clampPosition({
         x: origin.x + Math.cos(angle) * distance,
         y: origin.y + Math.sin(angle) * distance,
@@ -6102,6 +6117,9 @@ export class RoomDO {
     const snapshot: RngState = {
       organicMatterRespawn: this.normalizeRngSeed(this.rngState.organicMatterRespawn),
       progression: this.normalizeRngSeed(this.rngState.progression),
+      microorganismWaypoint: this.normalizeRngSeed(
+        this.rngState.microorganismWaypoint,
+      ),
     };
     await this.state.storage.put(RNG_STATE_KEY, snapshot);
   }
