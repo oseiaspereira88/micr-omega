@@ -2,12 +2,31 @@ import { useMemo } from "react";
 import { shallowEqual, useGameStore, type ConnectionStatus } from "../store/gameStore";
 import styles from "./ConnectionStatusOverlay.module.css";
 
-const STATUS_LABEL: Record<string, string> = {
-  idle: "Aguardando nome",
-  connecting: "Conectando…",
-  connected: "Conectado",
-  reconnecting: "Reconectando…",
-  disconnected: "Desconectado",
+const STATUS_LABEL: Record<string, { label: string; icon: string; title?: string }> = {
+  idle: {
+    label: "Aguardando nome",
+    icon: "💤",
+    title: "Aguardando identificação do jogador",
+  },
+  connecting: {
+    label: "Conectando…",
+    icon: "⏳",
+    title: "Tentando estabelecer conexão",
+  },
+  connected: {
+    label: "Conectado",
+    icon: "⚡",
+  },
+  reconnecting: {
+    label: "Reconectando…",
+    icon: "🔄",
+    title: "Tentando reconectar",
+  },
+  disconnected: {
+    label: "Desconectado",
+    icon: "🚨",
+    title: "Conexão perdida",
+  },
 };
 
 const STATUS_CLASS: Partial<Record<ConnectionStatus, string>> = {
@@ -16,6 +35,10 @@ const STATUS_CLASS: Partial<Record<ConnectionStatus, string>> = {
   reconnecting: styles.statusReconnecting,
   disconnected: styles.statusDisconnected,
   idle: styles.statusIdle,
+};
+
+const STATUS_ICON_CLASS: Partial<Record<ConnectionStatus, string>> = {
+  reconnecting: styles.statusIconPulse,
 };
 
 const LATENCY_FORMATTER = new Intl.NumberFormat(undefined, {
@@ -49,15 +72,26 @@ const ConnectionStatusOverlay = () => {
     return delta;
   }, [connectionState.lastPingAt, connectionState.lastPongAt]);
 
-  const statusLabel =
-    STATUS_LABEL[connectionState.connectionStatus as string] ??
-    connectionState.connectionStatus;
+  const statusMeta =
+    STATUS_LABEL[connectionState.connectionStatus as string] ?? {
+      label: connectionState.connectionStatus,
+      icon: "ℹ️",
+    };
+
+  const statusLabel = statusMeta.label;
 
   const statusClassName = useMemo(() => {
     const className =
       STATUS_CLASS[connectionState.connectionStatus] ?? styles.statusIdle;
     return `${styles.statusDot} ${className}`;
   }, [connectionState.connectionStatus]);
+
+  const statusIconClassName =
+    STATUS_ICON_CLASS[connectionState.connectionStatus] ?? "";
+  const statusIconClasses =
+    statusIconClassName !== ""
+      ? `${styles.statusIcon} ${statusIconClassName}`
+      : styles.statusIcon;
 
   const showLatency =
     connectionState.connectionStatus === "connected" && latency !== null;
@@ -71,6 +105,13 @@ const ConnectionStatusOverlay = () => {
     <div className={styles.container} role="status" aria-live="polite">
       <div className={styles.header}>
         <span className={statusClassName} aria-hidden="true" />
+        <span
+          className={statusIconClasses}
+          aria-hidden="true"
+          title={statusMeta.title}
+        >
+          {statusMeta.icon}
+        </span>
         <span>{statusLabel}</span>
       </div>
       {hasMetrics ? (
