@@ -54,14 +54,15 @@
 
 .item {
   display: grid;
-  grid-template-columns: minmax(2.2rem, max-content) 1fr auto;
+  grid-template-columns: minmax(2.2rem, max-content) minmax(0, 1fr) auto;
   gap: 0.65rem;
   align-items: center;
   padding: 0.55rem 0.75rem;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid transparent;
-  transition: transform 0.2s ease, background 0.2s ease;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .rankBadge {
@@ -78,10 +79,24 @@
   color: rgba(246, 248, 255, 0.95);
 }
 
+.mainCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
 .nameCell {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.nameWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
   min-width: 0;
 }
 
@@ -98,6 +113,52 @@
   font-size: 0.9rem;
   font-weight: 600;
   color: rgba(229, 232, 255, 0.9);
+}
+
+.avatar {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(111, 137, 255, 0.48), rgba(44, 56, 130, 0.65));
+  color: rgba(246, 248, 255, 0.95);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  display: grid;
+  place-items: center;
+  text-transform: uppercase;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15),
+    0 4px 16px rgba(39, 54, 126, 0.32);
+  flex-shrink: 0;
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0.1rem 0;
+}
+
+.progress {
+  position: relative;
+  width: 100%;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.02));
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.progressFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(116, 136, 255, 0.95), rgba(87, 153, 255, 0.78));
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: width;
 }
 
 .localTag {
@@ -177,6 +238,12 @@
     padding: 0.45rem 0.6rem;
   }
 
+  .avatar {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.65rem;
+  }
+
   .name {
     font-size: 0.9rem;
   }
@@ -187,5 +254,13 @@
 
   .list {
     max-height: 50vh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item,
+  .progressFill {
+    transition: none;
+    animation: none;
   }
 }
