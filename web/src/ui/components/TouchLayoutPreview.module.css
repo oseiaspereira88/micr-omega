@@ -1,7 +1,10 @@
 .preview {
+  position: relative;
   --touch-active-color: rgba(122, 208, 255, 0.85);
   --touch-active-glow: rgba(122, 208, 255, 0.45);
   --touch-active-sheen: rgba(156, 224, 255, 0.16);
+  --touch-preview-scale: 1;
+  --touch-preview-joystick-sensitivity: 1;
   display: inline-flex;
   flex-direction: column;
   gap: 6px;
@@ -81,10 +84,10 @@
 }
 
 .joystickRing {
-  width: 28px;
-  height: 28px;
+  width: calc(28px * var(--touch-preview-scale));
+  height: calc(28px * var(--touch-preview-scale));
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border: calc(2px * var(--touch-preview-scale)) solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -94,8 +97,8 @@
 }
 
 .joystickHandle {
-  width: 14px;
-  height: 14px;
+  width: calc(14px * var(--touch-preview-scale));
+  height: calc(14px * var(--touch-preview-scale));
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.75);
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.18);
@@ -127,13 +130,13 @@
 }
 
 .utilityButton {
-  width: 16px;
-  height: 10px;
+  width: calc(16px * var(--touch-preview-scale));
+  height: calc(10px * var(--touch-preview-scale));
 }
 
 .utilityBar {
-  width: 22px;
-  height: 10px;
+  width: calc(22px * var(--touch-preview-scale));
+  height: calc(10px * var(--touch-preview-scale));
 }
 
 .preview[data-layout="left"] .utilityButton,
@@ -148,8 +151,8 @@
 }
 
 .actionButton {
-  width: 12px;
-  height: 12px;
+  width: calc(12px * var(--touch-preview-scale));
+  height: calc(12px * var(--touch-preview-scale));
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.14);
   box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.3);
@@ -157,8 +160,8 @@
 }
 
 .skillButton {
-  width: 26px;
-  height: 12px;
+  width: calc(26px * var(--touch-preview-scale));
+  height: calc(12px * var(--touch-preview-scale));
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.14);
   box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.3);
@@ -169,6 +172,17 @@
 .preview[data-layout="right"] .skillButton {
   background: linear-gradient(160deg, rgba(162, 232, 255, 0.7), rgba(88, 184, 255, 0.6));
   box-shadow: inset 0 -1px 2px rgba(12, 32, 52, 0.6), 0 0 10px rgba(118, 210, 255, 0.45);
+}
+
+.preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: calc(0.08 + (var(--touch-preview-joystick-sensitivity) - 0.5) * 0.08);
+  box-shadow: 0 0 0 1px rgba(162, 232, 255, 0.15);
+  transition: opacity 0.2s ease;
 }
 
 .labels {
@@ -197,6 +211,41 @@
 .preview[data-layout="right"] .rightLabel {
   color: rgba(162, 232, 255, 0.92);
   opacity: 1;
+}
+
+.sensitivityMeter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(245, 247, 255, 0.6);
+}
+
+.sensitivityLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.sensitivityBar {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.sensitivityBar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: var(--touch-preview-sensitivity-fill, 50%);
+  background: linear-gradient(90deg, rgba(122, 208, 255, 0.8), rgba(72, 182, 255, 0.9));
+  box-shadow: 0 0 10px rgba(124, 210, 255, 0.55);
+  transition: width 0.2s ease;
 }
 
 .preview[data-layout="right"] .leftLabel,

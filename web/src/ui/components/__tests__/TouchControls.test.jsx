@@ -160,6 +160,32 @@ describe('TouchControls', () => {
     );
   });
 
+  it('ajusta escala e sensibilidade conforme as configurações', () => {
+    const defaultRender = render(<TouchControls {...baseProps} />);
+    const defaultScale = Number.parseFloat(
+      defaultRender.container.firstChild.style.getPropertyValue('--touch-scale') || '0',
+    );
+    defaultRender.unmount();
+
+    const { container } = render(
+      <TouchControls
+        {...baseProps}
+        touchControlScale={1.35}
+        joystickSensitivity={1.4}
+      />,
+    );
+
+    const root = container.firstChild;
+    expect(root).toBeInstanceOf(HTMLElement);
+    const scaled = Number.parseFloat(
+      root.style.getPropertyValue('--touch-scale') || '0',
+    );
+    expect(scaled).toBeCloseTo(defaultScale * 1.35, 3);
+
+    const joystickZone = container.querySelector(`.${styles.joystickZone}`);
+    expect(joystickZone?.getAttribute('data-joystick-sensitivity')).toBe('1.400');
+  });
+
   it('exibe o texto de recarga da habilidade e não usa atributos ARIA inválidos no botão', () => {
     const { getByRole, getByText } = render(
       <TouchControls

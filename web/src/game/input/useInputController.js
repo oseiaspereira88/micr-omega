@@ -4,6 +4,10 @@ import {
   computeJoystickFromKeys,
   updateJoystickPosition
 } from './utils';
+import {
+  DEFAULT_JOYSTICK_SENSITIVITY,
+  clampJoystickSensitivity
+} from '../../config/touchControls';
 
 const preventDefaultForGame = (event) => {
   const targetTag = event.target?.tagName?.toLowerCase();
@@ -51,6 +55,50 @@ const useInputController = ({
   const [pointerActive, setPointerActive] = useState(false);
   const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 });
   const [movementIntent, setMovementIntent] = useState({ ...DEFAULT_JOYSTICK_STATE });
+
+  const applyJoystickSensitivity = useCallback((joystick, sensitivity) => {
+    const multiplier = clampJoystickSensitivity(sensitivity, DEFAULT_JOYSTICK_SENSITIVITY);
+    if (!Number.isFinite(multiplier) || multiplier === 1) {
+      return joystick;
+    }
+
+    const scale = (axis) => {
+      const scaled = axis * multiplier;
+      if (!Number.isFinite(scaled)) {
+        return axis;
+      }
+      if (scaled > 1) {
+        return 1;
+      }
+      if (scaled < -1) {
+        return -1;
+      }
+      return scaled;
+    };
+
+    return {
+      ...joystick,
+      x: scale(joystick.x),
+      y: scale(joystick.y)
+    };
+  }, []);
+
+  const getJoystickSensitivity = useCallback((event) => {
+    const direct = event?.micrOmegaJoystickSensitivity ?? event?.nativeEvent?.micrOmegaJoystickSensitivity;
+    if (Number.isFinite(direct)) {
+      return clampJoystickSensitivity(direct, DEFAULT_JOYSTICK_SENSITIVITY);
+    }
+
+    const datasetValue = event?.currentTarget?.dataset?.joystickSensitivity;
+    if (datasetValue) {
+      const parsed = Number.parseFloat(datasetValue);
+      if (Number.isFinite(parsed)) {
+        return clampJoystickSensitivity(parsed, DEFAULT_JOYSTICK_SENSITIVITY);
+      }
+    }
+
+    return DEFAULT_JOYSTICK_SENSITIVITY;
+  }, []);
 
   const emitMovementIntent = useCallback(
     (intent) => {
@@ -187,9 +235,11 @@ const useInputController = ({
       );
 
       setJoystickPosition(position);
-      emitMovementIntent(joystick);
+      const sensitivity = getJoystickSensitivity(event);
+      const adjustedJoystick = applyJoystickSensitivity(joystick, sensitivity);
+      emitMovementIntent(adjustedJoystick);
     },
-    [emitMovementIntent]
+    [applyJoystickSensitivity, emitMovementIntent, getJoystickSensitivity]
   );
 
   const handleJoystickMove = useCallback(
@@ -225,9 +275,11 @@ const useInputController = ({
       );
 
       setJoystickPosition(position);
-      emitMovementIntent(joystick);
+      const sensitivity = getJoystickSensitivity(event);
+      const adjustedJoystick = applyJoystickSensitivity(joystick, sensitivity);
+      emitMovementIntent(adjustedJoystick);
     },
-    [emitMovementIntent, pointerActive]
+    [applyJoystickSensitivity, emitMovementIntent, getJoystickSensitivity, pointerActive]
   );
 
   const handleJoystickEnd = useCallback(

@@ -9,6 +9,12 @@ import {
 } from "react";
 
 import { featureToggles } from "../config/featureToggles.js";
+import {
+  DEFAULT_JOYSTICK_SENSITIVITY,
+  DEFAULT_TOUCH_CONTROL_SCALE,
+  clampJoystickSensitivity,
+  clampTouchControlScale,
+} from "../config/touchControls";
 
 export type VisualDensity = "low" | "medium" | "high";
 
@@ -22,6 +28,8 @@ export type GameSettings = {
   showMinimap: boolean;
   touchLayout: TouchLayout;
   autoSwapTouchLayoutWhenSidebarOpen: boolean;
+  touchControlScale: number;
+  joystickSensitivity: number;
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -32,6 +40,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   showMinimap: featureToggles.minimap,
   touchLayout: "right",
   autoSwapTouchLayoutWhenSidebarOpen: true,
+  touchControlScale: DEFAULT_TOUCH_CONTROL_SCALE,
+  joystickSensitivity: DEFAULT_JOYSTICK_SENSITIVITY,
 };
 
 const STORAGE_KEY = "micr-omega:game-settings";
@@ -166,6 +176,16 @@ const parseStoredSettings = (): GameSettings => {
       DEFAULT_SETTINGS.autoSwapTouchLayoutWhenSidebarOpen,
     );
 
+    const touchControlScale = clampTouchControlScale(
+      parsed.touchControlScale,
+      DEFAULT_SETTINGS.touchControlScale,
+    );
+
+    const joystickSensitivity = clampJoystickSensitivity(
+      parsed.joystickSensitivity,
+      DEFAULT_SETTINGS.joystickSensitivity,
+    );
+
     return {
       audioEnabled,
       masterVolume,
@@ -174,6 +194,8 @@ const parseStoredSettings = (): GameSettings => {
       showMinimap,
       touchLayout,
       autoSwapTouchLayoutWhenSidebarOpen,
+      touchControlScale,
+      joystickSensitivity,
     };
   } catch (error) {
     console.warn("Não foi possível ler as configurações do jogo salvas", error);
@@ -197,10 +219,32 @@ export const GameSettingsProvider = ({ children }: { children: ReactNode }) => {
   }, [settings]);
 
   const updateSettings = useCallback((next: Partial<GameSettings>) => {
-    setSettings((prev) => ({
-      ...prev,
-      ...next,
-    }));
+    setSettings((prev) => {
+      const normalizedNext: Partial<GameSettings> = { ...next };
+
+      if ("masterVolume" in normalizedNext && typeof normalizedNext.masterVolume === "number") {
+        normalizedNext.masterVolume = clampVolume(normalizedNext.masterVolume);
+      }
+
+      if ("touchControlScale" in normalizedNext) {
+        normalizedNext.touchControlScale = clampTouchControlScale(
+          normalizedNext.touchControlScale,
+          prev.touchControlScale,
+        );
+      }
+
+      if ("joystickSensitivity" in normalizedNext) {
+        normalizedNext.joystickSensitivity = clampJoystickSensitivity(
+          normalizedNext.joystickSensitivity,
+          prev.joystickSensitivity,
+        );
+      }
+
+      return {
+        ...prev,
+        ...normalizedNext,
+      };
+    });
   }, []);
 
   const resetSettings = useCallback(() => {

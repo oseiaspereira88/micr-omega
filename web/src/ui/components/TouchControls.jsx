@@ -1,5 +1,11 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import styles from './TouchControls.module.css';
+import {
+  JOYSTICK_SENSITIVITY_MAX,
+  JOYSTICK_SENSITIVITY_MIN,
+  TOUCH_CONTROL_SCALE_MAX,
+  TOUCH_CONTROL_SCALE_MIN,
+} from '../../config/touchControls';
 
 const joinClassNames = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -63,6 +69,8 @@ const TouchControls = ({
   touchLayout = 'right',
   isSidebarOpen = false,
   autoInvertWhenSidebarOpen = false,
+  touchControlScale = 1,
+  joystickSensitivity = 1,
   className,
   ...a11yProps
 }) => {
@@ -126,9 +134,57 @@ const TouchControls = ({
     [viewport.height],
   );
 
+  const effectiveTouchMultiplier = useMemo(() => {
+    const clampedMultiplier = clamp(
+      touchControlScale,
+      TOUCH_CONTROL_SCALE_MIN,
+      TOUCH_CONTROL_SCALE_MAX,
+    );
+    return clampedMultiplier;
+  }, [touchControlScale]);
+
+  const effectiveJoystickSensitivity = useMemo(
+    () => clamp(joystickSensitivity, JOYSTICK_SENSITIVITY_MIN, JOYSTICK_SENSITIVITY_MAX),
+    [joystickSensitivity],
+  );
+
+  const decorateJoystickEvent = useCallback(
+    event => {
+      if (!event) {
+        return event;
+      }
+
+      const sensitivity = effectiveJoystickSensitivity;
+      try {
+        // eslint-disable-next-line no-param-reassign
+        event.micrOmegaJoystickSensitivity = sensitivity;
+      } catch (error) {
+        // Ignore if event is immutable
+      }
+
+      const nativeEvent = event?.nativeEvent;
+      if (nativeEvent && typeof nativeEvent === 'object') {
+        try {
+          // eslint-disable-next-line no-param-reassign
+          nativeEvent.micrOmegaJoystickSensitivity = sensitivity;
+        } catch (error) {
+          // Ignore if nativeEvent is immutable
+        }
+      }
+
+      return event;
+    },
+    [effectiveJoystickSensitivity],
+  );
+
+  const effectiveTouchScale = useMemo(
+    () => touchScale * effectiveTouchMultiplier,
+    [effectiveTouchMultiplier, touchScale],
+  );
+
   const touchVerticalScale = useMemo(
-    () => touchScale * heightScale,
-    [heightScale, touchScale],
+    () => effectiveTouchScale * heightScale,
+    [effectiveTouchScale, heightScale],
   );
 
   const isLandscape = viewport.width > viewport.height;
@@ -320,7 +376,7 @@ const TouchControls = ({
       hudElement.style.removeProperty('--touch-controls-footprint');
       hudElement.style.removeProperty('--touch-controls-footprint-height');
     };
-  }, [effectiveLayout, touchScale, showButtonLegends]);
+  }, [effectiveLayout, effectiveTouchScale, showButtonLegends]);
 
   const isTouchLikePointer = event => {
     const pointerType =
@@ -331,16 +387,19 @@ const TouchControls = ({
 
   const handleJoystickPointerStart = event => {
     if (!isTouchLikePointer(event)) return;
+    decorateJoystickEvent(event);
     onJoystickStart?.(event);
   };
 
   const handleJoystickPointerMove = event => {
     if (!isTouchLikePointer(event)) return;
+    decorateJoystickEvent(event);
     onJoystickMove?.(event);
   };
 
   const handleJoystickPointerEnd = event => {
     if (!isTouchLikePointer(event)) return;
+    decorateJoystickEvent(event);
     onJoystickEnd?.(event);
   };
 
@@ -356,10 +415,10 @@ const TouchControls = ({
         className,
       )}
       style={{
-        '--touch-scale': touchScale.toFixed(3),
+        '--touch-scale': effectiveTouchScale.toFixed(3),
         '--touch-vertical-scale': touchVerticalScale.toFixed(3),
         '--touch-legend-space': showButtonLegends
-          ? `${Math.round(touchScale * 26)}px`
+          ? `${Math.round(effectiveTouchScale * 26)}px`
           : '0px',
       }}
     >
@@ -373,6 +432,7 @@ const TouchControls = ({
         onTouchMove={onJoystickMove}
         onTouchEnd={onJoystickEnd}
         onTouchCancel={onJoystickEnd}
+        data-joystick-sensitivity={effectiveJoystickSensitivity.toFixed(3)}
       >
         <div
           className={styles.joystickKnob}

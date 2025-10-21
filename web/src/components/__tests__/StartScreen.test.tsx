@@ -490,6 +490,12 @@ describe("StartScreen", () => {
     fireEvent.click(touchAutoSwapToggle);
     fireEvent.change(touchLayoutSelect, { target: { value: "left" } });
 
+    const touchScaleSlider = screen.getByLabelText(/tamanho dos controles/i);
+    fireEvent.change(touchScaleSlider, { target: { value: "115" } });
+
+    const joystickSensitivitySlider = screen.getByLabelText(/sensibilidade do joystick/i);
+    fireEvent.change(joystickSensitivitySlider, { target: { value: "90" } });
+
     await waitFor(() => {
       expect(settingsSpy).toHaveBeenCalled();
       const lastCall = settingsSpy.mock.calls.at(-1);
@@ -501,6 +507,8 @@ describe("StartScreen", () => {
         showMinimap: featureToggles.minimap,
         touchLayout: "left",
         autoSwapTouchLayoutWhenSidebarOpen: false,
+        touchControlScale: 1.15,
+        joystickSensitivity: 0.9,
       });
     });
   });

@@ -227,6 +227,30 @@
   gap: 0.9rem;
 }
 
+.touchSliderControls {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.touchSlider {
+  width: min(240px, 48vw);
+  accent-color: #6f89ff;
+}
+
+.touchSlider:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.touchSliderValue {
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-width: 3ch;
+  text-align: right;
+  color: rgba(245, 247, 255, 0.85);
+}
+
 .touchLayoutPreview {
   margin-inline-start: 0.25rem;
 }
