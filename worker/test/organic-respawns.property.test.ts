@@ -180,7 +180,7 @@ describe("organic respawn randomness", () => {
     expect(initialGroup.seed).toBe(baselineFirst.seed);
     expect(initialValues).toEqual(baselineFirstValues);
 
-    await initialRoom.persistRngState();
+    await initialRoom.flushQueuedRngStatePersist({ force: true });
 
     const { roomAny: resumedRoom } = await createRoom({ state: restartState });
     const resumedGroup = resumedRoom.createOrganicRespawnRng();

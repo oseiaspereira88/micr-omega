@@ -856,6 +856,8 @@ const normalizeStoredWorldState = (
 };
 
 export class RoomDO {
+  static readonly RNG_STATE_PERSIST_DEBOUNCE_MS = 50;
+
   private readonly state: DurableObjectState;
   private readonly ready: Promise<void>;
   private readonly observability: Observability;
@@ -901,6 +903,10 @@ export class RoomDO {
   private pendingPlayerDeaths: Array<{ playerId: string; socket: WebSocket | null }> = [];
   private playersPendingRemoval = new Set<string>();
   private damagePopupSequence = 0;
+
+  private rngStatePersistPending = false;
+  private rngStatePersistTimeout: ReturnType<typeof setTimeout> | null = null;
+  private rngStatePersistInFlight: Promise<void> | null = null;
 
   private alarmSchedule: Map<AlarmType, number> = new Map();
   private alarmsDirty = false;
@@ -1199,7 +1205,7 @@ export class RoomDO {
   private async initialize(): Promise<void> {
     const storedRngState = await this.state.storage.get<RngState>(RNG_STATE_KEY);
     this.initializeRngState(storedRngState ?? null);
-    await this.persistRngState();
+    await this.flushQueuedRngStatePersist({ force: true });
 
     const storedProgression = await this.state.storage.get<
       Record<string, PlayerProgressionState>
@@ -2562,11 +2568,51 @@ export class RoomDO {
   }
 
   private queueRngStatePersist(): void {
-    void this.persistRngState().catch((error) => {
-      this.observability.logError("rng_state_persist_failed", error, {
-        category: "persistence",
+    this.rngStatePersistPending = true;
+    if (this.rngStatePersistTimeout !== null) {
+      return;
+    }
+
+    this.rngStatePersistTimeout = setTimeout(() => {
+      this.rngStatePersistTimeout = null;
+      void this.flushQueuedRngStatePersist().catch((error) => {
+        this.observability.logError("rng_state_persist_failed", error, {
+          category: "persistence",
+        });
       });
-    });
+    }, RoomDO.RNG_STATE_PERSIST_DEBOUNCE_MS);
+  }
+
+  private async flushQueuedRngStatePersist(options: { force?: boolean } = {}): Promise<void> {
+    const { force = false } = options;
+
+    if (this.rngStatePersistTimeout !== null) {
+      clearTimeout(this.rngStatePersistTimeout);
+      this.rngStatePersistTimeout = null;
+    }
+
+    if (!force && !this.rngStatePersistPending) {
+      if (this.rngStatePersistInFlight) {
+        await this.rngStatePersistInFlight;
+      }
+      return;
+    }
+
+    this.rngStatePersistPending = false;
+
+    if (this.rngStatePersistInFlight) {
+      await this.rngStatePersistInFlight;
+    }
+
+    const persistPromise = this.persistRngState();
+    this.rngStatePersistInFlight = persistPromise;
+    try {
+      await persistPromise;
+    } finally {
+      if (this.rngStatePersistInFlight === persistPromise) {
+        this.rngStatePersistInFlight = null;
+      }
+    }
   }
 
   private createOrganicRespawnRng(): { seed: number; rng: () => number } {
@@ -2790,7 +2836,7 @@ export class RoomDO {
       await this.persistProgression();
     }
 
-    await this.persistRngState();
+    await this.flushQueuedRngStatePersist({ force });
     await this.persistSnapshotState();
 
     if (force) {
@@ -5489,7 +5535,7 @@ export class RoomDO {
     const worldDiff = this.regenerateWorldForPrimarySpawn();
 
     this.initializeRngState();
-    await this.persistRngState();
+    await this.flushQueuedRngStatePersist({ force: true });
 
     const resetTimestamp = Date.now();
     for (const player of this.players.values()) {

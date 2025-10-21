@@ -523,7 +523,7 @@ describe("RoomDO progression resource updates", () => {
     );
 
     await preRestartRoom.persistPlayers();
-    await preRestartRoom.persistRngState();
+    await preRestartRoom.flushQueuedRngStatePersist({ force: true });
 
     const { roomAny: postRestartRoom } = await createRoom({ state: restartState });
     const resumedPlayer = postRestartRoom.players.get(restartPlayer.id);
