@@ -21,6 +21,20 @@ export default {
     const observability = createObservability(env, { component: "Worker" });
     const url = new URL(request.url);
 
+    const normalizedPath = normalizePathname(url.pathname);
+    if (normalizedPath === "/health") {
+      return Response.json(
+        { status: "ok" },
+        {
+          status: 200,
+          headers: {
+            "Cache-Control": "no-store",
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    }
+
     const route = parseRoomRoute(url.pathname);
     const expectsWebSocket = routeExpectsWebSocket(route);
     const derivedRoom = deriveRoomIdFromUrl(url, route);
@@ -83,7 +97,6 @@ export default {
       }
     }
 
-    const normalizedPath = normalizePathname(url.pathname);
     observability.log("warn", "unexpected_route", {
       category: "protocol_error",
       path: url.pathname,
