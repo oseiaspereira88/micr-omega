@@ -11,6 +11,7 @@ import {
   deriveRoomIdFromUrl,
   parseRoomRoute,
   routeExpectsWebSocket,
+  normalizePathname,
   sanitizeRoomId,
 } from "./room-routing";
 import {
@@ -929,16 +930,22 @@ export class RoomDO {
   async fetch(request: Request): Promise<Response> {
     await this.ready;
     const url = new URL(request.url);
-    const route = parseRoomRoute(url.pathname);
-    const expectsWebSocket = routeExpectsWebSocket(route);
-    const derivedRoom = deriveRoomIdFromUrl(url, route);
-    const forwardedRoom = sanitizeRoomId(request.headers.get(ROOM_ID_HEADER));
-    const roomId = forwardedRoom ?? derivedRoom.roomId;
+    const normalizedPath = normalizePathname(url.pathname);
 
     const baseHeaders = {
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
     } as const;
+
+    if (normalizedPath === "/health") {
+      return Response.json({ status: "ok" }, { status: 200, headers: baseHeaders });
+    }
+
+    const route = parseRoomRoute(url.pathname);
+    const expectsWebSocket = routeExpectsWebSocket(route);
+    const derivedRoom = deriveRoomIdFromUrl(url, route);
+    const forwardedRoom = sanitizeRoomId(request.headers.get(ROOM_ID_HEADER));
+    const roomId = forwardedRoom ?? derivedRoom.roomId;
 
     if (!route || !expectsWebSocket) {
       return new Response("Not Found", { status: 404, headers: baseHeaders });
