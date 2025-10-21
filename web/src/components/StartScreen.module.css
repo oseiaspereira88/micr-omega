@@ -36,11 +36,65 @@
   padding: var(--panel-padding-block) var(--panel-padding-inline);
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  gap: clamp(1.1rem, 0.6rem + 1.5vw, 1.85rem);
   max-height: min(calc(var(--app-viewport-height, 100vh) - 3rem), 720px);
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   overflow: hidden;
+}
+
+.previewContainer {
+  position: relative;
+  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  background: radial-gradient(circle at 20% 20%, rgba(110, 148, 255, 0.18), transparent 58%),
+    radial-gradient(circle at 80% 35%, rgba(66, 214, 255, 0.22), transparent 52%),
+    linear-gradient(180deg, rgba(9, 12, 25, 0.92), rgba(5, 7, 16, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 40px rgba(13, 18, 40, 0.6), 0 26px 60px rgba(3, 6, 15, 0.55);
+  isolation: isolate;
+  flex-shrink: 0;
+}
+
+.desktopPreview {
+  height: clamp(200px, 26vh, 300px);
+}
+
+.mobilePreview {
+  height: clamp(160px, 40vw, 220px);
+}
+
+.preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+.previewFallback {
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 18% 22%, rgba(111, 137, 255, 0.45), transparent 55%),
+    radial-gradient(circle at 72% 24%, rgba(78, 229, 255, 0.32), transparent 50%),
+    linear-gradient(180deg, rgba(10, 14, 28, 0.92), rgba(6, 9, 20, 0.97));
+  filter: saturate(120%);
+}
+
+.previewOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+      180deg,
+      rgba(9, 11, 22, 0.12) 0%,
+      rgba(9, 11, 22, 0.78) 68%,
+      rgba(6, 8, 18, 0.95) 100%
+    ),
+    radial-gradient(circle at 18% 18%, rgba(128, 164, 255, 0.25), transparent 55%),
+    radial-gradient(circle at 82% 24%, rgba(72, 232, 255, 0.22), transparent 60%);
+  background-blend-mode: normal, screen, screen;
+  box-shadow: inset 0 -70px 80px rgba(4, 6, 14, 0.75);
+  pointer-events: none;
 }
 
 .mobilePanel {
