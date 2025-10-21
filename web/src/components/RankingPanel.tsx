@@ -13,6 +13,9 @@ type RankingRow = {
   score: number;
   connected: boolean;
   isLocal: boolean;
+  relativeScore: number;
+  progressPercent: number;
+  initials: string;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -59,6 +62,23 @@ const RankingPanel = () => {
       return [];
     }
 
+    const maxScore = ranking.reduce((max, entry) => Math.max(max, entry.score), 0);
+    const safeMaxScore = maxScore > 0 ? maxScore : 1;
+
+    const computeInitials = (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) {
+        return "?";
+      }
+
+      const parts = trimmed
+        .split(/\s+/u)
+        .filter(Boolean)
+        .slice(0, 2);
+      const initials = parts.map((part) => part.charAt(0)).join("");
+      return initials ? initials.toUpperCase() : trimmed.charAt(0).toUpperCase();
+    };
+
     return [...ranking]
       .sort((a, b) => {
         if (a.score !== b.score) {
@@ -72,12 +92,17 @@ const RankingPanel = () => {
       })
       .map((entry) => {
         const player = players[entry.playerId];
+        const relativeScore = Math.max(0, Math.min(1, entry.score / safeMaxScore));
+        const progressPercent = Math.round(relativeScore * 100);
         return {
           playerId: entry.playerId,
           name: entry.name,
           score: entry.score,
           connected: player ? player.connected : false,
           isLocal: entry.playerId === localPlayerId,
+          relativeScore,
+          progressPercent,
+          initials: computeInitials(entry.name),
         };
       });
   }, [ranking, players, localPlayerId, collator]);
@@ -124,7 +149,8 @@ const RankingPanel = () => {
           const playerLabel = row.isLocal ? "Você" : row.name;
           const scoreLabel = `${row.score.toLocaleString(RANKING_SORT_LOCALE)} pontos`;
           const connectionLabel = row.connected ? "conectado" : "desconectado";
-          const accessibleLabel = `${rankLabel} — ${playerLabel} — ${scoreLabel} — ${connectionLabel}`;
+          const progressLabel = `${row.progressPercent}% da pontuação do líder`;
+          const accessibleLabel = `${rankLabel} — ${playerLabel} — ${scoreLabel} — ${progressLabel} — ${connectionLabel}`;
           return (
             <li
               key={row.playerId}
@@ -134,11 +160,37 @@ const RankingPanel = () => {
               role="listitem"
             >
               <span className={styles.rankBadge}>{index + 1}</span>
-              <div className={styles.nameCell}>
-                <span className={styles.name} title={row.name}>
-                  {row.name}
-                </span>
-                {row.isLocal ? <span className={styles.localTag}>Você</span> : null}
+              <div className={styles.mainCell}>
+                <div className={styles.nameCell}>
+                  <span className={styles.avatar} aria-hidden="true">
+                    {row.initials}
+                  </span>
+                  <div className={styles.nameWrapper}>
+                    <span className={styles.name} title={row.name}>
+                      {row.name}
+                    </span>
+                    {row.isLocal ? <span className={styles.localTag}>Você</span> : null}
+                  </div>
+                </div>
+                <div className={styles.progressRow}>
+                  <div
+                    className={styles.progress}
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={row.progressPercent}
+                    aria-valuetext={progressLabel}
+                    aria-label={`Progresso relativo de ${playerLabel}`}
+                  >
+                    <div
+                      className={styles.progressFill}
+                      style={{
+                        width: `${row.progressPercent}%`,
+                        opacity: 0.4 + row.relativeScore * 0.6,
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
               <span className={styles.score}>
                 {row.score.toLocaleString(RANKING_SORT_LOCALE)}
