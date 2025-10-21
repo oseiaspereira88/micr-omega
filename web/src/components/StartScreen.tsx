@@ -33,6 +33,7 @@ import {
   sanitizePlayerName,
 } from "../utils/messageTypes";
 import styles from "./StartScreen.module.css";
+import StartScreenPreview from "./StartScreenPreview";
 import ControlsGuide from "../ui/components/ControlsGuide";
 
 export const START_SCREEN_MOBILE_MEDIA_QUERY = "(max-width: 640px)";
@@ -570,6 +571,8 @@ const StartScreen = ({
         onKeyDown={handleKeyDown}
         aria-hidden={isControlsGuideOpen ? "true" : undefined}
       >
+        <StartScreenPreview isMobile={isMobileLayout} />
+
         <header className={styles.header}>
           <h1 id={dialogTitleId} className={styles.title}>
             Micro Ωmega
