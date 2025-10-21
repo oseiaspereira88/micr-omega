@@ -39,6 +39,49 @@ import TouchLayoutPreview from "../ui/components/TouchLayoutPreview";
 import useSoundPreview from "../hooks/useSoundPreview";
 
 export const START_SCREEN_MOBILE_MEDIA_QUERY = "(max-width: 640px)";
+export const HAS_SEEN_CONTROLS_GUIDE_STORAGE_KEY = "hasSeenControlsGuide";
+export const CONTROLS_GUIDE_DONT_SHOW_AGAIN_STORAGE_KEY =
+  "controlsGuideDontShowAgain";
+
+type ControlsGuidePersistence = {
+  hasSeen: boolean;
+  dontShowAgain: boolean;
+  shouldOpen: boolean;
+};
+
+const getInitialControlsGuidePersistence = (): ControlsGuidePersistence => {
+  if (typeof window === "undefined") {
+    return {
+      hasSeen: false,
+      dontShowAgain: true,
+      shouldOpen: false,
+    };
+  }
+
+  try {
+    const storage = window.localStorage;
+    const seenRaw = storage.getItem(HAS_SEEN_CONTROLS_GUIDE_STORAGE_KEY);
+    const dontShowRaw = storage.getItem(
+      CONTROLS_GUIDE_DONT_SHOW_AGAIN_STORAGE_KEY,
+    );
+
+    const hasSeen = seenRaw === "true";
+    const dontShowAgain =
+      dontShowRaw === null ? true : dontShowRaw === "true";
+
+    return {
+      hasSeen,
+      dontShowAgain,
+      shouldOpen: !hasSeen || !dontShowAgain,
+    };
+  } catch (error) {
+    return {
+      hasSeen: false,
+      dontShowAgain: true,
+      shouldOpen: true,
+    };
+  }
+};
 
 type StartScreenProps = {
   onStart: (
@@ -127,13 +170,48 @@ const StartScreen = ({
 
   const [inputValue, setInputValue] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
-  const [isControlsGuideOpen, setControlsGuideOpen] = useState(false);
+  const initialControlsGuidePersistence = useMemo(
+    () => getInitialControlsGuidePersistence(),
+    [],
+  );
+  const [hasSeenControlsGuide, setHasSeenControlsGuide] = useState(
+    initialControlsGuidePersistence.hasSeen,
+  );
+  const [controlsGuideDontShowAgain, setControlsGuideDontShowAgain] = useState(
+    initialControlsGuidePersistence.dontShowAgain,
+  );
+  const [isControlsGuideOpen, setControlsGuideOpen] = useState(
+    initialControlsGuidePersistence.shouldOpen,
+  );
   const panelRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const controlsGuideTriggerRef = useRef<HTMLButtonElement | null>(null);
   const controlsGuideDialogRef = useRef<HTMLDivElement | null>(null);
   const shouldRestoreGuideFocusRef = useRef(false);
+
+  const persistControlsGuidePreferences = useCallback(
+    (nextHasSeen: boolean, nextDontShowAgain: boolean) => {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      try {
+        const storage = window.localStorage;
+        storage.setItem(
+          HAS_SEEN_CONTROLS_GUIDE_STORAGE_KEY,
+          nextHasSeen ? "true" : "false",
+        );
+        storage.setItem(
+          CONTROLS_GUIDE_DONT_SHOW_AGAIN_STORAGE_KEY,
+          nextDontShowAgain ? "true" : "false",
+        );
+      } catch (error) {
+        // Ignore persistence failures.
+      }
+    },
+    [],
+  );
 
   const focusInput = useCallback(() => {
     inputRef.current?.focus({ preventScroll: true });
@@ -381,6 +459,7 @@ const StartScreen = ({
   const controlsGuideDialogId = "controls-guide-dialog";
   const controlsGuideTitleId = "controls-guide-title";
   const controlsGuideDescriptionId = "controls-guide-description";
+  const controlsGuidePreferenceId = "controls-guide-preference";
 
   const isTouchLayoutDisabled =
     isConnecting || !settings.showTouchControls;
@@ -441,7 +520,19 @@ const StartScreen = ({
   const closeControlsGuide = useCallback(() => {
     setControlsGuideOpen(false);
     shouldRestoreGuideFocusRef.current = true;
-  }, []);
+    const nextHasSeen = true;
+    setHasSeenControlsGuide(nextHasSeen);
+    persistControlsGuidePreferences(nextHasSeen, controlsGuideDontShowAgain);
+  }, [controlsGuideDontShowAgain, persistControlsGuidePreferences]);
+
+  const handleControlsGuidePreferenceChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const nextDontShowAgain = event.target.checked;
+      setControlsGuideDontShowAgain(nextDontShowAgain);
+      persistControlsGuidePreferences(hasSeenControlsGuide, nextDontShowAgain);
+    },
+    [hasSeenControlsGuide, persistControlsGuidePreferences],
+  );
 
   const handleControlsGuideKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -974,13 +1065,28 @@ const StartScreen = ({
               titleId={controlsGuideTitleId}
               descriptionId={controlsGuideDescriptionId}
               actions={
-                <button
-                  type="button"
-                  className={styles.controlsGuideCloseButton}
-                  onClick={closeControlsGuide}
-                >
-                  Fechar
-                </button>
+                <div className={styles.controlsGuideActions}>
+                  <label
+                    htmlFor={controlsGuidePreferenceId}
+                    className={styles.controlsGuidePreference}
+                  >
+                    <input
+                      id={controlsGuidePreferenceId}
+                      type="checkbox"
+                      className={styles.controlsGuidePreferenceCheckbox}
+                      checked={controlsGuideDontShowAgain}
+                      onChange={handleControlsGuidePreferenceChange}
+                    />
+                    <span>Não mostrar novamente</span>
+                  </label>
+                  <button
+                    type="button"
+                    className={styles.controlsGuideCloseButton}
+                    onClick={closeControlsGuide}
+                  >
+                    Fechar
+                  </button>
+                </div>
               }
             />
           </div>
