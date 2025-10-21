@@ -1235,9 +1235,44 @@ export class RoomDO {
 
     const storedPlayers = await this.state.storage.get<StoredPlayerSnapshot[]>(PLAYERS_KEY);
     let needsLegacyHashMigration = false;
-    if (storedPlayers) {
+    if (Array.isArray(storedPlayers)) {
       const now = Date.now();
-      for (const stored of storedPlayers) {
+      for (const storedRaw of storedPlayers) {
+        if (!storedRaw || typeof storedRaw !== "object") {
+          this.observability.log("warn", "player_restore_invalid_record", {
+            reason: "invalid_payload",
+          });
+          continue;
+        }
+
+        const stored = storedRaw as StoredPlayerSnapshot & Record<string, unknown>;
+        const playerId = typeof stored.id === "string" ? stored.id.trim() : "";
+        if (!playerId) {
+          this.observability.log("warn", "player_restore_invalid_record", {
+            reason: "missing_id",
+          });
+          continue;
+        }
+
+        const rawName = typeof stored.name === "string" ? stored.name : "";
+        const trimmedName = rawName.trim();
+        if (!trimmedName) {
+          this.observability.log("warn", "player_restore_invalid_record", {
+            reason: "missing_name",
+            playerId,
+          });
+          continue;
+        }
+
+        const sanitizedName = sanitizePlayerName(trimmedName);
+        if (!sanitizedName) {
+          this.observability.log("warn", "player_restore_invalid_record", {
+            reason: "invalid_name",
+            playerId,
+          });
+          continue;
+        }
+
         const evolutionState = createEvolutionState(stored.evolutionState);
         const archetypeKey = stored.archetypeKey
           ? sanitizeArchetypeKey(stored.archetypeKey)
@@ -1259,8 +1294,8 @@ export class RoomDO {
         const reconnectToken = generateReconnectToken();
 
         const normalized: StoredPlayer = {
-          id: stored.id,
-          name: stored.name,
+          id: playerId,
+          name: sanitizedName,
           score: stored.score,
           combo: stored.combo,
           energy: Number.isFinite(stored.energy)
