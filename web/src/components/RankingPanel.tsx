@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { RANKING_SORT_LOCALE, RANKING_SORT_OPTIONS } from "@micr-omega/shared";
 
@@ -41,6 +41,8 @@ const PLACEHOLDER_MESSAGE: Record<ConnectionStatus | "default", string> = {
   default: "Aguarde o servidor enviar a classificação em tempo real.",
 };
 
+const LONG_LIST_THRESHOLD = 8;
+
 const RankingPanel = () => {
   const { ranking, players, playerId: localPlayerId, connectionStatus } = useGameStore(
     (state) => ({
@@ -51,6 +53,8 @@ const RankingPanel = () => {
     }),
     shallowEqual,
   );
+
+  const itemRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
   const collator = useMemo(
     () => new Intl.Collator(RANKING_SORT_LOCALE, RANKING_SORT_OPTIONS),
@@ -107,8 +111,31 @@ const RankingPanel = () => {
       });
   }, [ranking, players, localPlayerId, collator]);
 
+  const localPlayerIndex = useMemo(
+    () => rows.findIndex((row) => row.isLocal),
+    [rows],
+  );
+
+  const localPlayerRow = useMemo(() => rows[localPlayerIndex] ?? null, [rows, localPlayerIndex]);
+
+  const scrollLocalPlayerIntoView = useCallback(() => {
+    if (!localPlayerRow) {
+      return;
+    }
+    const element = itemRefs.current[localPlayerRow.playerId];
+    element?.scrollIntoView({ block: "nearest" });
+  }, [localPlayerRow]);
+
+  useEffect(() => {
+    if (localPlayerIndex === -1) {
+      return;
+    }
+    scrollLocalPlayerIntoView();
+  }, [localPlayerIndex, scrollLocalPlayerIntoView]);
+
   const statusLabel = STATUS_LABEL[connectionStatus] ?? connectionStatus;
   const statusClass = STATUS_CLASS[connectionStatus] ?? "";
+  const showJumpButton = rows.length > LONG_LIST_THRESHOLD && Boolean(localPlayerRow);
 
   if (rows.length === 0) {
     const placeholderMessage =
@@ -117,7 +144,9 @@ const RankingPanel = () => {
       <aside className={styles.panel} aria-label="Ranking da partida">
         <header className={styles.header}>
           <h3 className={styles.title}>Ranking</h3>
-          <span className={`${styles.statusBadge} ${statusClass}`}>{statusLabel}</span>
+          <div className={styles.headerControls}>
+            <span className={`${styles.statusBadge} ${statusClass}`}>{statusLabel}</span>
+          </div>
         </header>
         <div className={styles.placeholder}>
           {placeholderMessage}
@@ -130,7 +159,18 @@ const RankingPanel = () => {
     <aside className={styles.panel} aria-label="Ranking da partida">
       <header className={styles.header}>
         <h3 className={styles.title}>Ranking</h3>
-        <span className={`${styles.statusBadge} ${statusClass}`}>{statusLabel}</span>
+        <div className={styles.headerControls}>
+          {showJumpButton ? (
+            <button
+              type="button"
+              className={styles.jumpButton}
+              onClick={scrollLocalPlayerIntoView}
+            >
+              Pular para você
+            </button>
+          ) : null}
+          <span className={`${styles.statusBadge} ${statusClass}`}>{statusLabel}</span>
+        </div>
       </header>
       <ol className={styles.list}>
         {rows.map((row, index) => {
@@ -158,6 +198,13 @@ const RankingPanel = () => {
               aria-current={row.isLocal ? "true" : undefined}
               aria-label={accessibleLabel}
               role="listitem"
+              ref={(element) => {
+                if (element) {
+                  itemRefs.current[row.playerId] = element;
+                } else {
+                  delete itemRefs.current[row.playerId];
+                }
+              }}
             >
               <span className={styles.rankBadge}>{index + 1}</span>
               <div className={styles.mainCell}>

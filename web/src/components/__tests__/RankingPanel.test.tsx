@@ -1,10 +1,20 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import RankingPanel from "../RankingPanel";
 import { gameStore, type GameStoreState } from "../../store/gameStore";
 import type { SharedPlayerState } from "../../utils/messageTypes";
 
 const baseState = gameStore.getState();
+const scrollIntoViewMock = vi.fn();
+const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;
+
+beforeAll(() => {
+  Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: scrollIntoViewMock,
+  });
+});
 
 const snapshot = (): GameStoreState => {
   const emptyPlayers = { byId: {}, all: [] };
@@ -46,11 +56,24 @@ const resetStore = () => {
 
 describe("RankingPanel", () => {
   beforeEach(() => {
+    scrollIntoViewMock.mockClear();
     resetStore();
   });
 
   afterEach(() => {
     resetStore();
+  });
+
+  afterAll(() => {
+    scrollIntoViewMock.mockReset();
+    if (originalScrollIntoView) {
+      Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+        configurable: true,
+        value: originalScrollIntoView,
+      });
+    } else {
+      delete window.HTMLElement.prototype.scrollIntoView;
+    }
   });
 
   it("renders placeholder content when no ranking is available", () => {
@@ -130,7 +153,7 @@ describe("RankingPanel", () => {
     expect(firstRow.getByText("Alice")).toBeVisible();
     expect(firstRow.getByText("4.200")).toBeVisible();
     expect(items[0]).toHaveAccessibleName(
-      "1º lugar — Alice — 4.200 pontos — conectado",
+      "1º lugar — Alice — 4.200 pontos — 100% da pontuação do líder — conectado",
     );
 
     const secondRow = within(items[1]!);
@@ -141,7 +164,7 @@ describe("RankingPanel", () => {
     expect(secondRow.getByLabelText("Jogador desconectado")).toBeVisible();
     expect(items[1]).toHaveAttribute("aria-current", "true");
     expect(items[1]).toHaveAccessibleName(
-      "2º lugar — Você — 3.150 pontos — desconectado",
+      "2º lugar — Você — 3.150 pontos — 75% da pontuação do líder — desconectado",
     );
   });
 
@@ -301,6 +324,104 @@ describe("RankingPanel", () => {
     expect(within(first!).getByText("Ágata")).toBeVisible();
     expect(within(second!).getByText("Agata")).toBeVisible();
     expect(within(third!).getByText("Bruno")).toBeVisible();
+  });
+
+  it("scrolls the local player into view when the ranking becomes available", async () => {
+    render(<RankingPanel />);
+
+    act(() => {
+      const players: GameStoreState["players"] = Object.fromEntries(
+        Array.from({ length: 6 }, (_, index) => {
+          const id = `player-${index + 1}`;
+          return [
+            id,
+            createPlayer({
+              id,
+              name: `Jogador ${index + 1}`,
+              connected: true,
+              score: 1_000 - index * 10,
+              combo: 1,
+              lastActiveAt: 1_000 + index,
+            }),
+          ];
+        }),
+      );
+
+      const remotePlayers = {
+        byId: players,
+        all: Object.values(players),
+      };
+
+      gameStore.setState(() => ({
+        ...snapshot(),
+        connectionStatus: "connected",
+        playerId: "player-4",
+        players,
+        remotePlayers,
+        ranking: Object.values(players).map((player) => ({
+          playerId: player.id,
+          name: player.name,
+          score: player.score,
+        })),
+      }));
+    });
+
+    await waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalled();
+    });
+  });
+
+  it("allows jumping to the local player through the shortcut button", async () => {
+    const user = userEvent.setup();
+    render(<RankingPanel />);
+
+    act(() => {
+      const players: GameStoreState["players"] = Object.fromEntries(
+        Array.from({ length: 10 }, (_, index) => {
+          const id = `player-${index + 1}`;
+          return [
+            id,
+            createPlayer({
+              id,
+              name: `Competidor ${index + 1}`,
+              connected: true,
+              score: 2_000 - index * 50,
+              combo: 1,
+              lastActiveAt: 5_000 + index,
+            }),
+          ];
+        }),
+      );
+
+      const remotePlayers = {
+        byId: players,
+        all: Object.values(players),
+      };
+
+      gameStore.setState(() => ({
+        ...snapshot(),
+        connectionStatus: "connected",
+        playerId: "player-9",
+        players,
+        remotePlayers,
+        ranking: Object.values(players).map((player) => ({
+          playerId: player.id,
+          name: player.name,
+          score: player.score,
+        })),
+      }));
+    });
+
+    const jumpButton = await screen.findByRole("button", { name: /pular para você/i });
+    expect(jumpButton).toBeVisible();
+
+    await waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalled();
+    });
+
+    const initialCalls = scrollIntoViewMock.mock.calls.length;
+    await user.click(jumpButton);
+    expect(scrollIntoViewMock.mock.calls.length).toBeGreaterThan(initialCalls);
   });
 });
 const createPlayer = (
