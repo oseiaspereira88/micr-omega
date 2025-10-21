@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import StartScreen, {
+  CONTROLS_GUIDE_DONT_SHOW_AGAIN_STORAGE_KEY,
+  HAS_SEEN_CONTROLS_GUIDE_STORAGE_KEY,
   START_SCREEN_MOBILE_MEDIA_QUERY,
 } from "../StartScreen";
 import { GameSettingsProvider, useGameSettings } from "../../store/gameSettings";
@@ -168,6 +170,14 @@ describe("StartScreen", () => {
         value: (query: string) => mediaQueryMock!.matchMedia(query),
       });
       setMobileLayout(false);
+      window.localStorage.setItem(
+        HAS_SEEN_CONTROLS_GUIDE_STORAGE_KEY,
+        "true",
+      );
+      window.localStorage.setItem(
+        CONTROLS_GUIDE_DONT_SHOW_AGAIN_STORAGE_KEY,
+        "true",
+      );
     }
   });
 
@@ -249,6 +259,85 @@ describe("StartScreen", () => {
       }),
     ).not.toBeInTheDocument();
     expect(openGuideButton).toHaveFocus();
+  });
+
+  it("abre o guia de controles automaticamente na primeira visita", () => {
+    window.localStorage.removeItem(HAS_SEEN_CONTROLS_GUIDE_STORAGE_KEY);
+    window.localStorage.removeItem(
+      CONTROLS_GUIDE_DONT_SHOW_AGAIN_STORAGE_KEY,
+    );
+
+    const { unmount } = renderWithProviders(
+      <StartScreen onStart={() => {}} onQuit={() => {}} />,
+    );
+
+    const guideDialog = screen.getByRole("dialog", { name: /como jogar/i });
+    expect(guideDialog).toBeInTheDocument();
+
+    const preferenceCheckbox = screen.getByRole("checkbox", {
+      name: /não mostrar novamente/i,
+    });
+    expect(preferenceCheckbox).toBeChecked();
+
+    const closeButton = screen.getByRole("button", { name: /fechar/i });
+    fireEvent.click(closeButton);
+
+    expect(window.localStorage.getItem(HAS_SEEN_CONTROLS_GUIDE_STORAGE_KEY)).toBe(
+      "true",
+    );
+    expect(
+      window.localStorage.getItem(
+        CONTROLS_GUIDE_DONT_SHOW_AGAIN_STORAGE_KEY,
+      ),
+    ).toBe("true");
+
+    unmount();
+
+    const { unmount: unmountSecond } = renderWithProviders(
+      <StartScreen onStart={() => {}} onQuit={() => {}} />,
+    );
+
+    expect(
+      screen.queryByRole("dialog", { name: /como jogar/i }),
+    ).not.toBeInTheDocument();
+
+    unmountSecond();
+  });
+
+  it("permite reativar a abertura automática do guia de controles", () => {
+    const firstRender = renderWithProviders(
+      <StartScreen onStart={() => {}} onQuit={() => {}} />,
+    );
+
+    const openGuideButton = screen.getByRole("button", { name: /como jogar/i });
+    fireEvent.click(openGuideButton);
+
+    const preferenceCheckbox = screen.getByRole("checkbox", {
+      name: /não mostrar novamente/i,
+    });
+    expect(preferenceCheckbox).toBeChecked();
+
+    fireEvent.click(preferenceCheckbox);
+    expect(preferenceCheckbox).not.toBeChecked();
+
+    const closeButton = screen.getByRole("button", { name: /fechar/i });
+    fireEvent.click(closeButton);
+
+    expect(
+      window.localStorage.getItem(
+        CONTROLS_GUIDE_DONT_SHOW_AGAIN_STORAGE_KEY,
+      ),
+    ).toBe("false");
+
+    firstRender.unmount();
+
+    const secondRender = renderWithProviders(
+      <StartScreen onStart={() => {}} onQuit={() => {}} />,
+    );
+
+    expect(screen.getByRole("dialog", { name: /como jogar/i })).toBeInTheDocument();
+
+    secondRender.unmount();
   });
 
   it("foca o diálogo ao abrir e mantém o foco preso nele", async () => {
