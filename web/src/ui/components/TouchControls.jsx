@@ -431,6 +431,7 @@ const TouchControls = ({
             styles.button,
             styles.dashButton,
             dashReady ? styles.chargeReady : styles.chargeEmpty,
+            dashReady ? null : styles.cooldownState,
             dashReady ? null : styles.disabled,
           )}
           onClick={onDash}
@@ -490,6 +491,7 @@ const TouchControls = ({
             styles.button,
             styles.skillButton,
             skillDisabled ? styles.skillDisabled : styles.skillReady,
+            showSkillCooldown ? styles.cooldownState : null,
             skillDisabled ? styles.disabled : null,
           )}
           onClick={onUseSkill}

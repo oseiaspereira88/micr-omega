@@ -11,6 +11,36 @@
   --touch-joystick-size: calc(var(--touch-scale) * 110px);
   --touch-joystick-knob: calc(var(--touch-scale) * 45px);
   --touch-legend-space: 0px;
+  --touch-primary: #38bdf8;
+  --touch-secondary: #2dd4bf;
+  --touch-tertiary: #0ea5e9;
+  --touch-surface: rgba(10, 22, 40, 0.82);
+  --touch-surface-alt: rgba(12, 32, 54, 0.72);
+  --touch-surface-deep: rgba(12, 32, 54, 0.95);
+  --touch-border: rgba(125, 211, 252, 0.55);
+  --touch-border-strong: rgba(56, 189, 248, 0.75);
+  --touch-primary-border-strong: rgba(125, 211, 252, 0.85);
+  --touch-secondary-border: rgba(34, 197, 210, 0.65);
+  --touch-primary-soft: rgba(56, 189, 248, 0.32);
+  --touch-primary-glow: rgba(56, 189, 248, 0.45);
+  --touch-primary-highlight: rgba(56, 189, 248, 0.6);
+  --touch-primary-bright: rgba(165, 243, 252, 0.6);
+  --touch-secondary-soft: rgba(45, 212, 191, 0.35);
+  --touch-secondary-glow: rgba(45, 212, 191, 0.55);
+  --touch-secondary-strong: rgba(34, 197, 210, 0.7);
+  --touch-secondary-intense: rgba(34, 211, 238, 0.8);
+  --touch-tertiary-strong: rgba(14, 165, 233, 0.75);
+  --touch-tertiary-soft: rgba(14, 165, 233, 0.65);
+  --touch-tertiary-deep: rgba(3, 105, 161, 0.95);
+  --touch-surface-shadow: rgba(4, 10, 24, 0.92);
+  --touch-primary-muted: rgba(59, 130, 246, 0.18);
+  --touch-neutral-soft: rgba(148, 163, 184, 0.35);
+  --touch-neutral-glow: rgba(148, 163, 184, 0.45);
+  --touch-neutral-border: rgba(148, 163, 184, 0.45);
+  --touch-shadow: 0 14px 32px rgba(4, 10, 24, 0.58);
+  --touch-shadow-soft: 0 6px 18px rgba(4, 10, 24, 0.42);
+  --touch-disabled-filter: saturate(0.4) brightness(0.85);
+  --touch-cooldown-filter: saturate(0.65) brightness(0.9);
   --touch-bottom-base: calc(
     var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-legend-space)
   );
@@ -145,28 +175,56 @@
   width: var(--touch-joystick-size);
   height: var(--touch-joystick-size);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: radial-gradient(
+      circle at 32% 30%,
+      var(--touch-primary-soft),
+      rgba(8, 18, 36, 0.8) 70%,
+      var(--touch-surface-shadow) 100%
+    ),
+    var(--touch-surface);
+  border: 1px solid var(--touch-border);
   display: flex;
   justify-content: center;
   align-items: center;
   touch-action: none;
   backdrop-filter: blur(5px);
   pointer-events: auto;
+  box-shadow: var(--touch-shadow);
+  position: relative;
+}
+
+.joystickZone::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: radial-gradient(circle, var(--touch-primary-soft), transparent 70%);
+  opacity: 0.65;
+  filter: blur(4px);
+  z-index: 0;
 }
 
 .joystickKnob {
   width: var(--touch-joystick-knob);
   height: var(--touch-joystick-knob);
   border-radius: 50%;
-  border: 2px solid #fff;
+  background: radial-gradient(
+    circle at 35% 28%,
+    var(--touch-primary-highlight),
+    var(--touch-tertiary-soft) 55%,
+    var(--touch-surface-deep)
+  );
+  border: 1px solid var(--touch-border-strong);
+  box-shadow: inset 0 0 12px rgba(4, 10, 24, 0.68), 0 6px 16px rgba(4, 10, 24, 0.55);
   transition: transform 0.2s;
+  position: relative;
+  z-index: 1;
 }
 
 .button {
   position: absolute;
   border-radius: 50%;
-  border: 3px solid #fff;
+  border: 1px solid var(--touch-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -175,6 +233,35 @@
   pointer-events: auto;
   color: #fff;
   overflow: visible;
+  background: radial-gradient(
+      circle at 30% 30%,
+    var(--touch-primary-soft),
+    rgba(8, 18, 36, 0.85) 70%,
+    var(--touch-surface-shadow) 100%
+    ),
+    var(--touch-surface-alt);
+  box-shadow: var(--touch-shadow), 0 0 16px var(--touch-primary-soft);
+  position: relative;
+  transition: box-shadow 180ms ease, transform 180ms ease, filter 180ms ease,
+    border-color 180ms ease;
+}
+
+.button::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: inherit;
+  background: radial-gradient(circle, var(--touch-secondary-soft), transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+  filter: blur(6px);
+  z-index: 0;
+}
+
+.button:focus-visible:not(:disabled):not(.disabled)::before,
+.button:hover::before {
+  opacity: 0.85;
 }
 
 .actionGroup {
@@ -202,8 +289,15 @@
   width: calc(var(--touch-scale) * 70px);
   height: calc(var(--touch-scale) * 70px);
   font-size: calc(var(--touch-scale) * 1.8rem);
-  background: linear-gradient(135deg, #ff0066, #ff6600);
-  box-shadow: 0 0 20px rgba(255, 0, 102, 0.5);
+  background: radial-gradient(
+      circle at 32% 28%,
+      var(--touch-primary-glow),
+      var(--touch-tertiary-strong) 55%,
+      var(--touch-tertiary-deep)
+    ),
+    linear-gradient(160deg, rgba(8, 18, 36, 0.9), var(--touch-surface-alt));
+  border-color: var(--touch-border-strong);
+  box-shadow: 0 12px 28px rgba(4, 10, 24, 0.6), 0 0 28px var(--touch-primary-glow);
 }
 
 .dashButton {
@@ -211,6 +305,14 @@
   width: calc(var(--touch-scale) * 60px);
   height: calc(var(--touch-scale) * 60px);
   font-size: calc(var(--touch-scale) * 1.5rem);
+  background: radial-gradient(
+      circle at 30% 30%,
+      var(--touch-secondary-glow),
+      var(--touch-secondary-strong) 60%,
+      var(--touch-surface-shadow)
+    ),
+    linear-gradient(160deg, rgba(8, 18, 36, 0.9), var(--touch-surface-alt));
+  border-color: var(--touch-secondary-strong);
 }
 
 .skillButton {
@@ -218,7 +320,16 @@
   width: calc(var(--touch-scale) * 65px);
   height: calc(var(--touch-scale) * 65px);
   font-size: calc(var(--touch-scale) * 1.6rem);
-  color: #000;
+  color: rgba(8, 18, 36, 0.9);
+  background: radial-gradient(
+      circle at 28% 28%,
+      var(--touch-primary-highlight),
+      var(--touch-primary) 55%,
+      var(--touch-surface-deep)
+    ),
+    linear-gradient(160deg, rgba(8, 18, 36, 0.9), var(--touch-surface-alt));
+  border-color: var(--touch-primary-border-strong);
+  box-shadow: 0 14px 30px rgba(4, 10, 24, 0.62), 0 0 30px var(--touch-primary-glow);
 }
 
 .cycleSkillButton {
@@ -226,12 +337,19 @@
   width: calc(var(--touch-scale) * 55px);
   height: calc(var(--touch-scale) * 55px);
   font-size: calc(var(--touch-scale) * 1.4rem);
-  background: rgba(100, 100, 100, 0.35);
+  background: radial-gradient(
+      circle at 28% 28%,
+      var(--touch-primary-soft),
+      var(--touch-secondary-strong) 58%,
+      var(--touch-surface-shadow)
+    ),
+    linear-gradient(160deg, rgba(8, 18, 36, 0.9), var(--touch-surface-alt));
+  border-color: var(--touch-secondary-border);
 }
 
 .buttonIcon {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
 }
 
@@ -307,14 +425,20 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: conic-gradient(rgba(0, 0, 0, 0.45) var(--cooldown-progress, 0%), transparent 0);
+  background: conic-gradient(
+    rgba(56, 189, 248, 0.45) var(--cooldown-progress, 0%),
+    rgba(4, 10, 24, 0.45) 0
+  );
   transform: rotate(-90deg);
   pointer-events: none;
-  z-index: 0;
+  z-index: 1;
 }
 
 .skillCooldownOverlay {
-  background: conic-gradient(rgba(0, 0, 0, 0.55) var(--cooldown-progress, 0%), transparent 0);
+  background: conic-gradient(
+    rgba(45, 212, 191, 0.55) var(--cooldown-progress, 0%),
+    rgba(4, 10, 24, 0.55) 0
+  );
 }
 
 .cooldownLabel {
@@ -373,7 +497,8 @@
 
 .disabled {
   cursor: not-allowed;
-  opacity: 0.7;
+  filter: var(--touch-disabled-filter);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.28), 0 6px 16px rgba(4, 10, 24, 0.4);
 }
 
 .visuallyHidden {
@@ -389,37 +514,88 @@
 }
 
 .chargeReady {
-  background: linear-gradient(135deg, #ffd700, #ffa500);
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+  background: radial-gradient(
+      circle at 35% 28%,
+      var(--touch-primary-bright),
+      var(--touch-secondary-intense) 60%,
+      var(--touch-surface-deep)
+    ),
+    linear-gradient(170deg, rgba(8, 18, 36, 0.95), rgba(12, 32, 54, 0.76));
+  box-shadow: 0 12px 26px rgba(4, 10, 24, 0.6), 0 0 24px var(--touch-secondary-glow);
 }
 
 .chargeEmpty {
-  background: rgba(100, 100, 100, 0.5);
+  background: radial-gradient(
+      circle at 35% 28%,
+      var(--touch-primary-muted),
+      var(--touch-surface-deep)
+    ),
+    linear-gradient(170deg, rgba(8, 18, 36, 0.92), rgba(12, 32, 54, 0.7));
+  border-color: var(--touch-neutral-border);
+  box-shadow: var(--touch-shadow-soft);
 }
 
 .skillReady {
-  background: linear-gradient(135deg, #00d9ff, #7b2fff);
-  box-shadow: 0 0 22px rgba(0, 217, 255, 0.55);
+  background: radial-gradient(
+      circle at 35% 28%,
+      var(--touch-primary-highlight),
+      var(--touch-primary) 60%,
+      var(--touch-surface-deep)
+    ),
+    linear-gradient(170deg, rgba(8, 18, 36, 0.95), rgba(12, 32, 54, 0.75));
+  box-shadow: 0 14px 32px rgba(4, 10, 24, 0.62), 0 0 30px var(--touch-primary-glow);
 }
 
 .skillDisabled {
-  background: rgba(100, 100, 100, 0.35);
-  color: rgba(255, 255, 255, 0.75);
+  background: radial-gradient(
+      circle at 40% 32%,
+      var(--touch-neutral-soft),
+      rgba(15, 23, 42, 0.85)
+    ),
+    linear-gradient(170deg, rgba(8, 18, 36, 0.9), rgba(12, 32, 54, 0.75));
+  color: rgba(226, 232, 240, 0.78);
+  border-color: var(--touch-neutral-border);
+  box-shadow: var(--touch-shadow-soft);
 }
 
 .cycleSkillReady {
-  background: linear-gradient(135deg, #ffcc00, #ff8800);
-  box-shadow: 0 0 18px rgba(255, 204, 0, 0.55);
+  background: radial-gradient(
+      circle at 32% 30%,
+      var(--touch-primary-glow),
+      var(--touch-secondary-strong) 60%,
+      var(--touch-surface-shadow)
+    ),
+    linear-gradient(170deg, rgba(8, 18, 36, 0.95), rgba(12, 32, 54, 0.76));
+  box-shadow: 0 12px 26px rgba(4, 10, 24, 0.58), 0 0 26px var(--touch-secondary-glow);
 }
 
 .evolveReady {
-  background: linear-gradient(135deg, #00ff88, #00d9ff);
-  box-shadow: 0 0 25px rgba(0, 255, 136, 0.8);
+  background: radial-gradient(
+      circle at 35% 32%,
+      var(--touch-secondary-glow),
+      var(--touch-secondary-intense) 55%,
+      var(--touch-surface-shadow)
+    ),
+    linear-gradient(170deg, rgba(8, 18, 36, 0.95), rgba(12, 32, 54, 0.76));
+  box-shadow: 0 14px 32px rgba(4, 10, 24, 0.6), 0 0 32px var(--touch-secondary-glow);
   transform: scale(1);
 }
 
 .evolveLocked {
-  background: rgba(100, 100, 100, 0.3);
+  background: radial-gradient(
+      circle at 40% 34%,
+      var(--touch-neutral-soft),
+      rgba(15, 23, 42, 0.88)
+    ),
+    linear-gradient(170deg, rgba(8, 18, 36, 0.92), rgba(12, 32, 54, 0.72));
+  border-color: var(--touch-neutral-border);
+  box-shadow: var(--touch-shadow-soft);
+}
+
+.cooldownState {
+  filter: var(--touch-cooldown-filter);
+  box-shadow: inset 0 0 0 1px var(--touch-neutral-glow), 0 10px 20px rgba(4, 10, 24, 0.45);
+  cursor: progress;
 }
 
 @media (max-width: 400px) {
