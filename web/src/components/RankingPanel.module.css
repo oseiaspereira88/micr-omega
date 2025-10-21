@@ -22,6 +22,12 @@
   gap: 0.5rem;
 }
 
+.headerControls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .title {
   margin: 0;
   font-size: 1.1rem;
@@ -38,6 +44,30 @@
   letter-spacing: 0.12em;
   background: rgba(111, 137, 255, 0.18);
   color: rgba(187, 197, 255, 0.95);
+}
+
+.jumpButton {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(111, 137, 255, 0.18);
+  color: rgba(214, 222, 255, 0.95);
+  border: 1px solid rgba(111, 137, 255, 0.35);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.jumpButton:hover,
+.jumpButton:focus-visible {
+  background: rgba(111, 137, 255, 0.28);
+  box-shadow: 0 4px 12px rgba(111, 137, 255, 0.25);
+}
+
+.jumpButton:focus-visible {
+  outline: none;
+  transform: translateY(-1px);
 }
 
 .list {
