@@ -16,6 +16,12 @@ import { gameStore } from '../../store/gameStore';
 import { createInitialState } from '../state/initialState';
 import { pushDamagePopup } from '../state/damagePopups';
 import {
+  CAMERA_ZOOM_EPSILON,
+  DEFAULT_CAMERA_ZOOM,
+  clampCameraZoom,
+  useGameSettings,
+} from '../../store/gameSettings';
+import {
   checkEvolution as checkEvolutionSystem,
   chooseEvolution as chooseEvolutionSystem,
   restartGame as restartGameSystem,
@@ -40,6 +46,7 @@ const DEFAULT_SETTINGS = {
   visualDensity: 'medium',
   showTouchControls: false,
   showMinimap: featureToggles.minimap,
+  cameraZoom: DEFAULT_CAMERA_ZOOM,
 };
 
 const EVOLUTION_STAT_KEYS = ['attack', 'defense', 'speed', 'range'];
@@ -738,6 +745,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
   const dispatchRef = useRef(dispatch);
   const commandCallbackRef = useRef(settings?.onCommandBatch ?? null);
   const evolutionCallbackRef = useRef(settings?.onEvolutionDelta ?? null);
+  const { settings: userSettings, updateSettings } = useGameSettings();
 
   useEffect(() => {
     dispatchRef.current = dispatch;
@@ -1124,22 +1132,42 @@ const useGameLoop = ({ canvasRef, dispatch, settings }) => {
     (zoomValue) => {
       const state = renderStateRef.current;
       const camera = state?.camera;
-      if (!camera) return;
-
-      const minZoom = 0.6;
-      const maxZoom = 1.2;
       const parsed = Number.parseFloat(zoomValue);
-      const safeValue = Number.isFinite(parsed) ? parsed : 1;
-      const clamped = clamp(safeValue, minZoom, maxZoom);
+      const safeValue = Number.isFinite(parsed) ? parsed : DEFAULT_CAMERA_ZOOM;
+      const clamped = clampCameraZoom(safeValue);
+      const currentCameraZoom = Number.isFinite(camera?.zoom) ? camera.zoom : DEFAULT_CAMERA_ZOOM;
+      const settingsZoom = clampCameraZoom(
+        typeof userSettings?.cameraZoom === 'number' ? userSettings.cameraZoom : DEFAULT_CAMERA_ZOOM
+      );
+      const shouldPersist = Math.abs(clamped - settingsZoom) > CAMERA_ZOOM_EPSILON;
 
-      if (Math.abs((camera.zoom ?? 1) - clamped) < 0.0001) {
+      if (state) {
+        state.cameraZoom = clamped;
+      }
+
+      if (!camera) {
+        if (state) {
+          syncHudState(state);
+        }
+        if (shouldPersist) {
+          updateSettings({ cameraZoom: clamped });
+        }
         return;
       }
 
-      camera.zoom = clamped;
-      syncHudState(state);
+      if (Math.abs(currentCameraZoom - clamped) >= CAMERA_ZOOM_EPSILON) {
+        camera.zoom = clamped;
+      }
+
+      if (state) {
+        syncHudState(state);
+      }
+
+      if (shouldPersist) {
+        updateSettings({ cameraZoom: clamped });
+      }
     },
-    [syncHudState]
+    [syncHudState, updateSettings, userSettings?.cameraZoom]
   );
 
   const setActiveEvolutionTier = useCallback(

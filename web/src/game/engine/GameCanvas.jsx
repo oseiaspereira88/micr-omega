@@ -6,6 +6,12 @@ import styles from '../../MicroOmegaGame.module.css';
 import { useGameDispatch, useGameState } from './GameContext';
 import useGameLoop from './useGameLoop';
 import useIsTouchDevice from '../../hooks/useIsTouchDevice';
+import {
+  CAMERA_ZOOM_EPSILON,
+  DEFAULT_CAMERA_ZOOM,
+  clampCameraZoom,
+  useGameSettings,
+} from '../../store/gameSettings';
 
 const DEFAULT_EVOLUTION_MENU = Object.freeze({
   activeTier: 'small',
@@ -129,6 +135,7 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
   const gameState = useGameState();
   const dispatch = useGameDispatch();
   const [journeyStats, setJourneyStats] = useState(() => createEmptyJourneyStats());
+  const { settings: globalSettings } = useGameSettings();
 
   const runStartRef = useRef(null);
   const lastGameOverRef = useRef(Boolean(gameState.gameOver));
@@ -150,6 +157,15 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
   });
 
   const isTouchDevice = useIsTouchDevice();
+  const preferredCameraZoom = useMemo(
+    () =>
+      clampCameraZoom(
+        typeof globalSettings?.cameraZoom === 'number'
+          ? globalSettings.cameraZoom
+          : DEFAULT_CAMERA_ZOOM,
+      ),
+    [globalSettings?.cameraZoom]
+  );
 
   const {
     currentSkill: currentSkillInfo,
@@ -193,6 +209,18 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
     maxCombo,
     activePowerUps,
   } = gameState;
+
+  useEffect(() => {
+    const currentZoom = Number.isFinite(cameraZoom) ? cameraZoom : null;
+    if (
+      currentZoom !== null &&
+      Math.abs(currentZoom - preferredCameraZoom) <= CAMERA_ZOOM_EPSILON
+    ) {
+      return;
+    }
+
+    setCameraZoom(preferredCameraZoom);
+  }, [cameraZoom, preferredCameraZoom, setCameraZoom]);
 
   useEffect(() => {
     const now = Date.now();
@@ -529,7 +557,11 @@ const GameCanvas = ({ settings, onQuit, onReconnect }) => {
         onOpenEvolutionMenu={inputActions.openEvolutionMenu}
         canEvolve={canEvolve}
         showTouchControls={Boolean(settings?.showTouchControls && isTouchDevice)}
-        cameraZoom={cameraZoom ?? gameState.camera?.zoom ?? 1}
+        cameraZoom={
+          Number.isFinite(cameraZoom)
+            ? cameraZoom
+            : clampCameraZoom(gameState.camera?.zoom ?? preferredCameraZoom)
+        }
         onCameraZoomChange={setCameraZoom}
         onQuit={onQuit}
         onReconnect={onReconnect}

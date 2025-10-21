@@ -1,22 +1,20 @@
 import React, { useCallback, useMemo } from 'react';
 
-import styles from './CameraControls.module.css';
+import { CAMERA_ZOOM_MAX, CAMERA_ZOOM_MIN, clampCameraZoom } from '../../store/gameSettings';
 
-const clampZoom = (zoom) => {
-  const value = Number.isFinite(zoom) ? zoom : 1;
-  return Math.min(1.2, Math.max(0.6, value));
-};
+import styles from './CameraControls.module.css';
 
 const formatZoomLabel = (zoom) => `${Math.round(zoom * 100)}%`;
 
 const CameraControls = ({ zoom = 1, onChange }) => {
-  const safeZoom = useMemo(() => clampZoom(zoom), [zoom]);
+  const safeZoom = useMemo(() => clampCameraZoom(zoom), [zoom]);
 
   const handleChange = useCallback(
     (event) => {
       const value = Number.parseFloat(event.target.value);
       if (typeof onChange === 'function') {
-        onChange(Number.isFinite(value) ? value : safeZoom);
+        const parsedValue = Number.isFinite(value) ? value : safeZoom;
+        onChange(clampCameraZoom(parsedValue));
       }
     },
     [onChange, safeZoom]
@@ -25,7 +23,7 @@ const CameraControls = ({ zoom = 1, onChange }) => {
   const handlePreset = useCallback(
     (value) => () => {
       if (typeof onChange === 'function') {
-        onChange(value);
+        onChange(clampCameraZoom(value));
       }
     },
     [onChange]
@@ -46,14 +44,14 @@ const CameraControls = ({ zoom = 1, onChange }) => {
         <input
           className={styles.slider}
           type="range"
-          min={0.6}
-          max={1.2}
+          min={CAMERA_ZOOM_MIN}
+          max={CAMERA_ZOOM_MAX}
           step={0.05}
           value={safeZoom}
           onChange={handleChange}
           aria-label="Controle de zoom da câmera"
-          aria-valuemin={0.6}
-          aria-valuemax={1.2}
+          aria-valuemin={CAMERA_ZOOM_MIN}
+          aria-valuemax={CAMERA_ZOOM_MAX}
           aria-valuenow={safeZoom}
           aria-valuetext={formatZoomLabel(safeZoom)}
         />

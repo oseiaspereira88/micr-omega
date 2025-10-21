@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 
 import GameHud from '../GameHud';
 import { gameStore } from '../../../store/gameStore';
-import { GameSettingsProvider } from '../../../store/gameSettings';
+import { GameSettingsProvider, useGameSettings } from '../../../store/gameSettings';
 import * as touchDeviceModule from '../../../hooks/useIsTouchDevice';
 
 const originalMatchMedia = window.matchMedia;
@@ -513,6 +513,72 @@ describe('GameHud settings panel', () => {
     });
     expect(persistedToggle).not.toBeChecked();
     expect(screen.getByText(/som desligado/i)).toBeInTheDocument();
+  });
+
+  it('mantém o zoom da câmera após remontar o HUD', async () => {
+    const storageKey = 'micr-omega:game-settings';
+    const user = userEvent.setup();
+
+    const CameraZoomHarness = () => {
+      const { settings, updateSettings } = useGameSettings();
+      const [zoom, setZoom] = useState(() =>
+        Number.isFinite(settings?.cameraZoom) ? settings.cameraZoom : 1
+      );
+
+      useEffect(() => {
+        if (Number.isFinite(settings?.cameraZoom)) {
+          setZoom(settings.cameraZoom);
+        }
+      }, [settings?.cameraZoom]);
+
+      return (
+        <GameHud
+          {...BASE_PROPS}
+          cameraZoom={zoom}
+          onCameraZoomChange={(value) => {
+            const parsed = Number.isFinite(value) ? value : 1;
+            setZoom(parsed);
+            updateSettings({ cameraZoom: parsed });
+          }}
+        />
+      );
+    };
+
+    const renderHud = () =>
+      render(
+        <GameSettingsProvider>
+          <CameraZoomHarness />
+        </GameSettingsProvider>
+      );
+
+    const firstRender = renderHud();
+
+    const openButton = screen.getByRole('button', { name: /mostrar painel/i });
+    await user.click(openButton);
+
+    const macroPreset = await screen.findByRole('button', { name: /macro/i });
+    await user.click(macroPreset);
+
+    await waitFor(() => {
+      const stored = window.localStorage.getItem(storageKey);
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored ?? '{}');
+      expect(parsed.cameraZoom).toBeCloseTo(0.7, 5);
+    });
+
+    firstRender.unmount();
+
+    const secondUser = userEvent.setup();
+    renderHud();
+
+    const secondOpenButton = screen.getByRole('button', { name: /mostrar painel/i });
+    await secondUser.click(secondOpenButton);
+
+    const zoomSlider = await screen.findByRole('slider', {
+      name: /controle de zoom da câmera/i,
+    });
+    expect(Number(zoomSlider.value)).toBeCloseTo(0.7);
+    expect(screen.getByText('70%')).toBeInTheDocument();
   });
 
   it('não exibe preferências de controles touch quando o dispositivo não é compatível', async () => {

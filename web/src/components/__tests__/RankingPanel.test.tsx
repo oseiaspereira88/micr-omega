@@ -130,7 +130,7 @@ describe("RankingPanel", () => {
     expect(firstRow.getByText("Alice")).toBeVisible();
     expect(firstRow.getByText("4.200")).toBeVisible();
     expect(items[0]).toHaveAccessibleName(
-      "1º lugar — Alice — 4.200 pontos — conectado",
+      "1º lugar — Alice — 4.200 pontos — 100% da pontuação do líder — conectado",
     );
 
     const secondRow = within(items[1]!);
@@ -141,7 +141,7 @@ describe("RankingPanel", () => {
     expect(secondRow.getByLabelText("Jogador desconectado")).toBeVisible();
     expect(items[1]).toHaveAttribute("aria-current", "true");
     expect(items[1]).toHaveAccessibleName(
-      "2º lugar — Você — 3.150 pontos — desconectado",
+      "2º lugar — Você — 3.150 pontos — 75% da pontuação do líder — desconectado",
     );
   });
 

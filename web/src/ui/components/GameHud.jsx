@@ -17,7 +17,12 @@ import RankingPanel from '../../components/RankingPanel';
 import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
 import useIsTouchDevice from '../../hooks/useIsTouchDevice';
 import { shallowEqual, useGameStore } from '../../store/gameStore';
-import { useGameSettings } from '../../store/gameSettings';
+import {
+  CAMERA_ZOOM_EPSILON,
+  DEFAULT_CAMERA_ZOOM,
+  clampCameraZoom,
+  useGameSettings,
+} from '../../store/gameSettings';
 
 const MOBILE_HUD_QUERY = '(max-width: 900px)';
 const SIDEBAR_TRANSITION_DURATION_MS = 350;
@@ -130,6 +135,13 @@ const GameHud = ({
   const touchLayoutAutoSwapDescribedBy = showTouchControlsSetting
     ? touchLayoutAutoSwapDescriptionId
     : `${touchLayoutAutoSwapDescriptionId} ${touchLayoutAutoSwapHelperId}`;
+  const cameraZoomSetting = useMemo(
+    () =>
+      clampCameraZoom(
+        typeof settings?.cameraZoom === 'number' ? settings.cameraZoom : DEFAULT_CAMERA_ZOOM,
+      ),
+    [settings?.cameraZoom]
+  );
   const minimapPreviewClassName = useMemo(
     () =>
       [
@@ -191,6 +203,17 @@ const GameHud = ({
 
     return undefined;
   }, []);
+
+  useEffect(() => {
+    if (!Number.isFinite(cameraZoom)) {
+      return;
+    }
+
+    const normalizedCameraZoom = clampCameraZoom(cameraZoom);
+    if (Math.abs(normalizedCameraZoom - cameraZoomSetting) > CAMERA_ZOOM_EPSILON) {
+      updateSettings({ cameraZoom: normalizedCameraZoom });
+    }
+  }, [cameraZoom, cameraZoomSetting, updateSettings]);
 
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
@@ -759,7 +782,10 @@ const GameHud = ({
                 </ul>
               </div>
             ) : null}
-            <CameraControls zoom={cameraZoom} onChange={onCameraZoomChange} />
+            <CameraControls
+              zoom={Number.isFinite(cameraZoom) ? cameraZoom : cameraZoomSetting}
+              onChange={onCameraZoomChange}
+            />
             {onQuit ? (
               <button type="button" className={styles.leaveButton} onClick={onQuit}>
                 Sair da sala

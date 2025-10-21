@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import useGameLoop from './useGameLoop';
+import { GameSettingsProvider } from '../../store/gameSettings';
 
 const mocks = vi.hoisted(() => {
   const listeners = new Set();
@@ -138,7 +139,7 @@ const createCanvas = () => {
   return canvas;
 };
 
-const HookWrapper = ({ canvas, dispatch, settings, onReady }) => {
+const HookWrapperContent = ({ canvas, dispatch, settings, onReady }) => {
   const canvasRef = useRef(canvas);
 
   useEffect(() => {
@@ -155,6 +156,12 @@ const HookWrapper = ({ canvas, dispatch, settings, onReady }) => {
 
   return null;
 };
+
+const HookWrapper = (props) => (
+  <GameSettingsProvider>
+    <HookWrapperContent {...props} />
+  </GameSettingsProvider>
+);
 
 describe('useGameLoop timing safeguards', () => {
   let originalRequestAnimationFrame;

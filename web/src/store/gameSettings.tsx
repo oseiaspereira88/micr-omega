@@ -21,6 +21,24 @@ export type GameSettings = {
   showMinimap: boolean;
   touchLayout: TouchLayout;
   autoSwapTouchLayoutWhenSidebarOpen: boolean;
+  cameraZoom: number;
+};
+
+export const CAMERA_ZOOM_MIN = 0.6;
+export const CAMERA_ZOOM_MAX = 1.2;
+export const CAMERA_ZOOM_EPSILON = 0.0001;
+export const DEFAULT_CAMERA_ZOOM = 1;
+
+export const clampCameraZoom = (value: unknown): number => {
+  const numericValue =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseFloat(value)
+        : Number.NaN;
+
+  const safeValue = Number.isFinite(numericValue) ? Number(numericValue) : DEFAULT_CAMERA_ZOOM;
+  return Math.min(CAMERA_ZOOM_MAX, Math.max(CAMERA_ZOOM_MIN, safeValue));
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -30,6 +48,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   showMinimap: featureToggles.minimap,
   touchLayout: "right",
   autoSwapTouchLayoutWhenSidebarOpen: true,
+  cameraZoom: DEFAULT_CAMERA_ZOOM,
 };
 
 const STORAGE_KEY = "micr-omega:game-settings";
@@ -88,6 +107,15 @@ const parseTouchLayout = (value: unknown, fallback: TouchLayout): TouchLayout =>
   return fallback;
 };
 
+const parseCameraZoom = (value: unknown, fallback: number): number => {
+  const resolvedFallback = clampCameraZoom(fallback);
+  if (typeof value === "number" || typeof value === "string") {
+    return clampCameraZoom(value);
+  }
+
+  return resolvedFallback;
+};
+
 const parseStoredSettings = (): GameSettings => {
   if (typeof window === "undefined") {
     return { ...DEFAULT_SETTINGS };
@@ -131,6 +159,8 @@ const parseStoredSettings = (): GameSettings => {
       DEFAULT_SETTINGS.autoSwapTouchLayoutWhenSidebarOpen,
     );
 
+    const cameraZoom = parseCameraZoom(parsed.cameraZoom, DEFAULT_SETTINGS.cameraZoom);
+
     return {
       audioEnabled,
       visualDensity,
@@ -138,6 +168,7 @@ const parseStoredSettings = (): GameSettings => {
       showMinimap,
       touchLayout,
       autoSwapTouchLayoutWhenSidebarOpen,
+      cameraZoom,
     };
   } catch (error) {
     console.warn("Não foi possível ler as configurações do jogo salvas", error);
