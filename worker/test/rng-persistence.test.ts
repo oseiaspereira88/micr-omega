@@ -52,4 +52,24 @@ describe("RoomDO RNG persistence", () => {
     await vi.advanceTimersByTimeAsync(RoomDO.RNG_STATE_PERSIST_DEBOUNCE_MS);
     expect(mockState.storageImpl.getPutCount(RNG_STATE_KEY)).toBe(1);
   });
+
+  it("does not immediately persist RNG state when restored from storage", async () => {
+    vi.useFakeTimers();
+    const mockState = new MockDurableObjectState();
+    const seeds = {
+      organicMatterRespawn: 123_456,
+      progression: 987_654,
+      microorganismWaypoint: 456_789,
+    } as const;
+    mockState.storageImpl.data.set(RNG_STATE_KEY, { ...seeds });
+
+    const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+    await (room as any).ready;
+
+    expect(mockState.storageImpl.getPutCount(RNG_STATE_KEY)).toBe(0);
+
+    await vi.runAllTimersAsync();
+
+    expect(mockState.storageImpl.getPutCount(RNG_STATE_KEY)).toBe(0);
+  });
 });
