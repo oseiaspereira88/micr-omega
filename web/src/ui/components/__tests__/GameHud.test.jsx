@@ -594,6 +594,12 @@ describe('GameHud settings panel', () => {
     });
     expect(touchLayoutSelect).toBeDisabled();
 
+    const preview = screen.getByRole('img', {
+      name: /prévia do layout com botões à direita/i,
+    });
+    expect(preview).toHaveAttribute('data-layout', 'right');
+    expect(preview).toHaveAccessibleName(/botões à direita/i);
+
     const autoSwapToggle = screen.getByRole('checkbox', {
       name: /ajustar layout automaticamente quando o painel lateral estiver aberto/i,
     });
@@ -619,6 +625,8 @@ describe('GameHud settings panel', () => {
 
     await waitFor(() => {
       expect(touchLayoutSelect).toHaveValue('left');
+      expect(preview).toHaveAttribute('data-layout', 'left');
+      expect(preview).toHaveAccessibleName(/botões à esquerda/i);
       const stored = window.localStorage.getItem(storageKey);
       expect(stored).not.toBeNull();
       const parsed = JSON.parse(stored);

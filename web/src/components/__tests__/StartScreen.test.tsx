@@ -384,6 +384,27 @@ describe("StartScreen", () => {
     expect(window.localStorage.getItem("micr-omega:player-name")).toBe("Alice");
   });
 
+  it("atualiza a prévia do layout touch conforme a seleção", () => {
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+    const preview = screen.getByRole("img", {
+      name: /prévia do layout com botões à direita/i,
+    });
+    expect(preview).toHaveAttribute("data-layout", "right");
+    expect(preview).toHaveAccessibleName(/botões à direita/i);
+
+    const touchToggle = screen.getByLabelText(/mostrar controles/i);
+    fireEvent.click(touchToggle);
+
+    const touchLayoutSelect = screen.getByLabelText(
+      /layout dos controles touch/i,
+    );
+    fireEvent.change(touchLayoutSelect, { target: { value: "left" } });
+
+    expect(preview).toHaveAttribute("data-layout", "left");
+    expect(preview).toHaveAccessibleName(/botões à esquerda/i);
+  });
+
   it("preenche o campo com o nome persistido sem atualizar o store", async () => {
     const persistedName = "Persistido";
     window.localStorage.setItem("micr-omega:player-name", persistedName);

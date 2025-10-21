@@ -917,6 +917,12 @@
   min-width: 0;
 }
 
+.settingsSelectContent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .settingsSelect {
   appearance: none;
   border-radius: 10px;
@@ -935,6 +941,29 @@
   background-position: right 12px center, right 6px center;
   background-size: 8px 8px;
   background-repeat: no-repeat;
+}
+
+.settingsTouchLayoutPreview {
+  margin-left: 6px;
+}
+
+@media (max-width: 720px) {
+  .settingsSelectWrapper {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .settingsSelectContent {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .settingsTouchLayoutPreview {
+    margin-left: 0;
+    align-self: center;
+  }
 }
 
 .settingsSelect:focus-visible {

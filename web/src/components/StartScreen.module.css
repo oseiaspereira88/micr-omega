@@ -221,6 +221,16 @@
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.touchLayoutControls {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.touchLayoutPreview {
+  margin-inline-start: 0.25rem;
+}
+
 .optionContent {
   display: flex;
   flex-direction: column;
@@ -541,6 +551,18 @@
 
   .toggleWrapper {
     justify-content: space-between;
+  }
+
+  .touchLayoutControls {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .touchLayoutPreview {
+    margin-inline-start: 0;
+    align-self: center;
   }
 }
 
