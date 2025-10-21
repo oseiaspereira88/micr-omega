@@ -16,6 +16,7 @@ export type TouchLayout = "right" | "left";
 
 export type GameSettings = {
   audioEnabled: boolean;
+  masterVolume: number;
   visualDensity: VisualDensity;
   showTouchControls: boolean;
   showMinimap: boolean;
@@ -25,6 +26,7 @@ export type GameSettings = {
 
 const DEFAULT_SETTINGS: GameSettings = {
   audioEnabled: true,
+  masterVolume: 1,
   visualDensity: "medium",
   showTouchControls: false,
   showMinimap: featureToggles.minimap,
@@ -88,6 +90,37 @@ const parseTouchLayout = (value: unknown, fallback: TouchLayout): TouchLayout =>
   return fallback;
 };
 
+const clampVolume = (value: number): number => {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+
+  if (value < 0) {
+    return 0;
+  }
+
+  if (value > 1) {
+    return 1;
+  }
+
+  return value;
+};
+
+const parseMasterVolume = (value: unknown, fallback: number): number => {
+  if (typeof value === "number") {
+    return clampVolume(value);
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return clampVolume(parsed);
+    }
+  }
+
+  return clampVolume(fallback);
+};
+
 const parseStoredSettings = (): GameSettings => {
   if (typeof window === "undefined") {
     return { ...DEFAULT_SETTINGS };
@@ -105,6 +138,8 @@ const parseStoredSettings = (): GameSettings => {
     }
 
     const audioEnabled = parseBoolean(parsed.audioEnabled, DEFAULT_SETTINGS.audioEnabled);
+
+    const masterVolume = parseMasterVolume(parsed.masterVolume, DEFAULT_SETTINGS.masterVolume);
 
     const visualDensity = parseVisualDensity(
       parsed.visualDensity,
@@ -133,6 +168,7 @@ const parseStoredSettings = (): GameSettings => {
 
     return {
       audioEnabled,
+      masterVolume,
       visualDensity,
       showTouchControls,
       showMinimap,

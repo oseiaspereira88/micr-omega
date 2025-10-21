@@ -8,6 +8,17 @@ import { gameStore } from '../../../store/gameStore';
 import { GameSettingsProvider } from '../../../store/gameSettings';
 import * as touchDeviceModule from '../../../hooks/useIsTouchDevice';
 
+const previewMock = vi.fn();
+const useSoundPreviewMock = vi.fn(() => ({
+  playPreview: previewMock,
+  isSupported: true,
+}));
+
+vi.mock('../../../hooks/useSoundPreview', () => ({
+  __esModule: true,
+  default: (...args) => useSoundPreviewMock(...args),
+}));
+
 const originalMatchMedia = window.matchMedia;
 const createMatchMedia = (matches = false) =>
   vi.fn().mockImplementation((query) => ({
@@ -25,6 +36,8 @@ beforeEach(() => {
   window.matchMedia = createMatchMedia(false);
   window.localStorage.clear();
   useIsTouchDeviceSpy.mockReturnValue(false);
+  previewMock.mockClear();
+  useSoundPreviewMock.mockClear();
 });
 
 afterEach(() => {
@@ -428,16 +441,16 @@ describe('GameHud settings panel', () => {
     const openButton = screen.getByRole('button', { name: /mostrar painel/i });
     await user.click(openButton);
 
-    const audioToggle = await screen.findByRole('checkbox', {
-      name: /efeitos sonoros/i,
-    });
-    expect(audioToggle).toBeChecked();
+    await screen.findByRole('slider', { name: /volume dos efeitos sonoros/i });
+    const muteButton = screen.getByRole('button', { name: /mutar som/i });
     expect(screen.getByText(/som ligado/i)).toBeInTheDocument();
 
-    await user.click(audioToggle);
+    await user.click(muteButton);
 
     await waitFor(() => {
-      expect(audioToggle).not.toBeChecked();
+      expect(
+        screen.getByRole('button', { name: /ativar som/i })
+      ).toBeInTheDocument();
       expect(screen.getByText(/som desligado/i)).toBeInTheDocument();
     });
 
@@ -448,10 +461,13 @@ describe('GameHud settings panel', () => {
       expect(parsed.audioEnabled).toBe(false);
     });
 
-    await user.click(audioToggle);
+    const unmuteButton = screen.getByRole('button', { name: /ativar som/i });
+    await user.click(unmuteButton);
 
     await waitFor(() => {
-      expect(audioToggle).toBeChecked();
+      expect(
+        screen.getByRole('button', { name: /mutar som/i })
+      ).toBeInTheDocument();
       expect(screen.getByText(/som ligado/i)).toBeInTheDocument();
     });
 
@@ -476,16 +492,18 @@ describe('GameHud settings panel', () => {
     const openButton = screen.getByRole('button', { name: /mostrar painel/i });
     await user.click(openButton);
 
-    const audioToggle = await screen.findByRole('checkbox', {
-      name: /efeitos sonoros/i,
+    const volumeSlider = await screen.findByRole('slider', {
+      name: /volume dos efeitos sonoros/i,
     });
-    expect(audioToggle).toBeChecked();
+    expect(volumeSlider).toHaveValue('100');
 
-    await user.click(audioToggle);
+    fireEvent.change(volumeSlider, { target: { value: '45' } });
+
+    const muteButton = screen.getByRole('button', { name: /mutar som/i });
+    await user.click(muteButton);
 
     await waitFor(() => {
-      expect(audioToggle).not.toBeChecked();
-      expect(audioToggle).toHaveAccessibleName(/efeitos sonoros/i);
+      expect(screen.getByRole('button', { name: /ativar som/i })).toBeInTheDocument();
       expect(screen.getByText(/som desligado/i)).toBeInTheDocument();
     });
 
@@ -494,6 +512,7 @@ describe('GameHud settings panel', () => {
       expect(stored).not.toBeNull();
       const parsed = JSON.parse(stored);
       expect(parsed.audioEnabled).toBe(false);
+      expect(parsed.masterVolume).toBeCloseTo(0.45, 5);
     });
 
     firstRender.unmount();
@@ -508,11 +527,30 @@ describe('GameHud settings panel', () => {
     const secondOpenButton = screen.getByRole('button', { name: /mostrar painel/i });
     await secondUser.click(secondOpenButton);
 
-    const persistedToggle = await screen.findByRole('checkbox', {
-      name: /efeitos sonoros/i,
+    const persistedSlider = await screen.findByRole('slider', {
+      name: /volume dos efeitos sonoros/i,
     });
-    expect(persistedToggle).not.toBeChecked();
+    expect(persistedSlider).toHaveValue('45');
+    expect(screen.getByRole('button', { name: /ativar som/i })).toBeInTheDocument();
     expect(screen.getByText(/som desligado/i)).toBeInTheDocument();
+  });
+
+  it('executa a prévia de áudio ao clicar em Testar som', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <GameSettingsProvider>
+        <GameHud {...BASE_PROPS} />
+      </GameSettingsProvider>,
+    );
+
+    const openButton = screen.getByRole('button', { name: /mostrar painel/i });
+    await user.click(openButton);
+
+    const previewButton = await screen.findByRole('button', { name: /testar som/i });
+    await user.click(previewButton);
+
+    expect(previewMock).toHaveBeenCalledTimes(1);
   });
 
   it('não exibe preferências de controles touch quando o dispositivo não é compatível', async () => {

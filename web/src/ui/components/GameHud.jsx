@@ -18,6 +18,7 @@ import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
 import useIsTouchDevice from '../../hooks/useIsTouchDevice';
 import { shallowEqual, useGameStore } from '../../store/gameStore';
 import { useGameSettings } from '../../store/gameSettings';
+import useSoundPreview from '../../hooks/useSoundPreview';
 
 const MOBILE_HUD_QUERY = '(max-width: 900px)';
 const SIDEBAR_TRANSITION_DURATION_MS = 350;
@@ -102,7 +103,8 @@ const GameHud = ({
   const hudContentRef = useRef(null);
   const sidebarId = useId();
   const minimapToggleId = useId();
-  const audioToggleId = useId();
+  const audioGroupLabelId = useId();
+  const audioSliderId = useId();
   const audioStatusId = useId();
   const touchToggleId = useId();
   const touchLayoutSelectId = useId();
@@ -113,8 +115,19 @@ const GameHud = ({
   const touchLayoutAutoSwapHelperId = useId();
   const { settings, updateSettings } = useGameSettings();
   const audioEnabled = settings?.audioEnabled !== false;
+  const masterVolume =
+    typeof settings?.masterVolume === 'number' ? settings.masterVolume : 1;
+  const audioVolumePercentage = Math.round(masterVolume * 100);
   const audioToggleLabel = 'Efeitos sonoros';
   const audioStatusLabel = audioEnabled ? 'Som ligado' : 'Som desligado';
+  const audioStatusMessage = audioEnabled
+    ? `${audioStatusLabel} – ${audioVolumePercentage}%`
+    : audioStatusLabel;
+  const muteButtonLabel = audioEnabled ? 'Mutar som' : 'Ativar som';
+  const { playPreview, isSupported: isAudioPreviewSupported } = useSoundPreview({
+    audioEnabled,
+    masterVolume,
+  });
   const isMinimapEnabled = Boolean(settings?.showMinimap);
   const showTouchControlsSetting = Boolean(settings?.showTouchControls);
   const touchLayoutPreference = settings?.touchLayout === 'left' ? 'left' : 'right';
@@ -159,6 +172,8 @@ const GameHud = ({
 
   const showStatusOverlay = connectionStatus !== 'connected';
   const hudDisabled = showStatusOverlay;
+  const audioControlsDisabled = hudDisabled;
+  const canTestAudio = audioEnabled && isAudioPreviewSupported && !audioControlsDisabled;
   const sidebarIsInactive = hudDisabled || !isSidebarOpen;
   const sidebarInert = sidebarIsInactive ? 'true' : undefined;
 
@@ -366,9 +381,26 @@ const GameHud = ({
     updateSettings({ showMinimap: !isMinimapEnabled });
   }, [isMinimapEnabled, updateSettings]);
 
-  const handleToggleAudio = useCallback(() => {
+  const handleMuteAudio = useCallback(() => {
     updateSettings({ audioEnabled: !audioEnabled });
   }, [audioEnabled, updateSettings]);
+
+  const handleVolumeChange = useCallback(
+    (event) => {
+      const rawValue = Number.parseInt(event?.target?.value, 10);
+      if (!Number.isFinite(rawValue)) {
+        return;
+      }
+
+      const clamped = Math.min(Math.max(rawValue, 0), 100);
+      updateSettings({ masterVolume: clamped / 100 });
+    },
+    [updateSettings],
+  );
+
+  const handleTestSound = useCallback(() => {
+    playPreview();
+  }, [playPreview]);
 
   const handleToggleTouchControls = useCallback(
     (event) => {
@@ -768,7 +800,11 @@ const GameHud = ({
           </div>
           <div className={styles.settingsPanel}>
             <h3 className={styles.settingsHeading}>Áudio</h3>
-            <label className={styles.settingsToggle} htmlFor={audioToggleId}>
+            <div
+              className={styles.settingsToggle}
+              role="group"
+              aria-labelledby={audioGroupLabelId}
+            >
               <div className={styles.settingsToggleInfo}>
                 <div className={audioPreviewClassName} aria-hidden="true">
                   <span className={styles.audioPreviewIcon} aria-hidden="true">
@@ -776,33 +812,77 @@ const GameHud = ({
                   </span>
                 </div>
                 <div className={styles.settingsToggleText}>
-                  <span className={styles.settingsToggleTitle}>Efeitos sonoros</span>
+                  <span
+                    id={audioGroupLabelId}
+                    className={styles.settingsToggleTitle}
+                  >
+                    Efeitos sonoros
+                  </span>
                   <span className={styles.settingsToggleDescription}>
-                    Ative ou desative o áudio ambiente durante a partida.
+                    Ajuste o volume global dos efeitos da partida.
                   </span>
                 </div>
               </div>
-              <div className={styles.settingsToggleControl}>
-                <input
-                  id={audioToggleId}
-                  type="checkbox"
-                  className={styles.toggleInput}
-                  checked={audioEnabled}
-                  onChange={handleToggleAudio}
-                  aria-checked={audioEnabled}
-                  aria-label={audioToggleLabel}
-                  aria-describedby={audioStatusId}
-                />
+              <div className={styles.settingsAudioControls}>
+                <label
+                  className={styles.settingsSliderLabel}
+                  htmlFor={audioSliderId}
+                >
+                  Volume dos efeitos sonoros
+                </label>
+                <div className={styles.settingsSliderRow}>
+                  <input
+                    id={audioSliderId}
+                    type="range"
+                    className={styles.settingsSliderInput}
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={audioVolumePercentage}
+                    onChange={handleVolumeChange}
+                    disabled={audioControlsDisabled}
+                    aria-describedby={audioStatusId}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={audioVolumePercentage}
+                    aria-valuetext={`${audioVolumePercentage}%`}
+                  />
+                  <span
+                    className={styles.settingsSliderValue}
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    {audioVolumePercentage}%
+                  </span>
+                </div>
                 <span
                   id={audioStatusId}
-                  className={styles.toggleStatusText}
+                  className={styles.settingsAudioStatus}
                   aria-live="polite"
                   aria-atomic="true"
                 >
-                  {audioStatusLabel}
+                  {audioStatusMessage}
                 </span>
+                <div className={styles.settingsAudioActions}>
+                  <button
+                    type="button"
+                    className={styles.settingsAudioButton}
+                    onClick={handleMuteAudio}
+                    disabled={audioControlsDisabled}
+                  >
+                    {muteButtonLabel}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.settingsAudioButton}
+                    onClick={handleTestSound}
+                    disabled={!canTestAudio}
+                  >
+                    Testar som
+                  </button>
+                </div>
               </div>
-            </label>
+            </div>
             <h3 className={styles.settingsHeading}>Exibição</h3>
             <label className={styles.settingsToggle} htmlFor={minimapToggleId}>
               <div className={styles.settingsToggleInfo}>
