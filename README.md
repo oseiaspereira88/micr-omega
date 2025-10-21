@@ -82,7 +82,7 @@ O Durable Object aceita variáveis de ambiente opcionais para ajustar tempos de 
 | `ROOM_RATE_LIMIT_WINDOW_MS` | `60000` | Janela (ms) usada para contabilizar mensagens no rate limiting. |
 | `ROOM_MAX_MESSAGES_PER_CONNECTION` | `4200` | Número máximo de mensagens aceitas por conexão dentro da janela configurada. |
 | `ROOM_MAX_MESSAGES_GLOBAL` | `12000` | Teto mínimo global de mensagens processadas por sala dentro da janela. |
-| `ROOM_GLOBAL_RATE_LIMIT_HEADROOM` | `1.25` | Multiplicador aplicado ao limite por conexão ao calcular o orçamento global. |
+| `ROOM_GLOBAL_RATE_LIMIT_HEADROOM` | `1.25` | Fator aplicado de forma simétrica ao orçamento global derivado do limite por conexão; valores acima de `1` ampliam o teto e valores abaixo reduzem o total (mínimo de 1 mensagem por janela). |
 | `ROOM_RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS` | `5000` | Intervalo mínimo (ms) entre relatórios de utilização do rate limiting. |
 
 Defina esses valores no `wrangler.toml` (seção `[vars]`) ou no painel de variáveis da Cloudflare para cada ambiente (`Preview`, `Production`). Em ambientes locais com Miniflare, utilize `createMiniflare({ runtimeConfig: { ... } })` ou sobrescreva os bindings ao instanciar o Durable Object nos testes.
