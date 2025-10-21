@@ -170,14 +170,20 @@ const pushTier = (state, tier) => {
   state.canEvolve = true;
 };
 
+const hasAvailableSlots = (slot = {}) => {
+  const used = Number.isFinite(slot.used) ? slot.used : 0;
+  const max = Number.isFinite(slot.max) ? slot.max : 0;
+  return used < max;
+};
+
 const determineFallbackTier = (state) => {
-  if ((state.evolutionSlots?.large?.used ?? 0) < (state.evolutionSlots?.large?.max ?? 0)) {
+  if (hasAvailableSlots(state.evolutionSlots?.large)) {
     return 'large';
   }
-  if ((state.evolutionSlots?.medium?.used ?? 0) < (state.evolutionSlots?.medium?.max ?? 0)) {
+  if (hasAvailableSlots(state.evolutionSlots?.medium)) {
     return 'medium';
   }
-  if ((state.characteristicPoints?.available ?? 0) >= SMALL_EVOLUTION_POINT_COST) {
+  if (hasAvailableSlots(state.evolutionSlots?.small)) {
     return 'small';
   }
   return null;
@@ -618,9 +624,13 @@ export const openEvolutionMenu = (state, helpers = {}) => {
   };
   let activeOptions = options[tier] || [];
 
-  const hasAvailableOption = activeOptions.some((option) => option?.available);
+  let hasAvailableOption = activeOptions.some((option) => option?.available);
+  const isSmallTier = () => tier === 'small';
+  const allowUnavailableSmallOptions = () =>
+    isSmallTier() && activeOptions.length > 0 && (state.characteristicPoints?.available ?? 0) < SMALL_EVOLUTION_POINT_COST;
+  let canShowUnavailableSmallOptions = allowUnavailableSmallOptions();
 
-  if (!hasAvailableOption) {
+  if (!hasAvailableOption && !canShowUnavailableSmallOptions) {
     const tierOrder = ['small', 'medium', 'large'];
     for (const candidate of tierOrder) {
       if (candidate === tier) continue;
@@ -629,15 +639,14 @@ export const openEvolutionMenu = (state, helpers = {}) => {
         queue.unshift(originalTier);
         tier = candidate;
         activeOptions = candidateOptions;
+        hasAvailableOption = true;
+        canShowUnavailableSmallOptions = false;
         break;
       }
     }
   }
 
-  const hasValidOptions =
-    activeOptions.length > 0 && activeOptions.some((option) => option?.available);
-
-  if (!hasValidOptions) {
+  if (!hasAvailableOption && !canShowUnavailableSmallOptions) {
     helpers.addNotification?.(state, 'Nenhuma evolução disponível no momento.');
     state.canEvolve = false;
     return state;

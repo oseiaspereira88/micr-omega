@@ -233,6 +233,28 @@ describe('openEvolutionMenu and chooseEvolution', () => {
     });
   });
 
+  it('mantém aba small visível mesmo sem pontos característicos suficientes', () => {
+    const state = createState();
+    state.progressionQueue = [];
+    state.progressionQueue.push('small');
+    state.characteristicPoints.spent = state.characteristicPoints.total;
+    state.characteristicPoints.available = 0;
+
+    openEvolutionMenu(state, helpers);
+
+    expect(state.showEvolutionChoice).toBe(true);
+    expect(state.evolutionMenu?.activeTier).toBe('small');
+
+    const options = state.evolutionMenu?.options?.small ?? [];
+    expect(options.length).toBeGreaterThan(0);
+    expect(options.every((option) => option.available === false)).toBe(true);
+    const reasons = options.map((option) => option.reason);
+    expect(reasons).toContain('Recursos insuficientes');
+
+    const notificationMessages = helpers.addNotification.mock.calls.map(([, message]) => message);
+    expect(notificationMessages).not.toContain('Nenhuma evolução disponível no momento.');
+  });
+
   it('requires MG and fragments for medium evolutions', () => {
     const state = createState();
     state.level = 6;
