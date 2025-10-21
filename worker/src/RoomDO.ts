@@ -1197,9 +1197,34 @@ export class RoomDO {
   }
 
   private async initialize(): Promise<void> {
-    const storedRngState = await this.state.storage.get<RngState>(RNG_STATE_KEY);
-    this.initializeRngState(storedRngState ?? null);
-    await this.persistRngState();
+    const storedRngCandidate = await this.state.storage.get<unknown>(RNG_STATE_KEY);
+    const storedRngState =
+      storedRngCandidate && typeof storedRngCandidate === "object"
+        ? storedRngCandidate
+        : null;
+
+    const restoredRngState =
+      storedRngState &&
+      Number.isFinite((storedRngState as RngState).organicMatterRespawn) &&
+      Number.isFinite((storedRngState as RngState).progression) &&
+      (storedRngState as RngState).organicMatterRespawn > 0 &&
+      (storedRngState as RngState).progression > 0
+        ? (storedRngState as RngState)
+        : null;
+
+    this.initializeRngState(restoredRngState);
+    if (restoredRngState) {
+      this.observability.log("debug", "rng_state_restored", {
+        organicMatterRespawn: restoredRngState.organicMatterRespawn,
+        progression: restoredRngState.progression,
+      });
+    } else {
+      await this.persistRngState();
+      this.observability.log("debug", "rng_state_initialized", {
+        organicMatterRespawn: this.rngState.organicMatterRespawn,
+        progression: this.rngState.progression,
+      });
+    }
 
     const storedProgression = await this.state.storage.get<
       Record<string, PlayerProgressionState>
