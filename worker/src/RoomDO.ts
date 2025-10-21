@@ -1150,12 +1150,10 @@ export class RoomDO {
 
   private getDynamicGlobalLimit(): number {
     const activeConnections = Math.max(1, this.activeSockets.size);
-    const scaledLimit = Math.ceil(
-      activeConnections *
-        this.config.maxMessagesPerConnection *
-        this.config.globalRateLimitHeadroom
-    );
-    return Math.max(this.config.maxMessagesGlobal, scaledLimit);
+    const baseline = activeConnections * this.config.maxMessagesPerConnection;
+    const headroom = this.config.globalRateLimitHeadroom;
+    const scaledLimit = Math.ceil(baseline * headroom);
+    return Math.max(1, scaledLimit);
   }
 
   private handleRateLimit(
