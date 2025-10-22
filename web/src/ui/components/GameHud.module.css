@@ -6,6 +6,10 @@
   font-family: var(--font-sans, system-ui);
 }
 
+:global(:root) {
+  --hud-toolbar-height: calc(1.75rem + 16px);
+}
+
 .mobileHud {
   display: flex;
   flex-direction: column;
@@ -254,6 +258,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  min-height: var(--hud-toolbar-height);
   background: linear-gradient(
     135deg,
     rgba(16, 20, 34, 0.9),
