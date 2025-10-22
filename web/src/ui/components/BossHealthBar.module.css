@@ -1,7 +1,7 @@
 
 .container {
   position: absolute;
-  top: calc(48px + var(--safe-area-inset-top, 0px));
+  top: calc(var(--safe-area-inset-top, 0px) + var(--hud-toolbar-height, calc(1.75rem + 16px)));
   left: 50%;
   transform: translateX(-50%);
   width: min(640px, 86%);
