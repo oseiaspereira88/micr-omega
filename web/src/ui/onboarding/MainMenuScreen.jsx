@@ -133,7 +133,7 @@ const MainMenuScreen = ({
                   >
                     <span className={styles.storeButtonLabel}>{action.label}</span>
                     {action.isComingSoon && (
-                      <span className={styles.storeButtonMeta} role="status">
+                      <span className={styles.storeButtonMeta} aria-hidden="true">
                         <span className={styles.storeButtonBadge}>Em breve</span>
                       </span>
                     )}
