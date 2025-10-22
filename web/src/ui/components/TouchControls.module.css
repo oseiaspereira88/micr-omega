@@ -401,12 +401,26 @@
   z-index: 2;
 }
 
+.landscape .buttonLabel {
+  top: calc(50% + var(--touch-scale) * 10px);
+  font-size: calc(var(--touch-scale) * 0.5rem);
+  letter-spacing: 0.04em;
+}
+
 .buttonLabelBottom {
   top: calc(50% + var(--touch-scale) * 14px);
 }
 
+.landscape .buttonLabelBottom {
+  top: calc(50% + var(--touch-scale) * 12px);
+}
+
 .buttonLabelTop {
   top: calc(50% - var(--touch-scale) * 16px);
+}
+
+.landscape .buttonLabelTop {
+  top: calc(50% - var(--touch-scale) * 14px);
 }
 
 .buttonLabelHighlight {
@@ -449,9 +463,10 @@
 }
 
 .landscape .buttonLegend {
-  font-size: calc(var(--touch-scale) * 0.6rem);
-  margin-top: calc(var(--touch-scale) * 6px);
-  padding: calc(var(--touch-scale) * 2.5px) calc(var(--touch-scale) * 6px);
+  font-size: calc(var(--touch-scale) * 0.55rem);
+  margin-top: calc(var(--touch-scale) * 5px);
+  padding: calc(var(--touch-scale) * 2px) calc(var(--touch-scale) * 6px);
+  letter-spacing: 0.04em;
 }
 
 .cooldownOverlay {
