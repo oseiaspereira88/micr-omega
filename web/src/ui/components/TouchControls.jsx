@@ -571,7 +571,6 @@ const TouchControls = ({
         <button
           type="button"
           className={joinClassNames(styles.button, styles.attackButton)}
-          aria-label="Executar ataque básico"
           onTouchStart={event => {
             event.preventDefault();
             onAttackPress?.();
@@ -591,7 +590,7 @@ const TouchControls = ({
           <span className={styles.buttonIcon} aria-hidden="true">
             ⚔️
           </span>
-          <span className={styles.buttonLabel} aria-hidden="true">
+          <span className={styles.buttonLabel}>
             Ataque
           </span>
           {showButtonLegends && (
