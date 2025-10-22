@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RoomDO } from "../src/RoomDO";
 import type { Env } from "../src";
 import type { DurableObjectState } from "@cloudflare/workers-types";
@@ -28,6 +28,66 @@ describe("RoomDO snapshot batching", () => {
 
     expect(mockState.storageImpl.getPutCount("players")).toBe(1);
     expect(mockState.storageImpl.getPutCount("world")).toBe(1);
+  });
+
+  it("debounces snapshot state persistence", async () => {
+    vi.useFakeTimers();
+    try {
+      const { room, mockState } = await createRoom();
+      const roomAny = room as any;
+
+      roomAny.markPlayersDirty();
+      roomAny.markWorldDirty();
+      roomAny.markProgressionDirty();
+
+      expect(mockState.storageImpl.getPutCount("snapshot_state")).toBe(0);
+
+      const delay = RoomDO.SNAPSHOT_STATE_PERSIST_DEBOUNCE_MS;
+
+      await vi.advanceTimersByTimeAsync(Math.max(0, delay - 1));
+
+      expect(mockState.storageImpl.getPutCount("snapshot_state")).toBe(0);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await vi.runOnlyPendingTimersAsync();
+
+      const initialCount = mockState.storageImpl.getPutCount("snapshot_state");
+      expect(initialCount).toBe(1);
+
+      roomAny.markPlayersDirty();
+      roomAny.markWorldDirty();
+
+      await vi.advanceTimersByTimeAsync(delay);
+      await vi.runOnlyPendingTimersAsync();
+
+      expect(mockState.storageImpl.getPutCount("snapshot_state")).toBe(initialCount);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("flushes pending snapshot state immediately when flushing snapshots", async () => {
+    vi.useFakeTimers();
+    try {
+      const { room, mockState } = await createRoom();
+      const roomAny = room as any;
+
+      roomAny.markPlayersDirty();
+      roomAny.markWorldDirty();
+
+      await vi.advanceTimersByTimeAsync(RoomDO.SNAPSHOT_STATE_PERSIST_DEBOUNCE_MS);
+      await vi.runOnlyPendingTimersAsync();
+
+      expect(mockState.storageImpl.data.has("snapshot_state")).toBe(true);
+
+      roomAny.markPlayersDirty();
+
+      await roomAny.flushSnapshots();
+
+      expect(mockState.storageImpl.data.has("snapshot_state")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("forces a snapshot flush for critical transitions", async () => {
