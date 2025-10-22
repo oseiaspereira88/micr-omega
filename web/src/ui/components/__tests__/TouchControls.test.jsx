@@ -151,8 +151,8 @@ describe('TouchControls', () => {
       />
     );
 
-    expect(getByText('20%')).toBeInTheDocument();
-    expect(getByText('Dash carregando: 20%')).toBeInTheDocument();
+    expect(getByText('20/30')).toBeInTheDocument();
+    expect(getByText('Dash carregando: 20/30')).toBeInTheDocument();
 
     const dashButton = getByRole('button', { name: 'Usar dash — carregando' });
 
