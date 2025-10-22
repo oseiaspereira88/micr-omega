@@ -58,4 +58,22 @@ describe("RoomDO dynamic global rate limit", () => {
 
     expect(limit).toBe(1);
   });
+
+  it("does not exceed the configured global limit regardless of connections", async () => {
+    const roomAny = await createRoom();
+
+    roomAny.config.maxMessagesPerConnection = 200;
+    roomAny.config.globalRateLimitHeadroom = 3;
+    roomAny.config.maxMessagesGlobal = 400;
+
+    roomAny.activeSockets.clear();
+    const sockets = Array.from({ length: 10 }, () => ({ readyState: 1 } as WebSocket));
+    for (const socket of sockets) {
+      roomAny.activeSockets.add(socket);
+    }
+
+    const limit = roomAny.getDynamicGlobalLimit();
+
+    expect(limit).toBe(400);
+  });
 });

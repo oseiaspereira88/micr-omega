@@ -1148,7 +1148,8 @@ export class RoomDO {
     const baseline = activeConnections * this.config.maxMessagesPerConnection;
     const headroom = this.config.globalRateLimitHeadroom;
     const scaledLimit = Math.ceil(baseline * headroom);
-    return Math.max(1, scaledLimit);
+    const maxLimit = Math.max(1, this.config.maxMessagesGlobal);
+    return Math.min(maxLimit, Math.max(1, scaledLimit));
   }
 
   private handleRateLimit(
