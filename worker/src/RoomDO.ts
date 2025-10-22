@@ -232,6 +232,8 @@ export const DEFAULT_INACTIVE_TIMEOUT_MS = DEFAULT_RUNTIME_CONFIG.inactiveTimeou
 export const DEFAULT_MAX_PLAYERS = DEFAULT_RUNTIME_CONFIG.maxPlayers;
 
 const MAX_COMBO_MULTIPLIER = 50;
+const MAX_STORED_SCORE = Number.MAX_SAFE_INTEGER;
+const DEFAULT_COMBO_MULTIPLIER = 1;
 
 const PLAYERS_KEY = "players";
 const WORLD_KEY = "world";
@@ -1321,11 +1323,21 @@ export class RoomDO {
 
         const reconnectToken = generateReconnectToken();
 
+        const numericScore = Number(stored.score);
+        const sanitizedScore = Number.isFinite(numericScore)
+          ? clamp(Math.trunc(numericScore), 0, MAX_STORED_SCORE)
+          : 0;
+
+        const numericCombo = Number(stored.combo);
+        const sanitizedCombo = Number.isFinite(numericCombo)
+          ? clamp(Math.trunc(numericCombo), DEFAULT_COMBO_MULTIPLIER, MAX_COMBO_MULTIPLIER)
+          : DEFAULT_COMBO_MULTIPLIER;
+
         const normalized: StoredPlayer = {
           id: playerId,
           name: sanitizedName,
-          score: stored.score,
-          combo: stored.combo,
+          score: sanitizedScore,
+          combo: sanitizedCombo,
           energy: Number.isFinite(stored.energy)
             ? Math.max(0, stored.energy)
             : DEFAULT_PLAYER_ENERGY,
