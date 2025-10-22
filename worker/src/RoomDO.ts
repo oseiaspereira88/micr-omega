@@ -6443,6 +6443,61 @@ export class RoomDO {
       return;
     }
 
+    const bufferedAmount = (socket as WebSocket & { bufferedAmount?: number }).bufferedAmount ?? 0;
+    const bufferedLimit = this.config.socketBufferedAmountLimitBytes;
+    if (bufferedLimit > 0 && bufferedAmount > bufferedLimit) {
+      const playerId = this.clientsBySocket.get(socket);
+      const isDiffMessage =
+        message.type === "state" && (message as StateDiffMessage | StateFullMessage).mode === "diff";
+
+      const policy = isDiffMessage ? "drop_diff" : "close_connection";
+      this.observability.recordMetric("socket_buffer_pressure", bufferedAmount, {
+        messageType: message.type,
+        policy,
+        ...(playerId ? { playerId } : {}),
+      });
+
+      if (isDiffMessage) {
+        this.observability.log("warn", "socket_buffer_diff_dropped", {
+          ...(playerId ? { playerId } : {}),
+          messageType: message.type,
+          bufferedAmount,
+          bufferedLimit,
+        });
+        return;
+      }
+
+      this.observability.log("warn", "socket_buffer_limit_exceeded", {
+        ...(playerId ? { playerId } : {}),
+        messageType: message.type,
+        bufferedAmount,
+        bufferedLimit,
+      });
+
+      this.clientsBySocket.delete(socket);
+      this.activeSockets.delete(socket);
+      if (playerId && this.socketsByPlayer.get(playerId) === socket) {
+        this.socketsByPlayer.delete(playerId);
+      }
+
+      const closingState = (WebSocket as unknown as { CLOSING?: number }).CLOSING;
+      if (
+        socket.readyState === WebSocket.OPEN ||
+        (typeof closingState === "number" && socket.readyState === closingState)
+      ) {
+        try {
+          socket.close(1013, "buffer_pressure");
+        } catch (closeError) {
+          this.observability.logError("socket_close_failed", closeError, {
+            ...(playerId ? { playerId } : {}),
+            messageType: message.type,
+          });
+        }
+      }
+
+      return;
+    }
+
     const serialized = payload ?? JSON.stringify(message);
 
     try {

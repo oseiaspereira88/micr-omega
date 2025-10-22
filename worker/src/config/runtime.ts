@@ -12,6 +12,7 @@ export interface RuntimeConfig {
   maxMessagesGlobal: number;
   globalRateLimitHeadroom: number;
   rateLimitUtilizationReportIntervalMs: number;
+  socketBufferedAmountLimitBytes: number;
 }
 
 export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
@@ -28,6 +29,7 @@ export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   maxMessagesGlobal: 12_000,
   globalRateLimitHeadroom: 1.25,
   rateLimitUtilizationReportIntervalMs: 5_000,
+  socketBufferedAmountLimitBytes: 1_000_000,
 };
 
 const BINDING_TO_CONFIG_KEY = {
@@ -44,6 +46,7 @@ const BINDING_TO_CONFIG_KEY = {
   ROOM_MAX_MESSAGES_GLOBAL: "maxMessagesGlobal",
   ROOM_GLOBAL_RATE_LIMIT_HEADROOM: "globalRateLimitHeadroom",
   ROOM_RATE_LIMIT_UTILIZATION_REPORT_INTERVAL_MS: "rateLimitUtilizationReportIntervalMs",
+  ROOM_SOCKET_BUFFERED_AMOUNT_LIMIT_BYTES: "socketBufferedAmountLimitBytes",
 } as const satisfies Record<string, keyof RuntimeConfig>;
 
 type BindingKey = keyof typeof BINDING_TO_CONFIG_KEY;
