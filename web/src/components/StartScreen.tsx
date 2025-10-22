@@ -1160,6 +1160,7 @@ const StartScreen = ({
               }}
               aria-expanded={isControlsGuideOpen}
               aria-controls={controlsGuideDialogId}
+              aria-haspopup="dialog"
               ref={controlsGuideTriggerRef}
             >
               Como jogar

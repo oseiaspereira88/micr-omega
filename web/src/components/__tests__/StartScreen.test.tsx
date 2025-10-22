@@ -236,6 +236,7 @@ describe("StartScreen", () => {
 
     const openGuideButton = screen.getByRole("button", { name: /como jogar/i });
     expect(openGuideButton).toBeInTheDocument();
+    expect(openGuideButton).toHaveAttribute("aria-haspopup", "dialog");
     expect(
       screen.queryByRole("dialog", {
         name: /como jogar/i,
