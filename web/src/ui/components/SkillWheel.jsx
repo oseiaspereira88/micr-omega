@@ -18,7 +18,7 @@ const SkillWheel = ({
   touchControlsActive = false,
   layout,
   showTouchControls = false,
-  touchLayout = 'right',
+  touchLayout = null,
 }) => {
   const resolvedLayout = layout ?? (touchControlsActive ? 'mobile' : 'desktop');
   const isMobileLayout = resolvedLayout === 'mobile';
@@ -84,11 +84,13 @@ const SkillWheel = ({
     };
   }, [touchControlsActive, showTouchControls, touchLayout]);
 
-  const resolvedTouchLayout = touchLayout === 'left' ? 'left' : 'right';
+  const resolvedTouchLayout =
+    touchLayout === 'left' ? 'left' : touchLayout === 'right' ? 'right' : null;
   const hasMeasuredFootprint = Number.isFinite(touchControlsFootprint)
     ? touchControlsFootprint > 0
     : true;
   const shouldOffsetForTouchControls =
+    Boolean(resolvedTouchLayout) &&
     isMobileLayout &&
     touchControlsActive &&
     showTouchControls &&

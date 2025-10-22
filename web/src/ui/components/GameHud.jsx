@@ -1244,7 +1244,7 @@ const GameHud = ({
                 onUseSkill={onUseSkill}
                 touchControlsActive={showTouchControls}
                 showTouchControls={showTouchControls}
-                touchLayout={touchLayoutPreference}
+                touchLayout={effectiveTouchLayout}
               />
               {!showTouchControls && canEvolve && typeof onOpenEvolutionMenu === 'function' ? (
                 <button
@@ -1283,7 +1283,7 @@ const GameHud = ({
             hasCurrentSkill={Boolean(currentSkill)}
             onOpenEvolutionMenu={onOpenEvolutionMenu}
             canEvolve={canEvolve}
-            touchLayout={touchLayoutPreference}
+            touchLayout={effectiveTouchLayout}
             isSidebarOpen={isSidebarOpen}
             autoInvertWhenSidebarOpen={settings.autoSwapTouchLayoutWhenSidebarOpen}
             touchControlScale={touchControlScale}
