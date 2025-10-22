@@ -63,33 +63,58 @@ describe("RoomDO snapshot batching", () => {
   it("debounces snapshot state persistence", async () => {
     const { room, mockState } = await createRoom();
     const roomAny = room as any;
+    vi.useFakeTimers();
 
-    roomAny.markPlayersDirty();
-    roomAny.markPlayersDirty();
-    roomAny.markWorldDirty();
+    const putSpy = vi.spyOn(mockState.storageImpl, "put");
 
-    expect(mockState.storageImpl.getPutCount("snapshot_state")).toBe(0);
+    try {
 
-    await new Promise((resolve) =>
-      setTimeout(resolve, RoomDO.SNAPSHOT_STATE_PERSIST_DEBOUNCE_MS + 10),
-    );
+      roomAny.markPlayersDirty();
+      roomAny.markPlayersDirty();
+      roomAny.markWorldDirty();
 
-    expect(mockState.storageImpl.getPutCount("snapshot_state")).toBe(1);
+      const getSnapshotPutCalls = () =>
+        putSpy.mock.calls.filter(([key]) => key === "snapshot_state");
+
+      expect(getSnapshotPutCalls()).toHaveLength(0);
+
+      vi.advanceTimersByTime(RoomDO.SNAPSHOT_STATE_PERSIST_DEBOUNCE_MS - 1);
+      await Promise.resolve();
+
+      expect(getSnapshotPutCalls()).toHaveLength(0);
+
+      vi.advanceTimersByTime(1);
+      await vi.runAllTimersAsync();
+
+      expect(getSnapshotPutCalls()).toHaveLength(1);
+    } finally {
+      putSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("flushSnapshots persists pending snapshot state immediately", async () => {
-    const { room, mockState } = await createRoom();
+    const { room } = await createRoom();
     const roomAny = room as any;
+    vi.useFakeTimers();
+
     const persistSpy = vi.spyOn(roomAny, "persistSnapshotState");
 
-    roomAny.markPlayersDirty();
+    try {
+      roomAny.markPlayersDirty();
 
-    expect(mockState.storageImpl.getPutCount("snapshot_state")).toBe(0);
+      expect(persistSpy).not.toHaveBeenCalled();
 
-    await roomAny.flushSnapshots();
+      await roomAny.flushSnapshots();
 
-    expect(persistSpy).toHaveBeenCalledTimes(1);
-    expect(roomAny.snapshotStatePersistPending).toBe(false);
-    expect(roomAny.snapshotStatePersistTimeout).toBeNull();
+      expect(persistSpy).toHaveBeenCalledTimes(1);
+
+      await vi.runAllTimersAsync();
+
+      expect(persistSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      persistSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });
