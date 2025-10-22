@@ -6781,6 +6781,7 @@ export class RoomDO {
         limit,
         messageType: message.type,
         action,
+        ...(playerId ? { playerId } : {}),
       });
 
       if (isDiffMessage) {
@@ -6788,6 +6789,7 @@ export class RoomDO {
           messageType: message.type,
           bufferedAmount,
           limit,
+          ...(playerId ? { playerId } : {}),
         });
         return;
       }

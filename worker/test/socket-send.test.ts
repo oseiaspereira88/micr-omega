@@ -112,6 +112,7 @@ describe("RoomDO send", () => {
           action: "dropped",
           limit: 100,
           messageType: "state",
+          playerId,
         }),
       );
       expect(logSpy).toHaveBeenCalledWith(
@@ -120,6 +121,7 @@ describe("RoomDO send", () => {
         expect.objectContaining({
           bufferedAmount: 200,
           limit: 100,
+          playerId,
         }),
       );
       expect(socket.send).not.toHaveBeenCalled();
@@ -182,6 +184,7 @@ describe("RoomDO send", () => {
           action: "closed",
           limit: 100,
           messageType: "error",
+          playerId,
         }),
       );
       expect(logSpy).toHaveBeenCalledWith(
