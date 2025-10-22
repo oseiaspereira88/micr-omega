@@ -228,6 +228,117 @@ describe("RoomDO", () => {
     }
   });
 
+  it("queues messages received while join is pending", async () => {
+    const mf = await createMiniflare();
+    try {
+      const initialSocket = await openSocket(mf);
+      const initialJoinedPromise = onceMessage<{
+        type: string;
+        playerId: string;
+        reconnectToken: string;
+        state: {
+          players: {
+            id: string;
+            position: { x: number; y: number };
+            orientation: { angle: number; tilt?: number };
+          }[];
+        };
+      }>(initialSocket, "joined", 5000);
+
+      initialSocket.send(JSON.stringify({ type: "join", name: "QueueUser" }));
+
+      const initialJoined = await initialJoinedPromise;
+      const { playerId, reconnectToken } = initialJoined;
+      const initialPlayerState = initialJoined.state.players.find(
+        (player) => player.id === playerId,
+      );
+
+      expect(initialPlayerState).toBeDefined();
+
+      initialSocket.close();
+
+      const reconnectSocket = await openSocket(mf);
+      const errorReasons: string[] = [];
+      const onMessage = (event: MessageEvent) => {
+        const data = typeof event.data === "string" ? event.data : String(event.data);
+        const parsed = JSON.parse(data) as { type: string; reason?: string };
+        if (parsed.type === "error" && parsed.reason) {
+          errorReasons.push(parsed.reason);
+        }
+      };
+      reconnectSocket.addEventListener("message", onMessage as EventListener);
+
+      const joinedPromise = onceMessage<{
+        type: string;
+        playerId: string;
+      }>(reconnectSocket, "joined", 5000);
+
+      reconnectSocket.send(
+        JSON.stringify({
+          type: "join",
+          name: "QueueUser",
+          playerId,
+          reconnectToken,
+        }),
+      );
+
+      const movementMessage = {
+        type: "movement",
+        playerId,
+        position: {
+          x: initialPlayerState!.position.x,
+          y: initialPlayerState!.position.y,
+        },
+        movementVector: { x: 1, y: 0 },
+        orientation: {
+          angle: initialPlayerState!.orientation.angle,
+          ...(initialPlayerState!.orientation.tilt !== undefined
+            ? { tilt: initialPlayerState!.orientation.tilt }
+            : {}),
+        },
+      };
+
+      reconnectSocket.send(JSON.stringify(movementMessage));
+
+      const rejoined = await joinedPromise;
+      expect(rejoined.playerId).toBe(playerId);
+
+      const receivePlayerDiff = async () => {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const message = await onceMessage<{
+            type: string;
+            mode: string;
+            state: {
+              upsertPlayers?: {
+                id: string;
+                movementVector?: { x: number; y: number };
+              }[];
+            };
+          }>(reconnectSocket, "state", 5000);
+          if (message.mode !== "diff") {
+            continue;
+          }
+          const playerUpdate = message.state.upsertPlayers?.find(
+            (player) => player.id === playerId,
+          );
+          if (playerUpdate && playerUpdate.movementVector) {
+            return playerUpdate.movementVector;
+          }
+        }
+        throw new Error("Did not receive player movement diff");
+      };
+
+      const updatedMovementVector = await receivePlayerDiff();
+      expect(updatedMovementVector).toEqual(movementMessage.movementVector);
+      expect(errorReasons).not.toContain("unknown_player");
+
+      reconnectSocket.removeEventListener("message", onMessage as EventListener);
+      reconnectSocket.close();
+    } finally {
+      await mf.dispose();
+    }
+  });
+
   it("allows joining with accented unicode characters", async () => {
     const mf = await createMiniflare();
     try {
