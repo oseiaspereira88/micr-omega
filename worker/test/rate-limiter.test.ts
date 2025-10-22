@@ -32,8 +32,23 @@ describe("MessageRateLimiter", () => {
     expect(limiter.getRetryAfterMs(300)).toBe(300);
 
     expect(limiter.consume(601)).toBe(true);
-    expect(limiter.getRetryAfterMs(700)).toBe(401);
+    expect(limiter.getRetryAfterMs(600)).toBe(100);
+    expect(limiter.getRetryAfterMs(700)).toBe(0);
     expect(limiter.getRetryAfterMs(1_101)).toBe(0);
+  });
+
+  it("uses the provided limit override when computing retry-after durations", () => {
+    const limiter = new MessageRateLimiter(5, 1_000);
+
+    for (let i = 0; i < 5; i += 1) {
+      expect(limiter.consume(i * 100)).toBe(true);
+    }
+
+    expect(limiter.consume(500, 2)).toBe(false);
+    expect(limiter.getRetryAfterMs(500, 2)).toBe(800);
+    expect(limiter.getRetryAfterMs(500)).toBe(500);
+
+    expect(limiter.getRetryAfterMs(1_301, 2)).toBe(0);
   });
 
   it("allows sustained bursts of at least 70 messages per second", () => {

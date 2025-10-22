@@ -4140,11 +4140,12 @@ export class RoomDO {
         const now = Date.now();
 
         const perConnectionLimiter = this.getConnectionLimiter(socket);
-        if (!perConnectionLimiter.consume(now)) {
-          const retryAfter = perConnectionLimiter.getRetryAfterMs(now);
+        const perConnectionLimit = this.config.maxMessagesPerConnection;
+        if (!perConnectionLimiter.consume(now, perConnectionLimit)) {
+          const retryAfter = perConnectionLimiter.getRetryAfterMs(now, perConnectionLimit);
           const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
           this.handleRateLimit(socket, "connection", retryAfter, knownPlayerId, {
-            limit: this.config.maxMessagesPerConnection,
+            limit: perConnectionLimit,
             activeConnections: this.activeSockets.size,
           });
           return;
@@ -4154,12 +4155,12 @@ export class RoomDO {
           socket,
           perConnectionLimiter,
           now,
-          this.config.maxMessagesPerConnection
+          perConnectionLimit
         );
 
         const globalLimit = this.getDynamicGlobalLimit();
         if (!this.globalRateLimiter.consume(now, globalLimit)) {
-          const retryAfter = this.globalRateLimiter.getRetryAfterMs(now);
+          const retryAfter = this.globalRateLimiter.getRetryAfterMs(now, globalLimit);
           const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
           this.handleRateLimit(socket, "global", retryAfter, knownPlayerId, {
             limit: globalLimit,
