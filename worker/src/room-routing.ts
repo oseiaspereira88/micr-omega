@@ -22,7 +22,7 @@ export function normalizePathname(pathname: string): string {
   if (!pathname) {
     return "/";
   }
-  let normalized = pathname.replace(/\/+/g, "/");
+  let normalized = pathname.replace(/\/+/g, "/"); // collapse repeated slashes
   if (!normalized.startsWith("/")) {
     normalized = `/${normalized}`;
   }
