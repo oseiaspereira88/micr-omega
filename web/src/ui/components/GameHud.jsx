@@ -200,6 +200,8 @@ const GameHud = ({
         Math.min(JOYSTICK_SENSITIVITY_MAX, settings.joystickSensitivity),
       )
     : 1;
+  const reconnectButtonRef = useRef(null);
+  const previousFocusRef = useRef(null);
   const touchControlsPreviewClassName = useMemo(
     () =>
       [
@@ -219,6 +221,39 @@ const GameHud = ({
   const sidebarInert = sidebarIsInactive ? 'true' : undefined;
   const touchScaleValueLabel = `${Math.round(touchControlScale * 100)}%`;
   const joystickSensitivityValueLabel = `${Math.round(joystickSensitivity * 100)}%`;
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    if (showStatusOverlay) {
+      const activeElement = document.activeElement;
+
+      previousFocusRef.current =
+        activeElement instanceof HTMLElement ? activeElement : null;
+
+      const button = reconnectButtonRef.current;
+
+      if (button && typeof button.focus === 'function') {
+        button.focus({ preventScroll: true });
+      }
+
+      return;
+    }
+
+    const previous = previousFocusRef.current;
+
+    if (
+      previous &&
+      typeof previous.focus === 'function' &&
+      (previous.isConnected || document.contains(previous))
+    ) {
+      previous.focus({ preventScroll: true });
+    }
+
+    previousFocusRef.current = null;
+  }, [showStatusOverlay]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -763,6 +798,7 @@ const GameHud = ({
                   <button
                     type="button"
                     className={styles.canvasOverlayButton}
+                    ref={reconnectButtonRef}
                     onClick={handleReconnectClick}
                     disabled={isReconnectInProgress}
                     aria-disabled={isReconnectInProgress ? true : undefined}
