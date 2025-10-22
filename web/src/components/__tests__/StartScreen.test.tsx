@@ -465,6 +465,8 @@ describe("StartScreen", () => {
         showMinimap: featureToggles.minimap,
         touchLayout: "left",
         autoSwapTouchLayoutWhenSidebarOpen: false,
+        touchControlScale: 1,
+        joystickSensitivity: 1,
       },
       autoJoinRequested: true,
     });
@@ -492,6 +494,43 @@ describe("StartScreen", () => {
 
     expect(preview).toHaveAttribute("data-layout", "left");
     expect(preview).toHaveAccessibleName(/botões à esquerda/i);
+  });
+
+  it("ajusta escala e sensibilidade dos controles touch com visualização em tempo real", async () => {
+    renderWithProviders(<StartScreen onStart={() => {}} onQuit={() => {}} />);
+
+    const touchToggle = screen.getByLabelText(/mostrar controles/i);
+    fireEvent.click(touchToggle);
+
+    const preview = screen.getByRole("img", {
+      name: /prévia do layout com botões à direita/i,
+    });
+    expect(preview).toHaveAttribute("data-touch-scale", "1.000");
+    expect(preview).toHaveAttribute("data-touch-sensitivity", "1.000");
+
+    const touchScaleSlider = screen.getByLabelText(/tamanho dos controles/i);
+    fireEvent.change(touchScaleSlider, { target: { value: "1.3" } });
+
+    await waitFor(() => {
+      expect(touchScaleSlider).toHaveValue("1.3");
+      expect(preview).toHaveAttribute("data-touch-scale", "1.300");
+      const stored = window.localStorage.getItem("micr-omega:game-settings");
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored ?? "{}");
+      expect(parsed.touchControlScale).toBeCloseTo(1.3, 5);
+    });
+
+    const joystickSlider = screen.getByLabelText(/sensibilidade do joystick/i);
+    fireEvent.change(joystickSlider, { target: { value: "0.7" } });
+
+    await waitFor(() => {
+      expect(joystickSlider).toHaveValue("0.7");
+      expect(preview).toHaveAttribute("data-touch-sensitivity", "0.700");
+      const stored = window.localStorage.getItem("micr-omega:game-settings");
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored ?? "{}");
+      expect(parsed.joystickSensitivity).toBeCloseTo(0.7, 5);
+    });
   });
 
   it("preenche o campo com o nome persistido sem atualizar o store", async () => {

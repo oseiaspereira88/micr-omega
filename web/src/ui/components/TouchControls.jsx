@@ -1,4 +1,10 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  JOYSTICK_SENSITIVITY_MAX,
+  JOYSTICK_SENSITIVITY_MIN,
+  TOUCH_CONTROL_SCALE_MAX,
+  TOUCH_CONTROL_SCALE_MIN,
+} from '../../store/gameSettings';
 import styles from './TouchControls.module.css';
 
 const joinClassNames = (...classes) => classes.filter(Boolean).join(' ');
@@ -9,6 +15,23 @@ const clamp = (value, min, max) => {
   }
 
   return Math.min(max, Math.max(min, value));
+};
+
+const clampWithFallback = (value, min, max, fallback) => {
+  const numericValue = typeof value === 'string' ? Number.parseFloat(value) : value;
+  if (!Number.isFinite(numericValue)) {
+    return fallback;
+  }
+
+  if (numericValue < min) {
+    return min;
+  }
+
+  if (numericValue > max) {
+    return max;
+  }
+
+  return Number(numericValue);
 };
 
 const getViewportSize = () => {
@@ -39,6 +62,121 @@ const clampProgress = value => {
   return Math.max(0, Math.min(100, Math.round(numericValue)));
 };
 
+const getEventClientPosition = (event) => {
+  const touch = event.touches?.[0] ?? event.changedTouches?.[0];
+  if (touch && Number.isFinite(touch.clientX) && Number.isFinite(touch.clientY)) {
+    return { clientX: touch.clientX, clientY: touch.clientY };
+  }
+
+  if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+    return { clientX: event.clientX, clientY: event.clientY };
+  }
+
+  return null;
+};
+
+const createSyntheticTouchList = (coords, originalList) => {
+  const baseTouch = {
+    identifier: (originalList && originalList[0]?.identifier) ?? 0,
+    clientX: coords.clientX,
+    clientY: coords.clientY,
+    pageX: coords.clientX,
+    pageY: coords.clientY,
+    screenX: coords.clientX,
+    screenY: coords.clientY,
+  };
+
+  const touches = [baseTouch];
+
+  if (originalList && typeof originalList.length === 'number' && originalList.length > 1) {
+    for (let index = 1; index < originalList.length; index += 1) {
+      const touch = typeof originalList.item === 'function'
+        ? originalList.item(index)
+        : originalList[index];
+      if (touch) {
+        touches.push({
+          identifier: touch.identifier ?? index,
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+          pageX: touch.pageX ?? touch.clientX,
+          pageY: touch.pageY ?? touch.clientY,
+          screenX: touch.screenX ?? touch.clientX,
+          screenY: touch.screenY ?? touch.clientY,
+        });
+      }
+    }
+  }
+
+  touches.item = (index) => touches[index] ?? null;
+  return touches;
+};
+
+const decorateJoystickEvent = (event, sensitivity) => {
+  if (!Number.isFinite(sensitivity) || Math.abs(sensitivity - 1) < 0.0001) {
+    return event;
+  }
+
+  const target = event.currentTarget;
+  if (!target || typeof target.getBoundingClientRect !== 'function') {
+    return event;
+  }
+
+  const rect = target.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const coordinates = getEventClientPosition(event);
+  if (!coordinates) {
+    return event;
+  }
+
+  const deltaX = coordinates.clientX - centerX;
+  const deltaY = coordinates.clientY - centerY;
+  const scaledCoords = {
+    clientX: centerX + deltaX * sensitivity,
+    clientY: centerY + deltaY * sensitivity,
+  };
+
+  if (
+    Math.abs(scaledCoords.clientX - coordinates.clientX) < 0.0001 &&
+    Math.abs(scaledCoords.clientY - coordinates.clientY) < 0.0001
+  ) {
+    return event;
+  }
+
+  const touches = event.touches && event.touches.length
+    ? createSyntheticTouchList(scaledCoords, event.touches)
+    : undefined;
+  const changedTouches = event.changedTouches && event.changedTouches.length
+    ? createSyntheticTouchList(scaledCoords, event.changedTouches)
+    : touches;
+
+  return {
+    type: event.type,
+    pointerId: event.pointerId,
+    pointerType: event.pointerType,
+    isPrimary: event.isPrimary,
+    buttons: event.buttons,
+    button: event.button,
+    clientX: scaledCoords.clientX,
+    clientY: scaledCoords.clientY,
+    pageX: scaledCoords.clientX,
+    pageY: scaledCoords.clientY,
+    screenX: scaledCoords.clientX,
+    screenY: scaledCoords.clientY,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    shiftKey: event.shiftKey,
+    preventDefault: (...args) => event.preventDefault?.(...args),
+    stopPropagation: (...args) => event.stopPropagation?.(...args),
+    currentTarget: target,
+    target: event.target,
+    nativeEvent: event.nativeEvent ?? event,
+    touches,
+    changedTouches,
+  };
+};
+
 const TouchControls = ({
   joystick,
   onJoystickStart,
@@ -63,11 +201,33 @@ const TouchControls = ({
   touchLayout = 'right',
   isSidebarOpen = false,
   autoInvertWhenSidebarOpen = false,
+  touchControlScale: touchControlScaleProp = 1,
+  joystickSensitivity: joystickSensitivityProp = 1,
   className,
   ...a11yProps
 }) => {
   const [viewport, setViewport] = useState(getViewportSize);
   const actionGroupRef = useRef(null);
+  const normalizedTouchControlScale = useMemo(
+    () =>
+      clampWithFallback(
+        touchControlScaleProp,
+        TOUCH_CONTROL_SCALE_MIN,
+        TOUCH_CONTROL_SCALE_MAX,
+        1,
+      ),
+    [touchControlScaleProp],
+  );
+  const normalizedJoystickSensitivity = useMemo(
+    () =>
+      clampWithFallback(
+        joystickSensitivityProp,
+        JOYSTICK_SENSITIVITY_MIN,
+        JOYSTICK_SENSITIVITY_MAX,
+        1,
+      ),
+    [joystickSensitivityProp],
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -129,6 +289,16 @@ const TouchControls = ({
   const touchVerticalScale = useMemo(
     () => touchScale * heightScale,
     [heightScale, touchScale],
+  );
+
+  const configuredTouchScale = useMemo(
+    () => touchScale * normalizedTouchControlScale,
+    [touchScale, normalizedTouchControlScale],
+  );
+
+  const configuredTouchVerticalScale = useMemo(
+    () => touchVerticalScale * normalizedTouchControlScale,
+    [touchVerticalScale, normalizedTouchControlScale],
   );
 
   const isLandscape = viewport.width > viewport.height;
@@ -320,7 +490,7 @@ const TouchControls = ({
       hudElement.style.removeProperty('--touch-controls-footprint');
       hudElement.style.removeProperty('--touch-controls-footprint-height');
     };
-  }, [effectiveLayout, touchScale, showButtonLegends]);
+  }, [effectiveLayout, configuredTouchScale, showButtonLegends]);
 
   const isTouchLikePointer = event => {
     const pointerType =
@@ -329,14 +499,24 @@ const TouchControls = ({
     return pointerType === 'touch' || pointerType === 'pen' || pointerType === '';
   };
 
+  const forwardJoystickStartEvent = (event) => {
+    const decoratedEvent = decorateJoystickEvent(event, normalizedJoystickSensitivity);
+    onJoystickStart?.(decoratedEvent);
+  };
+
+  const forwardJoystickMoveEvent = (event) => {
+    const decoratedEvent = decorateJoystickEvent(event, normalizedJoystickSensitivity);
+    onJoystickMove?.(decoratedEvent);
+  };
+
   const handleJoystickPointerStart = event => {
     if (!isTouchLikePointer(event)) return;
-    onJoystickStart?.(event);
+    forwardJoystickStartEvent(event);
   };
 
   const handleJoystickPointerMove = event => {
     if (!isTouchLikePointer(event)) return;
-    onJoystickMove?.(event);
+    forwardJoystickMoveEvent(event);
   };
 
   const handleJoystickPointerEnd = event => {
@@ -356,10 +536,10 @@ const TouchControls = ({
         className,
       )}
       style={{
-        '--touch-scale': touchScale.toFixed(3),
-        '--touch-vertical-scale': touchVerticalScale.toFixed(3),
+        '--touch-scale': configuredTouchScale.toFixed(3),
+        '--touch-vertical-scale': configuredTouchVerticalScale.toFixed(3),
         '--touch-legend-space': showButtonLegends
-          ? `${Math.round(touchScale * 26)}px`
+          ? `${Math.round(configuredTouchScale * 26)}px`
           : '0px',
       }}
     >
@@ -369,8 +549,8 @@ const TouchControls = ({
         onPointerMove={handleJoystickPointerMove}
         onPointerUp={handleJoystickPointerEnd}
         onPointerCancel={handleJoystickPointerEnd}
-        onTouchStart={onJoystickStart}
-        onTouchMove={onJoystickMove}
+        onTouchStart={forwardJoystickStartEvent}
+        onTouchMove={forwardJoystickMoveEvent}
         onTouchEnd={onJoystickEnd}
         onTouchCancel={onJoystickEnd}
       >

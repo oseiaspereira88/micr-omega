@@ -18,7 +18,15 @@ import RankingPanel from '../../components/RankingPanel';
 import ConnectionStatusOverlay from '../../components/ConnectionStatusOverlay';
 import useIsTouchDevice from '../../hooks/useIsTouchDevice';
 import { shallowEqual, useGameStore } from '../../store/gameStore';
-import { useGameSettings } from '../../store/gameSettings';
+import {
+  JOYSTICK_SENSITIVITY_MAX,
+  JOYSTICK_SENSITIVITY_MIN,
+  JOYSTICK_SENSITIVITY_STEP,
+  TOUCH_CONTROL_SCALE_MAX,
+  TOUCH_CONTROL_SCALE_MIN,
+  TOUCH_CONTROL_SCALE_STEP,
+  useGameSettings,
+} from '../../store/gameSettings';
 import useSoundPreview from '../../hooks/useSoundPreview';
 
 const MOBILE_HUD_QUERY = '(max-width: 900px)';
@@ -125,6 +133,12 @@ const GameHud = ({
   const touchLayoutAutoSwapToggleId = useId();
   const touchLayoutAutoSwapDescriptionId = useId();
   const touchLayoutAutoSwapHelperId = useId();
+  const touchScaleSliderId = useId();
+  const touchScaleDescriptionId = useId();
+  const touchScaleHelperId = useId();
+  const joystickSensitivitySliderId = useId();
+  const joystickSensitivityDescriptionId = useId();
+  const joystickSensitivityHelperId = useId();
   const { settings, updateSettings } = useGameSettings();
   const audioEnabled = settings?.audioEnabled !== false;
   const masterVolume =
@@ -174,6 +188,18 @@ const GameHud = ({
       ].join(' '),
     [audioEnabled],
   );
+  const touchControlScale = Number.isFinite(settings?.touchControlScale)
+    ? Math.max(
+        TOUCH_CONTROL_SCALE_MIN,
+        Math.min(TOUCH_CONTROL_SCALE_MAX, settings.touchControlScale),
+      )
+    : 1;
+  const joystickSensitivity = Number.isFinite(settings?.joystickSensitivity)
+    ? Math.max(
+        JOYSTICK_SENSITIVITY_MIN,
+        Math.min(JOYSTICK_SENSITIVITY_MAX, settings.joystickSensitivity),
+      )
+    : 1;
   const touchControlsPreviewClassName = useMemo(
     () =>
       [
@@ -191,6 +217,8 @@ const GameHud = ({
   const canTestAudio = audioEnabled && isAudioPreviewSupported && !audioControlsDisabled;
   const sidebarIsInactive = hudDisabled || !isSidebarOpen;
   const sidebarInert = sidebarIsInactive ? 'true' : undefined;
+  const touchScaleValueLabel = `${Math.round(touchControlScale * 100)}%`;
+  const joystickSensitivityValueLabel = `${Math.round(joystickSensitivity * 100)}%`;
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -428,6 +456,26 @@ const GameHud = ({
     (event) => {
       const value = event.target.value === 'left' ? 'left' : 'right';
       updateSettings({ touchLayout: value });
+    },
+    [updateSettings],
+  );
+
+  const handleTouchScaleChange = useCallback(
+    (event) => {
+      const value = Number.parseFloat(event.target.value);
+      if (Number.isFinite(value)) {
+        updateSettings({ touchControlScale: value });
+      }
+    },
+    [updateSettings],
+  );
+
+  const handleJoystickSensitivityChange = useCallback(
+    (event) => {
+      const value = Number.parseFloat(event.target.value);
+      if (Number.isFinite(value)) {
+        updateSettings({ joystickSensitivity: value });
+      }
     },
     [updateSettings],
   );
@@ -998,9 +1046,99 @@ const GameHud = ({
                       <TouchLayoutPreview
                         layout={touchLayoutPreference}
                         className={styles.settingsTouchLayoutPreview}
+                        data-touch-scale={touchControlScale.toFixed(3)}
+                        data-touch-sensitivity={joystickSensitivity.toFixed(3)}
+                        scale={touchControlScale}
+                        joystickSensitivity={joystickSensitivity}
                         data-disabled={isTouchLayoutDisabled ? 'true' : undefined}
                       />
                     </div>
+                  </div>
+                </div>
+                <div className={styles.settingsField}>
+                  <div className={styles.settingsFieldInfo}>
+                    <label className={styles.settingsFieldTitle} htmlFor={touchScaleSliderId}>
+                      Tamanho dos controles
+                    </label>
+                    <span
+                      className={styles.settingsFieldDescription}
+                      id={touchScaleDescriptionId}
+                    >
+                      Ajuste a escala geral dos botões virtuais exibidos na tela.
+                    </span>
+                    {!showTouchControlsSetting ? (
+                      <span className={styles.settingsFieldHelper} id={touchScaleHelperId}>
+                        Ative os controles touch para visualizar este ajuste.
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className={styles.settingsSliderWrapper}>
+                    <span className={styles.settingsSliderValue} aria-hidden="true">
+                      {touchScaleValueLabel}
+                    </span>
+                    <input
+                      id={touchScaleSliderId}
+                      type="range"
+                      className={styles.settingsSlider}
+                      min={TOUCH_CONTROL_SCALE_MIN}
+                      max={TOUCH_CONTROL_SCALE_MAX}
+                      step={TOUCH_CONTROL_SCALE_STEP}
+                      value={touchControlScale}
+                      onChange={handleTouchScaleChange}
+                      disabled={isTouchLayoutDisabled}
+                      aria-valuetext={touchScaleValueLabel}
+                      aria-describedby={
+                        showTouchControlsSetting
+                          ? touchScaleDescriptionId
+                          : `${touchScaleDescriptionId} ${touchScaleHelperId}`
+                      }
+                    />
+                  </div>
+                </div>
+                <div className={styles.settingsField}>
+                  <div className={styles.settingsFieldInfo}>
+                    <label
+                      className={styles.settingsFieldTitle}
+                      htmlFor={joystickSensitivitySliderId}
+                    >
+                      Sensibilidade do joystick
+                    </label>
+                    <span
+                      className={styles.settingsFieldDescription}
+                      id={joystickSensitivityDescriptionId}
+                    >
+                      Determine quanto movimento é necessário para atingir a intensidade máxima.
+                    </span>
+                    {!showTouchControlsSetting ? (
+                      <span
+                        className={styles.settingsFieldHelper}
+                        id={joystickSensitivityHelperId}
+                      >
+                        Ative os controles touch para configurar este ajuste.
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className={styles.settingsSliderWrapper}>
+                    <span className={styles.settingsSliderValue} aria-hidden="true">
+                      {joystickSensitivityValueLabel}
+                    </span>
+                    <input
+                      id={joystickSensitivitySliderId}
+                      type="range"
+                      className={styles.settingsSlider}
+                      min={JOYSTICK_SENSITIVITY_MIN}
+                      max={JOYSTICK_SENSITIVITY_MAX}
+                      step={JOYSTICK_SENSITIVITY_STEP}
+                      value={joystickSensitivity}
+                      onChange={handleJoystickSensitivityChange}
+                      disabled={isTouchLayoutDisabled}
+                      aria-valuetext={joystickSensitivityValueLabel}
+                      aria-describedby={
+                        showTouchControlsSetting
+                          ? joystickSensitivityDescriptionId
+                          : `${joystickSensitivityDescriptionId} ${joystickSensitivityHelperId}`
+                      }
+                    />
                   </div>
                 </div>
                 <label className={styles.settingsToggle} htmlFor={touchLayoutAutoSwapToggleId}>
@@ -1148,6 +1286,8 @@ const GameHud = ({
             touchLayout={touchLayoutPreference}
             isSidebarOpen={isSidebarOpen}
             autoInvertWhenSidebarOpen={settings.autoSwapTouchLayoutWhenSidebarOpen}
+            touchControlScale={touchControlScale}
+            joystickSensitivity={joystickSensitivity}
             className={touchControlsClassName}
             aria-hidden={touchControlsDisabled ? true : undefined}
             inert={touchControlsDisabled ? 'true' : undefined}
