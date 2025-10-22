@@ -532,7 +532,7 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
         data-testid="main-menu-play"
         type="button"
       >
-        Play
+        Jogar
       </button>
       <div
         class="_badgeRow_87a75a"
@@ -1266,7 +1266,7 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
         data-testid="main-menu-play"
         type="button"
       >
-        Play
+        Jogar
       </button>
       <div
         class="_badgeRow_87a75a"
