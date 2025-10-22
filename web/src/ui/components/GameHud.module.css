@@ -173,7 +173,7 @@
   gap: 14px;
   align-items: stretch;
   width: clamp(240px, 26vw, 320px);
-  z-index: 20;
+  z-index: 24;
   visibility: hidden;
   transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
 }
