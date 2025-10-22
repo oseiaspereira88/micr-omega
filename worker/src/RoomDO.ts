@@ -278,11 +278,15 @@ const sanitizeStoredCombo = (value: unknown): number => {
 };
 
 const PLAYERS_KEY = "players";
+const PLAYER_INCREMENTAL_KEY_PREFIX = "player_incremental:";
 const WORLD_KEY = "world";
 const ALARM_KEY = "alarms";
 const SNAPSHOT_STATE_KEY = "snapshot_state";
 const RNG_STATE_KEY = "rng_state";
 const PROGRESSION_KEY = "progression";
+
+const SNAPSHOT_FLUSH_RETRY_MIN_DELAY_MS = 250;
+const SNAPSHOT_FLUSH_RETRY_MAX_DELAY_MS = 5_000;
 
 const SNAPSHOT_FLUSH_INTERVAL_MS = 500;
 const PLAYER_ATTACK_COOLDOWN_MS = 800;
@@ -349,6 +353,12 @@ type SnapshotState = {
   worldDirty: boolean;
   progressionDirty: boolean;
   pendingSnapshotAlarm: number | null;
+};
+
+type PlayerIncrementalSnapshot = {
+  id: string;
+  name: string;
+  reconnectTokenHash: string;
 };
 
 type RngState = {
@@ -968,6 +978,11 @@ export class RoomDO {
   private progressionState = new Map<string, PlayerProgressionState>();
   private pendingProgression = new Map<string, PendingProgressionStream>();
 
+  private pendingIncrementalPlayers = new Set<string>();
+  private snapshotFlushRequested = false;
+  private snapshotFlushForce = false;
+  private snapshotFlushInFlight: Promise<void> | null = null;
+
   private connectedPlayers = 0;
 
   constructor(state: DurableObjectState, env: Env) {
@@ -1425,6 +1440,8 @@ export class RoomDO {
         this.markPlayersDirty();
       }
     }
+
+    await this.restoreIncrementalPlayers();
 
     this.connectedPlayers = this.recalculateConnectedPlayers();
 
@@ -2828,6 +2845,236 @@ export class RoomDO {
       this.observability.logError("snapshot_state_persist_failed", error, {
         category: "persistence"
       });
+    });
+  }
+
+  private getPlayerIncrementalKey(playerId: string): string {
+    return `${PLAYER_INCREMENTAL_KEY_PREFIX}${playerId}`;
+  }
+
+  private sanitizePlayerIncrementalSnapshot(
+    raw: unknown,
+  ): PlayerIncrementalSnapshot | null {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+
+    const snapshot = raw as Partial<PlayerIncrementalSnapshot> & Record<string, unknown>;
+    const id = typeof snapshot.id === "string" ? snapshot.id.trim() : "";
+    if (!id) {
+      return null;
+    }
+
+    const nameSource = typeof snapshot.name === "string" ? snapshot.name : "";
+    const sanitizedName = sanitizePlayerName(nameSource);
+    if (!sanitizedName) {
+      return null;
+    }
+
+    const reconnectTokenHash = sanitizeReconnectToken(snapshot.reconnectTokenHash);
+    if (!reconnectTokenHash) {
+      return null;
+    }
+
+    return {
+      id,
+      name: sanitizedName,
+      reconnectTokenHash,
+    };
+  }
+
+  private createPlayerFromIncrementalSnapshot(
+    snapshot: PlayerIncrementalSnapshot,
+    now: number,
+  ): PlayerInternal {
+    const spawnPosition = this.clampPosition(
+      getSpawnPositionForPlayer(snapshot.id, PLAYER_SPAWN_POSITIONS),
+    );
+    const evolutionState = createEvolutionState();
+    const skillState = createPlayerSkillState();
+
+    const player: PlayerInternal = {
+      id: snapshot.id,
+      name: snapshot.name,
+      score: 0,
+      combo: 1,
+      energy: DEFAULT_PLAYER_ENERGY,
+      xp: DEFAULT_PLAYER_XP,
+      geneticMaterial: DEFAULT_PLAYER_GENETIC_MATERIAL,
+      geneFragments: createGeneCounter(),
+      stableGenes: createGeneCounter(),
+      dashCharge: DEFAULT_DASH_CHARGE,
+      dashCooldownMs: 0,
+      characteristicPoints: createCharacteristicPointsState(),
+      position: createVector(spawnPosition),
+      movementVector: createVector(),
+      orientation: createOrientation(),
+      health: createHealthState(),
+      combatStatus: createCombatStatusState(),
+      combatAttributes: getDeterministicCombatAttributesForPlayer(snapshot.id),
+      evolutionState,
+      archetypeKey: null,
+      reconnectToken: generateReconnectToken(),
+      reconnectTokenHash: snapshot.reconnectTokenHash,
+      connected: false,
+      lastActiveAt: now,
+      lastSeenAt: now,
+      connectedAt: null,
+      totalSessionDurationMs: 0,
+      sessionCount: 0,
+      skillState,
+      pendingAttack: null,
+      statusEffects: [],
+      invulnerableUntil: null,
+    };
+
+    player.combatAttributes = this.computePlayerCombatAttributes(player);
+    return player;
+  }
+
+  private async persistPlayerIncremental(player: PlayerInternal): Promise<void> {
+    const snapshot: PlayerIncrementalSnapshot = {
+      id: player.id,
+      name: player.name,
+      reconnectTokenHash: player.reconnectTokenHash,
+    };
+
+    const key = this.getPlayerIncrementalKey(player.id);
+    await this.state.storage.put(key, snapshot);
+    this.pendingIncrementalPlayers.add(player.id);
+  }
+
+  private async restoreIncrementalPlayers(): Promise<void> {
+    const storageWithList = this.state.storage as typeof this.state.storage & {
+      list?: (options?: { prefix?: string }) => Promise<Map<string, unknown>>;
+    };
+    const listFn = storageWithList.list;
+    if (typeof listFn !== "function") {
+      return;
+    }
+
+    let snapshots: Map<string, unknown>;
+    try {
+      snapshots = await listFn.call(this.state.storage, {
+        prefix: PLAYER_INCREMENTAL_KEY_PREFIX,
+      });
+    } catch (error) {
+      this.observability.logError("player_incremental_restore_failed", error, {
+        category: "persistence",
+      });
+      return;
+    }
+
+    if (snapshots.size === 0) {
+      return;
+    }
+
+    const now = Date.now();
+    for (const [, raw] of snapshots.entries()) {
+      const snapshot = this.sanitizePlayerIncrementalSnapshot(raw);
+      if (!snapshot) {
+        continue;
+      }
+
+      const normalizedNameKey = snapshot.name.toLowerCase();
+      let player = this.players.get(snapshot.id);
+      if (player) {
+        const previousKey = player.name.toLowerCase();
+        if (previousKey !== normalizedNameKey && this.nameToPlayerId.get(previousKey) === player.id) {
+          this.nameToPlayerId.delete(previousKey);
+        }
+        if (player.name !== snapshot.name) {
+          this.markRankingDirty();
+        }
+        player.name = snapshot.name;
+        this.nameToPlayerId.set(normalizedNameKey, player.id);
+        player.reconnectTokenHash = snapshot.reconnectTokenHash;
+      } else {
+        player = this.createPlayerFromIncrementalSnapshot(snapshot, now);
+        this.players.set(player.id, player);
+        this.nameToPlayerId.set(normalizedNameKey, player.id);
+        this.ensureProgressionState(player.id);
+        this.markPlayersDirty();
+        this.markRankingDirty();
+      }
+
+      this.ensureProgressionState(snapshot.id);
+      this.pendingIncrementalPlayers.add(player.id);
+    }
+  }
+
+  private async clearPendingIncrementalSnapshots(): Promise<void> {
+    if (this.pendingIncrementalPlayers.size === 0) {
+      return;
+    }
+
+    const pending = Array.from(this.pendingIncrementalPlayers);
+    this.pendingIncrementalPlayers.clear();
+
+    for (const playerId of pending) {
+      try {
+        await this.state.storage.delete(this.getPlayerIncrementalKey(playerId));
+      } catch (error) {
+        this.pendingIncrementalPlayers.add(playerId);
+        this.observability.logError("player_incremental_cleanup_failed", error, {
+          category: "persistence",
+          playerId,
+        });
+      }
+    }
+  }
+
+  private queueSnapshotFlush(options: { force?: boolean } = {}): void {
+    const { force = false } = options;
+    this.snapshotFlushRequested = true;
+    if (force) {
+      this.snapshotFlushForce = true;
+    }
+
+    if (this.snapshotFlushInFlight) {
+      return;
+    }
+
+    const task = this.processSnapshotFlushQueue();
+    this.snapshotFlushInFlight = task;
+    this.state.waitUntil(
+      task.catch((error) => {
+        this.observability.logError("snapshot_flush_unhandled", error, {
+          category: "persistence",
+        });
+      }),
+    );
+  }
+
+  private async processSnapshotFlushQueue(): Promise<void> {
+    let retryDelay = SNAPSHOT_FLUSH_RETRY_MIN_DELAY_MS;
+
+    while (this.snapshotFlushRequested) {
+      const force = this.snapshotFlushForce;
+      this.snapshotFlushRequested = false;
+      this.snapshotFlushForce = false;
+
+      try {
+        await this.flushSnapshots({ force });
+        await this.clearPendingIncrementalSnapshots();
+        retryDelay = SNAPSHOT_FLUSH_RETRY_MIN_DELAY_MS;
+      } catch (error) {
+        this.observability.logError("snapshot_flush_async_failed", error, {
+          category: "persistence",
+        });
+        this.snapshotFlushRequested = true;
+        this.snapshotFlushForce = force || this.snapshotFlushForce;
+        await this.delayForSnapshotFlush(retryDelay);
+        retryDelay = Math.min(retryDelay * 2, SNAPSHOT_FLUSH_RETRY_MAX_DELAY_MS);
+      }
+    }
+
+    this.snapshotFlushInFlight = null;
+  }
+
+  private async delayForSnapshotFlush(delayMs: number): Promise<void> {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, delayMs);
     });
   }
 
@@ -4730,26 +4977,21 @@ export class RoomDO {
     player.reconnectToken = reconnectToken;
     player.reconnectTokenHash = reconnectTokenHash;
 
-    this.markPlayersDirty();
-
-    const hadPendingSnapshot = this.pendingSnapshotAlarm;
     const previousPlayersDirty = this.playersDirty;
     const previousWorldDirty = this.worldDirty;
+    const previousPendingSnapshot = this.pendingSnapshotAlarm;
     const previousSnapshotSchedule = this.alarmSchedule.get("snapshot");
 
+    this.markPlayersDirty();
+
+    const snapshotAlarmAfterMark = this.pendingSnapshotAlarm;
+
     try {
-      if (this.playersDirty) {
-        if (hadPendingSnapshot === null) {
-          await this.flushSnapshots({ force: true });
-        } else {
-          await this.flushSnapshots();
-          this.queueSyncAlarms();
-        }
-      }
+      await this.persistPlayerIncremental(player);
     } catch (error) {
       this.playersDirty = previousPlayersDirty;
       this.worldDirty = previousWorldDirty;
-      this.pendingSnapshotAlarm = hadPendingSnapshot;
+      this.pendingSnapshotAlarm = previousPendingSnapshot;
       if (previousSnapshotSchedule !== undefined) {
         this.alarmSchedule.set("snapshot", previousSnapshotSchedule);
       } else {
@@ -4759,13 +5001,18 @@ export class RoomDO {
       this.queueSyncAlarms();
       player.reconnectToken = previousReconnectToken;
       player.reconnectTokenHash = previousReconnectTokenHash;
-      this.observability.logError("player_snapshot_flush_failed", error, {
+      this.observability.logError("player_incremental_persist_failed", error, {
         category: "persistence",
         playerId: player.id,
       });
       this.send(socket, { type: "error", reason: "internal_error" });
       socket.close(1011, "internal_error");
       return null;
+    }
+
+    this.queueSnapshotFlush({ force: snapshotAlarmAfterMark === null });
+    if (this.playersDirty && snapshotAlarmAfterMark !== null) {
+      this.queueSyncAlarms();
     }
 
     const connectedPlayers = this.getConnectedPlayersCount();
