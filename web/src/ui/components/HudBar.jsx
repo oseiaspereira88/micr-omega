@@ -155,11 +155,26 @@ const HudBar = ({
     () =>
       (activePowerUps || []).map((power) => {
         const duration = Math.max(0, sanitizeNumber(power.duration));
-        const remaining = Math.max(0, sanitizeNumber(power.remaining));
-        const percent =
+        const remainingRaw = sanitizeNumber(power.remaining, Number.NaN);
+        const remaining = Math.max(0, Number.isFinite(remainingRaw) ? remainingRaw : 0);
+        const percentRaw = sanitizeNumber(power.percent, Number.NaN);
+        const hasPercentProp = Number.isFinite(percentRaw);
+        const percentFromRemaining =
           duration > 0
             ? Math.max(0, Math.min(100, (remaining / duration) * 100))
             : 0;
+        const percent = Math.max(
+          0,
+          Math.min(100, hasPercentProp ? percentRaw : percentFromRemaining)
+        );
+        const roundedPercent = Math.round(percent);
+        const secondsRemaining = Number.isFinite(remainingRaw)
+          ? Math.max(0, Math.ceil(remainingRaw))
+          : null;
+        const timeDisplay =
+          secondsRemaining && secondsRemaining > 0
+            ? `${secondsRemaining}s restantes`
+            : `${roundedPercent}%`;
 
         return {
           key: power.type,
@@ -167,6 +182,8 @@ const HudBar = ({
           icon: power.icon,
           name: power.name,
           percent,
+          roundedPercent,
+          timeDisplay,
         };
       }),
     [activePowerUps]
@@ -480,8 +497,25 @@ const HudBar = ({
                     <div className={styles.powerUpTitle} style={{ color: power.color }}>
                       {power.icon} {power.name}
                     </div>
-                    <div className={styles.powerUpBar}>
-                      <div style={{ width: `${power.percent}%`, height: '100%', background: power.color }} />
+                    <span
+                      className={styles.powerUpMeta}
+                      aria-label={`${power.name}: ${power.timeDisplay}`}
+                    >
+                      {power.timeDisplay}
+                    </span>
+                    <div
+                      className={styles.powerUpBar}
+                      role="progressbar"
+                      aria-label={`Duração de ${power.name}`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={power.roundedPercent}
+                      aria-valuetext={power.timeDisplay}
+                    >
+                      <div
+                        style={{ width: `${power.percent}%`, height: '100%', background: power.color }}
+                        aria-hidden="true"
+                      />
                     </div>
                   </div>
                 ))}
