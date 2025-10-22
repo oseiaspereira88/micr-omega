@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   JOYSTICK_SENSITIVITY_MAX,
   JOYSTICK_SENSITIVITY_MIN,
@@ -207,6 +207,13 @@ const TouchControls = ({
   ...a11yProps
 }) => {
   const [viewport, setViewport] = useState(getViewportSize);
+  const [activeButtons, setActiveButtons] = useState({
+    attack: false,
+    dash: false,
+    skill: false,
+    cycle: false,
+    evolve: false,
+  });
   const actionGroupRef = useRef(null);
   const normalizedTouchControlScale = useMemo(
     () =>
@@ -354,21 +361,35 @@ const TouchControls = ({
     ? 'Trocar habilidade equipada'
     : 'Trocar habilidade — nenhuma habilidade equipada';
 
+  const setButtonActive = useCallback((buttonKey, isActive) => {
+    setActiveButtons(previousState => {
+      if (previousState[buttonKey] === isActive) {
+        return previousState;
+      }
+
+      return { ...previousState, [buttonKey]: isActive };
+    });
+  }, []);
+
   const handleAttackReleaseEvent = event => {
     event.preventDefault();
+    setButtonActive('attack', false);
     onAttackRelease?.();
   };
 
   const handleDashTouchEnd = event => {
     event.preventDefault();
+    setButtonActive('dash', false);
   };
 
   const handleSkillTouchEnd = event => {
     event.preventDefault();
+    setButtonActive('skill', false);
   };
 
   const handleCycleSkillTouchEnd = event => {
     event.preventDefault();
+    setButtonActive('cycle', false);
   };
 
   const layoutClass =
@@ -570,16 +591,30 @@ const TouchControls = ({
       <div ref={actionGroupRef} className={styles.actionGroup}>
         <button
           type="button"
-          className={joinClassNames(styles.button, styles.attackButton)}
+          className={joinClassNames(
+            styles.button,
+            styles.attackButton,
+            activeButtons.attack ? styles.buttonActive : null,
+            activeButtons.attack ? styles.attackButtonActive : null,
+          )}
           onTouchStart={event => {
             event.preventDefault();
+            setButtonActive('attack', true);
             onAttackPress?.();
           }}
           onTouchEnd={handleAttackReleaseEvent}
           onTouchCancel={handleAttackReleaseEvent}
+          onPointerDown={event => {
+            if (isTouchLikePointer(event)) {
+              setButtonActive('attack', true);
+            }
+          }}
           onPointerUp={handleAttackReleaseEvent}
           onPointerCancel={handleAttackReleaseEvent}
-          onMouseDown={onAttackPress}
+          onMouseDown={event => {
+            setButtonActive('attack', true);
+            onAttackPress?.(event);
+          }}
           onMouseUp={handleAttackReleaseEvent}
           onMouseLeave={handleAttackReleaseEvent}
           onClick={event => {
@@ -612,6 +647,8 @@ const TouchControls = ({
             dashReady ? styles.chargeReady : styles.chargeEmpty,
             dashReady ? null : styles.cooldownState,
             dashReady ? null : styles.disabled,
+            activeButtons.dash ? styles.buttonActive : null,
+            activeButtons.dash ? styles.dashButtonActive : null,
           )}
           onClick={onDash}
           aria-label={dashAriaLabel}
@@ -620,11 +657,29 @@ const TouchControls = ({
           onTouchStart={event => {
             event.preventDefault();
             if (dashReady) {
+              setButtonActive('dash', true);
               onDash?.();
             }
           }}
           onTouchEnd={handleDashTouchEnd}
           onTouchCancel={handleDashTouchEnd}
+          onPointerDown={event => {
+            if (!dashReady || !isTouchLikePointer(event)) {
+              return;
+            }
+
+            setButtonActive('dash', true);
+          }}
+          onPointerUp={event => {
+            if (isTouchLikePointer(event)) {
+              handleDashTouchEnd(event);
+            }
+          }}
+          onPointerCancel={event => {
+            if (isTouchLikePointer(event)) {
+              handleDashTouchEnd(event);
+            }
+          }}
           disabled={!dashReady}
         >
           {!dashReady && (
@@ -672,6 +727,8 @@ const TouchControls = ({
             skillDisabled ? styles.skillDisabled : styles.skillReady,
             showSkillCooldown ? styles.cooldownState : null,
             skillDisabled ? styles.disabled : null,
+            activeButtons.skill ? styles.buttonActive : null,
+            activeButtons.skill ? styles.skillButtonActive : null,
           )}
           onClick={onUseSkill}
           aria-label={skillAriaLabel}
@@ -680,11 +737,29 @@ const TouchControls = ({
           onTouchStart={event => {
             event.preventDefault();
             if (!skillDisabled) {
+              setButtonActive('skill', true);
               onUseSkill?.();
             }
           }}
           onTouchEnd={handleSkillTouchEnd}
           onTouchCancel={handleSkillTouchEnd}
+          onPointerDown={event => {
+            if (skillDisabled || !isTouchLikePointer(event)) {
+              return;
+            }
+
+            setButtonActive('skill', true);
+          }}
+          onPointerUp={event => {
+            if (isTouchLikePointer(event)) {
+              handleSkillTouchEnd(event);
+            }
+          }}
+          onPointerCancel={event => {
+            if (isTouchLikePointer(event)) {
+              handleSkillTouchEnd(event);
+            }
+          }}
           disabled={skillDisabled}
           title={skillAriaLabel}
         >
@@ -754,6 +829,8 @@ const TouchControls = ({
             styles.button,
             styles.cycleSkillButton,
             hasCurrentSkill ? styles.cycleSkillReady : styles.disabled,
+            activeButtons.cycle ? styles.buttonActive : null,
+            activeButtons.cycle ? styles.cycleSkillButtonActive : null,
           )}
           onClick={event => {
             event.preventDefault();
@@ -764,11 +841,29 @@ const TouchControls = ({
           onTouchStart={event => {
             event.preventDefault();
             if (hasCurrentSkill) {
+              setButtonActive('cycle', true);
               onCycleSkill?.();
             }
           }}
           onTouchEnd={handleCycleSkillTouchEnd}
           onTouchCancel={handleCycleSkillTouchEnd}
+          onPointerDown={event => {
+            if (!hasCurrentSkill || !isTouchLikePointer(event)) {
+              return;
+            }
+
+            setButtonActive('cycle', true);
+          }}
+          onPointerUp={event => {
+            if (isTouchLikePointer(event)) {
+              handleCycleSkillTouchEnd(event);
+            }
+          }}
+          onPointerCancel={event => {
+            if (isTouchLikePointer(event)) {
+              handleCycleSkillTouchEnd(event);
+            }
+          }}
           disabled={!hasCurrentSkill}
         >
           <span className={styles.buttonIcon} aria-hidden="true">
@@ -798,10 +893,40 @@ const TouchControls = ({
             styles.evolveButton,
             canEvolve ? styles.evolveReady : styles.evolveLocked,
             canEvolve ? null : styles.disabled,
+            activeButtons.evolve ? styles.buttonActive : null,
+            activeButtons.evolve ? styles.evolveButtonActive : null,
           )}
           onClick={onOpenEvolutionMenu}
           aria-label={evolveAriaLabel}
           aria-disabled={!canEvolve}
+          onTouchStart={() => {
+            if (canEvolve) {
+              setButtonActive('evolve', true);
+            }
+          }}
+          onTouchEnd={() => {
+            setButtonActive('evolve', false);
+          }}
+          onTouchCancel={() => {
+            setButtonActive('evolve', false);
+          }}
+          onPointerDown={event => {
+            if (!canEvolve || !isTouchLikePointer(event)) {
+              return;
+            }
+
+            setButtonActive('evolve', true);
+          }}
+          onPointerUp={event => {
+            if (isTouchLikePointer(event)) {
+              setButtonActive('evolve', false);
+            }
+          }}
+          onPointerCancel={event => {
+            if (isTouchLikePointer(event)) {
+              setButtonActive('evolve', false);
+            }
+          }}
           disabled={!canEvolve}
         >
           <span className={styles.buttonIcon} aria-hidden="true">
