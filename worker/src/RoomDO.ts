@@ -287,13 +287,6 @@ const ORGANIC_CLUSTER_PATTERNS = [
 
 const CLIENT_TIME_MAX_FUTURE_DRIFT_MS = 2_000;
 
-const WORLD_BOUNDS = {
-  minX: -WORLD_RADIUS,
-  maxX: WORLD_RADIUS,
-  minY: -WORLD_RADIUS,
-  maxY: WORLD_RADIUS
-} as const;
-
 const SUPPORTED_CLIENT_VERSIONS = new Set([PROTOCOL_VERSION]);
 const NAME_VALIDATION_ERROR_MESSAGES = new Set([
   "name_too_short",
