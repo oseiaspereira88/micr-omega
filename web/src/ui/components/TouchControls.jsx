@@ -309,7 +309,24 @@ const TouchControls = ({
   );
 
   const isLandscape = viewport.width > viewport.height;
-  const showButtonLegends = !isLandscape || viewport.height >= 600;
+  const showButtonLegends = true;
+  const useCompactButtonLegends = isLandscape;
+
+  const buttonLegends = useMemo(
+    () => ({
+      attack: useCompactButtonLegends ? 'Atk' : 'Ataque',
+      dash: 'Dash',
+      skill: useCompactButtonLegends ? 'Hab.' : 'Habilidade',
+      cycle: useCompactButtonLegends ? 'Troca' : 'Trocar',
+      evolve: useCompactButtonLegends ? 'Evol.' : 'Evoluir',
+    }),
+    [useCompactButtonLegends],
+  );
+
+  const touchLegendSpacing = useMemo(
+    () => Math.round(configuredTouchScale * (useCompactButtonLegends ? 20 : 26)),
+    [configuredTouchScale, useCompactButtonLegends],
+  );
 
   const effectiveLayout = useMemo(() => {
     if (!(autoInvertWhenSidebarOpen && isSidebarOpen)) {
@@ -337,6 +354,7 @@ const TouchControls = ({
     ? 'Dash carregado'
     : `Dash carregando: ${dashChargeDisplay}`;
   const dashAriaLabel = dashReady ? 'Usar dash — pronto' : 'Usar dash — carregando';
+  const attackAriaLabel = 'Ataque';
 
   let skillAriaLabel = 'Usar habilidade';
   if (!hasCurrentSkill) {
@@ -521,7 +539,7 @@ const TouchControls = ({
       hudElement.style.removeProperty('--touch-controls-footprint');
       hudElement.style.removeProperty('--touch-controls-footprint-height');
     };
-  }, [effectiveLayout, configuredTouchScale, showButtonLegends]);
+  }, [effectiveLayout, configuredTouchScale, touchLegendSpacing]);
 
   const isTouchLikePointer = event => {
     const pointerType =
@@ -569,9 +587,7 @@ const TouchControls = ({
       style={{
         '--touch-scale': configuredTouchScale.toFixed(3),
         '--touch-vertical-scale': configuredTouchVerticalScale.toFixed(3),
-        '--touch-legend-space': showButtonLegends
-          ? `${Math.round(configuredTouchScale * 26)}px`
-          : '0px',
+        '--touch-legend-space': `${touchLegendSpacing}px`,
       }}
     >
       <div
@@ -607,6 +623,7 @@ const TouchControls = ({
             activeButtons.attack ? styles.buttonActive : null,
             activeButtons.attack ? styles.attackButtonActive : null,
           )}
+          aria-label={attackAriaLabel}
           onTouchStart={event => {
             event.preventDefault();
             setButtonActive('attack', true);
@@ -635,8 +652,8 @@ const TouchControls = ({
           <span className={styles.buttonIcon} aria-hidden="true">
             ⚔️
           </span>
-          <span className={styles.buttonLabel}>
-            Ataque
+          <span className={styles.buttonLabel} aria-hidden="true">
+            {buttonLegends.attack}
           </span>
           {showButtonLegends && (
             <span
@@ -644,7 +661,7 @@ const TouchControls = ({
               aria-hidden="true"
               data-touch-legend="true"
             >
-              Ataque
+              {buttonLegends.attack}
             </span>
           )}
         </button>
@@ -707,7 +724,7 @@ const TouchControls = ({
             className={joinClassNames(styles.buttonLabel, styles.buttonLabelBottom)}
             aria-hidden="true"
           >
-            Dash
+            {buttonLegends.dash}
           </span>
           {showButtonLegends && (
             <span
@@ -715,7 +732,7 @@ const TouchControls = ({
               aria-hidden="true"
               data-touch-legend="true"
             >
-              Dash
+              {buttonLegends.dash}
             </span>
           )}
         </button>
@@ -811,7 +828,7 @@ const TouchControls = ({
             )}
             aria-hidden="true"
           >
-            Habilidade
+            {buttonLegends.skill}
           </span>
           {showButtonLegends && (
             <span
@@ -819,7 +836,7 @@ const TouchControls = ({
               aria-hidden="true"
               data-touch-legend="true"
             >
-              Habilidade
+              {buttonLegends.skill}
             </span>
           )}
         </button>
@@ -883,7 +900,7 @@ const TouchControls = ({
             className={joinClassNames(styles.buttonLabel, styles.buttonLabelBottom)}
             aria-hidden="true"
           >
-            Trocar
+            {buttonLegends.cycle}
           </span>
           {showButtonLegends && (
             <span
@@ -891,7 +908,7 @@ const TouchControls = ({
               aria-hidden="true"
               data-touch-legend="true"
             >
-              Trocar
+              {buttonLegends.cycle}
             </span>
           )}
         </button>
@@ -946,7 +963,7 @@ const TouchControls = ({
             className={joinClassNames(styles.buttonLabel, styles.buttonLabelBottom)}
             aria-hidden="true"
           >
-            Evoluir
+            {buttonLegends.evolve}
           </span>
           {showButtonLegends && (
             <span
@@ -954,7 +971,7 @@ const TouchControls = ({
               aria-hidden="true"
               data-touch-legend="true"
             >
-              Evoluir
+              {buttonLegends.evolve}
             </span>
           )}
         </button>

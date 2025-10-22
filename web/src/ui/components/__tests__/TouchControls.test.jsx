@@ -168,9 +168,13 @@ describe('TouchControls', () => {
       container.querySelectorAll(`.${styles.buttonLabel}`),
     ).map(node => node.textContent.trim());
 
-    expect(actionLabels).toEqual(
-      expect.arrayContaining(['Ataque', 'Dash', 'Habilidade', 'Trocar', 'Evoluir']),
-    );
+    const fullLabelSet = ['Ataque', 'Dash', 'Habilidade', 'Trocar', 'Evoluir'];
+    const compactLabelSet = ['Atk', 'Dash', 'Hab.', 'Troca', 'Evol.'];
+    const matchesFullSet = fullLabelSet.every(label => actionLabels.includes(label));
+    const matchesCompactSet = compactLabelSet.every(label => actionLabels.includes(label));
+
+    expect(actionLabels).toHaveLength(5);
+    expect(matchesFullSet || matchesCompactSet).toBe(true);
   });
 
   it('exibe o texto de recarga da habilidade e não usa atributos ARIA inválidos no botão', () => {
