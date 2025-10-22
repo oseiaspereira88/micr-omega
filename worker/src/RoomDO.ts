@@ -895,6 +895,8 @@ const normalizeStoredWorldState = (
   };
 };
 
+const HANDSHAKE_TIMEOUT_CLOSE_CODE = 4000;
+
 export class RoomDO {
   static readonly RNG_STATE_PERSIST_DEBOUNCE_MS = 50;
 
@@ -906,6 +908,7 @@ export class RoomDO {
 
   private readonly clientsBySocket = new Map<WebSocket, string>();
   private readonly activeSockets = new Set<WebSocket>();
+  private readonly handshakeTimeouts = new WeakMap<WebSocket, ReturnType<typeof setTimeout>>();
   private readonly socketsByPlayer = new Map<string, WebSocket>();
   private readonly players = new Map<string, PlayerInternal>();
   private readonly nameToPlayerId = new Map<string, string>();
@@ -4260,6 +4263,7 @@ export class RoomDO {
     };
 
     this.activeSockets.add(socket);
+    this.startHandshakeTimeout(socket);
 
     socket.addEventListener("message", (event) => {
       void (async () => {
@@ -4438,6 +4442,7 @@ export class RoomDO {
     });
 
     socket.addEventListener("close", () => {
+      this.clearHandshakeTimeout(socket);
       const disconnectPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
       if (disconnectPlayerId) {
         void this.handleDisconnect(socket, disconnectPlayerId).catch((error) => {
@@ -4452,6 +4457,7 @@ export class RoomDO {
     });
 
     socket.addEventListener("error", () => {
+      this.clearHandshakeTimeout(socket);
       if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CLOSING) {
         socket.close(1011, "error");
       }
@@ -4822,7 +4828,50 @@ export class RoomDO {
 
     await this.maybeStartGame();
 
+    this.clearHandshakeTimeout(socket);
+
     return player.id;
+  }
+
+  private startHandshakeTimeout(socket: WebSocket): void {
+    const timeoutMs = this.config.handshakeTimeoutMs;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      return;
+    }
+
+    this.clearHandshakeTimeout(socket);
+
+    const timeout = setTimeout(() => {
+      this.handshakeTimeouts.delete(socket);
+      this.observability.log("warn", "handshake_timeout", {
+        timeoutMs,
+        activeConnections: this.activeSockets.size,
+      });
+
+      if (
+        socket.readyState === WebSocket.OPEN ||
+        socket.readyState === WebSocket.CONNECTING ||
+        socket.readyState === WebSocket.CLOSING
+      ) {
+        try {
+          socket.close(HANDSHAKE_TIMEOUT_CLOSE_CODE, "handshake_timeout");
+        } catch (error) {
+          this.observability.logError("handshake_timeout_close_failed", error, {
+            timeoutMs,
+          });
+        }
+      }
+    }, timeoutMs);
+
+    this.handshakeTimeouts.set(socket, timeout);
+  }
+
+  private clearHandshakeTimeout(socket: WebSocket): void {
+    const timeout = this.handshakeTimeouts.get(socket);
+    if (timeout) {
+      clearTimeout(timeout);
+      this.handshakeTimeouts.delete(socket);
+    }
   }
 
   private normalizeName(rawName: string): string | null {
