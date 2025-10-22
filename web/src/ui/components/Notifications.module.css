@@ -1,6 +1,6 @@
 .container {
   position: absolute;
-  top: 60px;
+  top: calc(var(--hud-top-controls-offset, 60px) + 12px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;

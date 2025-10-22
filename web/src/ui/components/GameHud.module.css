@@ -8,6 +8,19 @@
 
 :global(:root) {
   --hud-toolbar-height: calc(1.75rem + 16px);
+  --hud-header-offset: calc(44px + var(--safe-area-inset-top, 0px) + 16px);
+  --hud-boss-bar-height: 120px;
+  --hud-boss-bar-offset: 0px;
+  --hud-top-controls-offset: calc(
+    var(--hud-header-offset) + var(--hud-boss-bar-offset)
+  );
+}
+
+.hud[data-boss-bar-active='true'] {
+  --hud-boss-bar-offset: calc(
+    48px + var(--safe-area-inset-top, 0px) + var(--hud-boss-bar-height, 120px) -
+      var(--hud-header-offset)
+  );
 }
 
 .mobileHud {
