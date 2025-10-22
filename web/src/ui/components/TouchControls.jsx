@@ -302,7 +302,22 @@ const TouchControls = ({
   );
 
   const isLandscape = viewport.width > viewport.height;
-  const showButtonLegends = !isLandscape || viewport.height >= 600;
+  const useCompactLegends = isLandscape;
+  const showButtonLegends = true;
+  const buttonLegendTexts = useMemo(
+    () => ({
+      attack: useCompactLegends ? 'Atk' : 'Ataque',
+      dash: 'Dash',
+      skill: useCompactLegends ? 'Hab.' : 'Habilidade',
+      cycle: useCompactLegends ? 'Troca' : 'Trocar',
+      evolve: useCompactLegends ? 'Evo.' : 'Evoluir',
+    }),
+    [useCompactLegends],
+  );
+  const attackAriaLabel = 'Ataque';
+  const legendSpace = Math.round(
+    configuredTouchScale * (useCompactLegends ? 22 : 26),
+  );
 
   const effectiveLayout = useMemo(() => {
     if (!(autoInvertWhenSidebarOpen && isSidebarOpen)) {
@@ -533,13 +548,14 @@ const TouchControls = ({
         orientationClass,
         isSidebarOpen ? styles.sidebarHidden : null,
         showButtonLegends ? styles.showLegends : null,
+        useCompactLegends ? styles.compactLegends : null,
         className,
       )}
       style={{
         '--touch-scale': configuredTouchScale.toFixed(3),
         '--touch-vertical-scale': configuredTouchVerticalScale.toFixed(3),
         '--touch-legend-space': showButtonLegends
-          ? `${Math.round(configuredTouchScale * 26)}px`
+          ? `${legendSpace}px`
           : '0px',
       }}
     >
@@ -571,6 +587,7 @@ const TouchControls = ({
         <button
           type="button"
           className={joinClassNames(styles.button, styles.attackButton)}
+          aria-label={attackAriaLabel}
           onTouchStart={event => {
             event.preventDefault();
             onAttackPress?.();
@@ -591,7 +608,7 @@ const TouchControls = ({
             ⚔️
           </span>
           <span className={styles.buttonLabel}>
-            Ataque
+            {buttonLegendTexts.attack}
           </span>
           {showButtonLegends && (
             <span
@@ -599,7 +616,7 @@ const TouchControls = ({
               aria-hidden="true"
               data-touch-legend="true"
             >
-              Ataque
+              {buttonLegendTexts.attack}
             </span>
           )}
         </button>
@@ -642,7 +659,7 @@ const TouchControls = ({
             className={joinClassNames(styles.buttonLabel, styles.buttonLabelBottom)}
             aria-hidden="true"
           >
-            Dash
+            {buttonLegendTexts.dash}
           </span>
           {showButtonLegends && (
             <span
@@ -650,7 +667,7 @@ const TouchControls = ({
               aria-hidden="true"
               data-touch-legend="true"
             >
-              Dash
+              {buttonLegendTexts.dash}
             </span>
           )}
         </button>
@@ -726,7 +743,7 @@ const TouchControls = ({
             )}
             aria-hidden="true"
           >
-            Habilidade
+            {buttonLegendTexts.skill}
           </span>
           {showButtonLegends && (
             <span
@@ -734,7 +751,7 @@ const TouchControls = ({
               aria-hidden="true"
               data-touch-legend="true"
             >
-              Habilidade
+              {buttonLegendTexts.skill}
             </span>
           )}
         </button>
@@ -778,7 +795,7 @@ const TouchControls = ({
             className={joinClassNames(styles.buttonLabel, styles.buttonLabelBottom)}
             aria-hidden="true"
           >
-            Trocar
+            {buttonLegendTexts.cycle}
           </span>
           {showButtonLegends && (
             <span
@@ -786,7 +803,7 @@ const TouchControls = ({
               aria-hidden="true"
               data-touch-legend="true"
             >
-              Trocar
+              {buttonLegendTexts.cycle}
             </span>
           )}
         </button>
@@ -811,7 +828,7 @@ const TouchControls = ({
             className={joinClassNames(styles.buttonLabel, styles.buttonLabelBottom)}
             aria-hidden="true"
           >
-            Evoluir
+            {buttonLegendTexts.evolve}
           </span>
           {showButtonLegends && (
             <span
@@ -819,7 +836,7 @@ const TouchControls = ({
               aria-hidden="true"
               data-touch-legend="true"
             >
-              Evoluir
+              {buttonLegendTexts.evolve}
             </span>
           )}
         </button>

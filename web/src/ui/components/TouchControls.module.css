@@ -92,6 +92,16 @@
   /* Utility class to allow legend-specific overrides when active */
 }
 
+.compactLegends .buttonLabel {
+  font-size: calc(var(--touch-scale) * 0.5rem);
+}
+
+.compactLegends .buttonLegend {
+  font-size: calc(var(--touch-scale) * 0.55rem);
+  margin-top: calc(var(--touch-scale) * 4px);
+  padding: calc(var(--touch-scale) * 2px) calc(var(--touch-scale) * 5px);
+}
+
 .layoutLeft {
   direction: ltr;
 }
@@ -419,6 +429,12 @@
   font-size: calc(var(--touch-scale) * 0.6rem);
   margin-top: calc(var(--touch-scale) * 6px);
   padding: calc(var(--touch-scale) * 2.5px) calc(var(--touch-scale) * 6px);
+}
+
+.landscape.compactLegends .buttonLegend {
+  font-size: calc(var(--touch-scale) * 0.5rem);
+  margin-top: calc(var(--touch-scale) * 4px);
+  padding: calc(var(--touch-scale) * 2px) calc(var(--touch-scale) * 5px);
 }
 
 .cooldownOverlay {
