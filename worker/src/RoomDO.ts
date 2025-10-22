@@ -911,6 +911,7 @@ export class RoomDO {
   private readonly nameToPlayerId = new Map<string, string>();
   private readonly connectionRateLimiters = new WeakMap<WebSocket, MessageRateLimiter>();
   private readonly rateLimitUtilizationLastReported = new WeakMap<WebSocket, number>();
+  private readonly handshakeTimeouts = new WeakMap<WebSocket, ReturnType<typeof setTimeout>>();
   private readonly globalRateLimiter: MessageRateLimiter;
   private lastGlobalRateLimitReportAt = 0;
   private rankingCache: RankingEntry[] = [];
@@ -4113,6 +4114,7 @@ export class RoomDO {
     let playerId: string | null = null;
 
     this.activeSockets.add(socket);
+    this.startHandshakeTimeout(socket);
 
     socket.addEventListener("message", (event) => {
       void (async () => {
@@ -4304,6 +4306,7 @@ export class RoomDO {
             .then((result) => {
               if (result) {
                 playerId = result;
+                this.clearHandshakeTimeout(socket);
               }
             })
             .catch((error) => {
@@ -4406,6 +4409,7 @@ export class RoomDO {
     });
 
     socket.addEventListener("close", () => {
+      this.clearHandshakeTimeout(socket);
       const disconnectPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
       if (disconnectPlayerId) {
         void this.handleDisconnect(socket, disconnectPlayerId).catch((error) => {
@@ -4423,6 +4427,44 @@ export class RoomDO {
         socket.close(1011, "error");
       }
     });
+  }
+
+  private startHandshakeTimeout(socket: WebSocket): void {
+    const timeoutMs = this.config.handshakeTimeoutMs;
+    if (timeoutMs <= 0) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      this.handshakeTimeouts.delete(socket);
+
+      if (
+        socket.readyState === WebSocket.CONNECTING ||
+        socket.readyState === WebSocket.OPEN
+      ) {
+        this.observability.log("warn", "handshake_timeout", {
+          timeoutMs,
+        });
+
+        try {
+          socket.close(4408, "handshake_timeout");
+        } catch (error) {
+          this.observability.logError("handshake_timeout_close_failed", error, {
+            timeoutMs,
+          });
+        }
+      }
+    }, timeoutMs);
+
+    this.handshakeTimeouts.set(socket, timeout);
+  }
+
+  private clearHandshakeTimeout(socket: WebSocket): void {
+    const timeout = this.handshakeTimeouts.get(socket);
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+      this.handshakeTimeouts.delete(socket);
+    }
   }
 
   private async handleJoin(socket: WebSocket, message: JoinMessage): Promise<string | null> {
