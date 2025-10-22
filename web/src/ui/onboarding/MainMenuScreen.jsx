@@ -67,7 +67,7 @@ const MainMenuScreen = ({
             data-testid="main-menu-play"
             onClick={onPlay}
           >
-            Play
+            Jogar
           </button>
           <div className={styles.badgeRow}>
             <div className={styles.badge}>
