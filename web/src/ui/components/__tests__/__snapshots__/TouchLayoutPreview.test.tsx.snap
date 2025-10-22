@@ -6,7 +6,10 @@ exports[`TouchLayoutPreview > gera snapshots distintos e nomes acessíveis para 
     aria-label="Prévia do layout com botões à esquerda"
     class="_preview_21c337"
     data-layout="left"
+    data-touch-scale="1.000"
+    data-touch-sensitivity="1.000"
     role="img"
+    style="--touch-preview-scale: 1.000; --touch-preview-sensitivity: 1.000;"
   >
     <div
       class="_device_21c337"
@@ -73,6 +76,46 @@ exports[`TouchLayoutPreview > gera snapshots distintos e nomes acessíveis para 
       >
         Ações
       </span>
+    </div>
+    <div
+      aria-hidden="true"
+      class="_previewMeters_21c337"
+    >
+      <div
+        class="_previewMeter_21c337"
+      >
+        <span
+          class="_previewMeterLabel_21c337"
+        >
+          Tamanho
+        </span>
+        <div
+          class="_previewMeterTrack_21c337"
+        >
+          <span
+            class="_previewMeterFill_21c337"
+            style="width: 100%;"
+          />
+        </div>
+      </div>
+      <div
+        class="_previewMeter_21c337"
+      >
+        <span
+          class="_previewMeterLabel_21c337"
+        >
+          Sensibilidade
+        </span>
+        <div
+          class="_previewMeterTrack_21c337"
+        >
+          <span
+            class="_previewMeterFill_21c337"
+            data-variant="sensitivity"
+            style="width: 100%;"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </DocumentFragment>
@@ -84,7 +127,10 @@ exports[`TouchLayoutPreview > gera snapshots distintos e nomes acessíveis para 
     aria-label="Prévia do layout com botões à direita"
     class="_preview_21c337"
     data-layout="right"
+    data-touch-scale="1.000"
+    data-touch-sensitivity="1.000"
     role="img"
+    style="--touch-preview-scale: 1.000; --touch-preview-sensitivity: 1.000;"
   >
     <div
       class="_device_21c337"
@@ -151,6 +197,46 @@ exports[`TouchLayoutPreview > gera snapshots distintos e nomes acessíveis para 
       >
         Ações
       </span>
+    </div>
+    <div
+      aria-hidden="true"
+      class="_previewMeters_21c337"
+    >
+      <div
+        class="_previewMeter_21c337"
+      >
+        <span
+          class="_previewMeterLabel_21c337"
+        >
+          Tamanho
+        </span>
+        <div
+          class="_previewMeterTrack_21c337"
+        >
+          <span
+            class="_previewMeterFill_21c337"
+            style="width: 100%;"
+          />
+        </div>
+      </div>
+      <div
+        class="_previewMeter_21c337"
+      >
+        <span
+          class="_previewMeterLabel_21c337"
+        >
+          Sensibilidade
+        </span>
+        <div
+          class="_previewMeterTrack_21c337"
+        >
+          <span
+            class="_previewMeterFill_21c337"
+            data-variant="sensitivity"
+            style="width: 100%;"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </DocumentFragment>

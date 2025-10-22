@@ -633,8 +633,8 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
             Configurações
           </span>
           <span
+            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
-            role="status"
           >
             <span
               class="_storeButtonBadge_87a75a"
@@ -657,8 +657,8 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
             Loja
           </span>
           <span
+            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
-            role="status"
           >
             <span
               class="_storeButtonBadge_87a75a"
@@ -681,8 +681,8 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
             Missões
           </span>
           <span
+            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
-            role="status"
           >
             <span
               class="_storeButtonBadge_87a75a"
@@ -705,8 +705,8 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders desktop variants f
             Amigos
           </span>
           <span
+            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
-            role="status"
           >
             <span
               class="_storeButtonBadge_87a75a"
@@ -1367,8 +1367,8 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
             Configurações
           </span>
           <span
+            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
-            role="status"
           >
             <span
               class="_storeButtonBadge_87a75a"
@@ -1391,8 +1391,8 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
             Loja
           </span>
           <span
+            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
-            role="status"
           >
             <span
               class="_storeButtonBadge_87a75a"
@@ -1415,8 +1415,8 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
             Missões
           </span>
           <span
+            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
-            role="status"
           >
             <span
               class="_storeButtonBadge_87a75a"
@@ -1439,8 +1439,8 @@ exports[`MicroWorldOnboardingFlow viewport variants > renders mobile variants fo
             Amigos
           </span>
           <span
+            aria-hidden="true"
             class="_storeButtonMeta_87a75a"
-            role="status"
           >
             <span
               class="_storeButtonBadge_87a75a"
