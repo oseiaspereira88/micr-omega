@@ -909,6 +909,7 @@ const HANDSHAKE_TIMEOUT_CLOSE_CODE = 4000;
 
 export class RoomDO {
   static readonly RNG_STATE_PERSIST_DEBOUNCE_MS = 50;
+  static readonly SNAPSHOT_STATE_PERSIST_DEBOUNCE_MS = 50;
 
   private readonly state: DurableObjectState;
   private readonly ready: Promise<void>;
@@ -965,6 +966,10 @@ export class RoomDO {
   private rngStatePersistPending = false;
   private rngStatePersistTimeout: ReturnType<typeof setTimeout> | null = null;
   private rngStatePersistInFlight: Promise<void> | null = null;
+
+  private snapshotStatePersistPending = false;
+  private snapshotStatePersistTimeout: ReturnType<typeof setTimeout> | null = null;
+  private snapshotStatePersistInFlight: Promise<void> | null = null;
 
   private alarmSchedule: Map<AlarmType, number> = new Map();
   private alarmsDirty = false;
@@ -1516,7 +1521,7 @@ export class RoomDO {
     }
 
     if (snapshotAlarmModified) {
-      await this.persistSnapshotState();
+      await this.flushQueuedSnapshotStatePersist({ force: true });
     }
 
     await this.syncAlarms();
@@ -2841,11 +2846,51 @@ export class RoomDO {
   }
 
   private queueSnapshotStatePersist(): void {
-    void this.persistSnapshotState().catch((error) => {
-      this.observability.logError("snapshot_state_persist_failed", error, {
-        category: "persistence"
+    this.snapshotStatePersistPending = true;
+    if (this.snapshotStatePersistTimeout !== null) {
+      return;
+    }
+
+    this.snapshotStatePersistTimeout = setTimeout(() => {
+      this.snapshotStatePersistTimeout = null;
+      void this.flushQueuedSnapshotStatePersist().catch((error) => {
+        this.observability.logError("snapshot_state_persist_failed", error, {
+          category: "persistence",
+        });
       });
-    });
+    }, RoomDO.SNAPSHOT_STATE_PERSIST_DEBOUNCE_MS);
+  }
+
+  private async flushQueuedSnapshotStatePersist(options: { force?: boolean } = {}): Promise<void> {
+    const { force = false } = options;
+
+    if (this.snapshotStatePersistTimeout !== null) {
+      clearTimeout(this.snapshotStatePersistTimeout);
+      this.snapshotStatePersistTimeout = null;
+    }
+
+    if (!force && !this.snapshotStatePersistPending) {
+      if (this.snapshotStatePersistInFlight) {
+        await this.snapshotStatePersistInFlight;
+      }
+      return;
+    }
+
+    this.snapshotStatePersistPending = false;
+
+    if (this.snapshotStatePersistInFlight) {
+      await this.snapshotStatePersistInFlight;
+    }
+
+    const persistPromise = this.persistSnapshotState();
+    this.snapshotStatePersistInFlight = persistPromise;
+    try {
+      await persistPromise;
+    } finally {
+      if (this.snapshotStatePersistInFlight === persistPromise) {
+        this.snapshotStatePersistInFlight = null;
+      }
+    }
   }
 
   private getPlayerIncrementalKey(playerId: string): string {
@@ -3151,7 +3196,7 @@ export class RoomDO {
       if (force && this.pendingSnapshotAlarm !== null) {
         this.pendingSnapshotAlarm = null;
         this.alarmSchedule.delete("snapshot");
-        await this.persistSnapshotState();
+        await this.flushQueuedSnapshotStatePersist({ force: true });
         await this.syncAlarms();
       }
       return;
@@ -3177,7 +3222,7 @@ export class RoomDO {
     }
 
     await this.flushQueuedRngStatePersist({ force });
-    await this.persistSnapshotState();
+    await this.flushQueuedSnapshotStatePersist({ force: true });
 
     if (force) {
       await this.syncAlarms();
