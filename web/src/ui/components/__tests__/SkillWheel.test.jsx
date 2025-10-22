@@ -1,9 +1,76 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SkillWheel from '../SkillWheel';
 import styles from '../SkillWheel.module.css';
+
+const originalMatchMedia = typeof window !== 'undefined' ? window.matchMedia : undefined;
+
+const createMatchMedia = (matches) => {
+  let currentMatches = matches;
+  const listeners = new Set();
+
+  const mediaQueryList = {
+    matches: currentMatches,
+    media: '(max-width: 900px)',
+    onchange: null,
+    addEventListener: vi.fn((event, handler) => {
+      if (event === 'change') {
+        listeners.add(handler);
+      }
+    }),
+    removeEventListener: vi.fn((event, handler) => {
+      if (event === 'change') {
+        listeners.delete(handler);
+      }
+    }),
+    addListener: vi.fn((handler) => {
+      listeners.add(handler);
+    }),
+    removeListener: vi.fn((handler) => {
+      listeners.delete(handler);
+    }),
+    dispatchEvent: vi.fn(() => true),
+  };
+
+  mediaQueryList.setMatches = (nextValue) => {
+    if (currentMatches === nextValue) {
+      return;
+    }
+
+    currentMatches = nextValue;
+    mediaQueryList.matches = nextValue;
+    const event = { matches: nextValue, media: mediaQueryList.media };
+
+    if (typeof mediaQueryList.onchange === 'function') {
+      mediaQueryList.onchange(event);
+    }
+
+    listeners.forEach((listener) => listener(event));
+  };
+
+  return mediaQueryList;
+};
+
+let lastMatchMediaInstance;
+
+beforeEach(() => {
+  window.matchMedia = vi.fn().mockImplementation(() => {
+    lastMatchMediaInstance = createMatchMedia(false);
+    return lastMatchMediaInstance;
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  if (originalMatchMedia) {
+    window.matchMedia = originalMatchMedia;
+  } else {
+    delete window.matchMedia;
+  }
+  lastMatchMediaInstance = undefined;
+});
 
 const BASE_PROPS = {
   currentSkill: {
@@ -72,6 +139,28 @@ describe('SkillWheel control hints', () => {
   });
 });
 
+describe('SkillWheel responsive layout', () => {
+  it('switches layout classes when the viewport media query changes', () => {
+    const { container } = render(<SkillWheel {...BASE_PROPS} touchControlsActive={false} />);
+
+    expect(lastMatchMediaInstance).toBeDefined();
+    expect(container.firstChild).not.toHaveClass(styles.mobile);
+
+    act(() => {
+      lastMatchMediaInstance?.setMatches(true);
+    });
+
+    expect(container.firstChild).toHaveClass(styles.mobile);
+    expect(container.firstChild).not.toHaveClass(styles.mobileWithTouchControls);
+
+    act(() => {
+      lastMatchMediaInstance?.setMatches(false);
+    });
+
+    expect(container.firstChild).not.toHaveClass(styles.mobile);
+  });
+});
+
 describe('SkillWheel descriptions', () => {
   it('renders the current skill description and includes it in tooltips', () => {
     render(<SkillWheel {...BASE_PROPS} />);
@@ -115,3 +204,4 @@ describe('SkillWheel empty state', () => {
     );
   });
 });
+

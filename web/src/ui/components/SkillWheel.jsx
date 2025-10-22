@@ -7,6 +7,9 @@ import {
   STATUS_LABELS,
 } from '../../shared/combat';
 
+const MOBILE_VIEWPORT_MAX_WIDTH = 900;
+const MOBILE_VIEWPORT_QUERY = `(max-width: ${MOBILE_VIEWPORT_MAX_WIDTH}px)`;
+
 const SkillWheel = ({
   currentSkill,
   skillList = [],
@@ -20,12 +23,104 @@ const SkillWheel = ({
   showTouchControls = false,
   touchLayout = null,
 }) => {
-  const resolvedLayout = layout ?? (touchControlsActive ? 'mobile' : 'desktop');
+  const [isViewportMobile, setIsViewportMobile] = React.useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    if (typeof window.matchMedia === 'function') {
+      return window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+    }
+
+    if (typeof window.innerWidth === 'number') {
+      return window.innerWidth <= MOBILE_VIEWPORT_MAX_WIDTH;
+    }
+
+    return false;
+  });
+  const resolvedLayout = layout ?? (touchControlsActive || isViewportMobile ? 'mobile' : 'desktop');
   const isMobileLayout = resolvedLayout === 'mobile';
   const usesTouchGuidance = touchControlsActive || isMobileLayout;
   const statusMessageId = React.useId();
   const containerRef = React.useRef(null);
   const [touchControlsFootprint, setTouchControlsFootprint] = React.useState(null);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    if (typeof window.matchMedia === 'function') {
+      const mediaQueryList = window.matchMedia(MOBILE_VIEWPORT_QUERY);
+      const handleMediaChange = (event) => {
+        setIsViewportMobile(event.matches);
+      };
+
+      handleMediaChange(mediaQueryList);
+
+      if (typeof mediaQueryList.addEventListener === 'function') {
+        mediaQueryList.addEventListener('change', handleMediaChange);
+
+        return () => {
+          mediaQueryList.removeEventListener('change', handleMediaChange);
+        };
+      }
+
+      if (typeof mediaQueryList.addListener === 'function') {
+        mediaQueryList.addListener(handleMediaChange);
+
+        return () => {
+          mediaQueryList.removeListener(handleMediaChange);
+        };
+      }
+
+      return undefined;
+    }
+
+    const updateViewportState = () => {
+      if (typeof window.innerWidth === 'number') {
+        setIsViewportMobile(window.innerWidth <= MOBILE_VIEWPORT_MAX_WIDTH);
+      }
+    };
+
+    if (typeof window.ResizeObserver === 'function') {
+      const observerTarget =
+        typeof document !== 'undefined'
+          ? document.documentElement || document.body
+          : containerRef.current;
+
+      if (!observerTarget) {
+        updateViewportState();
+        return undefined;
+      }
+
+      const resizeObserver = new window.ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const width = entry?.contentRect?.width;
+
+          if (typeof width === 'number') {
+            setIsViewportMobile(width <= MOBILE_VIEWPORT_MAX_WIDTH);
+          } else {
+            updateViewportState();
+          }
+        }
+      });
+
+      resizeObserver.observe(observerTarget);
+      updateViewportState();
+
+      return () => {
+        resizeObserver.disconnect();
+      };
+    }
+
+    updateViewportState();
+    window.addEventListener('resize', updateViewportState);
+
+    return () => {
+      window.removeEventListener('resize', updateViewportState);
+    };
+  }, []);
 
   React.useEffect(() => {
     if (typeof window === 'undefined') {
@@ -106,7 +201,7 @@ const SkillWheel = ({
     const emptyClassName = [
       styles.container,
       isMobileLayout ? styles.mobile : '',
-      touchControlsActive ? styles.mobileWithTouchControls : '',
+      isMobileLayout && touchControlsActive ? styles.mobileWithTouchControls : '',
       touchOffsetClass,
       styles.empty,
     ]
@@ -200,7 +295,7 @@ const SkillWheel = ({
   const containerClassName = [
     styles.container,
     isMobileLayout ? styles.mobile : '',
-    touchControlsActive ? styles.mobileWithTouchControls : '',
+    isMobileLayout && touchControlsActive ? styles.mobileWithTouchControls : '',
     touchOffsetClass,
   ]
     .filter(Boolean)
