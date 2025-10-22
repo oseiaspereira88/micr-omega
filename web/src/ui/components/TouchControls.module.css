@@ -129,6 +129,25 @@
   );
 }
 
+.compact {
+  --touch-spacing: calc(var(--touch-scale) * 10px);
+  --touch-gap: calc(var(--touch-scale) * var(--touch-vertical-scale) * 58px);
+  --touch-horizontal-offset: calc(var(--touch-scale) * 68px);
+  --touch-joystick-size: calc(var(--touch-scale) * 92px);
+  --touch-joystick-knob: calc(var(--touch-scale) * 36px);
+  --touch-bottom-base: calc(
+    var(--safe-area-inset-bottom, 0px) + var(--touch-spacing) + var(--touch-legend-space)
+  );
+}
+
+.compact .buttonLabel {
+  font-size: clamp(0.6rem, 1.8vw, 0.75rem);
+}
+
+.compact .buttonLegend {
+  font-size: clamp(0.55rem, 1.5vw, 0.7rem);
+}
+
 .layoutRight .joystickZone {
   left: calc(var(--safe-area-inset-left, 0px) + var(--touch-spacing));
   right: auto;

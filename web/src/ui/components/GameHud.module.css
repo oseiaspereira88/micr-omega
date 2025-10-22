@@ -455,6 +455,10 @@
   gap: clamp(12px, 4vw, 18px);
 }
 
+.mainHudMobileCollapsed {
+  gap: clamp(10px, 3vw, 14px);
+}
+
 .mainHudMobile > * {
   pointer-events: auto;
 }
@@ -468,6 +472,16 @@
   display: flex;
   flex-direction: column;
   gap: clamp(12px, 3vw, 18px);
+  max-height: 540px;
+  transition: max-height 0.35s ease, opacity 0.25s ease, transform 0.3s ease;
+}
+
+:global([data-mobile-hud='true']) :local(.mobileTopRegionCollapsed) {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-18px);
+  overflow: hidden;
 }
 
 :global([data-mobile-hud='true']) :local(.mobileBottomRegion) {
@@ -480,8 +494,73 @@
   width: 100%;
 }
 
+:global([data-mobile-hud='true']) :local(.mobileBottomRegionActive) {
+  align-items: stretch;
+}
+
+:global([data-mobile-hud='true']) :local(.mobileBottomRegionCompact) {
+  gap: clamp(12px, 3.5vw, 18px);
+}
+
 :global([data-mobile-hud='true']) :local(.mobileBottomRegion) > * {
   width: min(520px, 100%);
+}
+
+.mobileHudToggleRow {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  pointer-events: auto;
+}
+
+.mobileHudToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(16, 24, 46, 0.82);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 14px 32px rgba(4, 10, 24, 0.45);
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.mobileHudToggle:hover,
+.mobileHudToggle:focus-visible {
+  transform: translateY(-1px);
+  background: rgba(28, 40, 68, 0.94);
+  box-shadow: 0 16px 38px rgba(4, 10, 24, 0.5);
+}
+
+.mobileHudToggle:focus-visible {
+  outline: 3px solid #00ffe1;
+  outline-offset: 3px;
+}
+
+.mobileHudToggle:disabled,
+.mobileHudToggle[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.mobileHudToggleIcon {
+  font-size: 1rem;
+}
+
+.mobileHudToggleLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .desktopSkillControls {

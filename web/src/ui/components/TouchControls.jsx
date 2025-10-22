@@ -284,12 +284,12 @@ const TouchControls = ({
   }, []);
 
   const touchScale = useMemo(
-    () => clamp(viewport.width / 600, 0.8, 1.1),
+    () => clamp(viewport.width / 640, 0.7, 1.05),
     [viewport.width],
   );
 
   const heightScale = useMemo(
-    () => clamp(viewport.height / 800, 0.7, 1),
+    () => clamp(viewport.height / 840, 0.62, 1),
     [viewport.height],
   );
 
@@ -309,8 +309,8 @@ const TouchControls = ({
   );
 
   const isLandscape = viewport.width > viewport.height;
-  const showButtonLegends = true;
-  const useCompactButtonLegends = isLandscape;
+  const showButtonLegends = viewport.width > 420;
+  const useCompactButtonLegends = isLandscape || viewport.width <= 600;
 
   const buttonLegends = useMemo(
     () => ({
@@ -323,10 +323,15 @@ const TouchControls = ({
     [useCompactButtonLegends],
   );
 
-  const touchLegendSpacing = useMemo(
-    () => Math.round(configuredTouchScale * (useCompactButtonLegends ? 20 : 26)),
-    [configuredTouchScale, useCompactButtonLegends],
-  );
+  const touchLegendSpacing = useMemo(() => {
+    if (!showButtonLegends) {
+      return 0;
+    }
+
+    return Math.round(
+      configuredTouchScale * (useCompactButtonLegends ? 18 : 24),
+    );
+  }, [configuredTouchScale, showButtonLegends, useCompactButtonLegends]);
 
   const effectiveLayout = useMemo(() => {
     if (!(autoInvertWhenSidebarOpen && isSidebarOpen)) {
@@ -423,6 +428,8 @@ const TouchControls = ({
   const layoutClass =
     effectiveLayout === 'left' ? styles.layoutLeft : styles.layoutRight;
   const orientationClass = isLandscape ? styles.landscape : null;
+  const isCompactViewport =
+    !isLandscape && (viewport.width <= 600 || viewport.height <= 760);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -580,6 +587,7 @@ const TouchControls = ({
         styles.touchLayer,
         layoutClass,
         orientationClass,
+        isCompactViewport ? styles.compact : null,
         isSidebarOpen ? styles.sidebarHidden : null,
         showButtonLegends ? styles.showLegends : null,
         className,

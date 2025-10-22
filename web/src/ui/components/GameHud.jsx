@@ -115,6 +115,13 @@ const GameHud = ({
 
     return window.matchMedia(MOBILE_HUD_QUERY).matches;
   });
+  const [isMobileHudCollapsed, setIsMobileHudCollapsed] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+
+    return window.matchMedia(MOBILE_HUD_QUERY).matches;
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarBackdropVisible, setIsSidebarBackdropVisible] = useState(false);
   const sidebarRef = useRef(null);
@@ -139,6 +146,7 @@ const GameHud = ({
   const joystickSensitivitySliderId = useId();
   const joystickSensitivityDescriptionId = useId();
   const joystickSensitivityHelperId = useId();
+  const mobileHudRegionId = useId();
   const { settings, updateSettings } = useGameSettings();
   const audioEnabled = settings?.audioEnabled !== false;
   const masterVolume =
@@ -256,6 +264,10 @@ const GameHud = ({
   }, [showStatusOverlay]);
 
   useEffect(() => {
+    setIsMobileHudCollapsed(isMobileHud);
+  }, [isMobileHud]);
+
+  useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
       return undefined;
     }
@@ -291,6 +303,10 @@ const GameHud = ({
 
   const handleCloseSidebar = useCallback(() => {
     setIsSidebarOpen(false);
+  }, []);
+
+  const handleToggleMobileHudVisibility = useCallback(() => {
+    setIsMobileHudCollapsed((previous) => !previous);
   }, []);
 
   useEffect(() => {
@@ -665,6 +681,7 @@ const GameHud = ({
   const mainHudClassName = [
     styles.mainHud,
     isMobileHud ? styles.mainHudMobile : '',
+    isMobileHud && isMobileHudCollapsed ? styles.mainHudMobileCollapsed : '',
     hudDisabled ? styles.hudElementDisabled : '',
   ]
     .filter(Boolean)
@@ -680,6 +697,22 @@ const GameHud = ({
     : 'Mostrar painel';
   const touchControlsDisabled = hudDisabled || isSidebarOpen;
   const touchControlsClassName = hudDisabled ? styles.hudElementDisabled : undefined;
+  const mobileHudToggleLabel = isMobileHudCollapsed
+    ? 'Mostrar status do jogador'
+    : 'Ocultar status do jogador';
+  const mobileTopRegionClassName = [
+    styles.mobileTopRegion,
+    isMobileHud && isMobileHudCollapsed ? styles.mobileTopRegionCollapsed : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const mobileBottomRegionClassName = [
+    styles.mobileBottomRegion,
+    isMobileHud ? styles.mobileBottomRegionActive : '',
+    isMobileHud && isMobileHudCollapsed ? styles.mobileBottomRegionCompact : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   useEffect(() => {
     if (!isMobileHud) {
@@ -1229,7 +1262,12 @@ const GameHud = ({
           ref={hudContentRef}
           data-touch-controls-active={showTouchControls ? 'true' : 'false'}
         >
-          <div className={styles.mobileTopRegion}>
+          <div
+            id={isMobileHud ? mobileHudRegionId : undefined}
+            className={mobileTopRegionClassName}
+            aria-hidden={isMobileHud && isMobileHudCollapsed ? true : undefined}
+            inert={isMobileHud && isMobileHudCollapsed ? 'true' : undefined}
+          >
             <HudBar
               isMobileHud={isMobileHud}
               level={level}
@@ -1269,7 +1307,24 @@ const GameHud = ({
             <Notifications notifications={notifications} />
           </div>
 
-          <div className={styles.mobileBottomRegion}>
+          <div className={mobileBottomRegionClassName}>
+            {isMobileHud ? (
+              <div className={styles.mobileHudToggleRow}>
+                <button
+                  type="button"
+                  className={styles.mobileHudToggle}
+                  onClick={handleToggleMobileHudVisibility}
+                  aria-expanded={isMobileHudCollapsed ? 'false' : 'true'}
+                  aria-controls={mobileHudRegionId}
+                  disabled={hudDisabled}
+                >
+                  <span className={styles.mobileHudToggleIcon} aria-hidden="true">
+                    {isMobileHudCollapsed ? '📊' : '👁️'}
+                  </span>
+                  <span className={styles.mobileHudToggleLabel}>{mobileHudToggleLabel}</span>
+                </button>
+              </div>
+            ) : null}
             <div className={styles.desktopSkillControls}>
               <SkillWheel
                 currentSkill={currentSkill}
