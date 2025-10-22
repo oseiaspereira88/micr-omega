@@ -234,6 +234,49 @@ export const DEFAULT_MAX_PLAYERS = DEFAULT_RUNTIME_CONFIG.maxPlayers;
 const MAX_COMBO_MULTIPLIER = 50;
 const MAX_PERSISTED_SCORE = Number.MAX_SAFE_INTEGER;
 
+const toFiniteNumberOrNull = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "bigint") {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return null;
+    }
+    const numeric = Number(trimmed);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  if (value instanceof Number) {
+    const numeric = value.valueOf();
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  return null;
+};
+
+const sanitizeStoredScore = (value: unknown): number => {
+  const numeric = toFiniteNumberOrNull(value);
+  if (numeric === null) {
+    return 0;
+  }
+  return clamp(numeric, 0, MAX_PERSISTED_SCORE);
+};
+
+const sanitizeStoredCombo = (value: unknown): number => {
+  const numeric = toFiniteNumberOrNull(value);
+  if (numeric === null) {
+    return 1;
+  }
+  return clamp(numeric, 1, MAX_COMBO_MULTIPLIER);
+};
+
 const PLAYERS_KEY = "players";
 const WORLD_KEY = "world";
 const ALARM_KEY = "alarms";
@@ -1316,15 +1359,8 @@ export class RoomDO {
 
         const reconnectToken = generateReconnectToken();
 
-        const storedScore = Number(stored.score);
-        const sanitizedScore = Number.isFinite(storedScore)
-          ? clamp(storedScore, 0, MAX_PERSISTED_SCORE)
-          : 0;
-
-        const storedCombo = Number(stored.combo);
-        const sanitizedCombo = Number.isFinite(storedCombo)
-          ? clamp(storedCombo, 1, MAX_COMBO_MULTIPLIER)
-          : 1;
+        const sanitizedScore = sanitizeStoredScore(stored.score);
+        const sanitizedCombo = sanitizeStoredCombo(stored.combo);
 
         const normalized: StoredPlayer = {
           id: playerId,
