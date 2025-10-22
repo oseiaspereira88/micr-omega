@@ -321,11 +321,21 @@ const TouchControls = ({
 
   const dashStatusId = useId();
   const skillStatusId = useId();
-  const dashReady = dashCharge >= 30;
-  const dashChargePercent = clampProgress(dashCharge);
+  const DASH_CHARGE_THRESHOLD = 30;
+  const dashChargeNumeric = Number(dashCharge);
+  const dashChargeValue = Number.isFinite(dashChargeNumeric) ? dashChargeNumeric : 0;
+  const dashReady = dashChargeValue >= DASH_CHARGE_THRESHOLD;
+  const dashChargeClamped = Math.max(
+    0,
+    Math.min(dashChargeValue, DASH_CHARGE_THRESHOLD),
+  );
+  const dashChargePercent = clampProgress(
+    (dashChargeClamped / DASH_CHARGE_THRESHOLD) * 100,
+  );
+  const dashChargeDisplay = `${Math.round(dashChargeClamped)}/${DASH_CHARGE_THRESHOLD}`;
   const dashValueText = dashReady
     ? 'Dash carregado'
-    : `Dash carregando: ${dashChargePercent}%`;
+    : `Dash carregando: ${dashChargeDisplay}`;
   const dashAriaLabel = dashReady ? 'Usar dash — pronto' : 'Usar dash — carregando';
 
   let skillAriaLabel = 'Usar habilidade';
@@ -691,7 +701,7 @@ const TouchControls = ({
           )}
           <span className={styles.buttonIcon} aria-hidden="true">💨</span>
           <span className={joinClassNames(styles.cooldownLabel, styles.dashLabel)}>
-            {dashReady ? 'Pronto' : `${dashChargePercent}%`}
+            {dashReady ? 'Pronto' : dashChargeDisplay}
           </span>
           <span
             className={joinClassNames(styles.buttonLabel, styles.buttonLabelBottom)}
