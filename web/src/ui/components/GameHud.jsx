@@ -767,6 +767,7 @@ const GameHud = ({
       <div
         className={hudClassName}
         data-mobile-hud={isMobileHud ? 'true' : 'false'}
+        data-boss-bar-active={bossActive ? 'true' : undefined}
         ref={hudRootRef}
       >
         <div

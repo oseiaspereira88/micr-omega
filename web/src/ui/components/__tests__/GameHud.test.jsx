@@ -778,3 +778,57 @@ describe('GameHud boss health bar', () => {
   });
 });
 
+describe('GameHud notifications layout cues', () => {
+  it('mantém o deslocamento padrão sem barra de chefe ativa', () => {
+    const longNotification =
+      'Notificação prolongada para verificar o espaçamento entre elementos do HUD em cenários normais.';
+
+    render(
+      <GameSettingsProvider>
+        <GameHud
+          {...BASE_PROPS}
+          notifications={[{ id: 'long', text: longNotification }]}
+        />
+      </GameSettingsProvider>,
+    );
+
+    const hudRoot = document.querySelector('[data-mobile-hud]');
+    expect(hudRoot).toBeInTheDocument();
+    expect(hudRoot).not.toHaveAttribute('data-boss-bar-active');
+    expect(screen.getByText(longNotification)).toBeInTheDocument();
+  });
+
+  it('ativa o deslocamento somado quando a barra de chefe está presente', () => {
+    const extendedNotifications = [
+      {
+        id: 'boss-alert',
+        text: 'Alerta de chefe extremamente perigoso aparecendo com mensagem extensa e detalhada.',
+      },
+      {
+        id: 'boss-tip',
+        text: 'Dica prolongada: use habilidades de controle de multidão para diminuir o ritmo do inimigo chefe.',
+      },
+    ];
+
+    render(
+      <GameSettingsProvider>
+        <GameHud
+          {...BASE_PROPS}
+          bossActive
+          bossHealth={320}
+          bossMaxHealth={640}
+          bossName="Soberano Plasmático"
+          notifications={extendedNotifications}
+        />
+      </GameSettingsProvider>,
+    );
+
+    const hudRoot = document.querySelector('[data-mobile-hud]');
+    expect(hudRoot).toBeInTheDocument();
+    expect(hudRoot).toHaveAttribute('data-boss-bar-active', 'true');
+    extendedNotifications.forEach((notification) => {
+      expect(screen.getByText(notification.text)).toBeInTheDocument();
+    });
+  });
+});
+
