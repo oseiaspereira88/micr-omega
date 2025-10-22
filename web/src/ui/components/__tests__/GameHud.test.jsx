@@ -665,6 +665,11 @@ describe('GameHud settings panel', () => {
     });
     expect(autoSwapToggle).toBeDisabled();
 
+    const touchScaleSlider = screen.getByLabelText('Tamanho dos controles');
+    const joystickSensitivitySlider = screen.getByLabelText('Sensibilidade do joystick');
+    expect(touchScaleSlider).toBeDisabled();
+    expect(joystickSensitivitySlider).toBeDisabled();
+
     await user.click(touchToggle);
 
     await waitFor(() => {
@@ -680,6 +685,8 @@ describe('GameHud settings panel', () => {
 
     expect(touchLayoutSelect).not.toBeDisabled();
     expect(autoSwapToggle).not.toBeDisabled();
+    expect(touchScaleSlider).not.toBeDisabled();
+    expect(joystickSensitivitySlider).not.toBeDisabled();
 
     await user.selectOptions(touchLayoutSelect, 'left');
 
@@ -702,6 +709,28 @@ describe('GameHud settings panel', () => {
       expect(stored).not.toBeNull();
       const parsed = JSON.parse(stored);
       expect(parsed.autoSwapTouchLayoutWhenSidebarOpen).toBe(false);
+    });
+
+    fireEvent.change(touchScaleSlider, { target: { value: '1.4' } });
+
+    await waitFor(() => {
+      expect(touchScaleSlider).toHaveValue('1.4');
+      expect(preview).toHaveAttribute('data-touch-scale', '1.400');
+      const stored = window.localStorage.getItem(storageKey);
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored ?? '{}');
+      expect(parsed.touchControlScale).toBeCloseTo(1.4, 5);
+    });
+
+    fireEvent.change(joystickSensitivitySlider, { target: { value: '0.6' } });
+
+    await waitFor(() => {
+      expect(joystickSensitivitySlider).toHaveValue('0.6');
+      expect(preview).toHaveAttribute('data-touch-sensitivity', '0.600');
+      const stored = window.localStorage.getItem(storageKey);
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored ?? '{}');
+      expect(parsed.joystickSensitivity).toBeCloseTo(0.6, 5);
     });
   });
 });

@@ -18,6 +18,12 @@ import {
 } from "../store/gameStore";
 import {
   GameSettings,
+  JOYSTICK_SENSITIVITY_MAX,
+  JOYSTICK_SENSITIVITY_MIN,
+  JOYSTICK_SENSITIVITY_STEP,
+  TOUCH_CONTROL_SCALE_MAX,
+  TOUCH_CONTROL_SCALE_MIN,
+  TOUCH_CONTROL_SCALE_STEP,
   useGameSettings,
 } from "../store/gameSettings";
 import {
@@ -425,6 +431,26 @@ const StartScreen = ({
     [updateSettings]
   );
 
+  const handleTouchScaleChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const value = Number.parseFloat(event.target.value);
+      if (Number.isFinite(value)) {
+        updateSettings({ touchControlScale: value });
+      }
+    },
+    [updateSettings]
+  );
+
+  const handleJoystickSensitivityChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const value = Number.parseFloat(event.target.value);
+      if (Number.isFinite(value)) {
+        updateSettings({ joystickSensitivity: value });
+      }
+    },
+    [updateSettings]
+  );
+
   const handleTouchAutoSwapChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       updateSettings({
@@ -456,6 +482,12 @@ const StartScreen = ({
   const touchLayoutAutoSwapToggleId = "touch-layout-auto-swap";
   const touchLayoutAutoSwapDescriptionId = "touch-layout-auto-swap-description";
   const touchLayoutAutoSwapHelperId = "touch-layout-auto-swap-helper";
+  const touchScaleSliderId = "touch-control-scale";
+  const touchScaleDescriptionId = "touch-control-scale-description";
+  const touchScaleHelperId = "touch-control-scale-helper";
+  const joystickSensitivitySliderId = "joystick-sensitivity";
+  const joystickSensitivityDescriptionId = "joystick-sensitivity-description";
+  const joystickSensitivityHelperId = "joystick-sensitivity-helper";
   const controlsGuideDialogId = "controls-guide-dialog";
   const controlsGuideTitleId = "controls-guide-title";
   const controlsGuideDescriptionId = "controls-guide-description";
@@ -469,6 +501,26 @@ const StartScreen = ({
   const touchLayoutAutoSwapDescribedBy = settings.showTouchControls
     ? touchLayoutAutoSwapDescriptionId
     : `${touchLayoutAutoSwapDescriptionId} ${touchLayoutAutoSwapHelperId}`;
+  const touchControlScale = Number.isFinite(settings.touchControlScale)
+    ? Math.max(
+        TOUCH_CONTROL_SCALE_MIN,
+        Math.min(TOUCH_CONTROL_SCALE_MAX, settings.touchControlScale),
+      )
+    : 1;
+  const joystickSensitivity = Number.isFinite(settings.joystickSensitivity)
+    ? Math.max(
+        JOYSTICK_SENSITIVITY_MIN,
+        Math.min(JOYSTICK_SENSITIVITY_MAX, settings.joystickSensitivity),
+      )
+    : 1;
+  const touchControlScaleLabel = `${Math.round(touchControlScale * 100)}%`;
+  const joystickSensitivityLabel = `${Math.round(joystickSensitivity * 100)}%`;
+  const touchScaleDescribedBy = settings.showTouchControls
+    ? touchScaleDescriptionId
+    : `${touchScaleDescriptionId} ${touchScaleHelperId}`;
+  const joystickSensitivityDescribedBy = settings.showTouchControls
+    ? joystickSensitivityDescriptionId
+    : `${joystickSensitivityDescriptionId} ${joystickSensitivityHelperId}`;
 
   const audioStatusMessage = audioEnabled
     ? `${audioStatusLabel} – ${audioVolumePercentage}%`
@@ -954,7 +1006,97 @@ const StartScreen = ({
                         <TouchLayoutPreview
                           layout={settings.touchLayout}
                           className={styles.touchLayoutPreview}
+                          data-touch-scale={touchControlScale.toFixed(3)}
+                          data-touch-sensitivity={joystickSensitivity.toFixed(3)}
+                          scale={touchControlScale}
+                          joystickSensitivity={joystickSensitivity}
                           data-disabled={isTouchLayoutDisabled ? "true" : undefined}
+                        />
+                      </div>
+                    </div>
+
+                    <div className={styles.optionRow}>
+                      <div className={styles.optionContent}>
+                        <label
+                          className={styles.optionTitle}
+                          htmlFor={touchScaleSliderId}
+                        >
+                          Tamanho dos controles
+                        </label>
+                        <span
+                          className={styles.optionDescription}
+                          id={touchScaleDescriptionId}
+                        >
+                          Ajuste a escala dos botões virtuais renderizados na tela.
+                        </span>
+                        {!settings.showTouchControls ? (
+                          <span
+                            className={styles.optionDescription}
+                            id={touchScaleHelperId}
+                          >
+                            Ative os controles touch para visualizar este ajuste.
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className={styles.sliderControls}>
+                        <span className={styles.sliderValue} aria-hidden="true">
+                          {touchControlScaleLabel}
+                        </span>
+                        <input
+                          id={touchScaleSliderId}
+                          type="range"
+                          className={`${styles.rangeInput} ${styles.input}`.trim()}
+                          min={TOUCH_CONTROL_SCALE_MIN}
+                          max={TOUCH_CONTROL_SCALE_MAX}
+                          step={TOUCH_CONTROL_SCALE_STEP}
+                          value={touchControlScale}
+                          onChange={handleTouchScaleChange}
+                          disabled={isTouchLayoutDisabled}
+                          aria-valuetext={touchControlScaleLabel}
+                          aria-describedby={touchScaleDescribedBy}
+                        />
+                      </div>
+                    </div>
+
+                    <div className={styles.optionRow}>
+                      <div className={styles.optionContent}>
+                        <label
+                          className={styles.optionTitle}
+                          htmlFor={joystickSensitivitySliderId}
+                        >
+                          Sensibilidade do joystick
+                        </label>
+                        <span
+                          className={styles.optionDescription}
+                          id={joystickSensitivityDescriptionId}
+                        >
+                          Defina a distância necessária para atingir o movimento máximo.
+                        </span>
+                        {!settings.showTouchControls ? (
+                          <span
+                            className={styles.optionDescription}
+                            id={joystickSensitivityHelperId}
+                          >
+                            Ative os controles touch para configurar este ajuste.
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className={styles.sliderControls}>
+                        <span className={styles.sliderValue} aria-hidden="true">
+                          {joystickSensitivityLabel}
+                        </span>
+                        <input
+                          id={joystickSensitivitySliderId}
+                          type="range"
+                          className={`${styles.rangeInput} ${styles.input}`.trim()}
+                          min={JOYSTICK_SENSITIVITY_MIN}
+                          max={JOYSTICK_SENSITIVITY_MAX}
+                          step={JOYSTICK_SENSITIVITY_STEP}
+                          value={joystickSensitivity}
+                          onChange={handleJoystickSensitivityChange}
+                          disabled={isTouchLayoutDisabled}
+                          aria-valuetext={joystickSensitivityLabel}
+                          aria-describedby={joystickSensitivityDescribedBy}
                         />
                       </div>
                     </div>

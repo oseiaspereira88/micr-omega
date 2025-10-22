@@ -23,7 +23,16 @@ export type GameSettings = {
   touchLayout: TouchLayout;
   autoSwapTouchLayoutWhenSidebarOpen: boolean;
   cameraZoom: number;
+  touchControlScale: number;
+  joystickSensitivity: number;
 };
+
+export const TOUCH_CONTROL_SCALE_MIN = 0.6;
+export const TOUCH_CONTROL_SCALE_MAX = 1.6;
+export const TOUCH_CONTROL_SCALE_STEP = 0.05;
+export const JOYSTICK_SENSITIVITY_MIN = 0.5;
+export const JOYSTICK_SENSITIVITY_MAX = 1.5;
+export const JOYSTICK_SENSITIVITY_STEP = 0.05;
 
 const DEFAULT_SETTINGS: GameSettings = {
   audioEnabled: true,
@@ -34,6 +43,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   touchLayout: "right",
   autoSwapTouchLayoutWhenSidebarOpen: true,
   cameraZoom: 1,
+  touchControlScale: 1,
+  joystickSensitivity: 1,
 };
 
 const STORAGE_KEY = "micr-omega:game-settings";
@@ -154,6 +165,40 @@ const parseCameraZoom = (value: unknown, fallback: number): number => {
   return clampCameraZoom(fallback);
 };
 
+export const clampTouchControlScale = (value: unknown): number => {
+  const numericValue = typeof value === "string" ? Number.parseFloat(value) : value;
+  if (!Number.isFinite(numericValue)) {
+    return 1;
+  }
+
+  if (numericValue < TOUCH_CONTROL_SCALE_MIN) {
+    return TOUCH_CONTROL_SCALE_MIN;
+  }
+
+  if (numericValue > TOUCH_CONTROL_SCALE_MAX) {
+    return TOUCH_CONTROL_SCALE_MAX;
+  }
+
+  return Number(numericValue);
+};
+
+export const clampJoystickSensitivity = (value: unknown): number => {
+  const numericValue = typeof value === "string" ? Number.parseFloat(value) : value;
+  if (!Number.isFinite(numericValue)) {
+    return 1;
+  }
+
+  if (numericValue < JOYSTICK_SENSITIVITY_MIN) {
+    return JOYSTICK_SENSITIVITY_MIN;
+  }
+
+  if (numericValue > JOYSTICK_SENSITIVITY_MAX) {
+    return JOYSTICK_SENSITIVITY_MAX;
+  }
+
+  return Number(numericValue);
+};
+
 const parseStoredSettings = (): GameSettings => {
   if (typeof window === "undefined") {
     return { ...DEFAULT_SETTINGS };
@@ -201,6 +246,14 @@ const parseStoredSettings = (): GameSettings => {
 
     const cameraZoom = parseCameraZoom(parsed.cameraZoom, DEFAULT_SETTINGS.cameraZoom);
 
+    const touchControlScale = clampTouchControlScale(
+      parsed.touchControlScale ?? DEFAULT_SETTINGS.touchControlScale,
+    );
+
+    const joystickSensitivity = clampJoystickSensitivity(
+      parsed.joystickSensitivity ?? DEFAULT_SETTINGS.joystickSensitivity,
+    );
+
     return {
       audioEnabled,
       masterVolume,
@@ -210,6 +263,8 @@ const parseStoredSettings = (): GameSettings => {
       touchLayout,
       autoSwapTouchLayoutWhenSidebarOpen,
       cameraZoom,
+      touchControlScale,
+      joystickSensitivity,
     };
   } catch (error) {
     console.warn("Não foi possível ler as configurações do jogo salvas", error);
@@ -233,10 +288,30 @@ export const GameSettingsProvider = ({ children }: { children: ReactNode }) => {
   }, [settings]);
 
   const updateSettings = useCallback((next: Partial<GameSettings>) => {
-    setSettings((prev) => ({
-      ...prev,
-      ...next,
-    }));
+    setSettings((prev) => {
+      const merged: GameSettings = {
+        ...prev,
+        ...next,
+      };
+
+      if ("masterVolume" in next) {
+        merged.masterVolume = clampVolume(merged.masterVolume);
+      }
+
+      if ("cameraZoom" in next) {
+        merged.cameraZoom = clampCameraZoom(merged.cameraZoom);
+      }
+
+      if ("touchControlScale" in next) {
+        merged.touchControlScale = clampTouchControlScale(next.touchControlScale);
+      }
+
+      if ("joystickSensitivity" in next) {
+        merged.joystickSensitivity = clampJoystickSensitivity(next.joystickSensitivity);
+      }
+
+      return merged;
+    });
   }, []);
 
   const resetSettings = useCallback(() => {
