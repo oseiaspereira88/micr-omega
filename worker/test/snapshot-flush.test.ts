@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RoomDO } from "../src/RoomDO";
 import type { Env } from "../src";
 import type { DurableObjectState } from "@cloudflare/workers-types";
@@ -58,5 +58,38 @@ describe("RoomDO snapshot batching", () => {
 
     const fourth = roomAny.serializeGameState();
     expect(fourth).toBe(third);
+  });
+
+  it("debounces snapshot state persistence", async () => {
+    const { room, mockState } = await createRoom();
+    const roomAny = room as any;
+
+    roomAny.markPlayersDirty();
+    roomAny.markPlayersDirty();
+    roomAny.markWorldDirty();
+
+    expect(mockState.storageImpl.getPutCount("snapshot_state")).toBe(0);
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, RoomDO.SNAPSHOT_STATE_PERSIST_DEBOUNCE_MS + 10),
+    );
+
+    expect(mockState.storageImpl.getPutCount("snapshot_state")).toBe(1);
+  });
+
+  it("flushSnapshots persists pending snapshot state immediately", async () => {
+    const { room, mockState } = await createRoom();
+    const roomAny = room as any;
+    const persistSpy = vi.spyOn(roomAny, "persistSnapshotState");
+
+    roomAny.markPlayersDirty();
+
+    expect(mockState.storageImpl.getPutCount("snapshot_state")).toBe(0);
+
+    await roomAny.flushSnapshots();
+
+    expect(persistSpy).toHaveBeenCalledTimes(1);
+    expect(roomAny.snapshotStatePersistPending).toBe(false);
+    expect(roomAny.snapshotStatePersistTimeout).toBeNull();
   });
 });
