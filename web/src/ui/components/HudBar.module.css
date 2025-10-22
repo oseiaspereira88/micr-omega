@@ -493,10 +493,20 @@
 .powerUpCard {
   border-radius: 8px;
   padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .powerUpTitle {
   font-size: 0.65rem;
+}
+
+.powerUpMeta {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.82);
+  display: inline-flex;
+  align-items: center;
 }
 
 .powerUpBar {
