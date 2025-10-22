@@ -134,11 +134,24 @@
   position: absolute;
   top: 45px;
   left: 8px;
+  --skill-wheel-width: 230px;
+  --skill-wheel-gap: clamp(16px, 4vw, 28px);
+  --stats-reserved-space: calc(var(--skill-wheel-width) + var(--skill-wheel-gap));
+  right: calc(var(--safe-area-inset-right, 0px) + var(--stats-reserved-space));
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding-right: var(--skill-wheel-gap);
+  box-sizing: border-box;
   pointer-events: auto;
   z-index: 11;
+}
+
+@media (max-width: 960px) {
+  .stats {
+    --skill-wheel-width: 0px;
+    --skill-wheel-gap: 0px;
+  }
 }
 
 .statsCompact {
@@ -543,5 +556,8 @@
   left: auto;
   right: auto;
   max-width: none;
+  --skill-wheel-width: 0px;
+  --skill-wheel-gap: 0px;
+  padding-right: 0;
   z-index: 33;
 }
