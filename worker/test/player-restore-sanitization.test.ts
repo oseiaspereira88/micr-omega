@@ -69,5 +69,52 @@ describe("RoomDO player restoration", () => {
 
     expect(players.get(mappedId)?.name.toLowerCase()).toBe(normalizedName);
   });
+
+  it("sanitizes corrupted score and combo values for ranking", async () => {
+    const mockState = new MockDurableObjectState();
+
+    const storedPlayers: StoredPlayerSnapshot[] = [
+      createStoredPlayer({
+        id: "player-1",
+        name: "Player One",
+        score: "123.4",
+        combo: "5",
+        reconnectTokenHash: "hash-1"
+      }),
+      createStoredPlayer({
+        id: "player-2",
+        name: "Player Two",
+        score: Number.POSITIVE_INFINITY,
+        combo: Number.NEGATIVE_INFINITY,
+        reconnectTokenHash: "hash-2"
+      })
+    ];
+
+    await mockState.storage.put(PLAYERS_KEY, storedPlayers);
+
+    const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+    await (room as any).ready;
+
+    const players: Map<string, any> = (room as any).players;
+    const playerOne = players.get("player-1");
+    const playerTwo = players.get("player-2");
+
+    expect(playerOne?.score).toBeCloseTo(123.4);
+    expect(playerOne?.combo).toBe(5);
+    expect(playerTwo?.score).toBe(0);
+    expect(playerTwo?.combo).toBe(1);
+
+    for (const player of players.values()) {
+      player.connected = true;
+    }
+
+    (room as any).rankingDirty = true;
+    const ranking = (room as any).getRanking();
+
+    expect(ranking).toEqual([
+      { playerId: "player-1", name: "Player One", score: 123.4 },
+      { playerId: "player-2", name: "Player Two", score: 0 }
+    ]);
+  });
 });
 
