@@ -246,6 +246,39 @@
     border-color 180ms ease;
 }
 
+.buttonActive {
+  transform: scale(0.94);
+  box-shadow: 0 10px 26px rgba(4, 10, 24, 0.62), 0 0 24px var(--touch-primary-glow);
+  filter: brightness(1.05);
+}
+
+.attackButtonActive {
+  border-color: var(--touch-primary-border-strong);
+  box-shadow: 0 12px 30px rgba(56, 189, 248, 0.55), 0 0 32px var(--touch-primary-highlight);
+}
+
+.dashButtonActive {
+  border-color: var(--touch-secondary-intense);
+  box-shadow: 0 10px 24px rgba(45, 212, 191, 0.5), 0 0 26px var(--touch-secondary-glow);
+}
+
+.skillButtonActive {
+  border-color: var(--touch-primary-border-strong);
+  box-shadow: 0 12px 28px rgba(56, 189, 248, 0.5), 0 0 28px var(--touch-primary);
+  filter: brightness(1.08);
+}
+
+.cycleSkillButtonActive {
+  border-color: var(--touch-secondary-border);
+  box-shadow: 0 9px 22px rgba(45, 212, 191, 0.45), 0 0 22px var(--touch-secondary-soft);
+}
+
+.evolveButtonActive {
+  border-color: rgba(244, 114, 182, 0.8);
+  box-shadow: 0 10px 26px rgba(244, 114, 182, 0.4), 0 0 24px rgba(244, 114, 182, 0.5);
+  filter: brightness(1.06);
+}
+
 .button::before {
   content: '';
   position: absolute;
