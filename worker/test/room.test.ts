@@ -458,6 +458,32 @@ describe("RoomDO", () => {
     }
   });
 
+  it("closes sockets that do not join before the handshake timeout", async () => {
+    const mf = await createMiniflare({ runtimeConfig: { handshakeTimeoutMs: 25 } });
+    try {
+      const socket = await openSocket(mf);
+
+      const closeEvent = await new Promise<CloseEvent>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("socket did not close within expected timeout"));
+        }, 1000);
+        socket.addEventListener(
+          "close",
+          (event) => {
+            clearTimeout(timeout);
+            resolve(event as CloseEvent);
+          },
+          { once: true },
+        );
+      });
+
+      expect(closeEvent.code).toBe(4000);
+      expect(closeEvent.reason).toBe("handshake_timeout");
+    } finally {
+      await mf.dispose();
+    }
+  });
+
   it("accepts join payloads sent as Blob", async () => {
     const mf = await createMiniflare();
     try {

@@ -5,6 +5,7 @@ export interface RuntimeConfig {
   resetDelayMs: number;
   reconnectWindowMs: number;
   inactiveTimeoutMs: number;
+  handshakeTimeoutMs: number;
   maxPlayers: number;
   rateLimitWindowMs: number;
   maxMessagesPerConnection: number;
@@ -20,6 +21,7 @@ export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   resetDelayMs: 10_000,
   reconnectWindowMs: 30_000,
   inactiveTimeoutMs: 45_000,
+  handshakeTimeoutMs: 10_000,
   maxPlayers: 100,
   rateLimitWindowMs: 60_000,
   maxMessagesPerConnection: 4_200,
@@ -35,6 +37,7 @@ const BINDING_TO_CONFIG_KEY = {
   ROOM_RESET_DELAY_MS: "resetDelayMs",
   ROOM_RECONNECT_WINDOW_MS: "reconnectWindowMs",
   ROOM_INACTIVE_TIMEOUT_MS: "inactiveTimeoutMs",
+  ROOM_HANDSHAKE_TIMEOUT_MS: "handshakeTimeoutMs",
   ROOM_MAX_PLAYERS: "maxPlayers",
   ROOM_RATE_LIMIT_WINDOW_MS: "rateLimitWindowMs",
   ROOM_MAX_MESSAGES_PER_CONNECTION: "maxMessagesPerConnection",
