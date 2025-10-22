@@ -33,13 +33,26 @@ export class MessageRateLimiter {
     return this.getActiveCount() / limit;
   }
 
-  getRetryAfterMs(now: number): number {
+  getRetryAfterMs(now: number, limitOverride?: number): number {
     this.prune(now);
-    const earliest = this.timestamps[this.startIndex];
-    if (earliest === undefined) {
+    const limit = limitOverride ?? this.limit;
+
+    if (limit <= 0) {
       return 0;
     }
-    return Math.max(0, earliest + this.windowMs - now);
+
+    const activeCount = this.getActiveCount();
+    if (activeCount < limit) {
+      return 0;
+    }
+
+    const index = this.startIndex + (activeCount - limit);
+    const releaseTimestamp = this.timestamps[index];
+    if (releaseTimestamp === undefined) {
+      return 0;
+    }
+
+    return Math.max(0, releaseTimestamp + this.windowMs - now);
   }
 
   private prune(now: number): void {
