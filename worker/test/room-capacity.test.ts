@@ -120,6 +120,9 @@ describe("RoomDO capacity limits", () => {
       expect(roomAny.getConnectedPlayersCount()).toBe(0);
       expect(roomAny.players.size).toBe(0);
       expect(roomAny.nameToPlayerId.size).toBe(0);
+      expect(roomAny.progressionState.size).toBe(0);
+      expect(roomAny.pendingProgression.size).toBe(0);
+      expect(roomAny.progressionDirty).toBe(true);
     } finally {
       (globalThis as any).WebSocket = originalWebSocket;
     }

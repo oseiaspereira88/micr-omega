@@ -4612,6 +4612,11 @@ export class RoomDO {
           this.nameToPlayerId.delete(nameKey);
         }
         this.adjustConnectedPlayers(-1);
+        const removedProgression = this.progressionState.delete(player.id);
+        const removedPendingProgression = this.pendingProgression.delete(player.id);
+        if (removedProgression || removedPendingProgression) {
+          this.markProgressionDirty();
+        }
       }
       return null;
     }
