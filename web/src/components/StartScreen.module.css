@@ -628,10 +628,35 @@
   gap: 0.3rem;
   padding: 1.1rem 1.4rem;
   cursor: pointer;
+  position: relative;
+  border-radius: 14px;
 }
 
 .preferenceSummary::-webkit-details-marker {
   display: none;
+}
+
+.preferenceSummary::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 1.2rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-inline-end: 2px solid rgba(245, 247, 255, 0.8);
+  border-block-end: 2px solid rgba(245, 247, 255, 0.8);
+  transform: translateY(-50%) rotate(-45deg);
+  transition: transform 0.2s ease;
+  pointer-events: none;
+}
+
+.preferenceAccordion[open] .preferenceSummary::after {
+  transform: translateY(-50%) rotate(135deg);
+}
+
+.preferenceSummary:focus-visible {
+  outline: 2px solid rgba(111, 137, 255, 0.85);
+  outline-offset: 3px;
 }
 
 .preferenceSummaryTitle {
