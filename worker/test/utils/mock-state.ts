@@ -19,6 +19,21 @@ export class MockStorage {
     return existed;
   }
 
+  async list<T>(options: { prefix?: string } = {}): Promise<Map<string, T>> {
+    const { prefix } = options;
+    const result = new Map<string, T>();
+    for (const [key, value] of this.data.entries()) {
+      if (prefix && !key.startsWith(prefix)) {
+        continue;
+      }
+      const snapshot = typeof structuredClone === "function"
+        ? structuredClone(value)
+        : value;
+      result.set(key, snapshot as T);
+    }
+    return result;
+  }
+
   async setAlarm(timestamp: number): Promise<void> {
     this.alarm = timestamp;
   }
@@ -45,6 +60,7 @@ export class MockDurableObjectState {
       get: (key: string) => this.storageImpl.get(key),
       put: (key: string, value: unknown) => this.storageImpl.put(key, value),
       delete: (key: string) => this.storageImpl.delete(key),
+      list: (options?: { prefix?: string }) => this.storageImpl.list(options),
       setAlarm: (timestamp: number) => this.storageImpl.setAlarm(timestamp),
       getAlarm: () => this.storageImpl.getAlarm(),
     } as unknown as DurableObjectStorage;

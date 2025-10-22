@@ -148,7 +148,7 @@ describe("RoomDO reconnection status handling", () => {
     }
   });
 
-  it("restores previous reconnect token when snapshot flush fails", async () => {
+  it("queues snapshot flush retries when persistence fails", async () => {
     const originalWebSocket = globalThis.WebSocket;
     const websocketMock = { OPEN: 1, CLOSING: 2, CLOSED: 3 } as const;
     (globalThis as any).WebSocket = websocketMock;
@@ -168,8 +168,6 @@ describe("RoomDO reconnection status handling", () => {
       roomAny.maybeStartGame = vi.fn().mockResolvedValue(undefined);
       roomAny.broadcast = vi.fn();
       roomAny.send = vi.fn();
-      roomAny.queueSnapshotStatePersist = vi.fn();
-      roomAny.queueSyncAlarms = vi.fn();
 
       const joinSocket = createMockSocket();
       const playerId = await roomAny.handleJoin(joinSocket, { type: "join", name: "Bob" });
@@ -200,42 +198,125 @@ describe("RoomDO reconnection status handling", () => {
       roomAny.flushSnapshots = flushSnapshotsMock;
 
       roomAny.send.mockClear();
-      const failingSocket = createMockSocket();
-      const failedResult = await roomAny.handleJoin(failingSocket, {
+      const reconnectSocket = createMockSocket();
+      const result = await roomAny.handleJoin(reconnectSocket, {
         type: "join",
         name: "Bob",
         playerId: player.id,
         reconnectToken: originalToken,
       });
 
-      expect(failedResult).toBeNull();
-      expect(roomAny.send).toHaveBeenCalledWith(failingSocket, {
-        type: "error",
-        reason: "internal_error",
-      });
-      expect(failingSocket.close).toHaveBeenCalledWith(1011, "internal_error");
-      expect(player.reconnectToken).toBe(originalToken);
+      expect(result).toBe(player.id);
+      await Promise.resolve();
+      expect(flushSnapshotsMock).toHaveBeenCalledTimes(1);
 
-      roomAny.send.mockClear();
-      const retrySocket = createMockSocket();
-      const retryResult = await roomAny.handleJoin(retrySocket, {
-        type: "join",
-        name: "Bob",
-        playerId: player.id,
-        reconnectToken: originalToken,
-      });
+      await vi.runOnlyPendingTimersAsync();
+      await Promise.resolve();
 
-      expect(retryResult).toBe(player.id);
       expect(flushSnapshotsMock).toHaveBeenCalledTimes(2);
       expect(player.reconnectToken).not.toBe(originalToken);
 
       const joinedCall = roomAny.send.mock.calls.find(
-        ([socket, message]: any[]) => socket === retrySocket && message?.type === "joined"
+        ([socket, message]: any[]) => socket === reconnectSocket && message?.type === "joined"
       );
       expect(joinedCall).toBeTruthy();
       if (joinedCall) {
         const [, joinedMessage] = joinedCall as [any, any];
         expect(joinedMessage.reconnectToken).toBe(player.reconnectToken);
+      }
+    } finally {
+      vi.useRealTimers();
+      (globalThis as any).WebSocket = originalWebSocket;
+    }
+  });
+
+  it("restores reconnect tokens after restart using incremental persistence", async () => {
+    const originalWebSocket = globalThis.WebSocket;
+    const websocketMock = { OPEN: 1, CLOSING: 2, CLOSED: 3 } as const;
+    (globalThis as any).WebSocket = websocketMock;
+
+    vi.useFakeTimers();
+
+    try {
+      const initialTime = 3_000_000;
+      vi.setSystemTime(initialTime);
+
+      const mockState = new MockDurableObjectState();
+      const room = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+      const roomAny = room as any;
+      await roomAny.ready;
+
+      roomAny.scheduleWorldTick = vi.fn();
+      roomAny.maybeStartGame = vi.fn().mockResolvedValue(undefined);
+      roomAny.broadcast = vi.fn();
+      roomAny.send = vi.fn();
+
+      const joinSocket = createMockSocket();
+      const playerId = await roomAny.handleJoin(joinSocket, { type: "join", name: "Restart" });
+      expect(playerId).toBeTruthy();
+
+      const player = roomAny.players.get(playerId!);
+      expect(player).toBeDefined();
+      if (!player) {
+        throw new Error("player not created");
+      }
+
+      const reconnectToken = player.reconnectToken;
+
+      roomAny.flushSnapshots = vi.fn().mockImplementation(
+        () => new Promise(() => {
+          // never resolves to simulate crash before flush
+        }),
+      );
+
+      const reconnectTime = initialTime + 2_000;
+      vi.setSystemTime(reconnectTime);
+
+      roomAny.clientsBySocket.delete(joinSocket);
+      roomAny.socketsByPlayer.delete(player.id);
+      roomAny.activeSockets.delete(joinSocket);
+
+      player.connected = false;
+      player.lastSeenAt = reconnectTime;
+
+      const incrementalKey = `player_incremental:${player.id}`;
+      expect(mockState.storageImpl.data.has(incrementalKey)).toBe(true);
+
+      const restartedRoom = new RoomDO(mockState as unknown as DurableObjectState, {} as Env);
+      const restartedAny = restartedRoom as any;
+      await restartedAny.ready;
+
+      restartedAny.scheduleWorldTick = vi.fn();
+      restartedAny.maybeStartGame = vi.fn().mockResolvedValue(undefined);
+      restartedAny.broadcast = vi.fn();
+      restartedAny.send = vi.fn();
+
+      const reconnectSocket = createMockSocket();
+      const result = await restartedAny.handleJoin(reconnectSocket, {
+        type: "join",
+        name: "Restart",
+        playerId: player.id,
+        reconnectToken,
+      });
+
+      expect(result).toBe(player.id);
+
+      const restoredPlayer = restartedAny.players.get(player.id);
+      expect(restoredPlayer).toBeDefined();
+      if (!restoredPlayer) {
+        throw new Error("player not restored");
+      }
+
+      expect(restoredPlayer.reconnectToken).not.toBe(reconnectToken);
+      expect(mockState.storageImpl.data.has(incrementalKey)).toBe(true);
+
+      const joinedCall = restartedAny.send.mock.calls.find(
+        ([socket, message]: any[]) => socket === reconnectSocket && message?.type === "joined"
+      );
+      expect(joinedCall).toBeTruthy();
+      if (joinedCall) {
+        const [, joinedMessage] = joinedCall as [any, any];
+        expect(joinedMessage.reconnectToken).toBe(restoredPlayer.reconnectToken);
       }
     } finally {
       vi.useRealTimers();
