@@ -75,7 +75,7 @@ describe('TouchControls', () => {
       <TouchControls {...baseProps} onAttackRelease={onAttackRelease} />
     );
 
-    const attackButton = getByRole('button', { name: 'Executar ataque básico' });
+    const attackButton = getByRole('button', { name: 'Ataque' });
 
     fireEvent.touchCancel(attackButton);
 
@@ -89,7 +89,7 @@ describe('TouchControls', () => {
       <TouchControls {...baseProps} onAttackRelease={onAttackRelease} />
     );
 
-    const attackButton = getByRole('button', { name: 'Executar ataque básico' });
+    const attackButton = getByRole('button', { name: 'Ataque' });
 
     fireEvent.pointerCancel(attackButton);
 
@@ -103,7 +103,7 @@ describe('TouchControls', () => {
       <TouchControls {...baseProps} onAttackRelease={onAttackRelease} />
     );
 
-    const attackButton = getByRole('button', { name: 'Executar ataque básico' });
+    const attackButton = getByRole('button', { name: 'Ataque' });
 
     fireEvent.pointerUp(attackButton);
 
@@ -117,7 +117,7 @@ describe('TouchControls', () => {
       <TouchControls {...baseProps} onAttackRelease={onAttackRelease} />
     );
 
-    const attackButton = getByRole('button', { name: 'Executar ataque básico' });
+    const attackButton = getByRole('button', { name: 'Ataque' });
 
     fireEvent.mouseLeave(attackButton);
 
