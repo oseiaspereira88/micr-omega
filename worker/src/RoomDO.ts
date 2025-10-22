@@ -4111,6 +4111,153 @@ export class RoomDO {
 
   private async setupSession(socket: WebSocket): Promise<void> {
     let playerId: string | null = null;
+    let joinPromise: Promise<string | null> | null = null;
+    const queuedMessages: ClientMessage[] = [];
+
+    const flushQueuedMessages = (): void => {
+      if (!playerId || queuedMessages.length === 0) {
+        return;
+      }
+      const pending = queuedMessages.splice(0);
+      for (const message of pending) {
+        processClientMessage(message);
+      }
+    };
+
+    const processClientMessage = (parsed: ClientMessage): void => {
+      const handleActionFailure = (error: unknown, source: string): void => {
+        const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
+        this.observability.logError("action_message_failed", error, {
+          category: "protocol_error",
+          source,
+          playerId: knownPlayerId,
+        });
+        this.observability.recordMetric("protocol_errors", 1, {
+          type: "action_processing_failed",
+          source,
+        });
+        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CLOSING) {
+          try {
+            socket.close(1011, "error");
+          } catch (closeError) {
+            this.observability.logError("action_socket_close_failed", closeError, {
+              category: "protocol_error",
+              source,
+              playerId: knownPlayerId,
+            });
+          }
+        }
+      };
+
+      switch (parsed.type) {
+        case "join": {
+          const pendingJoin = this.handleJoin(socket, parsed)
+            .then((result) => {
+              if (result) {
+                playerId = result;
+                flushQueuedMessages();
+              }
+              return result;
+            })
+            .catch((error) => {
+              this.observability.logError("join_failed", error);
+              try {
+                if (
+                  socket.readyState === WebSocket.CONNECTING ||
+                  socket.readyState === WebSocket.OPEN
+                ) {
+                  socket.close(1011, "internal_error");
+                }
+              } catch (closeError) {
+                this.observability.logError("join_close_failed", closeError);
+              }
+            })
+            .finally(() => {
+              if (joinPromise === pendingJoin) {
+                joinPromise = null;
+              }
+            });
+          joinPromise = pendingJoin;
+          break;
+        }
+        case "action": {
+          const knownId = playerId ?? this.clientsBySocket.get(socket);
+          if (!knownId || knownId !== parsed.playerId) {
+            this.send(socket, { type: "error", reason: "unknown_player" });
+            return;
+          }
+          void this.handleActionMessage(parsed, socket).catch((error) =>
+            handleActionFailure(error, "action")
+          );
+          break;
+        }
+        case "movement": {
+          const knownId = playerId ?? this.clientsBySocket.get(socket);
+          if (!knownId || knownId !== parsed.playerId) {
+            this.send(socket, { type: "error", reason: "unknown_player" });
+            return;
+          }
+          const { playerId: movementPlayerId, clientTime, ...movement } = parsed;
+          const normalized: ActionMessage = {
+            type: "action",
+            playerId: movementPlayerId,
+            ...(clientTime !== undefined ? { clientTime } : {}),
+            action: movement as PlayerMovementAction,
+          };
+          void this.handleActionMessage(normalized, socket).catch((error) =>
+            handleActionFailure(error, "movement")
+          );
+          break;
+        }
+        case "attack": {
+          const knownId = playerId ?? this.clientsBySocket.get(socket);
+          if (!knownId || knownId !== parsed.playerId) {
+            this.send(socket, { type: "error", reason: "unknown_player" });
+            return;
+          }
+          const { playerId: attackPlayerId, clientTime, ...attack } = parsed;
+          const normalized: ActionMessage = {
+            type: "action",
+            playerId: attackPlayerId,
+            ...(clientTime !== undefined ? { clientTime } : {}),
+            action: attack as PlayerAttackAction,
+          };
+          void this.handleActionMessage(normalized, socket).catch((error) =>
+            handleActionFailure(error, "attack")
+          );
+          break;
+        }
+        case "collect": {
+          const knownId = playerId ?? this.clientsBySocket.get(socket);
+          if (!knownId || knownId !== parsed.playerId) {
+            this.send(socket, { type: "error", reason: "unknown_player" });
+            return;
+          }
+          const { playerId: collectPlayerId, clientTime, ...collect } = parsed;
+          const normalized: ActionMessage = {
+            type: "action",
+            playerId: collectPlayerId,
+            ...(clientTime !== undefined ? { clientTime } : {}),
+            action: collect as PlayerCollectAction,
+          };
+          void this.handleActionMessage(normalized, socket).catch((error) =>
+            handleActionFailure(error, "collect")
+          );
+          break;
+        }
+        case "ping":
+          void this.handlePing(socket, parsed.ts);
+          break;
+      }
+    };
+
+    const queueOrProcessClientMessage = (parsed: ClientMessage): void => {
+      if (joinPromise && playerId === null && parsed.type !== "join") {
+        queuedMessages.push(parsed);
+        return;
+      }
+      processClientMessage(parsed);
+    };
 
     this.activeSockets.add(socket);
 
@@ -4273,122 +4420,7 @@ export class RoomDO {
         }
 
         const parsed = validation.data;
-
-        const handleActionFailure = (error: unknown, source: string): void => {
-          const knownPlayerId = playerId ?? this.clientsBySocket.get(socket) ?? null;
-          this.observability.logError("action_message_failed", error, {
-            category: "protocol_error",
-            source,
-            playerId: knownPlayerId,
-          });
-          this.observability.recordMetric("protocol_errors", 1, {
-            type: "action_processing_failed",
-            source,
-          });
-          if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CLOSING) {
-            try {
-              socket.close(1011, "error");
-            } catch (closeError) {
-              this.observability.logError("action_socket_close_failed", closeError, {
-                category: "protocol_error",
-                source,
-                playerId: knownPlayerId,
-              });
-            }
-          }
-        };
-
-      switch (parsed.type) {
-        case "join":
-          void this.handleJoin(socket, parsed)
-            .then((result) => {
-              if (result) {
-                playerId = result;
-              }
-            })
-            .catch((error) => {
-              this.observability.logError("join_failed", error);
-              try {
-                if (
-                  socket.readyState === WebSocket.CONNECTING ||
-                  socket.readyState === WebSocket.OPEN
-                ) {
-                  socket.close(1011, "internal_error");
-                }
-              } catch (closeError) {
-                this.observability.logError("join_close_failed", closeError);
-              }
-            });
-          break;
-        case "action": {
-          const knownId = playerId ?? this.clientsBySocket.get(socket);
-          if (!knownId || knownId !== parsed.playerId) {
-            this.send(socket, { type: "error", reason: "unknown_player" });
-            return;
-          }
-          void this.handleActionMessage(parsed, socket).catch((error) =>
-            handleActionFailure(error, "action")
-          );
-          break;
-        }
-        case "movement": {
-          const knownId = playerId ?? this.clientsBySocket.get(socket);
-          if (!knownId || knownId !== parsed.playerId) {
-            this.send(socket, { type: "error", reason: "unknown_player" });
-            return;
-          }
-          const { playerId: movementPlayerId, clientTime, ...movement } = parsed;
-          const normalized: ActionMessage = {
-            type: "action",
-            playerId: movementPlayerId,
-            ...(clientTime !== undefined ? { clientTime } : {}),
-            action: movement as PlayerMovementAction,
-          };
-          void this.handleActionMessage(normalized, socket).catch((error) =>
-            handleActionFailure(error, "movement")
-          );
-          break;
-        }
-        case "attack": {
-          const knownId = playerId ?? this.clientsBySocket.get(socket);
-          if (!knownId || knownId !== parsed.playerId) {
-            this.send(socket, { type: "error", reason: "unknown_player" });
-            return;
-          }
-          const { playerId: attackPlayerId, clientTime, ...attack } = parsed;
-          const normalized: ActionMessage = {
-            type: "action",
-            playerId: attackPlayerId,
-            ...(clientTime !== undefined ? { clientTime } : {}),
-            action: attack as PlayerAttackAction,
-          };
-          void this.handleActionMessage(normalized, socket).catch((error) =>
-            handleActionFailure(error, "attack")
-          );
-          break;
-        }
-        case "collect": {
-          const knownId = playerId ?? this.clientsBySocket.get(socket);
-          if (!knownId || knownId !== parsed.playerId) {
-            this.send(socket, { type: "error", reason: "unknown_player" });
-            return;
-          }
-          const { playerId: collectPlayerId, clientTime, ...collect } = parsed;
-          const normalized: ActionMessage = {
-            type: "action",
-            playerId: collectPlayerId,
-            ...(clientTime !== undefined ? { clientTime } : {}),
-            action: collect as PlayerCollectAction,
-          };
-          void this.handleActionMessage(normalized, socket).catch((error) =>
-            handleActionFailure(error, "collect")
-          );
-          break;
-        }
-        case "ping":
-          void this.handlePing(socket, parsed.ts);
-          break;
-      }
+        queueOrProcessClientMessage(parsed);
       })().catch((error) => {
         this.observability.logError("client_message_handler_failed", error, {
           category: "protocol_error",
@@ -4414,6 +4446,7 @@ export class RoomDO {
           });
         });
       }
+      queuedMessages.length = 0;
       this.clientsBySocket.delete(socket);
       this.activeSockets.delete(socket);
     });
