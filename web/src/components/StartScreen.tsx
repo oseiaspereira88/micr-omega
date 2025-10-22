@@ -814,7 +814,12 @@ const StartScreen = ({
                   <div className={styles.preferenceContent}>
                     <div className={styles.optionRow}>
                       <div className={styles.optionContent}>
-                        <span className={styles.optionTitle}>Efeitos sonoros</span>
+                        <label
+                          className={styles.optionTitle}
+                          htmlFor={audioVolumeSliderId}
+                        >
+                          Efeitos sonoros
+                        </label>
                         <span className={styles.optionDescription}>
                           Ajuste o volume global dos efeitos durante a partida.
                         </span>
