@@ -6438,8 +6438,51 @@ export class RoomDO {
     this.activeSockets.delete(socket);
   }
 
+  private isStateDiffMessage(message: ServerMessage): message is StateDiffMessage {
+    return message.type === "state" && message.mode === "diff";
+  }
+
   private send(socket: WebSocket, message: ServerMessage, payload?: string): void {
     if (socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const limit = this.config.socketBufferedAmountLimitBytes;
+    const bufferedAmount = typeof socket.bufferedAmount === "number" ? socket.bufferedAmount : 0;
+
+    if (limit > 0 && bufferedAmount > limit) {
+      const playerId = this.clientsBySocket.get(socket);
+      const isDiffMessage = this.isStateDiffMessage(message);
+      const action = isDiffMessage ? "dropped" : "closed";
+
+      this.observability.recordMetric("socket_buffered_amount_exceeded", bufferedAmount, {
+        limit,
+        messageType: message.type,
+        action,
+      });
+
+      if (isDiffMessage) {
+        this.observability.log("debug", "socket_backpressure_skip_diff", {
+          messageType: message.type,
+          bufferedAmount,
+          limit,
+        });
+        return;
+      }
+
+      this.observability.log("warn", "socket_backpressure_closing", {
+        ...(playerId ? { playerId } : {}),
+        messageType: message.type,
+        bufferedAmount,
+        limit,
+      });
+
+      this.discardSocket(socket, 1013, "backpressure", "socket_backpressure_close_failed");
+
+      if (playerId && this.socketsByPlayer.get(playerId) === socket) {
+        this.socketsByPlayer.delete(playerId);
+      }
+
       return;
     }
 
