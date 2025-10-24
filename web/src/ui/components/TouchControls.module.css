@@ -733,7 +733,14 @@
     ),
     linear-gradient(170deg, rgba(8, 18, 36, 0.95), rgba(12, 32, 54, 0.76));
   box-shadow: 0 14px 32px rgba(4, 10, 24, 0.6), 0 0 32px var(--touch-secondary-glow);
+  /* BUG-008: Prevent reflow during pulse animation */
   transform: scale(1);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  /* Force GPU compositing */
+  transform: translateZ(0) scale(1);
+  -webkit-transform: translateZ(0) scale(1);
 }
 
 .evolveLocked {
@@ -1143,12 +1150,13 @@
   }
 }
 
+/* BUG-008: Optimized pulse animation - prevent reflow */
 @keyframes pulse {
   0%,
   100% {
-    transform: scale(1);
+    transform: translateZ(0) scale(1);
   }
   50% {
-    transform: scale(1.1);
+    transform: translateZ(0) scale(1.1);
   }
 }
