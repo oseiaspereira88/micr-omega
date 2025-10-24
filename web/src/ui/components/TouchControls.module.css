@@ -191,6 +191,7 @@
 .joystickZone {
   position: absolute;
   bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing));
+  left: calc(var(--safe-area-inset-left, 0px) + var(--touch-spacing));
   width: var(--touch-joystick-size);
   height: var(--touch-joystick-size);
   border-radius: 50%;
@@ -338,6 +339,7 @@
 
 .attackButton {
   bottom: var(--touch-attack-bottom);
+  right: calc(var(--safe-area-inset-right, 0px) + var(--touch-spacing));
   width: calc(var(--touch-scale) * 70px);
   height: calc(var(--touch-scale) * 70px);
   font-size: calc(var(--touch-scale) * 1.8rem);
@@ -354,6 +356,7 @@
 
 .dashButton {
   bottom: var(--touch-dash-bottom);
+  right: calc(var(--safe-area-inset-right, 0px) + var(--touch-spacing));
   width: calc(var(--touch-scale) * 60px);
   height: calc(var(--touch-scale) * 60px);
   font-size: calc(var(--touch-scale) * 1.5rem);
@@ -369,6 +372,9 @@
 
 .skillButton {
   bottom: var(--touch-skill-bottom);
+  right: calc(
+    var(--safe-area-inset-right, 0px) + var(--touch-spacing) + var(--touch-horizontal-offset)
+  );
   width: calc(var(--touch-scale) * 65px);
   height: calc(var(--touch-scale) * 65px);
   font-size: calc(var(--touch-scale) * 1.6rem);
@@ -386,6 +392,9 @@
 
 .cycleSkillButton {
   bottom: var(--touch-cycle-bottom);
+  right: calc(
+    var(--safe-area-inset-right, 0px) + var(--touch-spacing) + var(--touch-horizontal-offset)
+  );
   width: calc(var(--touch-scale) * 55px);
   height: calc(var(--touch-scale) * 55px);
   font-size: calc(var(--touch-scale) * 1.4rem);
@@ -557,6 +566,9 @@
 
 .evolveButton {
   bottom: var(--touch-evolve-bottom);
+  right: calc(
+    var(--safe-area-inset-right, 0px) + var(--touch-spacing) + var(--touch-horizontal-offset)
+  );
   width: calc(var(--touch-scale) * 60px);
   height: calc(var(--touch-scale) * 60px);
   font-size: calc(var(--touch-scale) * 1.5rem);
@@ -665,69 +677,146 @@
   cursor: progress;
 }
 
+/* Small screens - stack buttons vertically */
 @media (max-width: 400px) {
   .touchLayer {
+    --touch-spacing: calc(var(--touch-scale) * 8px);
+    --touch-gap: calc(var(--touch-scale) * var(--touch-vertical-scale) * 52px);
+    --touch-horizontal-offset: 0px;
     --touch-dash-bottom: clamp(
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.1),
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.6),
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.2)
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.0),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.4),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.8)
     );
     --touch-skill-bottom: clamp(
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.6),
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.2),
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.8)
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.0),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.5),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 3.0)
     );
     --touch-cycle-bottom: clamp(
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.2),
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 3),
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 3.6)
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 3.0),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 3.6),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 4.2)
     );
     --touch-evolve-bottom: clamp(
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.2),
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.8),
-      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.4)
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 1.5),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.0),
+      calc(var(--touch-bottom-base) + var(--touch-gap) * 2.5)
     );
   }
 
+  /* Stack all buttons in single column */
   .layoutRight .skillButton,
   .layoutRight .cycleSkillButton,
   .layoutRight .evolveButton {
     right: calc(var(--safe-area-inset-right, 0px) + var(--touch-spacing));
+    left: auto;
   }
 
   .layoutLeft .skillButton,
   .layoutLeft .cycleSkillButton,
   .layoutLeft .evolveButton {
     left: calc(var(--safe-area-inset-left, 0px) + var(--touch-spacing));
+    right: auto;
+  }
+
+  /* Reduce button sizes slightly */
+  .attackButton {
+    width: calc(var(--touch-scale) * 65px);
+    height: calc(var(--touch-scale) * 65px);
+  }
+
+  .dashButton,
+  .skillButton,
+  .evolveButton {
+    width: calc(var(--touch-scale) * 58px);
+    height: calc(var(--touch-scale) * 58px);
+  }
+
+  .cycleSkillButton {
+    width: calc(var(--touch-scale) * 52px);
+    height: calc(var(--touch-scale) * 52px);
+  }
+
+  .joystickZone {
+    width: calc(var(--touch-scale) * 100px);
+    height: calc(var(--touch-scale) * 100px);
+  }
+
+  .joystickKnob {
+    width: calc(var(--touch-scale) * 40px);
+    height: calc(var(--touch-scale) * 40px);
+  }
+}
+
+/* Extra small screens - even tighter spacing */
+@media (max-width: 350px) {
+  .touchLayer {
+    --touch-spacing: calc(var(--touch-scale) * 6px);
+    --touch-gap: calc(var(--touch-scale) * var(--touch-vertical-scale) * 48px);
+  }
+
+  .attackButton {
+    width: calc(var(--touch-scale) * 60px);
+    height: calc(var(--touch-scale) * 60px);
+  }
+
+  .dashButton,
+  .skillButton,
+  .evolveButton {
+    width: calc(var(--touch-scale) * 54px);
+    height: calc(var(--touch-scale) * 54px);
+  }
+
+  .cycleSkillButton {
+    width: calc(var(--touch-scale) * 48px);
+    height: calc(var(--touch-scale) * 48px);
+  }
+
+  .joystickZone {
+    width: calc(var(--touch-scale) * 90px);
+    height: calc(var(--touch-scale) * 90px);
+  }
+
+  .joystickKnob {
+    width: calc(var(--touch-scale) * 36px);
+    height: calc(var(--touch-scale) * 36px);
+  }
+
+  .buttonLabel {
+    font-size: clamp(0.55rem, 1.6vw, 0.7rem);
+  }
+
+  .buttonLegend {
+    font-size: clamp(0.5rem, 1.4vw, 0.65rem);
   }
 }
 
 /* Intermediate breakpoint: 400-600px width */
 @media (min-width: 401px) and (max-width: 600px) {
   .touchLayer {
-    --base-control-scale: 0.95;
-    --touch-gap: clamp(24px, 5vw, 32px);
+    --touch-gap: calc(var(--touch-scale) * var(--touch-vertical-scale) * 70px);
     --touch-spacing: calc(var(--touch-scale) * 12px);
+    --touch-horizontal-offset: calc(var(--touch-scale) * 85px);
   }
 }
 
 /* Landscape squeeze: small viewport height */
 @media (max-height: 500px) and (orientation: landscape) {
   .touchLayer {
-    --touch-attack-bottom: 8px;
-    --touch-attack-right: 8px;
-    --touch-dash-bottom: calc(8px + var(--touch-gap) * 0.6);
-    --touch-skill-bottom: calc(8px + var(--touch-gap) * 1.2);
-    --touch-cycle-bottom: calc(8px + var(--touch-gap) * 1.8);
-    --touch-evolve-bottom: calc(8px + var(--touch-gap) * 0.8);
-    --joystick-bottom: 8px;
-    --joystick-left: 8px;
+    --touch-spacing: 8px;
     --touch-gap: min(40px, 8vh);
+    --touch-horizontal-offset: calc(var(--touch-scale) * 58px);
+    --touch-attack-bottom: calc(var(--safe-area-inset-bottom, 0px) + 8px);
+    --touch-dash-bottom: calc(var(--safe-area-inset-bottom, 0px) + 8px + var(--touch-gap) * 0.6);
+    --touch-skill-bottom: calc(var(--safe-area-inset-bottom, 0px) + 8px + var(--touch-gap) * 1.2);
+    --touch-cycle-bottom: calc(var(--safe-area-inset-bottom, 0px) + 8px + var(--touch-gap) * 1.8);
+    --touch-evolve-bottom: calc(var(--safe-area-inset-bottom, 0px) + 8px + var(--touch-gap) * 0.8);
   }
 
   .attackButton,
   .dashButton,
-  .joystickContainer {
+  .joystickZone {
     transform: scale(0.85);
   }
 
@@ -742,11 +831,13 @@
 @media (max-height: 400px) and (orientation: landscape) {
   .touchLayer {
     --touch-gap: min(32px, 6vh);
+    --touch-spacing: 6px;
+    --touch-horizontal-offset: calc(var(--touch-scale) * 50px);
   }
 
   .attackButton,
   .dashButton,
-  .joystickContainer {
+  .joystickZone {
     transform: scale(0.7);
   }
 

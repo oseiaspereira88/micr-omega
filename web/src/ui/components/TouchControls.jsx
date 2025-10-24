@@ -342,11 +342,14 @@ const TouchControls = ({
   }, [configuredTouchScale, showButtonLegends, useCompactButtonLegends]);
 
   const effectiveLayout = useMemo(() => {
+    // Garantir que touchLayout sempre tenha um valor válido (fallback para 'right')
+    const validLayout = touchLayout === 'left' || touchLayout === 'right' ? touchLayout : 'right';
+
     if (!(autoInvertWhenSidebarOpen && isSidebarOpen)) {
-      return touchLayout;
+      return validLayout;
     }
 
-    return touchLayout === 'left' ? 'right' : 'left';
+    return validLayout === 'left' ? 'right' : 'left';
   }, [autoInvertWhenSidebarOpen, isSidebarOpen, touchLayout]);
 
   const dashStatusId = useId();
