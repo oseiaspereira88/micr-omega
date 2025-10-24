@@ -1,0 +1,47 @@
+/**
+ * Z-Index Hierarchy
+ *
+ * Centralizes all z-index values to prevent conflicts and ensure consistent layering.
+ * Use these CSS custom properties instead of hardcoded z-index values.
+ *
+ * Hierarchy (lowest to highest):
+ * 0-9:   Game canvas and base layers
+ * 10-19: HUD elements (boss bar, etc)
+ * 20-29: Interactive UI (skill wheel, sidebar)
+ * 30-39: HUD overlays and toggles
+ * 40-49: Canvas overlays and backdrops
+ * 50-59: Modal sheets and panels
+ * 60-69: Touch controls layer
+ * 100+:  Critical overlays (modals, game over)
+ */
+
+:root {
+  /* Base game layers (0-9) */
+  --z-game-canvas: 0;
+
+  /* HUD elements (10-19) */
+  --z-boss-bar: 10;
+  --z-hud-bar: 11;
+
+  /* Interactive UI (20-29) */
+  --z-skill-wheel: 20;
+  --z-hud-sidebar: 24;
+
+  /* HUD overlays (30-39) */
+  --z-hud-toggle: 30;
+
+  /* Canvas overlays (40-49) */
+  --z-canvas-overlay: 40;
+  --z-sidebar-backdrop: 42;
+
+  /* Modal sheets (50-59) */
+  --z-sidebar-sheet: 50;
+
+  /* Touch controls (60-69) */
+  --z-touch-controls: 60;
+
+  /* Critical UI (100+) */
+  --z-modals: 100;
+  --z-toast-notifications: 150;
+  --z-game-over: 1000;
+}

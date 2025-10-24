@@ -9,7 +9,7 @@
   border: 1px solid rgba(255, 0, 120, 0.45);
   border-radius: 14px;
   padding: 12px 20px;
-  z-index: 12;
+  z-index: var(--z-boss-bar);
   box-shadow: 0 0 30px rgba(255, 0, 120, 0.28);
   pointer-events: none;
   display: grid;
@@ -149,7 +149,11 @@
 
 :global([data-mobile-hud='true']) :local(.container) {
   top: auto;
-  bottom: calc(var(--hud-mobile-offset, 196px) + var(--safe-area-inset-bottom, 0px));
+  bottom: calc(
+    var(--hud-mobile-offset, 148px) +
+    var(--safe-area-inset-bottom, 0px) +
+    16px /* Additional padding for better spacing */
+  );
   width: min(540px, 92vw);
   border-radius: 16px;
   padding: 12px 18px;

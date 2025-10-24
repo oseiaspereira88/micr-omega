@@ -2,7 +2,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 60;
+  z-index: var(--z-touch-controls);
   --touch-scale: 1;
   --touch-vertical-scale: 1;
   --touch-spacing: calc(var(--touch-scale) * 15px);
@@ -699,6 +699,61 @@
   .layoutLeft .cycleSkillButton,
   .layoutLeft .evolveButton {
     left: calc(var(--safe-area-inset-left, 0px) + var(--touch-spacing));
+  }
+}
+
+/* Intermediate breakpoint: 400-600px width */
+@media (min-width: 401px) and (max-width: 600px) {
+  .touchLayer {
+    --base-control-scale: 0.95;
+    --touch-gap: clamp(24px, 5vw, 32px);
+    --touch-spacing: calc(var(--touch-scale) * 12px);
+  }
+}
+
+/* Landscape squeeze: small viewport height */
+@media (max-height: 500px) and (orientation: landscape) {
+  .touchLayer {
+    --touch-attack-bottom: 8px;
+    --touch-attack-right: 8px;
+    --touch-dash-bottom: calc(8px + var(--touch-gap) * 0.6);
+    --touch-skill-bottom: calc(8px + var(--touch-gap) * 1.2);
+    --touch-cycle-bottom: calc(8px + var(--touch-gap) * 1.8);
+    --touch-evolve-bottom: calc(8px + var(--touch-gap) * 0.8);
+    --joystick-bottom: 8px;
+    --joystick-left: 8px;
+    --touch-gap: min(40px, 8vh);
+  }
+
+  .attackButton,
+  .dashButton,
+  .joystickContainer {
+    transform: scale(0.85);
+  }
+
+  .skillButton,
+  .cycleSkillButton,
+  .evolveButton {
+    transform: scale(0.75);
+  }
+}
+
+/* Extra small height in landscape */
+@media (max-height: 400px) and (orientation: landscape) {
+  .touchLayer {
+    --touch-gap: min(32px, 6vh);
+  }
+
+  .attackButton,
+  .dashButton,
+  .joystickContainer {
+    transform: scale(0.7);
+  }
+
+  .skillButton,
+  .cycleSkillButton,
+  .evolveButton {
+    transform: scale(0.6);
   }
 }
 

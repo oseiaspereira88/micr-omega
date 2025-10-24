@@ -43,7 +43,7 @@
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.25s ease;
-  z-index: 40;
+  z-index: var(--z-canvas-overlay);
 }
 
 .canvasOverlayVisible {
@@ -166,14 +166,17 @@
 
 .sidebar {
   position: absolute;
-  top: calc(16px + var(--safe-area-inset-top, 0px));
-  right: calc(16px + var(--safe-area-inset-right, 0px));
+  top: max(16px, calc(16px + var(--safe-area-inset-top, 0px)));
+  right: min(
+    calc(100vw - 200px),
+    calc(16px + var(--safe-area-inset-right, 0px))
+  );
   display: flex;
   flex-direction: column;
   gap: 14px;
   align-items: stretch;
   width: clamp(240px, 26vw, 320px);
-  z-index: 24;
+  z-index: var(--z-hud-sidebar);
   visibility: hidden;
   transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
 }
@@ -198,7 +201,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  z-index: 45;
+  z-index: var(--z-sidebar-sheet);
   transform: translateY(100%);
   opacity: 1;
   visibility: hidden;
@@ -228,7 +231,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.35s ease;
-  z-index: 40;
+  z-index: var(--z-sidebar-backdrop);
 }
 
 .sidebarBackdropOpen {
@@ -264,9 +267,12 @@
 
 .sidebarToggle {
   position: absolute;
-  top: calc(16px + var(--safe-area-inset-top, 0px));
-  right: calc(16px + var(--safe-area-inset-right, 0px));
-  z-index: 30;
+  top: max(16px, calc(16px + var(--safe-area-inset-top, 0px)));
+  right: min(
+    calc(100vw - 120px),
+    calc(16px + var(--safe-area-inset-right, 0px))
+  );
+  z-index: var(--z-hud-toggle);
   pointer-events: auto;
   display: inline-flex;
   align-items: center;

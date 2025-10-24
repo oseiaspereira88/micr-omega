@@ -158,14 +158,22 @@ const SkillWheel = ({
 
     let frameId = scheduleFrame(updateFootprint);
     let resizeObserver;
+    let fallbackIntervalId;
 
     if (containerRef.current && typeof window.ResizeObserver === 'function') {
+      // Use ResizeObserver for modern browsers
       resizeObserver = new window.ResizeObserver(() => {
         updateFootprint();
       });
       resizeObserver.observe(containerRef.current);
+    } else {
+      // Fallback: poll for size changes every 500ms for browsers without ResizeObserver
+      fallbackIntervalId = window.setInterval(() => {
+        updateFootprint();
+      }, 500);
     }
 
+    // Also listen to window resize events as additional fallback
     window.addEventListener('resize', updateFootprint);
 
     return () => {
@@ -175,6 +183,9 @@ const SkillWheel = ({
       }
       if (resizeObserver) {
         resizeObserver.disconnect();
+      }
+      if (fallbackIntervalId) {
+        window.clearInterval(fallbackIntervalId);
       }
     };
   }, [touchControlsActive, showTouchControls, touchLayout]);

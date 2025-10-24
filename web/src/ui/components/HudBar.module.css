@@ -138,6 +138,7 @@
   --skill-wheel-gap: clamp(16px, 4vw, 28px);
   --stats-reserved-space: calc(var(--skill-wheel-width) + var(--skill-wheel-gap));
   right: calc(var(--safe-area-inset-right, 0px) + var(--stats-reserved-space));
+  min-width: 120px; /* Ensure minimum readable width */
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -145,6 +146,7 @@
   box-sizing: border-box;
   pointer-events: auto;
   z-index: 11;
+  overflow: hidden; /* Prevent overflow */
 }
 
 @media (max-width: 960px) {

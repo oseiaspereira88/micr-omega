@@ -215,7 +215,11 @@ const TouchControls = ({
     evolve: false,
   });
   const actionGroupRef = useRef(null);
-  const normalizedTouchControlScale = useMemo(
+  /**
+   * Touch controls visual scale - controls size of buttons and joystick (0.5-1.5)
+   * Does NOT affect movement sensitivity, only visual appearance
+   */
+  const touchControlsVisualScale = useMemo(
     () =>
       clampWithFallback(
         touchControlScaleProp,
@@ -225,7 +229,11 @@ const TouchControls = ({
       ),
     [touchControlScaleProp],
   );
-  const normalizedJoystickSensitivity = useMemo(
+  /**
+   * Joystick movement sensitivity - amplifies player movement (0.5-2.0)
+   * Higher values = more movement per joystick displacement
+   */
+  const joystickMovementSensitivity = useMemo(
     () =>
       clampWithFallback(
         joystickSensitivityProp,
@@ -299,13 +307,13 @@ const TouchControls = ({
   );
 
   const configuredTouchScale = useMemo(
-    () => touchScale * normalizedTouchControlScale,
-    [touchScale, normalizedTouchControlScale],
+    () => touchScale * touchControlsVisualScale,
+    [touchScale, touchControlsVisualScale],
   );
 
   const configuredTouchVerticalScale = useMemo(
-    () => touchVerticalScale * normalizedTouchControlScale,
-    [touchVerticalScale, normalizedTouchControlScale],
+    () => touchVerticalScale * touchControlsVisualScale,
+    [touchVerticalScale, touchControlsVisualScale],
   );
 
   const isLandscape = viewport.width > viewport.height;
@@ -556,12 +564,12 @@ const TouchControls = ({
   };
 
   const forwardJoystickStartEvent = (event) => {
-    const decoratedEvent = decorateJoystickEvent(event, normalizedJoystickSensitivity);
+    const decoratedEvent = decorateJoystickEvent(event, joystickMovementSensitivity);
     onJoystickStart?.(decoratedEvent);
   };
 
   const forwardJoystickMoveEvent = (event) => {
-    const decoratedEvent = decorateJoystickEvent(event, normalizedJoystickSensitivity);
+    const decoratedEvent = decorateJoystickEvent(event, joystickMovementSensitivity);
     onJoystickMove?.(decoratedEvent);
   };
 
@@ -632,26 +640,22 @@ const TouchControls = ({
             activeButtons.attack ? styles.attackButtonActive : null,
           )}
           aria-label={attackAriaLabel}
-          onTouchStart={event => {
-            event.preventDefault();
-            setButtonActive('attack', true);
-            onAttackPress?.();
-          }}
-          onTouchEnd={handleAttackReleaseEvent}
-          onTouchCancel={handleAttackReleaseEvent}
           onPointerDown={event => {
-            if (isTouchLikePointer(event)) {
-              setButtonActive('attack', true);
-            }
-          }}
-          onPointerUp={handleAttackReleaseEvent}
-          onPointerCancel={handleAttackReleaseEvent}
-          onMouseDown={event => {
+            event.preventDefault();
             setButtonActive('attack', true);
             onAttackPress?.(event);
           }}
-          onMouseUp={handleAttackReleaseEvent}
-          onMouseLeave={handleAttackReleaseEvent}
+          onPointerUp={event => {
+            event.preventDefault();
+            handleAttackReleaseEvent(event);
+          }}
+          onPointerCancel={handleAttackReleaseEvent}
+          onPointerLeave={event => {
+            // Only release on leave for mouse/pen, not touch
+            if (event.pointerType !== 'touch') {
+              handleAttackReleaseEvent(event);
+            }
+          }}
           onClick={event => {
             event.preventDefault();
             onAttack?.();
@@ -689,29 +693,21 @@ const TouchControls = ({
           aria-label={dashAriaLabel}
           aria-disabled={!dashReady}
           aria-describedby={dashStatusId}
-          onTouchStart={event => {
+          onPointerDown={event => {
             event.preventDefault();
             if (dashReady) {
               setButtonActive('dash', true);
-              onDash?.();
+              onDash?.(event);
             }
-          }}
-          onTouchEnd={handleDashTouchEnd}
-          onTouchCancel={handleDashTouchEnd}
-          onPointerDown={event => {
-            if (!dashReady || !isTouchLikePointer(event)) {
-              return;
-            }
-
-            setButtonActive('dash', true);
           }}
           onPointerUp={event => {
-            if (isTouchLikePointer(event)) {
-              handleDashTouchEnd(event);
-            }
+            event.preventDefault();
+            handleDashTouchEnd(event);
           }}
-          onPointerCancel={event => {
-            if (isTouchLikePointer(event)) {
+          onPointerCancel={handleDashTouchEnd}
+          onPointerLeave={event => {
+            // Only release on leave for mouse/pen, not touch
+            if (event.pointerType !== 'touch') {
               handleDashTouchEnd(event);
             }
           }}
