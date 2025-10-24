@@ -13,11 +13,7 @@ import {
   applyMultiplicativePassive,
   ensureBaseStat,
 } from './evolutionHelpers';
-
-const diminishingMultiplier = (previousPurchases = 0, rate = 0.5, minimum = 0.35) => {
-  if (previousPurchases <= 0) return 1;
-  return Math.max(minimum, rate ** previousPurchases);
-};
+import { calculateDiminishingMultiplier } from '@micr-omega/shared';
 
 const applyForm = (state, formKey) => {
   const form = forms[formKey];
@@ -172,8 +168,9 @@ export const majorEvolutions = {
       rewardPc: 2,
     },
     effect: (state, context) => {
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'large',
         context.entry.diminishing,
         context.entry.minimumBonus
       );
@@ -209,8 +206,9 @@ export const majorEvolutions = {
       rewardPc: 3,
     },
     effect: (state, context) => {
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'large',
         context.entry.diminishing,
         context.entry.minimumBonus
       );
@@ -246,8 +244,9 @@ export const majorEvolutions = {
       rewardPc: 3,
     },
     effect: (state, context) => {
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'large',
         context.entry.diminishing,
         context.entry.minimumBonus
       );
@@ -283,8 +282,9 @@ export const majorEvolutions = {
       rewardPc: 2,
     },
     effect: (state, context) => {
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'large',
         context.entry.diminishing,
         context.entry.minimumBonus
       );
@@ -321,8 +321,9 @@ export const majorEvolutions = {
       energyBonus: 35,
     },
     effect: (state, context) => {
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'large',
         context.entry.diminishing,
         context.entry.minimumBonus
       );
@@ -358,8 +359,9 @@ export const majorEvolutions = {
       rewardPc: 3,
     },
     effect: (state, context) => {
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'large',
         context.entry.diminishing,
         context.entry.minimumBonus
       );

@@ -143,6 +143,7 @@ import {
   type PendingProgressionStream,
   type PlayerProgressionState,
 } from "./progression";
+import { validateEvolutionRequirements } from "./evolutionValidator";
 import {
   GLOBAL_RATE_LIMIT_HEADROOM,
   MAX_CLIENT_MESSAGE_SIZE_BYTES,
@@ -5571,6 +5572,27 @@ export class RoomDO {
           }
 
           this.lastEvolutionSequence.set(playerId, sequenceNumber);
+        }
+
+        // Validar requisitos básicos (slots disponíveis)
+        // NOTA: Validação completa de requirements/cost requer definições de evolução no servidor
+        const validation = validateEvolutionRequirements(
+          player,
+          undefined, // requirements - TODO: buscar de definição server-side
+          undefined, // cost - TODO: buscar de definição server-side
+          evolutionAction.tier
+        );
+
+        if (!validation.valid) {
+          this.observability.logWarn('Evolution requirements not met', {
+            playerId,
+            reason: validation.reason,
+            evolutionId: evolutionAction.evolutionId,
+            tier: evolutionAction.tier,
+          });
+
+          // Não aplicar evolução inválida
+          return { updatedPlayers: [] };
         }
 
         if (!player.evolutionState) {

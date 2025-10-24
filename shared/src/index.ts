@@ -974,3 +974,9 @@ export const sanitizeArchetypeKey = (archetype: string): ArchetypeKey | null => 
 
 export { createMulberry32, createSeededRandom, randomFromSeed } from "./random";
 export type { SeededRandom } from "./random";
+
+export {
+  calculateDiminishingMultiplier,
+  DIMINISHING_CONFIGS,
+  type DiminishingConfig
+} from './evolutionCalculations';

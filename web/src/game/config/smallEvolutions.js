@@ -3,14 +3,7 @@ import {
   applyMultiplicativePassive,
   ensureBaseStat,
 } from './evolutionHelpers';
-
-const diminishingMultiplier = (previousPurchases = 0, rate = 0.6, minimum = 0.2) => {
-  if (previousPurchases <= 0) {
-    return 1;
-  }
-  const scaled = rate ** previousPurchases;
-  return Math.max(minimum, scaled);
-};
+import { calculateDiminishingMultiplier } from '@micr-omega/shared';
 
 export const smallEvolutions = {
   flagellum: {
@@ -25,8 +18,9 @@ export const smallEvolutions = {
     minimumBonus: 0.25,
     effect: (state, context) => {
       const { organism } = state;
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'small',
         context.entry.diminishing,
         context.entry.minimumBonus
       );
@@ -51,8 +45,9 @@ export const smallEvolutions = {
     minimumBonus: 0.2,
     effect: (state, context) => {
       const { organism } = state;
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'small',
         context.entry.diminishing,
         context.entry.minimumBonus
       );
@@ -74,8 +69,9 @@ export const smallEvolutions = {
     minimumBonus: 0.25,
     effect: (state, context) => {
       const { organism } = state;
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'small',
         context.entry.diminishing,
         context.entry.minimumBonus
       );

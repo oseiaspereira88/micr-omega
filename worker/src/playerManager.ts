@@ -332,6 +332,47 @@ export const createEvolutionState = (state?: Partial<PlayerEvolutionState> | nul
   };
 };
 
+/**
+ * Limita o histórico de evolução para prevenir crescimento descontrolado de memória.
+ *
+ * Mantém apenas as 100 evoluções mais usadas por tier, descartando evoluções
+ * pouco usadas para otimizar sincronização e uso de memória.
+ *
+ * @param history - Histórico de evolução completo
+ * @returns Histórico podado com no máximo 100 entradas por tier
+ */
+const MAX_EVOLUTION_HISTORY_ENTRIES = 100;
+
+export function pruneEvolutionHistory(
+  history: PlayerEvolutionHistory
+): PlayerEvolutionHistory {
+  const pruned: PlayerEvolutionHistory = {
+    small: {},
+    medium: {},
+    large: {},
+    macro: {},
+  };
+
+  for (const tier of ['small', 'medium', 'large', 'macro'] as const) {
+    const entries = Object.entries(history[tier] || {});
+
+    // Se não exceder o limite, manter tudo
+    if (entries.length <= MAX_EVOLUTION_HISTORY_ENTRIES) {
+      pruned[tier] = { ...history[tier] };
+      continue;
+    }
+
+    // Ordenar por quantidade de compras (descendente) e manter apenas as top 100
+    const sorted = entries
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, MAX_EVOLUTION_HISTORY_ENTRIES);
+
+    pruned[tier] = Object.fromEntries(sorted);
+  }
+
+  return pruned;
+}
+
 export const cloneEvolutionState = (state?: PlayerEvolutionState | null): PlayerEvolutionState => {
   if (!state) {
     return createEvolutionState();
@@ -339,12 +380,12 @@ export const cloneEvolutionState = (state?: PlayerEvolutionState | null): Player
 
   return {
     traits: [...state.traits],
-    history: {
+    history: pruneEvolutionHistory({
       small: { ...state.history.small },
       medium: { ...state.history.medium },
       large: { ...state.history.large },
       macro: { ...state.history.macro },
-    },
+    }),
     modifiers: {
       attack: { ...state.modifiers.attack },
       defense: { ...state.modifiers.defense },

@@ -3,11 +3,7 @@ import {
   applyMultiplicativePassive,
   ensureBaseStat,
 } from './evolutionHelpers';
-
-const diminishingMultiplier = (previousPurchases = 0, rate = 0.55, minimum = 0.25) => {
-  if (previousPurchases <= 0) return 1;
-  return Math.max(minimum, rate ** previousPurchases);
-};
+import { calculateDiminishingMultiplier } from '@micr-omega/shared';
 
 export const mediumEvolutions = {
   bioCapacitor: {
@@ -21,8 +17,9 @@ export const mediumEvolutions = {
     minimumBonus: 0.35,
     effect: (state, context) => {
       const { organism } = state;
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'medium',
         context.entry.diminishing,
         context.entry.minimumBonus
       );
@@ -50,8 +47,9 @@ export const mediumEvolutions = {
     minimumBonus: 0.3,
     effect: (state, context) => {
       const { organism } = state;
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'medium',
         context.entry.diminishing,
         context.entry.minimumBonus
       );
@@ -79,8 +77,9 @@ export const mediumEvolutions = {
     unique: true,
     effect: (state, context) => {
       const { organism } = state;
-      const multiplier = diminishingMultiplier(
+      const multiplier = calculateDiminishingMultiplier(
         context.previousPurchases,
+        'medium',
         context.entry.diminishing,
         context.entry.minimumBonus
       );

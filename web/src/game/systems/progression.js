@@ -3,6 +3,7 @@ import { createInitialState } from '../state/initialState';
 import { smallEvolutions as defaultSmallEvolutions } from '../config/smallEvolutions';
 import { mediumEvolutions as defaultMediumEvolutions } from '../config/mediumEvolutions';
 import { majorEvolutions as defaultMajorEvolutions } from '../config/majorEvolutions';
+import { calculateDiminishingMultiplier } from '@micr-omega/shared';
 
 // Evolution lock para prevenir dupla evolução
 let evolutionInProgress = false;
@@ -241,11 +242,10 @@ const getEvolutionPool = (helpers = {}, tier = 'small') => {
   return helpers.smallEvolutions || defaultSmallEvolutions || {};
 };
 
-const computeNextMultiplier = (entry = {}, purchases = 0) => {
-  const diminishing = Number.isFinite(entry.diminishing) ? entry.diminishing : 0.6;
-  const minimum = Number.isFinite(entry.minimumBonus) ? entry.minimumBonus : 0.2;
-  if (purchases <= 0) return 1;
-  return Math.max(minimum, diminishing ** purchases);
+const computeNextMultiplier = (entry = {}, purchases = 0, tier = 'small') => {
+  const customRate = Number.isFinite(entry.diminishing) ? entry.diminishing : undefined;
+  const customMin = Number.isFinite(entry.minimumBonus) ? entry.minimumBonus : undefined;
+  return calculateDiminishingMultiplier(purchases, tier, customRate, customMin);
 };
 
 const getHistoryCount = (state, tier, key) => {
@@ -434,7 +434,7 @@ const buildEvolutionOptions = (state, helpers = {}, tier = 'small') => {
       available,
       reason,
       unique: Boolean(entry?.unique),
-      nextBonusMultiplier: computeNextMultiplier(entry, purchases),
+      nextBonusMultiplier: computeNextMultiplier(entry, purchases, tier),
       macro: Boolean(entry?.macro),
       macroRewardPc: entry?.macroProfile?.rewardPc ?? 0,
       affinityOptions: entry?.macroProfile?.affinityOptions || [],
@@ -724,7 +724,7 @@ export const chooseEvolution = (state, helpers = {}, evolutionKey, forcedTier) =
 
     applyCost(state, entry.cost);
 
-    const multiplier = computeNextMultiplier(entry, purchases);
+    const multiplier = computeNextMultiplier(entry, purchases, tier);
     entry.effect?.(state, {
       entry,
       previousPurchases: purchases,
