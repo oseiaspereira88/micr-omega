@@ -159,14 +159,15 @@
   left: auto;
 }
 
-/* Enhanced safe area support in landscape */
-.landscape .joystickZone {
+/* Enhanced safe area support in landscape - layoutRight */
+.landscape.layoutRight .joystickZone {
   left: max(
     calc(var(--safe-area-inset-left, 0px) + var(--touch-spacing)),
     calc(var(--touch-spacing) * 1.5)
   );
 }
 
+/* Enhanced safe area support in landscape - layoutLeft */
 .landscape.layoutLeft .joystickZone {
   right: max(
     calc(var(--safe-area-inset-right, 0px) + var(--touch-spacing)),
