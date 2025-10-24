@@ -801,6 +801,30 @@
   }
 }
 
+/* Landscape: medium height (normal landscape) */
+@media (min-height: 501px) and (max-height: 667px) and (orientation: landscape) {
+  .touchLayer {
+    --touch-spacing: calc(var(--touch-scale) * 10px);
+    --touch-gap: min(60px, 9vh);
+    --touch-horizontal-offset: calc(var(--touch-scale) * 75px);
+  }
+
+  /* Ajuste fino para evitar sobreposição */
+  .attackButton,
+  .dashButton,
+  .joystickZone {
+    transform: scale(0.95);
+  }
+
+  .buttonLabel {
+    font-size: clamp(0.52rem, 1.6vw, 0.68rem);
+  }
+
+  .buttonLegend {
+    font-size: clamp(0.5rem, 1.4vw, 0.63rem);
+  }
+}
+
 /* Landscape squeeze: small viewport height */
 @media (max-height: 500px) and (orientation: landscape) {
   .touchLayer {
@@ -825,26 +849,139 @@
   .evolveButton {
     transform: scale(0.75);
   }
+
+  /* Reduzir tamanhos de fonte em landscape */
+  .buttonLabel {
+    font-size: clamp(0.5rem, 1.5vw, 0.65rem);
+  }
+
+  .buttonLegend {
+    font-size: clamp(0.48rem, 1.3vw, 0.6rem);
+  }
+
+  .cooldownLabel,
+  .skillLabel {
+    font-size: calc(var(--touch-scale) * 0.55rem);
+  }
 }
 
-/* Extra small height in landscape */
-@media (max-height: 400px) and (orientation: landscape) {
+/* Medium-small height in landscape (300-400px) */
+@media (min-height: 301px) and (max-height: 400px) and (orientation: landscape) {
   .touchLayer {
-    --touch-gap: min(32px, 6vh);
-    --touch-spacing: 6px;
-    --touch-horizontal-offset: calc(var(--touch-scale) * 50px);
+    --touch-gap: min(36px, 7vh);
+    --touch-spacing: 7px;
+    --touch-horizontal-offset: calc(var(--touch-scale) * 54px);
+    --touch-attack-bottom: calc(var(--safe-area-inset-bottom, 0px) + 7px);
+    --touch-dash-bottom: calc(var(--safe-area-inset-bottom, 0px) + 7px + var(--touch-gap) * 0.58);
+    --touch-skill-bottom: calc(var(--safe-area-inset-bottom, 0px) + 7px + var(--touch-gap) * 1.15);
+    --touch-cycle-bottom: calc(var(--safe-area-inset-bottom, 0px) + 7px + var(--touch-gap) * 1.72);
+    --touch-evolve-bottom: calc(var(--safe-area-inset-bottom, 0px) + 7px + var(--touch-gap) * 0.78);
   }
 
   .attackButton,
   .dashButton,
   .joystickZone {
-    transform: scale(0.7);
+    transform: scale(0.75);
   }
 
   .skillButton,
   .cycleSkillButton,
   .evolveButton {
-    transform: scale(0.6);
+    transform: scale(0.65);
+  }
+
+  .buttonLabel {
+    font-size: clamp(0.48rem, 1.4vw, 0.62rem);
+  }
+
+  .buttonLegend {
+    font-size: clamp(0.45rem, 1.2vw, 0.58rem);
+  }
+
+  .cooldownLabel,
+  .skillLabel {
+    font-size: calc(var(--touch-scale) * 0.52rem);
+  }
+}
+
+/* Extra small height in landscape (<= 300px) */
+@media (max-height: 300px) and (orientation: landscape) {
+  .touchLayer {
+    --touch-gap: min(28px, 5vh);
+    --touch-spacing: 5px;
+    --touch-horizontal-offset: calc(var(--touch-scale) * 45px);
+    --touch-attack-bottom: calc(var(--safe-area-inset-bottom, 0px) + 5px);
+    --touch-dash-bottom: calc(var(--safe-area-inset-bottom, 0px) + 5px + var(--touch-gap) * 0.5);
+    --touch-skill-bottom: calc(var(--safe-area-inset-bottom, 0px) + 5px + var(--touch-gap) * 1.0);
+    --touch-cycle-bottom: calc(var(--safe-area-inset-bottom, 0px) + 5px + var(--touch-gap) * 1.5);
+    --touch-evolve-bottom: calc(var(--safe-area-inset-bottom, 0px) + 5px + var(--touch-gap) * 0.7);
+  }
+
+  .attackButton,
+  .dashButton,
+  .joystickZone {
+    transform: scale(0.65);
+  }
+
+  .skillButton,
+  .cycleSkillButton,
+  .evolveButton {
+    transform: scale(0.55);
+  }
+
+  /* Fontes muito pequenas para altura crítica */
+  .buttonLabel {
+    font-size: clamp(0.42rem, 1.2vw, 0.55rem);
+  }
+
+  .buttonLegend {
+    font-size: clamp(0.4rem, 1vw, 0.5rem);
+  }
+
+  .cooldownLabel,
+  .skillLabel {
+    font-size: calc(var(--touch-scale) * 0.48rem);
+  }
+
+  .buttonIcon {
+    font-size: 0.85em;
+  }
+}
+
+/* Ultra-wide screens (aspect ratio > 2:1) */
+@media (min-aspect-ratio: 2/1) and (orientation: landscape) {
+  .touchLayer {
+    --touch-horizontal-offset: calc(var(--touch-scale) * 120px);
+    --touch-spacing: calc(var(--touch-scale) * 16px);
+  }
+
+  /* Mais espaço horizontal, aproveitar para espaçar melhor */
+  .layoutRight .skillButton,
+  .layoutRight .cycleSkillButton,
+  .layoutRight .evolveButton {
+    right: calc(
+      var(--safe-area-inset-right, 0px) + var(--touch-spacing) + var(--touch-horizontal-offset) + 20px
+    );
+  }
+
+  .layoutLeft .skillButton,
+  .layoutLeft .cycleSkillButton,
+  .layoutLeft .evolveButton {
+    left: calc(
+      var(--safe-area-inset-left, 0px) + var(--touch-spacing) + var(--touch-horizontal-offset) + 20px
+    );
+  }
+}
+
+/* Telas muito altas em portrait (aspect ratio < 0.5:1) */
+@media (max-aspect-ratio: 1/2) and (orientation: portrait) {
+  .touchLayer {
+    --touch-gap: calc(var(--touch-scale) * var(--touch-vertical-scale) * 90px);
+  }
+
+  /* Mais espaço vertical, aumentar gaps para melhor ergonomia */
+  .compact {
+    --touch-gap: calc(var(--touch-scale) * var(--touch-vertical-scale) * 65px);
   }
 }
 
