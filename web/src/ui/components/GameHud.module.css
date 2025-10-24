@@ -206,9 +206,12 @@
   opacity: 1;
   visibility: hidden;
   transition: transform 0.35s ease, visibility 0s linear 0.35s;
-  /* Performance optimization */
+  /* BUG-006: Performance optimizations */
   contain: layout style paint;
   will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-transform: translateZ(0) translateY(100%);
 }
 
 /* Fallback for browsers without backdrop-filter support */
@@ -220,13 +223,32 @@
 
 .sidebarSheet.sidebarOpen {
   transform: translateY(0);
+  -webkit-transform: translateZ(0) translateY(0);
   visibility: visible;
   transition: transform 0.35s ease, visibility 0s linear 0s;
 }
 
 .sidebarSheet.sidebarClosed {
   transform: translateY(calc(100% + 16px));
+  -webkit-transform: translateZ(0) translateY(calc(100% + 16px));
   pointer-events: none;
+}
+
+/* BUG-006: Disable blur during animation for better performance */
+.sidebarSheet:not(.sidebarOpen) {
+  backdrop-filter: none;
+}
+
+/* BUG-006: Reduced motion optimization */
+@media (prefers-reduced-motion: reduce) {
+  .sidebarSheet {
+    transition: transform 0.15s ease, visibility 0s linear 0.15s;
+    backdrop-filter: blur(8px);
+  }
+
+  .sidebarSheet.sidebarOpen {
+    transition: transform 0.15s ease, visibility 0s linear 0s;
+  }
 }
 
 .sidebar > * {

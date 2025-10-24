@@ -1,0 +1,118 @@
+.container {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 10001;
+  pointer-events: none;
+  animation: tooltipFadeIn 200ms ease;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.content {
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: rgba(226, 232, 240, 0.95);
+  max-width: 220px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+/* Position: top */
+.top {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.top .arrow {
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px 6px 0 6px;
+  border-color: rgba(56, 189, 248, 0.4) transparent transparent transparent;
+}
+
+/* Position: bottom */
+.bottom {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.bottom .arrow {
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 0 6px 6px 6px;
+  border-color: transparent transparent rgba(56, 189, 248, 0.4) transparent;
+}
+
+/* Position: left */
+.left {
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.left .arrow {
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 6px 0 6px 6px;
+  border-color: transparent transparent transparent rgba(56, 189, 248, 0.4);
+}
+
+/* Position: right */
+.right {
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.right .arrow {
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 6px 6px 6px 0;
+  border-color: transparent rgba(56, 189, 248, 0.4) transparent transparent;
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .content {
+    max-width: 180px;
+    font-size: 0.75rem;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .tooltip {
+    animation: none;
+  }
+}

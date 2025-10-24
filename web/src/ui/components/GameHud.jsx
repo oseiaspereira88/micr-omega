@@ -28,6 +28,7 @@ import {
   useGameSettings,
 } from '../../store/gameSettings';
 import useSoundPreview from '../../hooks/useSoundPreview';
+import useSwipeGesture from '../../hooks/useSwipeGesture';
 
 const MOBILE_HUD_QUERY = '(max-width: 900px)';
 const SIDEBAR_TRANSITION_DURATION_MS = 350;
@@ -308,6 +309,24 @@ const GameHud = ({
   const handleToggleMobileHudVisibility = useCallback(() => {
     setIsMobileHudCollapsed((previous) => !previous);
   }, []);
+
+  // UX-006: Swipe gesture para abrir/fechar sidebar
+  const swipeEnabled = isMobileHud && !hudDisabled;
+
+  useSwipeGesture({
+    enabled: swipeEnabled,
+    direction: 'left',
+    onSwipeEnd: (shouldOpen) => {
+      if (shouldOpen && !isSidebarOpen) {
+        setIsSidebarOpen(true);
+      } else if (!shouldOpen && isSidebarOpen) {
+        setIsSidebarOpen(false);
+      }
+    },
+    edgeThreshold: 50,
+    minSwipeDistance: 80,
+    velocityThreshold: 0.4,
+  });
 
   useEffect(() => {
     if (sidebarIsInactive) {

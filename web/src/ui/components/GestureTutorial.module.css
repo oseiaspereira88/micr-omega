@@ -1,0 +1,229 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(4, 8, 18, 0.92);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: overlayFadeIn 300ms ease;
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.container {
+  max-width: 540px;
+  width: 100%;
+  background: linear-gradient(160deg, rgba(12, 20, 36, 0.95), rgba(18, 28, 48, 0.95));
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 20px;
+  padding: clamp(24px, 5vw, 36px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  animation: containerSlideIn 400ms ease;
+}
+
+@keyframes containerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.title {
+  margin: 0 0 8px;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.4rem, 4vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+  text-align: center;
+}
+
+.subtitle {
+  margin: 0 0 28px;
+  font-size: clamp(0.9rem, 2.5vw, 1rem);
+  color: rgba(226, 232, 240, 0.8);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.gestures {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.gestureCard {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+
+.gestureCard:hover {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.gestureIcon {
+  font-size: 2rem;
+  text-align: center;
+  line-height: 1;
+}
+
+.gestureInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gestureTitle {
+  font-family: var(--font-display, inherit);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #bae6fd;
+}
+
+.gestureDescription {
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.85);
+  line-height: 1.4;
+}
+
+.gestureAction {
+  font-family: var(--font-display, inherit);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: rgba(56, 189, 248, 0.75);
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.button {
+  padding: 12px 24px;
+  border-radius: 999px;
+  border: none;
+  font-family: var(--font-display, inherit);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.button:hover {
+  transform: translateY(-2px);
+}
+
+.button:active {
+  transform: translateY(0);
+}
+
+.button:focus-visible {
+  outline: 3px solid rgba(125, 211, 252, 0.85);
+  outline-offset: 2px;
+}
+
+.buttonPrimary {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.95), rgba(99, 102, 241, 0.9));
+  color: #0f172a;
+  box-shadow: 0 10px 24px rgba(56, 189, 248, 0.35);
+}
+
+.buttonPrimary:hover {
+  box-shadow: 0 14px 32px rgba(56, 189, 248, 0.45);
+}
+
+.buttonSecondary {
+  background: rgba(30, 41, 59, 0.85);
+  color: rgba(226, 232, 240, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+.buttonSecondary:hover {
+  background: rgba(40, 51, 69, 0.9);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .container {
+    padding: 20px;
+  }
+
+  .gestures {
+    gap: 10px;
+  }
+
+  .gestureCard {
+    grid-template-columns: 40px 1fr auto;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .gestureIcon {
+    font-size: 1.6rem;
+  }
+
+  .gestureTitle {
+    font-size: 0.75rem;
+  }
+
+  .gestureDescription {
+    font-size: 0.8rem;
+  }
+
+  .gestureAction {
+    font-size: 1rem;
+  }
+
+  .actions {
+    flex-direction: column-reverse;
+  }
+
+  .button {
+    width: 100%;
+    padding: 14px 20px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .container {
+    animation: none;
+  }
+
+  .button:hover {
+    transform: none;
+  }
+}
