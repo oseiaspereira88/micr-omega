@@ -5,3 +5,7 @@ worker/dist/
 .DS_Store
 worker/.wrangler/
 logs/
+
+# Local environment files
+.env.local
+.env*.local

@@ -659,6 +659,12 @@ export const useGameSocket = (
   const connectInternal = useCallback(
     (name: string, isReconnect: boolean) => {
       if (typeof window === "undefined" || !effectiveUrl) {
+        if (import.meta.env.DEV) {
+          console.warn("[useGameSocket] Não foi possível conectar:", {
+            hasWindow: typeof window !== "undefined",
+            effectiveUrl,
+          });
+        }
         return;
       }
 
@@ -671,6 +677,14 @@ export const useGameSocket = (
 
       shouldReconnectRef.current = true;
       stopSocket();
+
+      if (import.meta.env.DEV) {
+        console.log("[useGameSocket] Conectando ao WebSocket:", {
+          url: effectiveUrl,
+          playerName: sanitizedName,
+          isReconnect,
+        });
+      }
 
       try {
         const socket = new WebSocket(effectiveUrl);
@@ -687,6 +701,10 @@ export const useGameSocket = (
         gameStore.actions.setPlayerName(sanitizedName);
 
         socket.onopen = () => {
+          if (import.meta.env.DEV) {
+            console.log("[useGameSocket] WebSocket conectado com sucesso");
+          }
+
           const joinMessage: JoinMessage = {
             type: "join",
             name: sanitizedName,
@@ -779,7 +797,13 @@ export const useGameSocket = (
           }
         };
 
-        socket.onerror = () => {
+        socket.onerror = (event) => {
+          if (import.meta.env.DEV) {
+            console.error("[useGameSocket] Erro no WebSocket:", {
+              url: effectiveUrl,
+              event,
+            });
+          }
           gameStore.actions.setConnectionStatus("disconnected");
         };
       } catch (err) {

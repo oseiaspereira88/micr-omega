@@ -17,10 +17,28 @@ function isWebSocketRequest(request: Request): boolean {
   return request.headers.get("Upgrade")?.toLowerCase() === "websocket";
 }
 
+function getCorsHeaders(request: Request): HeadersInit {
+  const origin = request.headers.get("Origin") || "*";
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Upgrade, Connection",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const observability = createObservability(env, { component: "Worker" });
     const url = new URL(request.url);
+
+    // Handle CORS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: getCorsHeaders(request),
+      });
+    }
 
     const normalizedPath = normalizePathname(url.pathname);
     if (normalizedPath === "/health") {
@@ -31,6 +49,7 @@ export default {
           headers: {
             "Cache-Control": "no-store",
             "Content-Type": "application/json",
+            ...getCorsHeaders(request),
           },
         },
       );
