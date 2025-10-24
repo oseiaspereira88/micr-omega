@@ -1,0 +1,307 @@
+/**
+ * PERF-002: Animation GPU Acceleration
+ * Force GPU acceleration for performance-critical animations
+ */
+
+/* Utility classes for GPU acceleration */
+
+.gpu-accelerated {
+  /* Force layer creation */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+
+  /* Prevent flickering */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+
+  /* Hint to browser about upcoming changes */
+  will-change: transform;
+}
+
+.gpu-accelerated-opacity {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: opacity;
+}
+
+.gpu-accelerated-transform-opacity {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* Apply GPU acceleration to common animated elements */
+
+/* Buttons - Only during interaction */
+button:active,
+[role="button"]:active {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Modals and overlays */
+[role="dialog"],
+[role="alertdialog"],
+[class*="modal"],
+[class*="Modal"],
+[class*="overlay"],
+[class*="Overlay"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* Sidebars and drawers */
+[class*="sidebar"],
+[class*="Sidebar"],
+[class*="drawer"],
+[class*="Drawer"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Tooltips */
+[role="tooltip"],
+[class*="tooltip"],
+[class*="Tooltip"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: opacity;
+}
+
+/* Dropdowns */
+[role="menu"],
+[role="listbox"],
+[class*="dropdown"],
+[class*="Dropdown"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: opacity, transform;
+}
+
+/* Progress bars - Animate width using transform */
+[role="progressbar"]::after,
+progress::-webkit-progress-value,
+progress::-moz-progress-bar {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Game-specific GPU acceleration */
+
+/* Touch controls */
+[class*="touch"],
+[class*="Touch"],
+[class*="joystick"],
+[class*="Joystick"],
+[class*="button"][class*="attack"],
+[class*="button"][class*="dash"],
+[class*="button"][class*="skill"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* HUD elements */
+[class*="hud"],
+[class*="HUD"],
+[class*="hudBar"],
+[class*="HudBar"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Boss health bar */
+[class*="boss"],
+[class*="Boss"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+[class*="boss"] [class*="fill"],
+[class*="Boss"] [class*="fill"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: width;
+}
+
+/* Skill wheel */
+[class*="skill"],
+[class*="Skill"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+[class*="skillWheel"],
+[class*="SkillWheel"],
+[class*="progressWheel"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Floating numbers */
+[class*="floating"],
+[class*="Floating"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* Notifications */
+[role="alert"],
+[role="status"],
+[class*="notification"],
+[class*="Notification"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* Evolution button */
+[class*="evolve"],
+[class*="Evolve"],
+[class*="evolution"],
+[class*="Evolution"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Performance overlay */
+[class*="performance"],
+[class*="Performance"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Canvas overlay */
+[class*="canvasOverlay"],
+[class*="CanvasOverlay"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: opacity;
+}
+
+/* Gesture tutorial */
+[class*="gesture"],
+[class*="Gesture"],
+[class*="tutorial"],
+[class*="Tutorial"] {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* Remove will-change after animation completes */
+/* This helps free up GPU resources */
+
+@keyframes removeWillChange {
+  to {
+    will-change: auto;
+  }
+}
+
+/* Apply to elements that finish animating */
+[data-animation-complete] {
+  will-change: auto;
+}
+
+/* Disable GPU acceleration on low-end devices */
+@media (max-width: 600px) and (max-height: 800px) {
+  /* Keep only critical animations GPU accelerated */
+
+  button,
+  [role="button"],
+  [role="tooltip"],
+  [role="menu"],
+  [role="listbox"] {
+    transform: none;
+    -webkit-transform: none;
+    will-change: auto;
+  }
+
+  /* Keep only game-critical elements accelerated */
+  [class*="touch"],
+  [class*="Touch"],
+  [class*="joystick"],
+  [class*="Joystick"],
+  [class*="sidebar"],
+  [class*="Sidebar"] {
+    /* Keep GPU acceleration for interactive elements */
+  }
+}
+
+/* Print - disable all GPU acceleration */
+@media print {
+  * {
+    transform: none !important;
+    -webkit-transform: none !important;
+    will-change: auto !important;
+    backface-visibility: visible !important;
+    -webkit-backface-visibility: visible !important;
+  }
+}
+
+/* Utility: Force composite layer for complex animations */
+.force-composite-layer {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
+}
+
+/* Utility: Optimize for 3D transforms */
+.optimize-3d {
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
+}
+
+/* Utility: Anti-aliasing for smooth edges */
+.smooth-edges {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}

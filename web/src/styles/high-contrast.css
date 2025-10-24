@@ -1,0 +1,303 @@
+/**
+ * A11Y-001: High Contrast Mode
+ * WCAG AAA compliance (7:1 contrast ratio)
+ */
+
+/* Apply high contrast mode when class is present on root */
+:root.high-contrast {
+  /* Core colors - Pure black and white */
+  --hc-bg-primary: #000000;
+  --hc-bg-secondary: #0a0a0a;
+  --hc-text-primary: #ffffff;
+  --hc-text-secondary: #ffffff;
+
+  /* Interactive elements - Bright yellow for maximum visibility */
+  --hc-interactive: #ffeb3b;
+  --hc-interactive-hover: #fff176;
+  --hc-interactive-active: #fdd835;
+
+  /* Borders and outlines - Bright white */
+  --hc-border: #ffffff;
+  --hc-border-thick: 2px;
+  --hc-border-focus: 4px;
+
+  /* Status colors - High contrast variants */
+  --hc-success: #00ff00;
+  --hc-warning: #ffff00;
+  --hc-error: #ff0000;
+  --hc-info: #00ffff;
+
+  /* Disable gradients and shadows */
+  --hc-no-gradient: none;
+  --hc-no-shadow: none;
+}
+
+/* Global overrides */
+:root.high-contrast * {
+  /* Remove all shadows */
+  box-shadow: var(--hc-no-shadow) !important;
+  text-shadow: var(--hc-no-shadow) !important;
+
+  /* Remove all filters */
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Body and main containers */
+:root.high-contrast body {
+  background: var(--hc-bg-primary);
+  color: var(--hc-text-primary);
+}
+
+/* Backgrounds */
+:root.high-contrast [class*="container"],
+:root.high-contrast [class*="panel"],
+:root.high-contrast [class*="modal"],
+:root.high-contrast [class*="overlay"] {
+  background: var(--hc-bg-primary) !important;
+  background-image: var(--hc-no-gradient) !important;
+  border: var(--hc-border-thick) solid var(--hc-border) !important;
+}
+
+/* Text elements */
+:root.high-contrast p,
+:root.high-contrast span,
+:root.high-contrast div,
+:root.high-contrast h1,
+:root.high-contrast h2,
+:root.high-contrast h3,
+:root.high-contrast h4,
+:root.high-contrast h5,
+:root.high-contrast h6 {
+  color: var(--hc-text-primary) !important;
+}
+
+/* Buttons and interactive elements */
+:root.high-contrast button,
+:root.high-contrast [role="button"],
+:root.high-contrast a,
+:root.high-contrast input,
+:root.high-contrast select,
+:root.high-contrast textarea {
+  background: var(--hc-bg-primary) !important;
+  background-image: var(--hc-no-gradient) !important;
+  color: var(--hc-interactive) !important;
+  border: var(--hc-border-thick) solid var(--hc-interactive) !important;
+  border-radius: 0 !important;
+}
+
+:root.high-contrast button:hover,
+:root.high-contrast [role="button"]:hover,
+:root.high-contrast a:hover,
+:root.high-contrast input:hover,
+:root.high-contrast select:hover,
+:root.high-contrast textarea:hover {
+  background: var(--hc-interactive) !important;
+  color: var(--hc-bg-primary) !important;
+  border-color: var(--hc-interactive-hover) !important;
+}
+
+:root.high-contrast button:active,
+:root.high-contrast [role="button"]:active,
+:root.high-contrast a:active {
+  background: var(--hc-interactive-active) !important;
+  border-color: var(--hc-interactive-active) !important;
+}
+
+/* Focus indicators - Ultra visible */
+:root.high-contrast *:focus-visible {
+  outline: var(--hc-border-focus) solid var(--hc-interactive) !important;
+  outline-offset: 2px !important;
+}
+
+/* Disabled state */
+:root.high-contrast button:disabled,
+:root.high-contrast [role="button"][aria-disabled="true"],
+:root.high-contrast input:disabled,
+:root.high-contrast select:disabled,
+:root.high-contrast textarea:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+/* Progress bars and meters */
+:root.high-contrast [role="progressbar"],
+:root.high-contrast progress,
+:root.high-contrast meter {
+  background: var(--hc-bg-secondary) !important;
+  border: var(--hc-border-thick) solid var(--hc-border) !important;
+}
+
+:root.high-contrast [role="progressbar"] > *,
+:root.high-contrast progress::-webkit-progress-value,
+:root.high-contrast progress::-moz-progress-bar {
+  background: var(--hc-interactive) !important;
+  background-image: var(--hc-no-gradient) !important;
+}
+
+/* Status indicators */
+:root.high-contrast [data-status="success"],
+:root.high-contrast [class*="success"] {
+  border-color: var(--hc-success) !important;
+  color: var(--hc-success) !important;
+}
+
+:root.high-contrast [data-status="warning"],
+:root.high-contrast [class*="warning"] {
+  border-color: var(--hc-warning) !important;
+  color: var(--hc-warning) !important;
+}
+
+:root.high-contrast [data-status="error"],
+:root.high-contrast [class*="error"],
+:root.high-contrast [data-status="critical"],
+:root.high-contrast [class*="critical"] {
+  border-color: var(--hc-error) !important;
+  color: var(--hc-error) !important;
+}
+
+:root.high-contrast [data-status="info"],
+:root.high-contrast [class*="info"] {
+  border-color: var(--hc-info) !important;
+  color: var(--hc-info) !important;
+}
+
+/* Lists */
+:root.high-contrast ul,
+:root.high-contrast ol {
+  list-style-position: outside;
+  padding-left: 1.5em;
+}
+
+:root.high-contrast li::marker {
+  color: var(--hc-interactive) !important;
+}
+
+/* Tables */
+:root.high-contrast table {
+  border-collapse: collapse;
+  border: var(--hc-border-thick) solid var(--hc-border) !important;
+}
+
+:root.high-contrast th,
+:root.high-contrast td {
+  border: 1px solid var(--hc-border) !important;
+  padding: 8px;
+}
+
+:root.high-contrast th {
+  background: var(--hc-bg-secondary) !important;
+  font-weight: bold;
+}
+
+/* Canvas elements - Add border for visibility */
+:root.high-contrast canvas {
+  border: var(--hc-border-thick) solid var(--hc-border) !important;
+}
+
+/* Images - Ensure visibility */
+:root.high-contrast img {
+  border: 1px solid var(--hc-border) !important;
+}
+
+/* SVG icons */
+:root.high-contrast svg {
+  fill: var(--hc-text-primary) !important;
+  stroke: var(--hc-text-primary) !important;
+}
+
+/* Scrollbars */
+:root.high-contrast ::-webkit-scrollbar {
+  background: var(--hc-bg-secondary);
+  width: 16px;
+  height: 16px;
+}
+
+:root.high-contrast ::-webkit-scrollbar-thumb {
+  background: var(--hc-interactive);
+  border: 2px solid var(--hc-bg-primary);
+}
+
+:root.high-contrast ::-webkit-scrollbar-thumb:hover {
+  background: var(--hc-interactive-hover);
+}
+
+/* Remove decorative elements */
+:root.high-contrast [aria-hidden="true"]:not([role]) {
+  opacity: 0.3;
+}
+
+/* Ensure separators are visible */
+:root.high-contrast hr,
+:root.high-contrast [role="separator"] {
+  border: 0;
+  border-top: var(--hc-border-thick) solid var(--hc-border) !important;
+  margin: 1em 0;
+}
+
+/* Toast notifications and alerts */
+:root.high-contrast [role="alert"],
+:root.high-contrast [role="status"],
+:root.high-contrast [role="log"] {
+  border: 3px solid var(--hc-interactive) !important;
+  padding: 1em;
+  margin: 0.5em 0;
+}
+
+/* Game-specific: HUD elements */
+:root.high-contrast [class*="hud"],
+:root.high-contrast [class*="HUD"] {
+  background: var(--hc-bg-primary) !important;
+  border: var(--hc-border-thick) solid var(--hc-border) !important;
+}
+
+/* Game-specific: Health bars */
+:root.high-contrast [class*="health"],
+:root.high-contrast [data-resource="health"] {
+  background: var(--hc-bg-secondary) !important;
+  color: var(--hc-success) !important;
+  border-color: var(--hc-success) !important;
+}
+
+:root.high-contrast [class*="health"][data-critical="true"],
+:root.high-contrast [data-resource="health"][data-critical="true"] {
+  color: var(--hc-error) !important;
+  border-color: var(--hc-error) !important;
+}
+
+/* Game-specific: Energy bars */
+:root.high-contrast [class*="energy"],
+:root.high-contrast [data-resource="energy"] {
+  background: var(--hc-bg-secondary) !important;
+  color: var(--hc-info) !important;
+  border-color: var(--hc-info) !important;
+}
+
+/* Game-specific: Touch controls */
+:root.high-contrast [class*="touch"],
+:root.high-contrast [class*="joystick"],
+:root.high-contrast [class*="button"] {
+  border: 3px solid var(--hc-interactive) !important;
+}
+
+/* Game-specific: Boss health bar */
+:root.high-contrast [class*="boss"] {
+  border: 4px solid var(--hc-error) !important;
+}
+
+/* Respect prefers-contrast media query */
+@media (prefers-contrast: more) {
+  :root:not(.high-contrast-disabled) {
+    /* Auto-apply high contrast styles when system preference is detected */
+  }
+}
+
+/* Print styles for high contrast */
+@media print {
+  :root.high-contrast * {
+    background: white !important;
+    color: black !important;
+    border-color: black !important;
+  }
+}

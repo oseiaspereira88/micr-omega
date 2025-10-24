@@ -1,0 +1,288 @@
+/**
+ * A11Y-004: Reduced Motion Mode Enhancements
+ * Respects user preference for reduced motion while maintaining essential feedback
+ */
+
+/* Apply when system preference is detected OR when manually enabled */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* Disable all animations and transitions by default */
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Exceptions: Keep critical feedback animations with reduced intensity */
+
+  /* Health/Energy state changes - instant but keep color feedback */
+  [data-critical="true"],
+  [data-full="true"],
+  [data-resource="health"],
+  [data-resource="energy"] {
+    animation-duration: 0.01ms !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease !important;
+  }
+
+  /* Button press feedback - instant scale */
+  button:active,
+  [role="button"]:active {
+    transition: transform 0.01ms !important;
+  }
+
+  /* Focus indicators - instant */
+  *:focus-visible {
+    transition: outline 0.01ms !important;
+  }
+
+  /* Progress bars - smooth but fast */
+  [role="progressbar"],
+  progress,
+  meter {
+    transition: width 0.2s linear, value 0.2s linear !important;
+  }
+
+  /* Modal and overlay appearance - instant */
+  [role="dialog"],
+  [role="alertdialog"],
+  [class*="modal"],
+  [class*="overlay"] {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Tooltips - instant */
+  [role="tooltip"] {
+    animation: none !important;
+    transition: opacity 0.1s ease !important;
+  }
+
+  /* Notifications - fade only, no slide */
+  [role="alert"],
+  [role="status"] {
+    animation: none !important;
+    transition: opacity 0.15s ease !important;
+  }
+
+  /* Game-specific: Disable decorative animations */
+
+  /* Pulse animations */
+  [class*="pulse"],
+  [class*="Pulse"] {
+    animation: none !important;
+  }
+
+  /* Shimmer/glow effects */
+  [class*="shimmer"],
+  [class*="glow"],
+  [class*="flash"] {
+    animation: none !important;
+  }
+
+  /* Floating animations */
+  [class*="float"],
+  [class*="bounce"] {
+    animation: none !important;
+  }
+
+  /* Rotation animations */
+  [class*="spin"],
+  [class*="rotate"] {
+    animation: none !important;
+  }
+
+  /* Particle effects indicator */
+  [data-particle-effects] {
+    opacity: 0.5;
+  }
+
+  /* Screen shake */
+  [data-screen-shake] {
+    transform: none !important;
+  }
+}
+
+/* Manual reduced motion class for override */
+:root.reduced-motion *,
+:root.reduced-motion *::before,
+:root.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Keep essential feedback with reduced motion class */
+:root.reduced-motion [data-critical="true"],
+:root.reduced-motion [data-full="true"],
+:root.reduced-motion [data-resource="health"],
+:root.reduced-motion [data-resource="energy"] {
+  transition: background-color 0.15s ease, border-color 0.15s ease !important;
+}
+
+:root.reduced-motion button:active,
+:root.reduced-motion [role="button"]:active {
+  transition: transform 0.01ms !important;
+}
+
+:root.reduced-motion [role="progressbar"],
+:root.reduced-motion progress,
+:root.reduced-motion meter {
+  transition: width 0.2s linear, value 0.2s linear !important;
+}
+
+/* Game-specific reduced motion enhancements */
+
+/* Sidebar animations - instant slide only */
+@media (prefers-reduced-motion: reduce) {
+  [class*="sidebar"],
+  [class*="Sidebar"] {
+    transition: transform 0.15s ease, opacity 0.15s ease !important;
+  }
+}
+
+:root.reduced-motion [class*="sidebar"],
+:root.reduced-motion [class*="Sidebar"] {
+  transition: transform 0.15s ease, opacity 0.15s ease !important;
+}
+
+/* Touch controls - keep position transitions */
+@media (prefers-reduced-motion: reduce) {
+  [class*="touch"],
+  [class*="Touch"],
+  [class*="joystick"],
+  [class*="Joystick"] {
+    transition: opacity 0.1s ease !important;
+  }
+
+  [class*="touch"] *,
+  [class*="Touch"] *,
+  [class*="joystick"] *,
+  [class*="Joystick"] * {
+    animation: none !important;
+  }
+}
+
+:root.reduced-motion [class*="touch"],
+:root.reduced-motion [class*="Touch"],
+:root.reduced-motion [class*="joystick"],
+:root.reduced-motion [class*="Joystick"] {
+  transition: opacity 0.1s ease !important;
+}
+
+/* HUD elements - instant appearance */
+@media (prefers-reduced-motion: reduce) {
+  [class*="hud"],
+  [class*="HUD"],
+  [class*="Bar"] {
+    animation: none !important;
+  }
+}
+
+:root.reduced-motion [class*="hud"],
+:root.reduced-motion [class*="HUD"],
+:root.reduced-motion [class*="Bar"] {
+  animation: none !important;
+}
+
+/* Boss health bar - keep fill animation but reduce speed */
+@media (prefers-reduced-motion: reduce) {
+  [class*="boss"] [class*="fill"],
+  [class*="Boss"] [class*="fill"] {
+    transition: width 0.15s ease !important;
+    animation: none !important;
+  }
+}
+
+:root.reduced-motion [class*="boss"] [class*="fill"],
+:root.reduced-motion [class*="Boss"] [class*="fill"] {
+  transition: width 0.15s ease !important;
+  animation: none !important;
+}
+
+/* Skill wheel - instant state changes */
+@media (prefers-reduced-motion: reduce) {
+  [class*="skill"],
+  [class*="Skill"] {
+    animation: none !important;
+    transition: opacity 0.1s ease, transform 0.1s ease !important;
+  }
+}
+
+:root.reduced-motion [class*="skill"],
+:root.reduced-motion [class*="Skill"] {
+  animation: none !important;
+  transition: opacity 0.1s ease, transform 0.1s ease !important;
+}
+
+/* Evolution button - no pulse, instant feedback */
+@media (prefers-reduced-motion: reduce) {
+  [class*="evolve"],
+  [class*="Evolve"],
+  [class*="evolution"],
+  [class*="Evolution"] {
+    animation: none !important;
+  }
+}
+
+:root.reduced-motion [class*="evolve"],
+:root.reduced-motion [class*="Evolve"],
+:root.reduced-motion [class*="evolution"],
+:root.reduced-motion [class*="Evolution"] {
+  animation: none !important;
+}
+
+/* Floating numbers - fade only, no float */
+@media (prefers-reduced-motion: reduce) {
+  [class*="floating"],
+  [class*="Floating"] {
+    animation: none !important;
+    opacity: 0.8;
+  }
+}
+
+:root.reduced-motion [class*="floating"],
+:root.reduced-motion [class*="Floating"] {
+  animation: none !important;
+  opacity: 0.8;
+}
+
+/* Performance overlay - no pulse on indicators */
+@media (prefers-reduced-motion: reduce) {
+  [class*="performance"],
+  [class*="Performance"] {
+    animation: none !important;
+  }
+}
+
+:root.reduced-motion [class*="performance"],
+:root.reduced-motion [class*="Performance"] {
+  animation: none !important;
+}
+
+/* Canvas rendering hints - reduce particle effects */
+@media (prefers-reduced-motion: reduce) {
+  canvas {
+    /* Custom property that can be read by JS to reduce effects */
+    --particle-count-multiplier: 0.25;
+    --screen-shake-intensity: 0;
+  }
+}
+
+:root.reduced-motion canvas {
+  --particle-count-multiplier: 0.25;
+  --screen-shake-intensity: 0;
+}
+
+/* Print media - disable all animations */
+@media print {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
