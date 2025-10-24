@@ -97,8 +97,9 @@
 }
 
 .landscape .joystickZone {
-  top: calc(var(--safe-area-inset-top, 0px) + var(--touch-spacing));
-  bottom: auto;
+  /* Keep joystick at bottom to avoid overlap with HUD */
+  bottom: calc(var(--safe-area-inset-bottom, 0px) + var(--touch-spacing));
+  top: auto;
 }
 
 .landscape {
@@ -156,6 +157,38 @@
 .layoutLeft .joystickZone {
   right: calc(var(--safe-area-inset-right, 0px) + var(--touch-spacing));
   left: auto;
+}
+
+/* Enhanced safe area support in landscape */
+.landscape .joystickZone {
+  left: max(
+    calc(var(--safe-area-inset-left, 0px) + var(--touch-spacing)),
+    calc(var(--touch-spacing) * 1.5)
+  );
+}
+
+.landscape.layoutLeft .joystickZone {
+  right: max(
+    calc(var(--safe-area-inset-right, 0px) + var(--touch-spacing)),
+    calc(var(--touch-spacing) * 1.5)
+  );
+  left: auto;
+}
+
+.landscape.layoutRight .attackButton,
+.landscape.layoutRight .dashButton {
+  right: max(
+    calc(var(--safe-area-inset-right, 0px) + var(--touch-spacing)),
+    calc(var(--touch-spacing) * 1.5)
+  );
+}
+
+.landscape.layoutLeft .attackButton,
+.landscape.layoutLeft .dashButton {
+  left: max(
+    calc(var(--safe-area-inset-left, 0px) + var(--touch-spacing)),
+    calc(var(--touch-spacing) * 1.5)
+  );
 }
 
 .layoutRight .attackButton,
@@ -928,6 +961,24 @@
     --touch-gap: calc(var(--touch-scale) * var(--touch-vertical-scale) * 70px);
     --touch-spacing: calc(var(--touch-scale) * 12px);
     --touch-horizontal-offset: calc(var(--touch-scale) * 85px);
+  }
+}
+
+/* Large smartphones and tablets (>600px width) */
+@media (min-width: 601px) {
+  .touchLayer {
+    --touch-spacing: calc(var(--touch-scale) * 18px);
+    --touch-gap: calc(var(--touch-scale) * var(--touch-vertical-scale) * 95px);
+    --touch-horizontal-offset: calc(var(--touch-scale) * 105px);
+  }
+}
+
+/* Large smartphones in landscape (>600px width) */
+@media (min-width: 601px) and (orientation: landscape) {
+  .touchLayer {
+    --touch-gap: calc(var(--touch-scale) * var(--touch-vertical-scale) * 75px);
+    --touch-horizontal-offset: calc(var(--touch-scale) * 110px);
+    --touch-spacing: calc(var(--touch-scale) * 16px);
   }
 }
 
