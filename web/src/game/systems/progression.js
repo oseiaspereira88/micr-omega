@@ -4,6 +4,10 @@ import { smallEvolutions as defaultSmallEvolutions } from '../config/smallEvolut
 import { mediumEvolutions as defaultMediumEvolutions } from '../config/mediumEvolutions';
 import { majorEvolutions as defaultMajorEvolutions } from '../config/majorEvolutions';
 
+// Evolution lock para prevenir dupla evolução
+let evolutionInProgress = false;
+let evolutionSequence = 0;
+
 const BASE_REROLL_COST = 25;
 const REROLL_GROWTH_FACTOR = 1.6;
 const MEDIUM_SLOT_INTERVAL = 2;
@@ -670,88 +674,113 @@ export const openEvolutionMenu = (state, helpers = {}) => {
 
 export const chooseEvolution = (state, helpers = {}, evolutionKey, forcedTier) => {
   if (!state) return state;
-  ensureResourceReferences(state);
 
-  const tier = forcedTier || state.evolutionContext?.tier || state.evolutionMenu?.activeTier;
-  if (!tier) return state;
-
-  const entry = getEvolutionEntry(helpers, tier, evolutionKey);
-  if (!entry) return state;
-
-  const purchases = getHistoryCount(state, tier, evolutionKey);
-  if (entry.unique && purchases > 0) {
-    helpers.addNotification?.(state, 'Evolução já adquirida.');
+  // Proteção contra dupla evolução
+  if (evolutionInProgress) {
+    console.warn('[Evolution] Evolução já em progresso, ignorando');
     return state;
   }
 
-  if (Number.isFinite(entry.maxPurchases) && purchases >= entry.maxPurchases) {
-    helpers.addNotification?.(state, 'Limite de evolução atingido.');
-    return state;
-  }
+  evolutionInProgress = true;
+  evolutionSequence++;
+  const currentSequence = evolutionSequence;
 
-  const requirementCheck = meetsRequirements(state, entry.requirements);
-  if (!requirementCheck.met) {
-    helpers.addNotification?.(state, requirementCheck.reason || 'Requisitos não atendidos.');
-    return state;
-  }
+  try {
+    ensureResourceReferences(state);
 
-  if (!hasCost(state, entry.cost)) {
-    helpers.addNotification?.(state, 'Recursos insuficientes.');
-    return state;
-  }
-
-  applyCost(state, entry.cost);
-
-  const multiplier = computeNextMultiplier(entry, purchases);
-  entry.effect?.(state, {
-    entry,
-    previousPurchases: purchases,
-    multiplier,
-    helpers,
-  });
-
-  registerEvolutionPurchase(state, tier, evolutionKey);
-  incrementSlotUsage(state, tier);
-
-  if (entry.macro) {
-    state.macroEvolutionSlots = state.macroEvolutionSlots || { used: 0, max: 0 };
-    state.macroEvolutionSlots.used = Math.min(
-      (state.macroEvolutionSlots.used ?? 0) + 1,
-      state.macroEvolutionSlots.max ?? Infinity
-    );
-
-    if (!Array.isArray(state.organism?.macroEvolutions)) {
-      state.organism.macroEvolutions = [];
-    }
-    if (!state.organism.macroEvolutions.includes(evolutionKey)) {
-      state.organism.macroEvolutions.push(evolutionKey);
+    const tier = forcedTier || state.evolutionContext?.tier || state.evolutionMenu?.activeTier;
+    if (!tier) {
+      evolutionInProgress = false;
+      return state;
     }
 
-    const rewardPc = entry.macroProfile?.rewardPc;
-    if (Number.isFinite(rewardPc) && state.characteristicPoints) {
-      state.characteristicPoints.total = (state.characteristicPoints.total ?? 0) + rewardPc;
-      state.characteristicPoints.available =
-        (state.characteristicPoints.available ?? 0) + rewardPc;
+    const entry = getEvolutionEntry(helpers, tier, evolutionKey);
+    if (!entry) {
+      evolutionInProgress = false;
+      return state;
     }
+
+    const purchases = getHistoryCount(state, tier, evolutionKey);
+    if (entry.unique && purchases > 0) {
+      helpers.addNotification?.(state, 'Evolução já adquirida.');
+      return state;
+    }
+
+    if (Number.isFinite(entry.maxPurchases) && purchases >= entry.maxPurchases) {
+      helpers.addNotification?.(state, 'Limite de evolução atingido.');
+      return state;
+    }
+
+    const requirementCheck = meetsRequirements(state, entry.requirements);
+    if (!requirementCheck.met) {
+      helpers.addNotification?.(state, requirementCheck.reason || 'Requisitos não atendidos.');
+      return state;
+    }
+
+    if (!hasCost(state, entry.cost)) {
+      helpers.addNotification?.(state, 'Recursos insuficientes.');
+      return state;
+    }
+
+    applyCost(state, entry.cost);
+
+    const multiplier = computeNextMultiplier(entry, purchases);
+    entry.effect?.(state, {
+      entry,
+      previousPurchases: purchases,
+      multiplier,
+      helpers,
+      sequenceNumber: currentSequence,
+    });
+
+    registerEvolutionPurchase(state, tier, evolutionKey);
+    incrementSlotUsage(state, tier);
+
+    if (entry.macro) {
+      state.macroEvolutionSlots = state.macroEvolutionSlots || { used: 0, max: 0 };
+      state.macroEvolutionSlots.used = Math.min(
+        (state.macroEvolutionSlots.used ?? 0) + 1,
+        state.macroEvolutionSlots.max ?? Infinity
+      );
+
+      if (!Array.isArray(state.organism?.macroEvolutions)) {
+        state.organism.macroEvolutions = [];
+      }
+      if (!state.organism.macroEvolutions.includes(evolutionKey)) {
+        state.organism.macroEvolutions.push(evolutionKey);
+      }
+
+      const rewardPc = entry.macroProfile?.rewardPc;
+      if (Number.isFinite(rewardPc) && state.characteristicPoints) {
+        state.characteristicPoints.total = (state.characteristicPoints.total ?? 0) + rewardPc;
+        state.characteristicPoints.available =
+          (state.characteristicPoints.available ?? 0) + rewardPc;
+      }
+    }
+
+    state.showEvolutionChoice = false;
+    state.evolutionContext = null;
+    state.evolutionMenu = {
+      activeTier: tier,
+      options: { small: [], medium: [], large: [] },
+    };
+    state.currentForm = state.organism?.form ?? null;
+    state.reroll.cost = state.reroll.baseCost ?? BASE_REROLL_COST;
+    state.reroll.count = 0;
+    state.uiSyncTimer = 0;
+
+    const queue = ensureQueue(state);
+    state.canEvolve = queue.length > 0;
+
+    helpers.addNotification?.(state, `✨ ${entry.name}`);
+    helpers.syncState?.(state);
+    return state;
+  } finally {
+    // Timeout de segurança para liberar lock
+    setTimeout(() => {
+      evolutionInProgress = false;
+    }, 1000);
   }
-
-  state.showEvolutionChoice = false;
-  state.evolutionContext = null;
-  state.evolutionMenu = {
-    activeTier: tier,
-    options: { small: [], medium: [], large: [] },
-  };
-  state.currentForm = state.organism?.form ?? null;
-  state.reroll.cost = state.reroll.baseCost ?? BASE_REROLL_COST;
-  state.reroll.count = 0;
-  state.uiSyncTimer = 0;
-
-  const queue = ensureQueue(state);
-  state.canEvolve = queue.length > 0;
-
-  helpers.addNotification?.(state, `✨ ${entry.name}`);
-  helpers.syncState?.(state);
-  return state;
 };
 
 export const chooseTrait = (state, helpers = {}, key) => chooseEvolution(state, helpers, key);

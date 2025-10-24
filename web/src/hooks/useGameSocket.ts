@@ -520,6 +520,26 @@ export const useGameSocket = (
           "";
 
         lastRequestedNameRef.current = normalizedName;
+
+        // Sincronizar estado de evolução para evitar race condition em reconexão
+        const localState = gameStore.getState();
+        const serverPlayer = message.state.players.find(p => p.id === message.playerId);
+
+        // Se havia evolução pendente localmente mas servidor não tem ou vice-versa
+        // o servidor é a fonte da verdade
+        if (localState.showEvolutionChoice && serverPlayer) {
+          // Limpar estado local de evolução que pode estar inconsistente
+          const currentState = gameStore.getState().gameState;
+          if (currentState) {
+            currentState.showEvolutionChoice = false;
+            currentState.evolutionContext = null;
+            currentState.evolutionMenu = {
+              activeTier: 'small',
+              options: { small: [], medium: [], large: [] },
+            };
+          }
+        }
+
         gameStore.actions.applyJoinedSnapshot({
           playerId: message.playerId,
           playerName: normalizedName,

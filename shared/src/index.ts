@@ -130,7 +130,8 @@ export const evolutionActionSchema = z.object({
   traitDeltas: z.array(z.string().trim().min(1).max(64)).optional(),
   additiveDelta: combatStatAdjustmentSchema.optional(),
   multiplierDelta: combatStatAdjustmentSchema.optional(),
-  baseDelta: combatStatAdjustmentSchema.optional()
+  baseDelta: combatStatAdjustmentSchema.optional(),
+  sequenceNumber: z.number().finite().int().nonnegative().optional()
 });
 
 const statusKeySchema = z.string().trim().min(1).max(64);

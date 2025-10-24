@@ -934,6 +934,7 @@ export class RoomDO {
   private lastGlobalRateLimitReportAt = 0;
   private rankingCache: RankingEntry[] = [];
   private rankingDirty = true;
+  private readonly lastEvolutionSequence = new Map<string, number>();
 
   private phase: GamePhase = "waiting";
   private roundId: string | null = null;
@@ -5552,10 +5553,30 @@ export class RoomDO {
         return { updatedPlayers };
       }
       case "evolution": {
+        // Validar sequence number para prevenir dupla evolução
+        const evolutionAction = action as PlayerEvolutionAction;
+        const sequenceNumber = (evolutionAction as any).sequenceNumber;
+
+        if (typeof sequenceNumber === 'number') {
+          const lastSeq = this.lastEvolutionSequence.get(playerId) || 0;
+
+          if (sequenceNumber <= lastSeq) {
+            // Duplicada, ignorar silenciosamente
+            this.observability.logInfo('Duplicate evolution ignored', {
+              playerId,
+              sequenceNumber,
+              lastSeq,
+            });
+            return { updatedPlayers: [] };
+          }
+
+          this.lastEvolutionSequence.set(playerId, sequenceNumber);
+        }
+
         if (!player.evolutionState) {
           player.evolutionState = createEvolutionState();
         }
-        applyEvolutionActionToState(player.evolutionState, action as PlayerEvolutionAction);
+        applyEvolutionActionToState(player.evolutionState, evolutionAction);
         player.lastActiveAt = Date.now();
         this.updatePlayerCombatAttributes(player);
         updatedPlayers.push(player);

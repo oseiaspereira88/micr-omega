@@ -475,7 +475,7 @@ const computeStatWithModifiers = (base: number, modifier: CombatStatModifierStat
   const multiplier = Number.isFinite(modifier.multiplier) ? modifier.multiplier : 0;
 
   const effectiveBase = base + baseOverride;
-  const effectiveMultiplier = 1 + multiplier / 100;
+  const effectiveMultiplier = 1 + multiplier;
 
   return Math.max(0, (effectiveBase + additive) * effectiveMultiplier);
 };
