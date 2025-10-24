@@ -443,6 +443,30 @@ const buildEvolutionOptions = (state, helpers = {}, tier = 'small') => {
   });
 };
 
+/**
+ * Verifica se o jogador pode evoluir, considerando não apenas a fila,
+ * mas também se há pelo menos uma evolução disponível em algum tier.
+ */
+const computeCanEvolve = (state, helpers = {}) => {
+  // Verificar se há tiers na fila
+  const queue = ensureQueue(state);
+  if (queue.length === 0) {
+    return false;
+  }
+
+  // Verificar se há pelo menos uma opção disponível em algum tier
+  const tiers = ['small', 'medium', 'large', 'macro'];
+  for (const tier of tiers) {
+    const options = buildEvolutionOptions(state, helpers, tier);
+    const hasAvailableOption = options.some((option) => option.available);
+    if (hasAvailableOption) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 const getEvolutionEntry = (helpers = {}, tier = 'small', key) => {
   const pool = getEvolutionPool(helpers, tier);
   return pool?.[key];
@@ -590,7 +614,7 @@ export const checkEvolution = (state, helpers = {}) => {
     }
   }
 
-  state.canEvolve = ensureQueue(state).length > 0;
+  state.canEvolve = computeCanEvolve(state, helpers);
 
   if (leveledUp) {
     state.reroll.cost = state.reroll.baseCost ?? BASE_REROLL_COST;
@@ -672,6 +696,20 @@ export const openEvolutionMenu = (state, helpers = {}) => {
   return state;
 };
 
+const closeEvolutionMenu = (state, helpers = {}) => {
+  if (!state) return;
+
+  state.showEvolutionChoice = false;
+  state.evolutionContext = null;
+  state.evolutionMenu = {
+    activeTier: state.evolutionMenu?.activeTier || 'small',
+    options: { small: [], medium: [], large: [], macro: [] },
+  };
+  state.currentForm = state.organism?.form ?? null;
+
+  helpers.syncState?.(state);
+};
+
 export const chooseEvolution = (state, helpers = {}, evolutionKey, forcedTier) => {
   if (!state) return state;
 
@@ -685,19 +723,28 @@ export const chooseEvolution = (state, helpers = {}, evolutionKey, forcedTier) =
   evolutionSequence++;
   const currentSequence = evolutionSequence;
 
+  // Timeout de segurança para garantir que menu fecha mesmo em erro
+  const safetyTimeoutId = setTimeout(() => {
+    console.error('[Evolution] Timeout de segurança atingido, fechando menu');
+    closeEvolutionMenu(state, helpers);
+    evolutionInProgress = false;
+  }, 5000);
+
   try {
     ensureResourceReferences(state);
 
     const tier = forcedTier || state.evolutionContext?.tier || state.evolutionMenu?.activeTier;
     if (!tier) {
-      evolutionInProgress = false;
-      return state;
+      throw new Error('Tier de evolução não especificado');
     }
 
     const entry = getEvolutionEntry(helpers, tier, evolutionKey);
     if (!entry) {
-      evolutionInProgress = false;
-      return state;
+      throw new Error(`Evolução não encontrada: ${tier}/${evolutionKey}`);
+    }
+
+    if (!entry.effect || typeof entry.effect !== 'function') {
+      throw new Error(`Evolução ${evolutionKey} não tem efeito válido`);
     }
 
     const purchases = getHistoryCount(state, tier, evolutionKey);
@@ -725,13 +772,31 @@ export const chooseEvolution = (state, helpers = {}, evolutionKey, forcedTier) =
     applyCost(state, entry.cost);
 
     const multiplier = computeNextMultiplier(entry, purchases, tier);
-    entry.effect?.(state, {
-      entry,
-      previousPurchases: purchases,
-      multiplier,
-      helpers,
-      sequenceNumber: currentSequence,
-    });
+
+    // Executar efeito com proteção
+    try {
+      entry.effect(state, {
+        entry,
+        previousPurchases: purchases,
+        multiplier,
+        helpers,
+        sequenceNumber: currentSequence,
+      });
+    } catch (effectError) {
+      console.error('[Evolution] Erro ao executar efeito de evolução:', effectError);
+
+      // Tentar reverter custo em caso de erro
+      if (entry.cost?.pc && state.characteristicPoints) {
+        state.characteristicPoints.available =
+          (state.characteristicPoints.available ?? 0) + entry.cost.pc;
+      }
+      if (entry.cost?.mg && state.geneticMaterial) {
+        state.geneticMaterial.current =
+          (state.geneticMaterial.current ?? 0) + entry.cost.mg;
+      }
+
+      throw effectError;
+    }
 
     registerEvolutionPurchase(state, tier, evolutionKey);
     incrementSlotUsage(state, tier);
@@ -758,22 +823,30 @@ export const chooseEvolution = (state, helpers = {}, evolutionKey, forcedTier) =
       }
     }
 
-    state.showEvolutionChoice = false;
-    state.evolutionContext = null;
-    state.evolutionMenu = {
-      activeTier: tier,
-      options: { small: [], medium: [], large: [] },
-    };
-    state.currentForm = state.organism?.form ?? null;
+    closeEvolutionMenu(state, helpers);
+
     state.reroll.cost = state.reroll.baseCost ?? BASE_REROLL_COST;
     state.reroll.count = 0;
     state.uiSyncTimer = 0;
 
     const queue = ensureQueue(state);
-    state.canEvolve = queue.length > 0;
+    state.canEvolve = computeCanEvolve(state, helpers);
 
     helpers.addNotification?.(state, `✨ ${entry.name}`);
     helpers.syncState?.(state);
+
+    clearTimeout(safetyTimeoutId);
+    return state;
+  } catch (error) {
+    console.error('[Evolution] Erro ao aplicar evolução:', error);
+
+    // Garantir que menu fecha mesmo em erro
+    closeEvolutionMenu(state, helpers);
+
+    // Notificar usuário
+    helpers.addNotification?.(state, 'Erro ao aplicar evolução. Tente novamente.');
+
+    clearTimeout(safetyTimeoutId);
     return state;
   } finally {
     // Timeout de segurança para liberar lock
@@ -851,7 +924,7 @@ export const cancelEvolutionChoice = (state, helpers = {}) => {
     },
   };
   state.currentForm = state.organism?.form ?? null;
-  state.canEvolve = queue.length > 0;
+  state.canEvolve = computeCanEvolve(state, helpers);
   state.uiSyncTimer = 0;
 
   helpers.syncState?.(state);

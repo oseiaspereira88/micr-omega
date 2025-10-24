@@ -154,6 +154,8 @@ const GameCanvas = ({ settings, updateSettings, onQuit, onReconnect }) => {
     selectArchetype,
     setCameraZoom,
     setActiveEvolutionTier,
+    pauseGame,
+    resumeGame,
   } = useGameLoop({
     canvasRef,
     dispatch,
@@ -162,6 +164,15 @@ const GameCanvas = ({ settings, updateSettings, onQuit, onReconnect }) => {
   });
 
   const isTouchDevice = useIsTouchDevice();
+
+  // Pausar jogo durante menu de evolução
+  useEffect(() => {
+    if (showEvolutionChoice) {
+      pauseGame?.();
+    } else {
+      resumeGame?.();
+    }
+  }, [showEvolutionChoice, pauseGame, resumeGame]);
 
   const {
     currentSkill: currentSkillInfo,

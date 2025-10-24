@@ -749,6 +749,7 @@ const useGameLoop = ({ canvasRef, dispatch, settings, updateSettings }) => {
   const audioCtxRef = useRef(null);
   const audioWarningLoggedRef = useRef(false);
   const animationFrameRef = useRef(null);
+  const isPausedRef = useRef(false);
   const renderStateRef = useRef(createInitialRenderState());
   const sharedStateRef = useRef(gameStore.getState());
   const movementIntentRef = useRef({ ...DEFAULT_JOYSTICK_STATE });
@@ -2018,6 +2019,12 @@ const useGameLoop = ({ canvasRef, dispatch, settings, updateSettings }) => {
       // when the tab resumes after being paused or throttled.
       lastTime = now;
 
+      // Pausar game loop durante menu de evolução
+      if (isPausedRef.current) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
       const canvasWidth = canvas.clientWidth || canvas.width / (window.devicePixelRatio || 1);
       const canvasHeight = canvas.clientHeight || canvas.height / (window.devicePixelRatio || 1);
 
@@ -2332,6 +2339,14 @@ const useGameLoop = ({ canvasRef, dispatch, settings, updateSettings }) => {
     };
   }, [canvasRef, createEffect, createParticle, playSound, pushNotification]);
 
+  const pauseGame = useCallback(() => {
+    isPausedRef.current = true;
+  }, []);
+
+  const resumeGame = useCallback(() => {
+    isPausedRef.current = false;
+  }, []);
+
   return {
     joystick,
     inputActions,
@@ -2342,6 +2357,8 @@ const useGameLoop = ({ canvasRef, dispatch, settings, updateSettings }) => {
     selectArchetype,
     setCameraZoom,
     setActiveEvolutionTier,
+    pauseGame,
+    resumeGame,
   };
 };
 
