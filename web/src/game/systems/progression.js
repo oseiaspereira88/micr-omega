@@ -112,6 +112,42 @@ const ensureResourceReferences = (state) => {
   }
 };
 
+/**
+ * Garante que os slots de macro evolução estão corretamente inicializados.
+ * Migração para jogadores antigos que não têm este campo.
+ */
+const ensureMacroEvolutionSlots = (state) => {
+  if (!state) return;
+
+  // Inicializar se ausente
+  if (!state.macroEvolutionSlots) {
+    state.macroEvolutionSlots = {
+      used: 0,
+      max: Math.max(1, Math.floor((state.level ?? 1) / LARGE_SLOT_INTERVAL)),
+    };
+  }
+
+  // Validar e corrigir valores inválidos
+  if (!Number.isFinite(state.macroEvolutionSlots.used)) {
+    state.macroEvolutionSlots.used = 0;
+  }
+
+  if (!Number.isFinite(state.macroEvolutionSlots.max)) {
+    state.macroEvolutionSlots.max = Math.max(1, Math.floor((state.level ?? 1) / LARGE_SLOT_INTERVAL));
+  }
+
+  // Garantir que max slots reflita o nível atual (compatibilidade retroativa)
+  const expectedMax = Math.max(1, Math.floor((state.level ?? 1) / LARGE_SLOT_INTERVAL));
+  if (state.macroEvolutionSlots.max < expectedMax) {
+    state.macroEvolutionSlots.max = expectedMax;
+  }
+
+  // Garantir que used não exceda max
+  if (state.macroEvolutionSlots.used > state.macroEvolutionSlots.max) {
+    state.macroEvolutionSlots.used = state.macroEvolutionSlots.max;
+  }
+};
+
 const recalcPointsAndSlots = (state) => {
   const points = state.characteristicPoints || {
     total: 0,
@@ -149,13 +185,8 @@ const recalcPointsAndSlots = (state) => {
   state.characteristicPoints = points;
   state.evolutionSlots = slots;
 
-  const macroSlots = state.macroEvolutionSlots || { used: 0, max: 0 };
-  macroSlots.max = Math.max(
-    macroSlots.max ?? 0,
-    Math.floor(state.level / LARGE_SLOT_INTERVAL)
-  );
-  macroSlots.used = Math.min(macroSlots.used ?? 0, macroSlots.max ?? macroSlots.used ?? 0);
-  state.macroEvolutionSlots = macroSlots;
+  // Garantir macro evolution slots (migração)
+  ensureMacroEvolutionSlots(state);
 
   if (state.organism?.unlockedEvolutionSlots) {
     state.organism.unlockedEvolutionSlots.small = Math.max(
@@ -574,6 +605,7 @@ const incrementSlotUsage = (state, tier) => {
 export const checkEvolution = (state, helpers = {}) => {
   if (!state) return state;
   ensureResourceReferences(state);
+  ensureMacroEvolutionSlots(state);
 
   const xpState = state.xp || { current: 0, next: 120, total: 0, level: state.level };
   const safeLevel = Number.isFinite(state.level) ? state.level : 1;
@@ -649,6 +681,23 @@ export const checkEvolution = (state, helpers = {}) => {
     leveledUp = true;
   }
 
+  // Restaurar fila pendente se houver (de morte anterior)
+  if (leveledUp && state.progressionQueuePending && Array.isArray(state.progressionQueuePending)) {
+    if (state.progressionQueuePending.length > 0) {
+      // Adicionar items da fila pendente à fila atual
+      const queue = ensureQueue(state);
+      state.progressionQueuePending.forEach((tier) => {
+        queue.push(tier);
+      });
+
+      // Limpar fila pendente
+      state.progressionQueuePending = [];
+
+      // Atualizar canEvolve
+      state.canEvolve = true;
+    }
+  }
+
   if (!leveledUp) {
     const targetLevel = Number.isFinite(state.level)
       ? state.level
@@ -698,6 +747,7 @@ export const checkEvolution = (state, helpers = {}) => {
 export const openEvolutionMenu = (state, helpers = {}) => {
   if (!state) return state;
   ensureResourceReferences(state);
+  ensureMacroEvolutionSlots(state);
   recalcPointsAndSlots(state);
 
   const queue = ensureQueue(state);
@@ -802,6 +852,7 @@ export const chooseEvolution = (state, helpers = {}, evolutionKey, forcedTier) =
 
   try {
     ensureResourceReferences(state);
+    ensureMacroEvolutionSlots(state);
 
     const tier = forcedTier || state.evolutionContext?.tier || state.evolutionMenu?.activeTier;
     if (!tier) {
@@ -1013,6 +1064,16 @@ export const restartGame = (state, helpers = {}) => {
   // Invalidar cache ao reiniciar o jogo
   invalidateEvolutionCache();
 
+  // Salvar fila de progressão antes do reset (será restaurada no próximo levelup)
+  const savedQueue = state.progressionQueue && Array.isArray(state.progressionQueue)
+    ? [...state.progressionQueue]
+    : [];
+
+  // Cancelar menu de evolução se estiver aberto
+  if (state.showEvolutionChoice) {
+    closeEvolutionMenu(state, helpers);
+  }
+
   const {
     resetControls,
     spawnObstacle,
@@ -1083,6 +1144,8 @@ export const restartGame = (state, helpers = {}) => {
     recentRewards: baseState.recentRewards,
     evolutionContext: null,
     traitLineage: baseState.traitLineage,
+    // Preservar fila de progressão para restaurar após próximo levelup
+    progressionQueuePending: savedQueue,
   });
 
   state.organism = { ...baseState.organism };
