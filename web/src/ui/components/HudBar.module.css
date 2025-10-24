@@ -365,6 +365,62 @@
   gap: 6px;
   color: #fff;
   min-width: 0;
+  position: relative;
+  overflow: hidden;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.badge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+
+/* UI-002: Visual hierarchy and feedback improvements */
+.badge[data-resource="health"] {
+  border: 1px solid rgba(255, 100, 100, 0.3);
+  box-shadow: inset 0 0 0 1px rgba(255, 100, 100, 0.1);
+}
+
+.badge[data-resource="energy"] {
+  border: 1px solid rgba(0, 217, 255, 0.3);
+  box-shadow: inset 0 0 0 1px rgba(0, 217, 255, 0.1);
+}
+
+.badge[data-critical="true"] {
+  animation: badgePulseRed 1.5s ease-in-out infinite;
+}
+
+.badge[data-full="true"]::before {
+  animation: shimmerEffect 2s ease-in-out infinite;
+}
+
+@keyframes badgePulseRed {
+  0%, 100% {
+    background: rgba(255, 100, 100, 0.2);
+    box-shadow: 0 0 8px rgba(255, 100, 100, 0.3);
+  }
+  50% {
+    background: rgba(255, 100, 100, 0.35);
+    box-shadow: 0 0 16px rgba(255, 100, 100, 0.5);
+  }
+}
+
+@keyframes shimmerEffect {
+  0% {
+    transform: translateX(-100%);
+  }
+  50%, 100% {
+    transform: translateX(200%);
+  }
 }
 
 .badgeIcon {

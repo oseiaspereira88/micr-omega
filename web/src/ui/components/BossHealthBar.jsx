@@ -51,7 +51,7 @@ const BossHealthBar = ({ active, health, maxHealth, name, portrait }) => {
   const legendText = isLowHealth ? 'Enfurecido!' : `Fase ${currentPhase}`;
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} data-enraged={isLowHealth || undefined}>
       <div className={styles.infoSection}>
         <div className={styles.header}>
           <span className={styles.name} title={bossName}>
@@ -80,6 +80,7 @@ const BossHealthBar = ({ active, health, maxHealth, name, portrait }) => {
           <div
             className={`${styles.fill} ${isLowHealth ? styles.lowHealth : ''}`}
             style={{ width: `${percent}%` }}
+            data-phase={currentPhase}
           />
           <div className={styles.segmentMarkers} aria-hidden="true">
             {SEGMENT_MARKERS.map((marker) => (

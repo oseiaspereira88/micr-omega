@@ -18,6 +18,15 @@
   row-gap: 10px;
   align-items: center;
   font-family: var(--font-sans, system-ui);
+  transition: background 300ms ease, border-color 300ms ease, box-shadow 300ms ease;
+}
+
+/* UI-004: Enhanced enrage state */
+.container[data-enraged='true'] {
+  background: rgba(60, 8, 22, 0.92);
+  border-color: rgba(255, 50, 80, 0.75);
+  box-shadow: 0 0 45px rgba(255, 50, 80, 0.55);
+  animation: enrageContainerPulse 1.2s ease-in-out infinite;
 }
 
 .infoSection {
@@ -95,8 +104,33 @@
   background: linear-gradient(90deg, #ff3a6b, #ffd166, #ff3a6b);
   background-size: 200% 200%;
   animation: gradientSweep 4s linear infinite;
-  transition: width 0.2s ease-in-out;
+  transition: width 0.2s ease-in-out, background 0.3s ease;
   box-shadow: 0 0 12px rgba(255, 58, 107, 0.35);
+}
+
+/* UI-004: Phase-based health bar colors */
+.fill[data-phase='1'] {
+  background: linear-gradient(90deg, #10b981, #34d399, #10b981);
+  background-size: 200% 200%;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.45);
+}
+
+.fill[data-phase='2'] {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b);
+  background-size: 200% 200%;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
+}
+
+.fill[data-phase='3'] {
+  background: linear-gradient(90deg, #ef4444, #f87171, #ef4444);
+  background-size: 200% 200%;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+}
+
+.fill[data-phase='4'] {
+  background: linear-gradient(90deg, #7c2d12, #991b1b, #7c2d12);
+  background-size: 200% 200%;
+  box-shadow: 0 0 12px rgba(124, 45, 18, 0.55);
 }
 
 .lowHealth {
@@ -147,6 +181,19 @@
   }
 }
 
+/* UI-004: Enhanced enrage state animation */
+@keyframes enrageContainerPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 45px rgba(255, 50, 80, 0.55);
+    border-color: rgba(255, 50, 80, 0.75);
+  }
+  50% {
+    box-shadow: 0 0 65px rgba(255, 50, 80, 0.85), 0 0 85px rgba(255, 50, 80, 0.45);
+    border-color: rgba(255, 80, 100, 0.95);
+  }
+}
+
 :global([data-mobile-hud='true']) :local(.container) {
   top: auto;
   bottom: calc(
@@ -158,4 +205,71 @@
   border-radius: 16px;
   padding: 12px 18px;
   transform: translate(-50%, 0);
+}
+
+/* BUG-003: Fix text overlap on very small screens (320px) */
+@media (max-width: 360px) {
+  .container {
+    padding: 10px 14px;
+  }
+
+  .header {
+    font-size: clamp(0.7rem, 3vw, 0.8rem);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .name {
+    font-size: clamp(0.75rem, 3.5vw, 0.85rem);
+    max-width: 100%;
+  }
+
+  .percent {
+    font-size: clamp(0.7rem, 3vw, 0.8rem);
+  }
+
+  .legend {
+    font-size: clamp(0.6rem, 2.5vw, 0.68rem);
+  }
+
+  .portraitSlot {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Galaxy Fold and ultra-small screens (320px) */
+@media (max-width: 320px) {
+  .container {
+    padding: 8px 12px;
+    grid-template-columns: 1fr;
+    row-gap: 8px;
+  }
+
+  .header {
+    font-size: 0.7rem;
+  }
+
+  .name {
+    font-size: 0.75rem;
+    /* Truncate long boss names */
+    max-width: calc(100vw - 140px);
+  }
+
+  .percent {
+    font-size: 0.7rem;
+  }
+
+  .legend {
+    font-size: 0.6rem;
+  }
+
+  .portraitSlot {
+    display: none; /* Hide portrait to save space */
+  }
+
+  .infoSection {
+    grid-column: 1 / -1;
+  }
 }

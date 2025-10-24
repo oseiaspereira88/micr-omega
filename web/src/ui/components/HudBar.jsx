@@ -198,7 +198,7 @@ const HudBar = ({
     .filter(Boolean)
     .join(' ');
 
-  const renderBadge = ({ key, icon, label, value, style, className, ariaLabel }) => (
+  const renderBadge = ({ key, icon, label, value, style, className, ariaLabel, dataAttributes }) => (
     <div
       key={key}
       className={[styles.badge, className].filter(Boolean).join(' ')}
@@ -207,6 +207,7 @@ const HudBar = ({
       title={ariaLabel}
       role="status"
       aria-live="polite"
+      {...(dataAttributes || {})}
     >
       <span className={styles.badgeIcon} aria-hidden="true">
         {icon}
@@ -218,6 +219,11 @@ const HudBar = ({
     </div>
   );
 
+  // UI-002: Enhanced visual feedback
+  const healthPercent = safeMaxHealth > 0 ? (safeHealth / safeMaxHealth) : 1;
+  const isHealthCritical = healthPercent < 0.3;
+  const isEnergyFull = safeEnergy >= 100;
+
   const primaryBadges = [
     {
       key: 'energy',
@@ -226,6 +232,10 @@ const HudBar = ({
       value: energyDisplay,
       style: { background: 'rgba(0, 217, 255, 0.2)' },
       ariaLabel: `Energia atual: ${energyDisplay}`,
+      dataAttributes: {
+        'data-resource': 'energy',
+        'data-full': isEnergyFull,
+      },
     },
     {
       key: 'health',
@@ -234,6 +244,10 @@ const HudBar = ({
       value: healthDisplay,
       style: { background: 'rgba(255, 100, 100, 0.2)' },
       ariaLabel: `Vida atual: ${formatNumber(safeHealth)} de ${formatNumber(safeMaxHealth)}`,
+      dataAttributes: {
+        'data-resource': 'health',
+        'data-critical': isHealthCritical,
+      },
     },
     {
       key: 'dash',

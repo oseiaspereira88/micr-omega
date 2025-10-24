@@ -279,9 +279,31 @@ const SkillWheel = ({
 
   const readinessPercent = Math.max(0, Math.min(100, Math.round(skillReadyPercent)));
   const readinessStatus = readinessPercent >= 100 ? 'Pronta' : `${readinessPercent}% recarregada`;
+
+  // UI-003: Track when skill just became ready for flash animation
+  const prevReadinessRef = React.useRef(readinessPercent);
+  const [justBecameReady, setJustBecameReady] = React.useState(false);
+
+  React.useEffect(() => {
+    const wasNotReady = prevReadinessRef.current < 100;
+    const isNowReady = readinessPercent >= 100;
+
+    if (wasNotReady && isNowReady) {
+      setJustBecameReady(true);
+      const timeout = setTimeout(() => {
+        setJustBecameReady(false);
+      }, 800); // Duration of skillReadyFlash animation
+
+      return () => clearTimeout(timeout);
+    }
+
+    prevReadinessRef.current = readinessPercent;
+  }, [readinessPercent]);
+
   const progressWheelClassName = [
     styles.progressWheel,
     readinessPercent >= 100 ? styles.progressWheelReady : '',
+    justBecameReady ? styles.progressWheelJustReady : '',
   ]
     .filter(Boolean)
     .join(' ');

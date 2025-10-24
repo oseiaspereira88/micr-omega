@@ -8,7 +8,7 @@
   gap: 6px;
   align-items: center;
   pointer-events: none;
-  z-index: 13;
+  z-index: var(--z-toast-notifications);
 }
 
 .notification {
@@ -76,9 +76,10 @@
   }
 }
 
+/* BUG-007: Improved positioning to avoid touch controls overlap */
 :global([data-mobile-hud='true']) :local(.container) {
-  top: auto;
-  bottom: calc(var(--hud-mobile-offset, 148px) + var(--safe-area-inset-bottom, 0px) + 12px);
+  top: calc(var(--hud-top-controls-offset, 60px) + 12px);
+  bottom: auto;
   transform: translate(-50%, 0);
   gap: 8px;
   max-width: min(420px, 90vw);
