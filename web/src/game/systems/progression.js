@@ -9,6 +9,10 @@ import { calculateDiminishingMultiplier } from '@micr-omega/shared';
 let evolutionInProgress = false;
 let evolutionSequence = 0;
 
+// Cache de opções de evolução para otimização de performance
+const evolutionOptionsCache = new Map();
+const MAX_CACHE_SIZE = 20;
+
 const BASE_REROLL_COST = 25;
 const REROLL_GROWTH_FACTOR = 1.6;
 const MEDIUM_SLOT_INTERVAL = 2;
@@ -252,6 +256,44 @@ const getHistoryCount = (state, tier, key) => {
   return state.organism?.evolutionHistory?.[tier]?.[key] ?? 0;
 };
 
+/**
+ * Gera uma chave de cache baseada nos estados que afetam as opções de evolução.
+ * Captura: tier, level, recursos disponíveis, slots e histórico de evoluções.
+ */
+const getCacheKey = (state, tier) => {
+  if (!state) return `${tier}-null`;
+
+  const level = state.level ?? 0;
+  const pcAvailable = state.characteristicPoints?.available ?? 0;
+  const mgCurrent = state.geneticMaterial?.current ?? 0;
+
+  // Serializar fragments e stable genes de forma compacta
+  const fragments = JSON.stringify(state.geneFragments || {});
+  const stableGenes = JSON.stringify(state.stableGenes || {});
+
+  // Slots para o tier específico
+  const slot = state.evolutionSlots?.[tier];
+  const slotUsed = slot?.used ?? 0;
+  const slotMax = slot?.max ?? 0;
+
+  // Macro slots se relevante
+  const macroUsed = state.macroEvolutionSlots?.used ?? 0;
+  const macroMax = state.macroEvolutionSlots?.max ?? 0;
+
+  // Histórico de evolução para verificar unique/maxPurchases
+  const history = JSON.stringify(state.organism?.evolutionHistory?.[tier] || {});
+
+  return `${tier}|L${level}|PC${pcAvailable}|MG${mgCurrent}|S${slotUsed}/${slotMax}|M${macroUsed}/${macroMax}|F${fragments}|G${stableGenes}|H${history}`;
+};
+
+/**
+ * Invalida todo o cache de opções de evolução.
+ * Deve ser chamado quando há mudanças significativas no estado do jogo.
+ */
+export const invalidateEvolutionCache = () => {
+  evolutionOptionsCache.clear();
+};
+
 export const selectArchetype = (state, helpers = {}, archetypeKey) => {
   if (!state) return state;
 
@@ -285,6 +327,10 @@ export const selectArchetype = (state, helpers = {}, archetypeKey) => {
   }
 
   helpers.addNotification?.(state, `🌱 Arquétipo selecionado: ${entry.name}`);
+
+  // Invalidar cache ao mudar arquétipo
+  invalidateEvolutionCache();
+
   helpers.syncState?.(state);
   return state;
 };
@@ -364,8 +410,18 @@ const pickRandomUniqueKeys = (keys = [], count = 0, randomFn = Math.random) => {
  * When no deterministic picker is provided via `helpers.pickRandomUnique`,
  * the selection uses the optional `helpers.random` function (falling back to
  * `Math.random`) to shuffle available evolutions.
+ *
+ * PERFORMANCE: Usa memoization para cachear opções já calculadas.
  */
 const buildEvolutionOptions = (state, helpers = {}, tier = 'small') => {
+  // Verificar cache primeiro
+  const cacheKey = getCacheKey(state, tier);
+
+  if (evolutionOptionsCache.has(cacheKey)) {
+    return evolutionOptionsCache.get(cacheKey);
+  }
+
+  // Cache miss - calcular opções
   const pool = getEvolutionPool(helpers, tier);
   const entries = Object.entries(pool || {});
   if (entries.length === 0) return [];
@@ -389,7 +445,7 @@ const buildEvolutionOptions = (state, helpers = {}, tier = 'small') => {
       ? helpers.pickRandomUnique(keys, count) || pickRandomUniqueKeys(keys, count, helpers.random)
       : pickRandomUniqueKeys(keys, count, helpers.random);
 
-  return pick.map((key) => {
+  const options = pick.map((key) => {
     const entry = pool[key];
     const purchases = getHistoryCount(state, tier, key);
     const requirementCheck = meetsRequirements(state, entry?.requirements);
@@ -441,6 +497,17 @@ const buildEvolutionOptions = (state, helpers = {}, tier = 'small') => {
       subforms: entry?.macroProfile?.subforms || [],
     };
   });
+
+  // Limitar tamanho do cache (LRU simples - remove o mais antigo)
+  if (evolutionOptionsCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = evolutionOptionsCache.keys().next().value;
+    evolutionOptionsCache.delete(firstKey);
+  }
+
+  // Armazenar no cache
+  evolutionOptionsCache.set(cacheKey, options);
+
+  return options;
 };
 
 /**
@@ -619,6 +686,9 @@ export const checkEvolution = (state, helpers = {}) => {
   if (leveledUp) {
     state.reroll.cost = state.reroll.baseCost ?? BASE_REROLL_COST;
     state.reroll.count = 0;
+
+    // Invalidar cache após level up (mudança de slots e pontos)
+    invalidateEvolutionCache();
   }
 
   helpers.syncState?.(state);
@@ -832,6 +902,9 @@ export const chooseEvolution = (state, helpers = {}, evolutionKey, forcedTier) =
     const queue = ensureQueue(state);
     state.canEvolve = computeCanEvolve(state, helpers);
 
+    // Invalidar cache após aplicar evolução (mudança de histórico, slots e recursos)
+    invalidateEvolutionCache();
+
     helpers.addNotification?.(state, `✨ ${entry.name}`);
     helpers.syncState?.(state);
 
@@ -881,6 +954,9 @@ export const requestEvolutionReroll = (state, helpers = {}) => {
   rerollState.cost = Math.ceil(currentCost * REROLL_GROWTH_FACTOR);
   rerollState.pity += 1;
   state.reroll = rerollState;
+
+  // Invalidar cache antes do reroll para gerar novas opções
+  invalidateEvolutionCache();
 
   const tier = state.evolutionMenu?.activeTier || state.evolutionContext?.tier || 'small';
   const updatedOptions = buildEvolutionOptions(state, helpers, tier);
@@ -933,6 +1009,9 @@ export const cancelEvolutionChoice = (state, helpers = {}) => {
 
 export const restartGame = (state, helpers = {}) => {
   if (!state) return state;
+
+  // Invalidar cache ao reiniciar o jogo
+  invalidateEvolutionCache();
 
   const {
     resetControls,
