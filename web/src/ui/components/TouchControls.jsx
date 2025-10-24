@@ -5,6 +5,7 @@ import {
   TOUCH_CONTROL_SCALE_MAX,
   TOUCH_CONTROL_SCALE_MIN,
 } from '../../store/gameSettings';
+import useHapticFeedback from '../../hooks/useHapticFeedback';
 import styles from './TouchControls.module.css';
 
 const joinClassNames = (...classes) => classes.filter(Boolean).join(' ');
@@ -203,6 +204,8 @@ const TouchControls = ({
   autoInvertWhenSidebarOpen = false,
   touchControlScale: touchControlScaleProp = 1,
   joystickSensitivity: joystickSensitivityProp = 1,
+  hapticEnabled = true,
+  hapticIntensity = 1.0,
   className,
   ...a11yProps
 }) => {
@@ -215,6 +218,12 @@ const TouchControls = ({
     evolve: false,
   });
   const actionGroupRef = useRef(null);
+
+  // Initialize haptic feedback
+  const haptic = useHapticFeedback({
+    enabled: hapticEnabled,
+    intensity: hapticIntensity,
+  });
   /**
    * Touch controls visual scale - controls size of buttons and joystick (0.5-1.5)
    * Does NOT affect movement sensitivity, only visual appearance
@@ -567,6 +576,7 @@ const TouchControls = ({
   };
 
   const forwardJoystickStartEvent = (event) => {
+    haptic.light();
     const decoratedEvent = decorateJoystickEvent(event, joystickMovementSensitivity);
     onJoystickStart?.(decoratedEvent);
   };
@@ -645,6 +655,7 @@ const TouchControls = ({
           aria-label={attackAriaLabel}
           onPointerDown={event => {
             event.preventDefault();
+            haptic.medium();
             setButtonActive('attack', true);
             onAttackPress?.(event);
           }}
@@ -699,6 +710,7 @@ const TouchControls = ({
           onPointerDown={event => {
             event.preventDefault();
             if (dashReady) {
+              haptic.heavy();
               setButtonActive('dash', true);
               onDash?.(event);
             }
@@ -771,6 +783,7 @@ const TouchControls = ({
           onTouchStart={event => {
             event.preventDefault();
             if (!skillDisabled) {
+              haptic.heavy();
               setButtonActive('skill', true);
               onUseSkill?.();
             }
@@ -875,6 +888,7 @@ const TouchControls = ({
           onTouchStart={event => {
             event.preventDefault();
             if (hasCurrentSkill) {
+              haptic.light();
               setButtonActive('cycle', true);
               onCycleSkill?.();
             }
@@ -935,6 +949,7 @@ const TouchControls = ({
           aria-disabled={!canEvolve}
           onTouchStart={() => {
             if (canEvolve) {
+              haptic.success();
               setButtonActive('evolve', true);
             }
           }}

@@ -156,6 +156,38 @@
   }
 }
 
+/* BUG-002: Landscape mobile optimization - prevent overflow */
+@media (orientation: landscape) and (max-height: 600px) {
+  .stats {
+    right: calc(var(--safe-area-inset-right, 0px) + 8px);
+    max-width: clamp(180px, 32vw, 280px);
+  }
+
+  .statsCompact {
+    max-width: clamp(160px, 28vw, 240px);
+  }
+
+  .primaryBadges {
+    gap: 4px;
+  }
+
+  .badge {
+    padding: 3px 6px;
+  }
+
+  .badgeIcon {
+    font-size: 0.75rem;
+  }
+
+  .badgeLabel {
+    font-size: clamp(0.5rem, 1.2vw, 0.58rem);
+  }
+
+  .badgeValue {
+    font-size: clamp(0.68rem, 1.5vw, 0.75rem);
+  }
+}
+
 .statsCompact {
   max-width: clamp(220px, 36vw, 340px);
 }

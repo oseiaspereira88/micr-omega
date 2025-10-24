@@ -1,0 +1,206 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1.5px solid;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(4px);
+}
+
+.icon {
+  font-size: 0.95em;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-display, system-ui);
+  letter-spacing: 0.02em;
+}
+
+.stacks {
+  font-weight: 700;
+  color: #fff;
+}
+
+.time {
+  font-size: 0.85em;
+  opacity: 0.95;
+}
+
+/* Pattern backgrounds - layered behind content */
+.badge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Dots pattern (Poison) */
+.pattern-dots::before {
+  background-image: radial-gradient(
+    circle,
+    var(--status-color, #fff) 1.5px,
+    transparent 1.5px
+  );
+  background-size: 6px 6px;
+}
+
+/* Diagonal stripes pattern (Burn) */
+.pattern-diagonal::before {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--status-color, #fff) 0px,
+    var(--status-color, #fff) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+}
+
+/* Crystalline pattern (Freeze) */
+.pattern-crystal::before {
+  background-image:
+    linear-gradient(45deg, var(--status-color, #fff) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--status-color, #fff) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--status-color, #fff) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--status-color, #fff) 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+}
+
+/* Zigzag pattern (Stun) */
+.pattern-zigzag::before {
+  background-image: linear-gradient(
+    135deg,
+    var(--status-color, #fff) 25%,
+    transparent 25%
+  ),
+  linear-gradient(
+    225deg,
+    var(--status-color, #fff) 25%,
+    transparent 25%
+  );
+  background-size: 8px 8px;
+  background-position: 0 0, 4px 0;
+}
+
+/* Horizontal lines pattern (Slow) */
+.pattern-horizontal::before {
+  background-image: repeating-linear-gradient(
+    0deg,
+    var(--status-color, #fff) 0px,
+    var(--status-color, #fff) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+}
+
+/* Vertical lines pattern (Bleed) */
+.pattern-vertical::before {
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--status-color, #fff) 0px,
+    var(--status-color, #fff) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+}
+
+/* Plus/cross pattern (Regeneration) */
+.pattern-plus::before {
+  background-image:
+    linear-gradient(90deg, transparent 40%, var(--status-color, #fff) 40%, var(--status-color, #fff) 60%, transparent 60%),
+    linear-gradient(0deg, transparent 40%, var(--status-color, #fff) 40%, var(--status-color, #fff) 60%, transparent 60%);
+  background-size: 8px 8px;
+}
+
+/* Grid pattern (Shield) */
+.pattern-grid::before {
+  background-image:
+    linear-gradient(var(--status-color, #fff) 1px, transparent 1px),
+    linear-gradient(90deg, var(--status-color, #fff) 1px, transparent 1px);
+  background-size: 6px 6px;
+}
+
+/* X-cross pattern (Weakness) */
+.pattern-cross::before {
+  background-image:
+    linear-gradient(45deg, transparent 45%, var(--status-color, #fff) 45%, var(--status-color, #fff) 55%, transparent 55%),
+    linear-gradient(-45deg, transparent 45%, var(--status-color, #fff) 45%, var(--status-color, #fff) 55%, transparent 55%);
+  background-size: 8px 8px;
+}
+
+/* Chevron pattern (Strength) */
+.pattern-chevron::before {
+  background-image:
+    linear-gradient(135deg, var(--status-color, #fff) 25%, transparent 25%),
+    linear-gradient(225deg, var(--status-color, #fff) 25%, transparent 25%);
+  background-size: 10px 10px;
+  background-position: 0 0, 5px 0;
+}
+
+/* Wave pattern (Haste) */
+.pattern-wave::before {
+  background-image: radial-gradient(
+    ellipse at center,
+    var(--status-color, #fff) 0%,
+    transparent 50%
+  );
+  background-size: 12px 6px;
+  background-position: 0 0, 6px 3px;
+}
+
+/* Spiral pattern (Confusion) */
+.pattern-spiral::before {
+  background-image:
+    radial-gradient(circle at 25% 25%, var(--status-color, #fff) 2px, transparent 2px),
+    radial-gradient(circle at 75% 75%, var(--status-color, #fff) 2px, transparent 2px);
+  background-size: 10px 10px;
+}
+
+/* Lock pattern (Paralysis) */
+.pattern-lock::before {
+  background-image:
+    linear-gradient(90deg, transparent 30%, var(--status-color, #fff) 30%, var(--status-color, #fff) 70%, transparent 70%);
+  background-size: 8px 8px;
+}
+
+/* Solid pattern (Blind) */
+.pattern-solid::before {
+  background: var(--status-color, #fff);
+  opacity: 0.25;
+}
+
+/* Mute pattern (Silence) */
+.pattern-mute::before {
+  background-image:
+    linear-gradient(135deg, transparent 40%, var(--status-color, #fff) 40%, var(--status-color, #fff) 60%, transparent 60%);
+  background-size: 10px 10px;
+}
+
+/* High contrast border for better visibility */
+.badge {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 2px 6px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* Ensure content is above pattern */
+.icon,
+.content {
+  position: relative;
+  z-index: 1;
+}
