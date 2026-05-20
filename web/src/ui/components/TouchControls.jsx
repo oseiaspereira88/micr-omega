@@ -293,19 +293,14 @@ const TouchControls = ({
     [viewport.height],
   );
 
-  const touchVerticalScale = useMemo(
-    () => touchScale * heightScale,
-    [heightScale, touchScale],
-  );
-
   const configuredTouchScale = useMemo(
     () => touchScale * normalizedTouchControlScale,
     [touchScale, normalizedTouchControlScale],
   );
 
   const configuredTouchVerticalScale = useMemo(
-    () => touchVerticalScale * normalizedTouchControlScale,
-    [touchVerticalScale, normalizedTouchControlScale],
+    () => heightScale * normalizedTouchControlScale,
+    [heightScale, normalizedTouchControlScale],
   );
 
   const isLandscape = viewport.width > viewport.height;
