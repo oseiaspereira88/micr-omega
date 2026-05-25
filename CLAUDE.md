@@ -134,6 +134,11 @@ npm run report:metrics        # Generate metrics report from log files
 4. Run tests before committing
 5. Use `lint` command to check code quality
 
+For detailed operational guidance, prioritize the docs in `docs/`:
+- `docs/load-testing.md` (k6 stress/load scenarios)
+- `docs/observability.md` (structured logs and metrics)
+- `docs/release-workflow.md` (release sequencing)
+
 ## Deployment
 
 - **Frontend**: Cloudflare Pages with `npm ci && npm run build`
@@ -217,7 +222,7 @@ This will report:
 - ✓ Servers running on correct ports
 - ✓ Worker responding to requests
 
-### Common Development Workflow
+### Common Development Workflow (Quick Reference)
 
 1. **First time setup**:
    ```bash

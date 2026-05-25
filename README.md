@@ -23,13 +23,17 @@ MicrΩ é um jogo de exploração microscópica renderizado em um único canvas 
 │  ├─ src/
 │  ├─ package.json
 │  └─ tsconfig.json
+├─ shared/        # Tipos e utilitários compartilhados (web + worker)
+│  ├─ src/
+│  ├─ package.json
+│  └─ tsconfig.json
 ├─ docs/
 ├─ package.json   # Dependências compartilhadas e scripts de orquestração
 ├─ tsconfig.json  # Referências de projeto (web + worker)
 └─ tsconfig.base.json
 ```
 
-O arquivo `package.json` na raiz declara os workspaces `web/` e `worker/` e concentra dependências compartilhadas, como validações com Zod e o TypeScript usado para ambos módulos.
+O arquivo `package.json` na raiz declara os workspaces `web/`, `worker/` e `shared/` e concentra dependências compartilhadas, como validações com Zod e o TypeScript usado para todos os módulos.
 
 ## Configuração e desenvolvimento local
 
@@ -87,7 +91,11 @@ O Durable Object aceita variáveis de ambiente opcionais para ajustar tempos de 
 
 Defina esses valores no `wrangler.toml` (seção `[vars]`) ou no painel de variáveis da Cloudflare para cada ambiente (`Preview`, `Production`). Em ambientes locais com Miniflare, utilize `createMiniflare({ runtimeConfig: { ... } })` ou sobrescreva os bindings ao instanciar o Durable Object nos testes.
 
-Consulte `docs/load-testing.md` para instruções de execução do teste de carga com k6 (50–100 conexões simultâneas).
+Consulte os artefatos abaixo para detalhes operacionais complementares:
+
+- `docs/load-testing.md`: teste de carga com k6 (50–100 conexões simultâneas).
+- `docs/observability.md`: telemetria, coleta de logs e inspeção de métricas.
+- `docs/release-workflow.md`: checklist de release e publicação.
 
 ## Critério de ordenação do ranking
 
