@@ -664,6 +664,8 @@ const TouchControls = ({
             handleAttackReleaseEvent(event);
           }}
           onPointerCancel={handleAttackReleaseEvent}
+          onTouchCancel={handleAttackReleaseEvent}
+          onMouseLeave={handleAttackReleaseEvent}
           onPointerLeave={event => {
             // Only release on leave for mouse/pen, not touch
             if (event.pointerType !== 'touch') {

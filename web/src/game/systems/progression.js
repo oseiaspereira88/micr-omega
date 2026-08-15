@@ -973,10 +973,8 @@ export const chooseEvolution = (state, helpers = {}, evolutionKey, forcedTier) =
     clearTimeout(safetyTimeoutId);
     return state;
   } finally {
-    // Timeout de segurança para liberar lock
-    setTimeout(() => {
-      evolutionInProgress = false;
-    }, 1000);
+    clearTimeout(safetyTimeoutId);
+    evolutionInProgress = false;
   }
 };
 
