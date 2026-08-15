@@ -6,12 +6,12 @@ govern agent work. This file is the short contract. For the operating manual
 
 ## Project context
 
-<!-- Describe here, in 3-6 lines, what this repository is: components,
-     high-level architecture, and where the project's canonical references
-     live (vision, backlog, decisions). Point to subproject AGENTS.md files
-     when they exist. -->
-
-micr-omega: describe the repository's purpose and its main components.
+MicrΩ is a microscopic exploration and evolution single-canvas game with a
+React (Vite) frontend and a Cloudflare Workers (Durable Objects) realtime
+multiplayer backend. Workspaces: `web/` (game client, canvas rendering, touch/desktop
+controls, HUD, UI), `worker/` (RoomDO Durable Objects, rooms, multiplayer state sync,
+rate limiting), and `shared/` (shared schemas and game types). Canonical references
+live in [`README.md`](README.md), [`CLAUDE.md`](CLAUDE.md), and [`docs/`](docs/).
 
 ## Instruction precedence
 
@@ -44,7 +44,7 @@ AI agents must use assessment tools at specific points in the flow:
 1. **Task / Spec Start (`pose-feature`)**:
    - Run `pose assess discover [--component <dir>]` / `pose_component_discover` to obtain LOC metrics, debts, and module structure before modifying code.
 2. **Inter-Module Contract Change / PR Review (`pose-review`)**:
-   - Run `pose assess integrate` / `pose_integration_check` when touching Protobuf, Kafka, REST APIs, or MCP tools.
+   - Run `pose assess integrate` / `pose_integration_check` when touching WebSocket protocols, REST APIs, or shared contracts.
    - Run `pose assess tech-debt` / `pose_tech_debt_check` during code review to ensure markers (`TODO`, `FIXME`, `stub`, `panic`) are covered by follow-ups or specs.
 3. **Spec Closure (`pose-spec-closeout`)**:
    - Run `pose assess discover --update-state` upon delivery completion to recalculate dynamic platform completeness and update `.pose/assessments/` and `.pose/state/`.
@@ -53,7 +53,7 @@ AI agents must use assessment tools at specific points in the flow:
 
 Apply the rules relevant to the scope, cumulatively:
 
-- Go backend: [`.pose/rules/backend-go.md`](.pose/rules/backend-go.md)
+- Cloudflare Workers backend: [`.pose/rules/backend-worker.md`](.pose/rules/backend-worker.md)
 - React frontend: [`.pose/rules/frontend-react.md`](.pose/rules/frontend-react.md)
 - Kubernetes: shipped as the reference extension `pose-rule-kubernetes`, not embedded — install it with `pose extension install` when the repository deploys to a cluster.
 - Security: [`.pose/rules/security.md`](.pose/rules/security.md)

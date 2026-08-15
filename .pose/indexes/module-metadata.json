@@ -1,24 +1,39 @@
 {
   "schemaVersion": 1,
   "defaults": {
-    "owner": "@pose-maintainers",
+    "owner": "@micr-omega-team",
     "criticality": "medium",
-    "domain": "developer-tooling",
+    "domain": "gaming",
     "validationProfile": "baseline"
   },
   "modules": {
-    "pose-mcp": {
-      "owner": "@pose-maintainers",
+    "web": {
+      "owner": "@micr-omega-team",
       "criticality": "high",
-      "domain": "governance-engine",
+      "domain": "game-frontend",
       "validationProfile": "baseline",
       "deliveryRole": "composition-root",
-      "entrypoints": "pose-mcp/cmd/pose/main.go"
+      "entrypoints": "web/src/main.tsx"
     },
-    "mcp-enforce": {
-      "owner": "@pose-maintainers",
+    "worker": {
+      "owner": "@micr-omega-team",
       "criticality": "high",
-      "domain": "policy-enforcement",
+      "domain": "game-backend",
+      "validationProfile": "baseline",
+      "deliveryRole": "composition-root",
+      "entrypoints": "worker/src/index.ts"
+    },
+    "shared": {
+      "owner": "@micr-omega-team",
+      "criticality": "medium",
+      "domain": "shared-library",
+      "validationProfile": "baseline",
+      "entrypoints": "shared/src/index.ts"
+    },
+    "micr-omega": {
+      "owner": "@micr-omega-team",
+      "criticality": "medium",
+      "domain": "gaming",
       "validationProfile": "baseline"
     }
   }
