@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "input_digest": "sha256:9cdc22ecf5b519b1ed2e91fed2b7ebe9eb29abe3417191f2a500f0cedc1158ea",
+  "provenance_digest": "sha256:aade89ae2026afe39ab153cd6a6b5a3c34e87a69a4c677daf467b942da699414",
+  "nodes": [],
+  "edges": [],
+  "claims": [],
+  "change_sets": [],
+  "reverse": {},
+  "findings": []
+}

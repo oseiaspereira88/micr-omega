@@ -1,0 +1,17 @@
+{
+  "_comment": "Artifact-contract policy (spec pose-artifact-provenance-ledger). Disabled by default: governed_roots must name this project's own source directories, not pose-mcp's. Set enabled=true and populate governed_roots once configured for this project.",
+  "schema_version": 1,
+  "enabled": false,
+  "adopted_at": "",
+  "governed_roots": [],
+  "exclusions": [],
+  "none_reasons": ["release", "migration"],
+  "severities": {
+    "resolvability": "error",
+    "existence": "error",
+    "action-mismatch": "error",
+    "undeclared": "error",
+    "orphan": "warning",
+    "legacy-narrative": "info"
+  }
+}
