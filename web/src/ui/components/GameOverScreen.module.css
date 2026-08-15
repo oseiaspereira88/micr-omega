@@ -513,5 +513,23 @@
 
   .container {
     width: min(520px, 100%);
+    gap: 18px;
+    padding-inline: 16px;
+    padding-block: 24px;
+  }
+
+  .journeyGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .journeyItem {
+    padding: 12px;
+    min-height: auto;
+    border-radius: 14px;
+  }
+
+  .journeyValue {
+    font-size: 1.25rem;
   }
 }
