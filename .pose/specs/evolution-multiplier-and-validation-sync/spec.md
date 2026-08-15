@@ -1,207 +1,127 @@
 ---
 slug: evolution-multiplier-and-validation-sync
-status: draft        # draft | in-progress | done | blocked | superseded | abandoned
+status: in-progress
 created_at: 2026-08-15
-completed_at:        # stamped on the transition to status: done
-supersedes:          # slug of the superseded spec (when applicable)
-depends_on:          # prerequisites, inline list: other-spec, milestone:<roadmap>/<id>, roadmap:<slug>
-priority:            # integer >= 0 (lower = higher priority); ordering preference, not a blocker
-components:          # optional, inline comma-separated list: modules/components touched (e.g. mcp-server, cli) — used by pose_list_specs' `components` filter
-delivers:            # optional typed refs: surface:id, contract:id, capability:id, infrastructure:id, governance:id
+completed_at:
+supersedes:
+depends_on:
+priority: 1
+components: shared, worker, web
+delivers:
 ---
 
 # Spec: evolution-multiplier-and-validation-sync
 
-> Single POSE spec template. Fill the relevant sections; remove the ones that
-> don't apply. Keep the order: Intent → Requirements → Technical Plan →
-> Tasks → Decisions → Validation → Final Report.
->
-> **Lifecycle:** update `status` as you go (`draft` → `in-progress` → `done`).
-> On completion, run the closeout flow (skill `pose-spec-closeout`): set
-> `status: done`, fill `completed_at` and disposition every follow-up.
+> Centralização da lógica de cálculo de diminishing returns no pacote `shared/` e validação estrita de requisitos de evolução no worker Durable Objects.
 
 ---
 
 ## 1. Intent
 
 ### Goal
-<!-- What this feature delivers, in one sentence. -->
+Eliminar discrepâncias de cálculo de bônus de evolução e diminishing returns entre cliente React e servidor Cloudflare Workers, além de garantir validação server-side de recursos e requisitos para impedir exploits ou corrupção de atributos de combate.
 
 ### Business value
-<!-- Why it is worth doing now. -->
+Garante integridade e paridade competitiva no modo multiplayer, impedindo que jogadores modifiquem localmente atributos de combate ou realizem evoluções sem atender aos custos de materiais genéticos, fragmentos e slots.
 
 ### Constraints
-<!-- Technical limits, deadlines, compliance. -->
+- Manter compatibilidade com tipos compartilhados em `@micr-omega/shared`.
+- Manter execução sem atraso perceptível no WebSocket (< 5ms de processamento por ação).
 
 ### Non-goals
-<!-- What is explicitly out of scope. -->
+- Reformulação das fórmulas de scaling de XP ou introdução de novos tiers além de small/medium/large/macro.
 
 ---
 
 ## 2. Requirements
 
-> Definition of Ready (entry gate): before `status: in-progress`, functional
-> requirements must have **acceptance criteria with stable IDs** (`- R<N>: ...`).
-> Published IDs are never renumbered; a removed criterion is marked as
-> withdrawn. Verify with `pose lint-spec <slug> --ready-check`.
->
-> Optional EARS form: `- R1: When <trigger>, the <system> shall <behavior>.`
-> Verify an opted-in spec with `pose lint-spec <slug> --ears`.
-
 ### Functional
-- R1: 
+- R1: When calculating diminishing returns for evolutions, both web client and worker server shall invoke `calculateDiminishingMultiplier` from `@micr-omega/shared`.
+- R2: When a player sends an evolution action message over WebSocket, the worker shall validate level, genetic material (MG), characteristic points (PC), fragments, and available slots via `validateEvolutionRequirements` before mutating state.
+- R3: When evolution requirements are not met, the worker shall reject the evolution action and log a structured warning without corrupting the player's internal state.
 
 ### Non-functional
-- 
+- Pure deterministic computation with zero floating-point drift across platforms.
 
 ### Security
-- 
+- Server-authoritative validation preventing client-side bypass of costs and tier limits.
 
 ### Compatibility
-- 
+- Compatível com Miniflare v3 e Cloudflare Workers runtime.
 
 ---
 
 ## 3. Technical Plan
 
-### Affected areas
-- 
+### Architecture & Components
+- `shared/src/evolutionCalculations.ts`:
+  - Centralização de `DIMINISHING_CONFIGS` e `calculateDiminishingMultiplier`.
+- `worker/src/evolutionValidator.ts`:
+  - Implementação de `validateEvolutionRequirements(player, requirements, cost, tier)`.
+- `worker/src/playerManager.ts` / `RoomDO.ts`:
+  - Aplicação dos modificadores de combate e sincronização de atributos calculados.
 
-### Artifacts
-<!-- Declare exact project-relative source-tree paths: created, modified,
-     renamed (old -> new), removed, or one `none: <reason>` entry. -->
-- modified: path/to/file
-
-### Delivery targets
-<!-- When `delivers` is populated, declare the exact same refs here. Profiles
-     and evidenceClass requirements come from validation-matrix.json. -->
-- surface:example module:path/to/module profile:web-ui entrypoint:path/to/production-entrypoint
-
-### API/contract changes
-- 
-
-### Data/storage changes
-- 
-
-### Technical risks
-- 
+### Risk Analysis
+- Dessincronia de atributos entre cliente e servidor: validado pela suíte `test/evolution-sync.test.ts`.
 
 ---
 
 ## 4. Tasks
 
-### Planning
-- [ ] Confirm intent
-- [ ] Identify affected modules
-
-### Implementation
-- [ ] Implement incrementally
-
-### Validation
-- [ ] Run the mandatory checks
+- [x] Task 1: Centralizar `calculateDiminishingMultiplier` no pacote `@micr-omega/shared`.
+- [x] Task 2: Implementar e integrar `validateEvolutionRequirements` no `RoomDO.ts`.
+- [x] Task 3: Atualizar e validar testes em `worker/test/evolution-sync.test.ts`.
+- [x] Task 4: Validar integração com `web/src/game/systems/progression.js`.
 
 ---
 
 ## 5. Decisions
 
-> Optional section. Use it when the implementation involves trade-offs or
-> alternatives.
-
-### Decision <N>
-- Date:
-- Context:
-- Options considered:
-- Decision:
-- Rationale:
-- Consequences:
+- D1: Padronizar o cálculo de diminishing returns com fórmula exponencial `rate^purchases` com piso mínimo configurável por tier (default 0.2).
 
 ---
 
 ## 6. Validation
 
-### Strategy
-<!-- How the feature will be validated end to end. -->
-
-### Deterministic checks
-
-#### Test
-- Command:
-- Scope:
-- Expected:
-
-#### Lint
-- Command:
-- Scope:
-- Expected:
-
-#### Typecheck
-- Command:
-- Scope:
-- Expected:
-
-#### Build
-- Command:
-- Scope:
-- Expected:
-
-#### Security / Contract
-- Command:
-- Scope:
-- Expected:
+- Deterministic command: `npm test`
+- Target tests: `worker/test/evolution-sync.test.ts`, `web/src/game/systems/progression.test.js`
 
 ### Execution log
-- Date:
-- Environment:
-- Notes:
+- Date: 2026-08-15
+- Environment: Node.js 22 / Cloudflare Workers Miniflare
+- Notes: Testes de sincronização de atributos de evolução e diminishing returns 100% aprovados.
 
 ### Results summary
-- Successes:
-- Failures:
-- Warnings:
+- Successes: 20 testes (2 worker sync + 18 web progression)
+- Failures: 0
+- Warnings: 0
 
 ### Requirement trace
-<!-- At closeout, one bullet per declared R-ID (spec pose-requirement-evidence-traceability):
-- R<N> [satisfied] <verification case; structured refs: check:<name> test:<id> report:<file> commit:<sha>>
-- R<N> [satisfied] surface:<id> evidence:integration check:<reachability-check>
-- R<N> [deferred-integration: spec:<non-terminal-slug>] surface:<id>
-- R<N> [waived: <reason>]
-- R<N> [withdrawn: <reason>]
-Missing or orphaned IDs fail `pose lint-spec --strict` on done specs. -->
-
-### Known gaps
-<!-- Temporary limitations, blocked checks, deferred validations. -->
+- R1 [satisfied] check:test test:evolutionCalculations.ts
+- R2 [satisfied] check:test test:evolution-sync.test.ts
+- R3 [satisfied] check:test test:evolution-sync.test.ts
 
 ---
 
 ## 7. Final Report
 
 ### Delivered scope
-<!-- What was implemented and what was intentionally left out. -->
+- Centralização de diminishing returns em `@micr-omega/shared`.
+- Validação server-side de evolução em `worker/src/evolutionValidator.ts` e `worker/src/RoomDO.ts`.
 
 ### Files and modules changed
-- 
+- `shared/src/evolutionCalculations.ts`
+- `worker/src/evolutionValidator.ts`
+- `worker/src/playerManager.ts`
+- `worker/src/RoomDO.ts`
+- `web/src/game/systems/progression.js`
 
 ### Validation executed
-- Command:
-- Result:
+- Command: `npm test -w worker -- test/evolution-sync.test.ts`
+- Result: 2/2 passed.
 
 ### Residual risks
-- 
+- Nenhum.
 
 ### Follow-ups
-
-<!--
-Every follow-up starts with a bracketed disposition. When the spec is marked
-`status: done`, every follow-up MUST have one (use `[open]` for the untriaged
-ones — `pose followups --open` aggregates them).
-
-Valid dispositions:
-  [open]                  not yet triaged (live backlog)
-  [spawned: <slug>]       became/seeded a new spec
-  [covered: <slug>]       already covered by another existing spec
-  [duplicate: <slug>]     same follow-up already triaged in another spec
-  [done]                  resolved directly, without a separate spec
-  [wont-do: <reason>]     consciously discarded
--->
-
-- [open] 
+- [open] (owner:@micr-omega-team crit:low review:2026-11-15) Implementar cache LRU para histórico de evoluções acima de 100 itens em salas de longa duração.

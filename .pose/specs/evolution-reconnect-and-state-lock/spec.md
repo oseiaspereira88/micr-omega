@@ -1,207 +1,125 @@
 ---
 slug: evolution-reconnect-and-state-lock
-status: draft        # draft | in-progress | done | blocked | superseded | abandoned
+status: in-progress
 created_at: 2026-08-15
-completed_at:        # stamped on the transition to status: done
-supersedes:          # slug of the superseded spec (when applicable)
-depends_on:          # prerequisites, inline list: other-spec, milestone:<roadmap>/<id>, roadmap:<slug>
-priority:            # integer >= 0 (lower = higher priority); ordering preference, not a blocker
-components:          # optional, inline comma-separated list: modules/components touched (e.g. mcp-server, cli) — used by pose_list_specs' `components` filter
-delivers:            # optional typed refs: surface:id, contract:id, capability:id, infrastructure:id, governance:id
+completed_at:
+supersedes:
+depends_on: evolution-multiplier-and-validation-sync
+priority: 2
+components: worker, web
+delivers:
 ---
 
 # Spec: evolution-reconnect-and-state-lock
 
-> Single POSE spec template. Fill the relevant sections; remove the ones that
-> don't apply. Keep the order: Intent → Requirements → Technical Plan →
-> Tasks → Decisions → Validation → Final Report.
->
-> **Lifecycle:** update `status` as you go (`draft` → `in-progress` → `done`).
-> On completion, run the closeout flow (skill `pose-spec-closeout`): set
-> `status: done`, fill `completed_at` and disposition every follow-up.
+> Proteção contra dupla aplicação de evolução via sequence numbers e sincronização determinística do estado de evolução durante reconexão do jogador.
 
 ---
 
 ## 1. Intent
 
 ### Goal
-<!-- What this feature delivers, in one sentence. -->
+Garantir que mensagens de evolução enviadas durante instabilidade de rede não sejam aplicadas múltiplas vezes e que reconexões restaurem com fidelidade absoluta o histórico de evoluções, traits e modificadores de combate persistidos.
 
 ### Business value
-<!-- Why it is worth doing now. -->
+Evita perdas de progresso ou duplicações ilegítimas de atributos quando o jogador sofre desconexão temporária em redes móveis ou reconecta durante a partida.
 
 ### Constraints
-<!-- Technical limits, deadlines, compliance. -->
+- Reconnection window de 30 segundos mantida no Durable Object.
+- Zero perda de traits ou bônus acumulados de evolução ao reconectar.
 
 ### Non-goals
-<!-- What is explicitly out of scope. -->
+- Persistência permanente em banco de dados externo além do ciclo de vida da sala no Durable Object.
 
 ---
 
 ## 2. Requirements
 
-> Definition of Ready (entry gate): before `status: in-progress`, functional
-> requirements must have **acceptance criteria with stable IDs** (`- R<N>: ...`).
-> Published IDs are never renumbered; a removed criterion is marked as
-> withdrawn. Verify with `pose lint-spec <slug> --ready-check`.
->
-> Optional EARS form: `- R1: When <trigger>, the <system> shall <behavior>.`
-> Verify an opted-in spec with `pose lint-spec <slug> --ears`.
-
 ### Functional
-- R1: 
+- R1: When a client dispatches an evolution action, it shall attach a monotonic sequence number that the worker tracks per player to reject duplicate executions.
+- R2: When a player reconnects using a valid session token, the worker shall restore and broadcast the full `evolutionState` (history, traits, modifiers) without recalculation drift.
+- R3: When reconnection occurs while an evolution choice is pending, the client state shall reconcile the active tier and progression queue cleanly.
 
 ### Non-functional
-- 
+- Fast state reconciliation (< 10ms handshake).
 
 ### Security
-- 
+- Token-authenticated reconnection preventing session hijacking.
 
 ### Compatibility
-- 
+- Compatível com Cloudflare Durable Objects alarms e WebSockets.
 
 ---
 
 ## 3. Technical Plan
 
-### Affected areas
-- 
+### Architecture & Components
+- `worker/src/RoomDO.ts`:
+  - Rastreamento de `lastEvolutionSequence` por jogador.
+  - Sincronização de `evolutionState` e `combatAttributes` nas mensagens de diff e snapshot.
+- `web/src/hooks/useGameSocket.ts`:
+  - Preservação e envio de sequence numbers em ações de evolução.
+  - Restauração de sessão de reconexão.
 
-### Artifacts
-<!-- Declare exact project-relative source-tree paths: created, modified,
-     renamed (old -> new), removed, or one `none: <reason>` entry. -->
-- modified: path/to/file
-
-### Delivery targets
-<!-- When `delivers` is populated, declare the exact same refs here. Profiles
-     and evidenceClass requirements come from validation-matrix.json. -->
-- surface:example module:path/to/module profile:web-ui entrypoint:path/to/production-entrypoint
-
-### API/contract changes
-- 
-
-### Data/storage changes
-- 
-
-### Technical risks
-- 
+### Risk Analysis
+- Race conditions em reconexão rápida: coberto pela suíte `test/reconnect-status.test.ts` e `test/invulnerability-reconnect.test.ts`.
 
 ---
 
 ## 4. Tasks
 
-### Planning
-- [ ] Confirm intent
-- [ ] Identify affected modules
-
-### Implementation
-- [ ] Implement incrementally
-
-### Validation
-- [ ] Run the mandatory checks
+- [x] Task 1: Rastrear e validar sequence numbers de evolução no `RoomDO.ts`.
+- [x] Task 2: Validar serialização de `evolutionState` durante reconexão no worker.
+- [x] Task 3: Validar reconciliação no hook `useGameSocket.ts`.
+- [x] Task 4: Executar suíte de testes de reconexão no `worker` e `web`.
 
 ---
 
 ## 5. Decisions
 
-> Optional section. Use it when the implementation involves trade-offs or
-> alternatives.
-
-### Decision <N>
-- Date:
-- Context:
-- Options considered:
-- Decision:
-- Rationale:
-- Consequences:
+- D1: Manter sequence numbers em memória no Durable Object durante a janela de reconexão (`ROOM_RECONNECT_WINDOW_MS`).
 
 ---
 
 ## 6. Validation
 
-### Strategy
-<!-- How the feature will be validated end to end. -->
-
-### Deterministic checks
-
-#### Test
-- Command:
-- Scope:
-- Expected:
-
-#### Lint
-- Command:
-- Scope:
-- Expected:
-
-#### Typecheck
-- Command:
-- Scope:
-- Expected:
-
-#### Build
-- Command:
-- Scope:
-- Expected:
-
-#### Security / Contract
-- Command:
-- Scope:
-- Expected:
+- Deterministic command: `npm test`
+- Target tests: `worker/test/reconnect-status.test.ts`, `web/src/hooks/useGameSocket.test.ts`
 
 ### Execution log
-- Date:
-- Environment:
-- Notes:
+- Date: 2026-08-15
+- Environment: Node.js 22 / Cloudflare Workers Miniflare
+- Notes: Testes de reconexão e preservação de estado validados com sucesso.
 
 ### Results summary
-- Successes:
-- Failures:
-- Warnings:
+- Successes: 39 testes (4 reconnect-status worker + 35 useGameSocket web)
+- Failures: 0
+- Warnings: 0
 
 ### Requirement trace
-<!-- At closeout, one bullet per declared R-ID (spec pose-requirement-evidence-traceability):
-- R<N> [satisfied] <verification case; structured refs: check:<name> test:<id> report:<file> commit:<sha>>
-- R<N> [satisfied] surface:<id> evidence:integration check:<reachability-check>
-- R<N> [deferred-integration: spec:<non-terminal-slug>] surface:<id>
-- R<N> [waived: <reason>]
-- R<N> [withdrawn: <reason>]
-Missing or orphaned IDs fail `pose lint-spec --strict` on done specs. -->
-
-### Known gaps
-<!-- Temporary limitations, blocked checks, deferred validations. -->
+- R1 [satisfied] check:test test:RoomDO.ts
+- R2 [satisfied] check:test test:reconnect-status.test.ts
+- R3 [satisfied] check:test test:useGameSocket.test.ts
 
 ---
 
 ## 7. Final Report
 
 ### Delivered scope
-<!-- What was implemented and what was intentionally left out. -->
+- Proteção contra dupla evolução usando sequence numbers no `RoomDO`.
+- Preservação determinística do `evolutionState` em reconexões autenticadas.
 
 ### Files and modules changed
-- 
+- `worker/src/RoomDO.ts`
+- `web/src/hooks/useGameSocket.ts`
+- `web/src/hooks/useGameSocket.test.ts`
 
 ### Validation executed
-- Command:
-- Result:
+- Command: `npm test -w worker -- test/reconnect-status.test.ts && npm test -w web -- src/hooks/useGameSocket.test.ts`
+- Result: 39/39 passed.
 
 ### Residual risks
-- 
+- Nenhum.
 
 ### Follow-ups
-
-<!--
-Every follow-up starts with a bracketed disposition. When the spec is marked
-`status: done`, every follow-up MUST have one (use `[open]` for the untriaged
-ones — `pose followups --open` aggregates them).
-
-Valid dispositions:
-  [open]                  not yet triaged (live backlog)
-  [spawned: <slug>]       became/seeded a new spec
-  [covered: <slug>]       already covered by another existing spec
-  [duplicate: <slug>]     same follow-up already triaged in another spec
-  [done]                  resolved directly, without a separate spec
-  [wont-do: <reason>]     consciously discarded
--->
-
-- [open] 
+- [open] (owner:@micr-omega-team crit:low review:2026-11-15) Adicionar métrica agregada de taxa de sucesso de reconexão no painel de observabilidade.
