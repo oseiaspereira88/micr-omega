@@ -2,11 +2,13 @@
 
 .flowRoot {
   position: relative;
+  height: 100vh;
   min-height: var(--app-viewport-height, 100vh);
-  padding: clamp(32px, 6vw, 72px) clamp(24px, 6vw, 88px);
+  max-height: var(--app-viewport-height, 100vh);
+  padding: clamp(16px, 2.5vw, 28px) clamp(20px, 3.5vw, 40px);
   display: flex;
   flex-direction: column;
-  gap: clamp(28px, 5vw, 48px);
+  gap: clamp(10px, 1.8vw, 18px);
   background: radial-gradient(circle at 10% 20%, rgba(74, 224, 255, 0.18), transparent 55%),
     radial-gradient(circle at 90% 70%, rgba(60, 247, 168, 0.18), transparent 60%),
     linear-gradient(140deg, #020510 0%, #05021c 48%, #081a35 100%);
@@ -31,28 +33,28 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: clamp(12px, 2vw, 18px);
-  max-width: 780px;
+  gap: 4px;
+  max-width: 800px;
 }
 
 .phaseLabel {
   font-family: 'Orbitron', 'Rajdhani', sans-serif;
-  letter-spacing: 0.32em;
+  letter-spacing: 0.25em;
   text-transform: uppercase;
-  font-size: clamp(0.75rem, 1.2vw, 0.95rem);
+  font-size: clamp(0.7rem, 1vw, 0.82rem);
   color: rgba(182, 220, 255, 0.78);
 }
 
 .title {
   font-family: 'Orbitron', 'Rajdhani', sans-serif;
-  font-size: clamp(2.4rem, 6vw, 3.8rem);
+  font-size: clamp(1.4rem, 2.8vw, 2.2rem);
   margin: 0;
 }
 
 .description {
   margin: 0;
-  font-size: clamp(1rem, 2vw, 1.25rem);
-  line-height: 1.6;
+  font-size: clamp(0.85rem, 1.2vw, 1rem);
+  line-height: 1.35;
   color: rgba(203, 230, 255, 0.85);
 }
 
@@ -60,9 +62,11 @@
   position: relative;
   z-index: 1;
   flex: 1;
+  min-height: 0;
   display: flex;
   align-items: stretch;
   justify-content: center;
+  overflow: hidden;
 }
 
 .skipButton {

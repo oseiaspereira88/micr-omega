@@ -947,11 +947,6 @@ const GameHud = ({
               zoom={settingsCameraZoom ?? clampCameraZoom(cameraZoom)}
               onChange={onCameraZoomChange}
             />
-            {onQuit ? (
-              <button type="button" className={styles.leaveButton} onClick={onQuit}>
-                Sair da sala
-              </button>
-            ) : null}
           </div>
           <div className={styles.settingsPanel}>
             <h3 className={styles.settingsHeading}>Áudio</h3>
@@ -1270,6 +1265,11 @@ const GameHud = ({
                   </div>
                 </label>
               </>
+            ) : null}
+            {onQuit ? (
+              <button type="button" className={styles.leaveButton} onClick={onQuit}>
+                Sair da sala
+              </button>
             ) : null}
           </div>
         </div>
