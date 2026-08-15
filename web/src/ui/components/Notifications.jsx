@@ -18,13 +18,17 @@ const resolveVariantClass = (variant) => {
   return VARIANT_CLASS_MAP[normalized] ?? null;
 };
 
-const Notifications = ({ notifications = [] }) => {
+const Notifications = ({ notifications = [], hasActiveBoss = false }) => {
   if (!notifications.length) {
     return null;
   }
 
   return (
-    <div className={styles.container} aria-live="polite">
+    <div
+      className={styles.container}
+      aria-live="polite"
+      data-has-active-boss={hasActiveBoss ? 'true' : undefined}
+    >
       {notifications.map((notification, index) => {
         const variantClass = resolveVariantClass(notification?.variant);
         const className = variantClass

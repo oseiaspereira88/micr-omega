@@ -1323,7 +1323,7 @@ const GameHud = ({
               name={resolvedBossName}
             />
 
-            <Notifications notifications={notifications} />
+            <Notifications notifications={notifications} hasActiveBoss={bossActive} />
           </div>
 
           <div className={mobileBottomRegionClassName}>

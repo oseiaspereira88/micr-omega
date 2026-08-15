@@ -57,6 +57,18 @@
   );
 }
 
+@media (orientation: landscape) and (max-height: 480px) {
+  .mobile.mobileWithTouchControls {
+    width: clamp(
+      180px,
+      calc(100vw - var(--touch-controls-footprint, 148px) * 2 - 32px),
+      360px
+    );
+    transform: scale(0.88);
+    transform-origin: bottom center;
+  }
+}
+
 .mobile.mobileWithTouchControls .skills {
   justify-content: center;
 }

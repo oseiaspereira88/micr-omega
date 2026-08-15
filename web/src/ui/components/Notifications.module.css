@@ -9,6 +9,12 @@
   align-items: center;
   pointer-events: none;
   z-index: var(--z-toast-notifications);
+  transition: top 250ms ease;
+}
+
+/* Offset downwards when BossHealthBar is active to prevent overlapping */
+.container[data-has-active-boss='true'] {
+  top: calc(var(--safe-area-inset-top, 0px) + var(--hud-toolbar-height, calc(1.75rem + 16px)) + 92px);
 }
 
 .notification {
@@ -83,6 +89,10 @@
   transform: translate(-50%, 0);
   gap: 8px;
   max-width: min(420px, 90vw);
+}
+
+:global([data-mobile-hud='true']) :local(.container)[data-has-active-boss='true'] {
+  top: calc(var(--hud-top-controls-offset, 60px) + 95px);
 }
 
 @media (prefers-reduced-motion: reduce) {
