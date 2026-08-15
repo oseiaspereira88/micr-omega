@@ -140,12 +140,26 @@ const renderWorldEntities = (ctx, worldView, camera) => {
       ctx.save();
       ctx.translate(screenX, screenY);
       ctx.rotate(obstacle.orientation ?? 0);
-      ctx.fillStyle = obstacle.impassable ? '#254055' : '#345f7a';
-      ctx.globalAlpha = 0.9;
-      ctx.fillRect(-halfWidth, -halfHeight, halfWidth * 2, halfHeight * 2);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+
+      const grad = ctx.createLinearGradient(-halfWidth, -halfHeight, halfWidth, halfHeight);
+      grad.addColorStop(0, obstacle.impassable ? 'rgba(18, 38, 58, 0.88)' : 'rgba(28, 58, 80, 0.88)');
+      grad.addColorStop(1, obstacle.impassable ? 'rgba(10, 22, 36, 0.95)' : 'rgba(16, 36, 52, 0.95)');
+
+      ctx.fillStyle = grad;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = obstacle.impassable ? 'rgba(0, 217, 255, 0.25)' : 'rgba(139, 234, 124, 0.25)';
+
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(-halfWidth, -halfHeight, halfWidth * 2, halfHeight * 2, 8);
+      } else {
+        ctx.rect(-halfWidth, -halfHeight, halfWidth * 2, halfHeight * 2);
+      }
+      ctx.fill();
+
+      ctx.strokeStyle = obstacle.impassable ? 'rgba(0, 217, 255, 0.45)' : 'rgba(139, 234, 124, 0.45)';
       ctx.lineWidth = 2;
-      ctx.strokeRect(-halfWidth, -halfHeight, halfWidth * 2, halfHeight * 2);
+      ctx.stroke();
       ctx.restore();
     });
 
@@ -182,10 +196,10 @@ const drawMinimap = (ctx, state, camera, options = {}) => {
     return;
   }
 
-  const size = options.size ?? 160;
-  const padding = options.padding ?? 18;
+  const size = options.size ?? 136;
+  const padding = options.padding ?? 16;
   const originX = Math.max(8, width - size - padding);
-  const originY = Math.max(8, padding);
+  const originY = Math.max(54, options.topOffset ?? 54);
 
   const safeWorldSize = Number.isFinite(worldSize) && worldSize > 0 ? worldSize : WORLD_SIZE;
   const worldRadius = safeWorldSize / 2;
