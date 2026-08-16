@@ -1,39 +1,39 @@
 {
   "schemaVersion": 1,
   "defaults": {
-    "owner": "@micr-omega-team",
     "criticality": "medium",
     "domain": "gaming",
+    "owner": "@micr-omega-team",
     "validationProfile": "baseline"
   },
   "modules": {
-    "web": {
-      "owner": "@micr-omega-team",
-      "criticality": "high",
-      "domain": "game-frontend",
-      "validationProfile": "baseline",
-      "deliveryRole": "composition-root",
-      "entrypoints": "web/src/main.tsx"
-    },
-    "worker": {
-      "owner": "@micr-omega-team",
-      "criticality": "high",
-      "domain": "game-backend",
-      "validationProfile": "baseline",
-      "deliveryRole": "composition-root",
-      "entrypoints": "worker/src/index.ts"
-    },
-    "shared": {
-      "owner": "@micr-omega-team",
-      "criticality": "medium",
-      "domain": "shared-library",
-      "validationProfile": "baseline",
-      "entrypoints": "shared/src/index.ts"
-    },
     "micr-omega": {
-      "owner": "@micr-omega-team",
       "criticality": "medium",
       "domain": "gaming",
+      "owner": "@micr-omega-team",
+      "validationProfile": "baseline"
+    },
+    "shared": {
+      "criticality": "medium",
+      "domain": "shared-library",
+      "entrypoints": "shared/src/index.ts",
+      "owner": "@micr-omega-team",
+      "validationProfile": "baseline"
+    },
+    "web": {
+      "criticality": "high",
+      "deliveryRole": "composition-root",
+      "domain": "game-frontend",
+      "entrypoints": "web/src/main.tsx",
+      "owner": "@micr-omega-team",
+      "validationProfile": "baseline"
+    },
+    "worker": {
+      "criticality": "high",
+      "deliveryRole": "composition-root",
+      "domain": "game-backend",
+      "entrypoints": "worker/src/index.ts",
+      "owner": "@micr-omega-team",
       "validationProfile": "baseline"
     }
   }

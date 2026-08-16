@@ -54,7 +54,7 @@ AI agents must use assessment tools at specific points in the flow:
 Apply the rules relevant to the scope, cumulatively:
 
 - Cloudflare Workers backend: [`.pose/rules/backend-worker.md`](.pose/rules/backend-worker.md)
-- React frontend: [`.pose/rules/frontend-react.md`](.pose/rules/frontend-react.md)
+- React frontend: shipped as the extension `pose-rule-frontend-react`, not embedded — install it with `pose extension install` when the repository has a React frontend.
 - Kubernetes: shipped as the reference extension `pose-rule-kubernetes`, not embedded — install it with `pose extension install` when the repository deploys to a cluster.
 - Security: [`.pose/rules/security.md`](.pose/rules/security.md)
 - Documentation / Process: [`.pose/rules/documentation-style.md`](.pose/rules/documentation-style.md)
