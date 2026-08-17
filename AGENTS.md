@@ -44,7 +44,7 @@ AI agents must use assessment tools at specific points in the flow:
 1. **Task / Spec Start (`pose-feature`)**:
    - Run `pose assess discover [--component <dir>]` / `pose_component_discover` to obtain LOC metrics, debts, and module structure before modifying code.
 2. **Inter-Module Contract Change / PR Review (`pose-review`)**:
-   - Run `pose assess integrate` / `pose_integration_check` when touching WebSocket protocols, REST APIs, or shared contracts.
+   - Run `pose assess integrate` / `pose_integration_check` when touching Protobuf, Kafka, REST APIs, or MCP tools.
    - Run `pose assess tech-debt` / `pose_tech_debt_check` during code review to ensure markers (`TODO`, `FIXME`, `stub`, `panic`) are covered by follow-ups or specs.
 3. **Spec Closure (`pose-spec-closeout`)**:
    - Run `pose assess discover --update-state` upon delivery completion to recalculate dynamic platform completeness and update `.pose/assessments/` and `.pose/state/`.
@@ -53,7 +53,7 @@ AI agents must use assessment tools at specific points in the flow:
 
 Apply the rules relevant to the scope, cumulatively:
 
-- Cloudflare Workers backend: [`.pose/rules/backend-worker.md`](.pose/rules/backend-worker.md)
+- Go backend: shipped as the extension `pose-rule-backend-go`, not embedded — install it with `pose extension install` when the repository has a Go backend.
 - React frontend: shipped as the extension `pose-rule-frontend-react`, not embedded — install it with `pose extension install` when the repository has a React frontend.
 - Kubernetes: shipped as the reference extension `pose-rule-kubernetes`, not embedded — install it with `pose extension install` when the repository deploys to a cluster.
 - Security: [`.pose/rules/security.md`](.pose/rules/security.md)
@@ -95,6 +95,16 @@ executed by `pose validate`.
      section of this file from the shipped contract but never touches this one,
      so put local conventions, exceptions and pointers here rather than editing
      the engine-owned sections above. -->
+
+## Domain-specific overrides
+
+- Backend rule: this repository's backend is Cloudflare Workers (Durable
+  Objects), not a Go service — apply [`.pose/rules/backend-worker.md`](.pose/rules/backend-worker.md)
+  instead of the generic `pose-rule-backend-go` extension referenced above.
+- Integration check trigger: run `pose assess integrate` /
+  `pose_integration_check` when touching WebSocket protocols, REST APIs, or
+  shared contracts between `web/`, `worker/` and `shared/` — the shipped
+  wording above (Protobuf/Kafka/MCP) does not apply to this stack.
 
 ## Objetivo deste guia
 
